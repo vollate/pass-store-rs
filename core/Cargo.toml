@@ -1,7 +1,6 @@
 [package]
-name = "pass-store"
+name = "pass-store-rs-core"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-pass-store-rs-core = { path = "core" }
