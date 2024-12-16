@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::io::Write;
 use std::process::{Command, Stdio};
+
 pub fn gpg_key_generate(
     executable: &str,
     input_func: impl FnOnce() -> Result<String, Box<dyn Error>>,
@@ -40,14 +41,13 @@ pub fn gpg_key_generate(
 
 #[cfg(test)]
 mod tests {
-    use crate::util::test_utils::get_test_password;
-    use crate::util::test_utils::{get_test_email, get_test_executable};
-
-    use super::*;
     use std::env;
     use std::fs::write;
     use std::io::stdin;
     use std::process::Command;
+
+    use super::*;
+    use crate::util::test_utils::{get_test_email, get_test_executable, get_test_password};
 
     fn example_batch_input() -> Result<String, Box<dyn std::error::Error>> {
         Ok(format!(
@@ -75,11 +75,8 @@ Passphrase: {}
         executable: &str,
         email: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let output = Command::new(executable)
-            .arg("--list-keys")
-            .arg("--with-colons")
-            .arg(email)
-            .output()?;
+        let output =
+            Command::new(executable).arg("--list-keys").arg("--with-colons").arg(email).output()?;
 
         if !output.status.success() {
             return Ok(());
@@ -102,12 +99,7 @@ Passphrase: {}
 
         for fingerprint in fingerprints {
             let delete_status = Command::new(executable)
-                .args(&[
-                    "--batch",
-                    "--yes",
-                    "--delete-secret-and-public-keys",
-                    &fingerprint,
-                ])
+                .args(&["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
                 .stdin(Stdio::null())
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit())

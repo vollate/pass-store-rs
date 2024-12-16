@@ -1,6 +1,5 @@
-use std::env;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {

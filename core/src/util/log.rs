@@ -1,8 +1,9 @@
+use std::sync::Arc;
+
 use chrono::Local;
 use lazy_static::lazy_static;
 use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use parking_lot::RwLock;
-use std::sync::Arc;
 
 lazy_static! {
     static ref LOG_LEVEL: RwLock<LevelFilter> = RwLock::new(LevelFilter::Info);

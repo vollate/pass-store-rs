@@ -8,11 +8,7 @@ fn encrypt_with_key(
     output_file: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut child = Command::new(executable)
-        .arg("--encrypt")
-        .arg("--recipient")
-        .arg(public_key)
-        .arg("--output")
-        .arg(output_file)
+        .args(&["--encrypt", "--recipient", public_key, "--output", output_file])
         .stdin(Stdio::piped())
         .spawn()?;
 
@@ -31,10 +27,10 @@ fn encrypt_with_key(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs::write;
     use std::process::Command;
 
+    use super::*;
 
     #[test]
     fn test_encrypt_with_key() {
