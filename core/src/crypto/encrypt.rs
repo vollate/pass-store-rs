@@ -3,12 +3,12 @@ use std::process::{Command, Stdio};
 
 fn encrypt_with_key(
     executable: &str,
-    public_key: &str,
+    key_fpr: &str,
     plaintext: &str,
     output_file: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut child = Command::new(executable)
-        .args(&["--encrypt", "--recipient", public_key, "--output", output_file])
+        .args(&["--encrypt", "--recipient", key_fpr, "--output", output_file])
         .stdin(Stdio::piped())
         .spawn()?;
 
@@ -27,40 +27,16 @@ fn encrypt_with_key(
 
 #[cfg(test)]
 mod tests {
-    use std::fs::write;
-    use std::process::Command;
+    use serial_test::serial;
 
-    use super::*;
+    use super::super::key_management::gpg_key_gen_batch;
+    use crate::util::test_utils::{clean_up_test_key, get_test_email, get_test_executable, gpg_key_gen_example_batch_input};
 
     #[test]
+    #[serial]
     fn test_encrypt_with_key() {
-        let public_key = "test_key.pub";
-        let plaintext = "This is a test";
-        let encrypted_file = "test_encrypted.gpg";
-
-        // Generate a test key pair
-        let mut gen_key_cmd = Command::new("gpg")
-            .arg("--batch")
-            .arg("--gen-key")
-            .stdin(Stdio::piped())
-            .spawn()
-            .expect("Failed to start gpg process");
-
-        {
-            let stdin = gen_key_cmd.stdin.as_mut().expect("Failed to open stdin");
-            stdin
-                .write_all(b"Key-Type: RSA\nKey-Length: 1024\nName-Real: Test\n")
-                .expect("Failed to write to stdin");
-        }
-
-        gen_key_cmd.wait().expect("Failed to wait on gpg process");
-
-        // Test the encrypt_with_key function
-        let result = encrypt_with_key("gpg", public_key, plaintext, encrypted_file);
-        assert!(result.is_ok());
-
-        // Clean up the temporary files
-        std::fs::remove_file(public_key).expect("Failed to delete temporary file");
-        std::fs::remove_file(encrypted_file).expect("Failed to delete temporary file");
+        gpg_key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch_input().unwrap())
+            .unwrap();
+        clean_up_test_key(&get_test_executable(), &get_test_email()).unwrap();
     }
 }
