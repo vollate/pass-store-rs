@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 pass-store-rs-core = { path = "core" }
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
