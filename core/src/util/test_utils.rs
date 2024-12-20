@@ -1,6 +1,9 @@
 use std::env;
 use std::process::{Command, Stdio};
 
+pub fn get_test_username() -> String {
+    env::var("PASS_RS_TEST_USERNAME").unwrap_or_else(|_| "rs-pass-test".into())
+}
 pub fn get_test_email() -> String {
     env::var("PASS_RS_TEST_EMAIL").unwrap_or("foo@rs.pass".to_string())
 }
@@ -13,7 +16,7 @@ pub fn get_test_password() -> String {
     env::var("PASS_RS_TEST_PASSWORD").unwrap_or("password".to_string())
 }
 
-use super::gpg_utils::email_to_fingerprints;
+use crate::gpg::utils::email_to_fingerprints;
 pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn std::error::Error>> {
     if let Ok(fingerprints) = email_to_fingerprints(executable, email) {
         for fingerprint in fingerprints {
@@ -39,13 +42,14 @@ Key-Type: RSA
 Key-Length: 2048
 Subkey-Type: RSA
 Subkey-Length: 2048
-Name-Real: Test User
+Name-Real: {}
 Name-Email: {}
 Expire-Date: 0
 Passphrase: {}
 %commit
 %echo Key generation complete
 "#,
+        get_test_username(),
         get_test_email(),
         get_test_password()
     )

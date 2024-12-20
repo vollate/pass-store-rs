@@ -1,24 +1,43 @@
 pub mod crypto;
 pub mod key_management;
+pub mod utils;
 
 use std::error::Error;
 use std::fmt::{Display, Formatter, Pointer};
 
-use crate::util::gpg_utils::{email_to_fingerprints, fingerprint_to_email};
-
+use utils::{email_to_fingerprints, fingerprint_to_email};
 pub struct GPGClient {
     executable: String,
     key_fpr: Option<String>,
+    username: Option<String>,
     email: Option<String>,
 }
 impl GPGClient {
-    pub fn new(executable: String, key_fpr: Option<String>, email: Option<String>) -> Self {
-        let mut gpg_client = GPGClient { executable, key_fpr, email };
+    pub fn new(
+        executable: String,
+        key_fpr: Option<String>,
+        username: Option<String>,
+        email: Option<String>,
+    ) -> Self {
+        let mut gpg_client = GPGClient { executable, key_fpr, username, email };
         let _ = gpg_client.update_info();
         gpg_client
     }
+
     pub fn get_executable(&self) -> &str {
         &self.executable
+    }
+
+    pub fn get_key_fpr(&self) -> Option<&str> {
+        self.key_fpr.as_deref()
+    }
+
+    pub fn get_username(&self) -> Option<&str> {
+        self.username.as_deref()
+    }
+
+    pub fn get_email(&self) -> Option<&str> {
+        self.email.as_deref()
     }
 
     pub fn set_email(&mut self, email: String) -> Result<(), Box<dyn Error>> {

@@ -100,12 +100,13 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
+    use pretty_assertions::{assert_eq, assert_ne};
     use serial_test::serial;
 
     use super::*;
     use crate::util::test_utils::{
         clean_up_test_key, get_test_email, get_test_executable, get_test_password,
-        gpg_key_edit_example_batch, gpg_key_gen_example_batch,
+        get_test_username, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
     };
     #[test]
     #[serial]
@@ -115,7 +116,12 @@ mod tests {
         let plaintext = "Hello, world!\nThis is a test message.";
         let output_dest = "encrypt.gpg";
 
-        let mut test_client = GPGClient::new(executable.to_string(), None, Some(email.to_string()));
+        let mut test_client = GPGClient::new(
+            executable.to_string(),
+            None,
+            Some(get_test_username()),
+            Some(email.to_string()),
+        );
         test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
 
         test_client.encrypt(plaintext, output_dest).unwrap();
@@ -138,7 +144,12 @@ mod tests {
 
         let _ = fs::remove_file(output_dest);
 
-        let mut test_client = GPGClient::new(executable.to_string(), None, Some(email.to_string()));
+        let mut test_client = GPGClient::new(
+            executable.to_string(),
+            None,
+            Some(get_test_username()),
+            Some(email.to_string()),
+        );
         test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
         test_client.gpg_key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         test_client.encrypt(plaintext, output_dest).unwrap();
@@ -150,21 +161,24 @@ mod tests {
     #[test]
     #[serial]
     fn test_decrypt_file() {
-        let executable = &get_test_executable();
-        let email = &get_test_email();
         let plaintext = "Hello, world!\nThis is a test message.\n";
         let output_dest = "decrypt.gpg";
 
         let _ = fs::remove_file(output_dest);
 
-        let mut test_client = GPGClient::new(executable.to_string(), None, Some(email.to_string()));
+        let mut test_client = GPGClient::new(
+            get_test_executable(),
+            None,
+            Some(get_test_username()),
+            Some(get_test_email()),
+        );
         test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
         test_client.gpg_key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         test_client.encrypt(plaintext, output_dest).unwrap();
         let decrypted =
             test_client.decrypt_with_password(output_dest, get_test_password().into()).unwrap();
         assert_eq!(decrypted.expose_secret(), plaintext);
-        clean_up_test_key(executable, email).unwrap();
+        clean_up_test_key(test_client.get_executable(), test_client.get_email().unwrap()).unwrap();
         fs::remove_file(output_dest).unwrap();
     }
 }
