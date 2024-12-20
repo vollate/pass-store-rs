@@ -15,6 +15,25 @@ pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     None
 }
 
+pub fn get_home_dir() -> PathBuf {
+    if let Some(home_str) = env::var_os("HOME") {
+        PathBuf::from(home_str)
+    } else {
+        // #[cfg(windows)]
+        // {
+        //     if let Some(userprofile) = env::var_os("USERPROFILE").map(PathBuf::from) {
+        //         userprofile
+        //     } else {
+        //         PathBuf::from("~")
+        //     }
+        // }
+        // #[cfg(unix)]
+        // {
+        // }
+        PathBuf::from("~")
+    }
+}
+
 fn is_executable(path: &Path) -> bool {
     if path.is_file() {
         #[cfg(unix)]

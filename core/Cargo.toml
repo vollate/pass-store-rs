@@ -11,6 +11,7 @@ chrono = "0.4.39"
 pgp = { version = "0.14.2", optional = true }
 zeroize = "1.8.1"
 secrecy = "0.10.3"
+regex = "1.11.1"
 
 [features]
 git = []
@@ -18,4 +19,5 @@ gpg = ["pgp"]
 default = []
 
 [dev-dependencies]
+pretty_assertions = "1.4.1"
 serial_test = "3.2.0"
