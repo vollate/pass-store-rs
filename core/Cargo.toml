@@ -1,0 +1,21 @@
+[package]
+name = "pass-store-rs-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.22"
+parking_lot = "0.12.3"
+lazy_static = "1.5.0"
+chrono = "0.4.39"
+pgp = { version = "0.14.2", optional = true }
+zeroize = "1.8.1"
+secrecy = "0.10.3"
+
+[features]
+git = []
+gpg = ["pgp"]
+default = []
+
+[dev-dependencies]
+serial_test = "3.2.0"
