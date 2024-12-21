@@ -5,34 +5,30 @@ use regex::Regex;
 
 use crate::gpg::GPGClient;
 
-pub fn email_to_fingerprints(executable: &str, email: &str) -> Result<Vec<String>, Box<dyn Error>> {
+pub(crate) fn user_email_to_fingerprint(
+    executable: &str,
+    email: &str,
+) -> Result<String, Box<dyn Error>> {
     let output =
         Command::new(executable).args(&["--list-keys", "--with-colons", email]).output()?;
     if !output.status.success() {
         return Err("Failed to get GPG key".into());
     }
     let info = String::from_utf8(output.stdout)?;
-    let mut found_target = false;
-    let mut fingerprints = Vec::new();
     for line in info.lines() {
-        if line.starts_with("uid") && line.contains(email) {
-            found_target = true;
-        } else if line.starts_with("fpr") && found_target {
+        if line.starts_with("fpr") {
             if let Some(fingerprint) = line.split(':').nth(9) {
-                fingerprints.push(fingerprint.to_string());
+                return Ok(fingerprint.to_string());
             }
-            found_target = false;
         }
     }
-
-    if fingerprints.len() == 0 {
-        Err("No GPG key found".into())
-    } else {
-        Ok(fingerprints)
-    }
+    Err("No GPG key found".into())
 }
 
-pub fn fingerprint_to_email(executable: &str, fingerprint: &str) -> Result<String, Box<dyn Error>> {
+pub(crate) fn fingerprint_to_email(
+    executable: &str,
+    fingerprint: &str,
+) -> Result<String, Box<dyn Error>> {
     let output =
         Command::new(executable).args(&["--list-keys", "--with-colons", fingerprint]).output()?;
     if !output.status.success() {
@@ -48,12 +44,12 @@ pub fn fingerprint_to_email(executable: &str, fingerprint: &str) -> Result<Strin
     Err(format!("No email found for {}", fingerprint).into())
 }
 
-pub enum RecipientType {
+pub(crate) enum RecipientType {
     Fingerprint,
     UserEmail,
 }
 
-pub fn check_recipient_type(recipient: &str) -> Result<RecipientType, Box<dyn Error>> {
+pub(crate) fn check_recipient_type(recipient: &str) -> Result<RecipientType, Box<dyn Error>> {
     let fpr_regex = Regex::new(r"^[A-Fa-f0-9]{40}$")?;
     if fpr_regex.is_match(recipient) {
         Ok(RecipientType::Fingerprint)
@@ -62,53 +58,112 @@ pub fn check_recipient_type(recipient: &str) -> Result<RecipientType, Box<dyn Er
     }
 }
 
+pub(crate) fn recipient_to_fingerprint(recipient: &str) -> Result<String, Box<dyn Error>> {
+    match check_recipient_type(recipient)? {
+        RecipientType::Fingerprint => Ok(recipient.to_string()),
+        RecipientType::UserEmail => Ok(recipient.to_string()),
+    }
+}
+
 impl GPGClient {
-    pub fn user_email_to_fingerprint(
-        &self,
-        user_email: &str,
-    ) -> Result<Vec<String>, Box<dyn Error>> {
-        let output = Command::new(&self.executable)
-            .args(&["--list-keys", "--with-colons", "--with-fingerprint", user_email])
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()?;
-        if !output.status.success() {
-            Err(std::str::from_utf8(&output.stderr)?.into())
-        } else {
-            let info = String::from_utf8(output.stdout)?;
-            println!("{}", info);
-            Ok(vec![user_email.to_string()])
-        }
+    pub(crate) fn new(
+        executable: String,
+        key_fpr: Option<String>,
+        username: Option<String>,
+        email: Option<String>,
+    ) -> Self {
+        let mut gpg_client = GPGClient { executable, key_fpr, username, email };
+        let _ = gpg_client.update_info();
+        gpg_client
     }
 
-    pub fn recipient_to_fingerprint(&self, recipient: &str) -> Result<String, Box<dyn Error>> {
-        match check_recipient_type(recipient)? {
-            RecipientType::Fingerprint => Ok(recipient.to_string()),
-            RecipientType::UserEmail => Ok(recipient.to_string()),
+    pub(crate) fn get_executable(&self) -> &str {
+        &self.executable
+    }
+
+    pub(crate) fn get_key_fpr(&self) -> Option<&str> {
+        self.key_fpr.as_deref()
+    }
+
+    pub(crate) fn get_username(&self) -> Option<&str> {
+        self.username.as_deref()
+    }
+
+    pub(crate) fn get_email(&self) -> Option<&str> {
+        self.email.as_deref()
+    }
+
+    pub(crate) fn set_email(&mut self, email: String) -> Result<(), Box<dyn Error>> {
+        self.email = Some(email);
+        if let Err(e) = self.update_info() {
+            self.username = None;
+            return Err(e);
         }
+        Ok(())
+    }
+
+    pub(crate) fn set_username(&mut self, username: String) -> Result<(), Box<dyn Error>> {
+        self.username = Some(username);
+        if let Err(e) = self.update_info() {
+            self.username = None;
+            return Err(e);
+        }
+        Ok(())
+    }
+
+    pub(super) fn update_info(&mut self) -> Result<(), Box<dyn Error>> {
+        //TODO: update username
+        match (&self.key_fpr, &self.username, &self.email) {
+            (Some(_), Some(_), Some(_)) => {}
+            (Some(k), _, _) => {
+                self.email = Some(fingerprint_to_email(&self.executable, k)?);
+            }
+            (_, Some(u), Some(m)) => {
+                self.key_fpr = Some(user_email_to_fingerprint(&self.executable, m)?);
+            }
+            (None, None, None) => {
+                return Err("Either key_fpr or email need to be set".into());
+            }
+            _ => {}
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod gpg_client_tests {
-    use pretty_assertions::{assert_eq, assert_ne};
+    use std::process::Command;
+
+    use pretty_assertions::assert_eq;
     use serial_test::serial;
 
+    use super::user_email_to_fingerprint;
     use crate::gpg::GPGClient;
     use crate::util::test_utils::{
-        get_test_email, get_test_executable, get_test_username, gpg_key_gen_example_batch,
+        clean_up_test_key, get_test_email, get_test_executable, get_test_username,
+        gpg_key_gen_example_batch,
     };
 
     #[test]
     #[serial]
     fn test_email_to_fingerprints() {
-        let mut client = GPGClient::new(
+        let mut test_client = GPGClient::new(
             get_test_executable(),
             None,
             Some(get_test_username()),
             Some(get_test_email()),
         );
-        client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        let fpr = user_email_to_fingerprint(
+            test_client.get_executable(),
+            test_client.get_email().unwrap(),
+        )
+        .unwrap();
+        let status = Command::new(test_client.get_executable())
+            .args(&["--list-keys", "--with-colons", &fpr])
+            .status()
+            .unwrap();
+        assert_eq!(true, status.success());
+        clean_up_test_key(test_client.get_executable(), test_client.get_email().unwrap()).unwrap();
     }
 }
