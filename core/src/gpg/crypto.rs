@@ -1,9 +1,6 @@
 use std::error::Error;
 use std::io::Write;
-use std::os::linux::raw::stat;
-use std::path::Path;
 use std::process::{Command, Stdio};
-use std::thread::spawn;
 
 use secrecy::{ExposeSecret, SecretString};
 
@@ -65,7 +62,11 @@ impl GPGClient {
         passwd: SecretString,
     ) -> Result<SecretString, Box<dyn Error>> {
         let mut cmd = Command::new(&self.executable)
+            //TODO: match each version
             .args(&[
+                "--batch",         // this is required after 2.0
+                "--pinentry-mode", //this is required after 2.1
+                "loopback",
                 "--decrypt",
                 "--passphrase-fd",
                 "0",
@@ -123,7 +124,7 @@ mod tests {
             Some(email.to_string()),
         );
         test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-
+        test_client.update_info().unwrap();
         test_client.encrypt(plaintext, output_dest).unwrap();
 
         if !Path::new(output_dest).exists() {
@@ -173,6 +174,7 @@ mod tests {
             Some(get_test_email()),
         );
         test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        test_client.update_info().unwrap();
         test_client.gpg_key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         test_client.encrypt(plaintext, output_dest).unwrap();
         let decrypted =

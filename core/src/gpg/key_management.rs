@@ -14,7 +14,6 @@ impl GPGClient {
             .status()?;
 
         if status.success() {
-            self.update_info()?;
             return Ok(());
         } else {
             return Err(format!("Failed to generate GPG key, code {:?}", status).into());
@@ -69,7 +68,6 @@ impl GPGClient {
         }
         let status = cmd.wait()?;
         if status.success() {
-            self.update_info()?;
             Ok(())
         } else {
             let err_msg = match cmd.stderr.take() {
@@ -159,6 +157,7 @@ mod tests {
         let mut gpg_client =
             GPGClient::new(executable, None, Some(get_test_username()), Some(get_test_email()));
         gpg_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        gpg_client.update_info().unwrap();
         gpg_client.gpg_key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         clean_up_test_key(gpg_client.get_executable(), &get_test_email()).unwrap();
     }

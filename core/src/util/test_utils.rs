@@ -16,10 +16,10 @@ pub fn get_test_password() -> String {
     env::var("PASS_RS_TEST_PASSWORD").unwrap_or("password".to_string())
 }
 
-use crate::gpg::utils::email_to_fingerprints;
+use crate::gpg::utils::user_email_to_fingerprint;
 pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn std::error::Error>> {
-    if let Ok(fingerprints) = email_to_fingerprints(executable, email) {
-        for fingerprint in fingerprints {
+    loop {
+        if let Ok(fingerprint) = user_email_to_fingerprint(executable, email) {
             let delete_status = Command::new(executable)
                 .args(&["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
                 .stdin(Stdio::null())
@@ -30,9 +30,10 @@ pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn st
             if !delete_status.success() {
                 return Err("Failed to delete GPG key".into());
             }
+        } else {
+            return Ok(());
         }
     }
-    Ok(())
 }
 
 pub fn gpg_key_gen_example_batch() -> String {
