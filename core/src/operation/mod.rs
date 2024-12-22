@@ -9,3 +9,6 @@ mod ls;
 mod mv;
 mod rm;
 mod show;
+
+pub use init::init;
+pub use ls::ls_interact;

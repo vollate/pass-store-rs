@@ -35,7 +35,8 @@ impl GPGClient {
             Err("GPG encryption failed".into())
         }
     }
-    pub fn decrypt_interact(
+
+    pub fn decrypt_stdin(
         &self,
         file_path: &str,
     ) -> Result<SecretString, Box<dyn std::error::Error>> {
@@ -101,7 +102,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
     use serial_test::serial;
 
     use super::*;
@@ -123,7 +124,7 @@ mod tests {
             Some(get_test_username()),
             Some(email.to_string()),
         );
-        test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
         test_client.update_info().unwrap();
         test_client.encrypt(plaintext, output_dest).unwrap();
 
@@ -151,10 +152,10 @@ mod tests {
             Some(get_test_username()),
             Some(email.to_string()),
         );
-        test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-        test_client.gpg_key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         test_client.encrypt(plaintext, output_dest).unwrap();
-        let decrypted = test_client.decrypt_interact(output_dest).unwrap();
+        let decrypted = test_client.decrypt_stdin(output_dest).unwrap();
         assert_eq!(decrypted.expose_secret(), plaintext);
         clean_up_test_key(executable, email).unwrap();
         fs::remove_file(output_dest).unwrap();
@@ -173,9 +174,9 @@ mod tests {
             Some(get_test_username()),
             Some(get_test_email()),
         );
-        test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
         test_client.update_info().unwrap();
-        test_client.gpg_key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+        test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         test_client.encrypt(plaintext, output_dest).unwrap();
         let decrypted =
             test_client.decrypt_with_password(output_dest, get_test_password().into()).unwrap();
