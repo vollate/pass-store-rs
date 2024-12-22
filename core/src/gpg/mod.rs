@@ -14,7 +14,7 @@ pub struct GPGClient {
 }
 
 #[derive(Debug)]
-enum GPGErr {
+pub(crate) enum GPGErr {
     NoneFingerprint,
     CannotTakeStdin,
     CannotTakeStdout,

@@ -1,5 +1,6 @@
 use std::error::Error;
-use std::process::{Command, Stdio};
+use std::io::Read;
+use std::process::{Child, Command};
 
 use regex::Regex;
 
@@ -44,6 +45,7 @@ pub(crate) fn fingerprint_to_email(
     Err(format!("No email found for {}", fingerprint).into())
 }
 
+#[derive(Eq, PartialEq)]
 pub(crate) enum RecipientType {
     Fingerprint,
     UserEmail,
@@ -62,6 +64,23 @@ pub(crate) fn recipient_to_fingerprint(recipient: &str) -> Result<String, Box<dy
     match check_recipient_type(recipient)? {
         RecipientType::Fingerprint => Ok(recipient.to_string()),
         RecipientType::UserEmail => Ok(recipient.to_string()),
+    }
+}
+
+pub(super) fn wait_child_process(cmd: &mut Child) -> Result<(), Box<dyn Error>> {
+    let status = cmd.wait()?;
+    if status.success() {
+        Ok(())
+    } else {
+        let err_msg = match cmd.stderr.take() {
+            Some(mut stderr) => {
+                let mut buf = String::new();
+                stderr.read_to_string(&mut buf)?;
+                buf
+            }
+            None => return Err("Failed to read stderr".into()),
+        };
+        Err(format!("Failed to edit GPG key, code: {:?}\nError: {}", status, err_msg).into())
     }
 }
 
@@ -132,7 +151,7 @@ impl GPGClient {
 
 #[cfg(test)]
 mod gpg_client_tests {
-    use std::process::Command;
+    use std::process::{Command, Stdio};
 
     use pretty_assertions::assert_eq;
     use serial_test::serial;
@@ -153,7 +172,7 @@ mod gpg_client_tests {
             Some(get_test_username()),
             Some(get_test_email()),
         );
-        test_client.gpg_key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
         let fpr = user_email_to_fingerprint(
             test_client.get_executable(),
             test_client.get_email().unwrap(),
@@ -161,6 +180,7 @@ mod gpg_client_tests {
         .unwrap();
         let status = Command::new(test_client.get_executable())
             .args(&["--list-keys", "--with-colons", &fpr])
+            .stdout(Stdio::null())
             .status()
             .unwrap();
         assert_eq!(true, status.success());

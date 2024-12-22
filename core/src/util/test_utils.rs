@@ -16,6 +16,8 @@ pub fn get_test_password() -> String {
     env::var("PASS_RS_TEST_PASSWORD").unwrap_or("password".to_string())
 }
 
+use rand::{thread_rng, Rng};
+
 use crate::gpg::utils::user_email_to_fingerprint;
 pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn std::error::Error>> {
     loop {
@@ -62,4 +64,14 @@ pub fn gpg_key_edit_example_batch() -> String {
 save
 "#
     .to_string()
+}
+
+pub fn gen_unique_temp_dir() -> std::path::PathBuf {
+    loop {
+        let path =
+            std::env::temp_dir().join("pass_rs_test").join(thread_rng().gen::<u64>().to_string());
+        if !path.exists() {
+            return path;
+        }
+    }
 }

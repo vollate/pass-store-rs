@@ -1131,6 +1131,7 @@ dependencies = [
  "parking_lot",
  "pgp",
  "pretty_assertions",
+ "rand",
  "regex",
  "secrecy",
  "serial_test",

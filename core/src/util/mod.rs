@@ -1,4 +1,5 @@
-pub mod fs_utils;
-pub mod log;
+pub(crate) mod fs_utils;
+pub(crate) mod log;
 #[cfg(test)]
-pub mod test_utils;
+pub(crate) mod test_utils;
+pub(crate) mod tree;
