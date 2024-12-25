@@ -1,5 +1,9 @@
 use std::error::Error;
 use std::fs::DirEntry;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
@@ -101,5 +105,21 @@ fn is_executable(path: &Path) -> bool {
         }
     } else {
         false
+    }
+}
+
+pub fn create_symlink<P: AsRef<Path>>(original: P, link: P) -> Result<(), Box<dyn Error>> {
+    #[cfg(unix)]
+    {
+        Ok(symlink(original, link)?)
+    }
+
+    #[cfg(windows)]
+    {
+        if original.as_ref().is_dir() {
+            Ok(symlink_dir(original, link)?)
+        } else {
+            Ok(symlink_file(original, link)?)
+        }
     }
 }
