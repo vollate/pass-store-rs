@@ -5,7 +5,8 @@ use std::path::Path;
 use colored::{Color, Colorize};
 use regex::Regex;
 
-use crate::IOErr;
+use super::fs_utils::path_to_str;
+use crate::{IOErr, IOErrType};
 
 pub struct TreeColorConfig {
     pub dir_color: Option<Color>,
@@ -36,7 +37,7 @@ impl TreeColorConfig {
 }
 fn traverse_dir(
     dir: &Path,
-    start_level: usize,
+    left_space: usize,
     depth: usize,
     exclude_filter: &Vec<Regex>,
     // color_cfg: &Option<TreeColorConfig>,//TODO: customize print
@@ -59,11 +60,11 @@ fn traverse_dir(
     for (i, entry) in entries_filtered.into_iter().enumerate() {
         let path = entry.path();
 
-        let file_name = path.file_name().ok_or_else(|| IOErr::InvalidPath)?.to_string_lossy();
+        let file_name = path_to_str(&path)?;
         let is_local_last = i == total - 1;
 
         let mut prefix: String = String::new();
-        for _ in 0..start_level {
+        for _ in 0..left_space {
             prefix.push_str("    ");
         }
         if is_top_last {
@@ -86,7 +87,7 @@ fn traverse_dir(
             let link = path.read_link()?;
             let link_str = link.to_string_lossy();
             result.push_str(&format!("{}{} -> {}\n", prefix, file_name, link_str));
-            traverse_dir(&link, start_level + 1, 0, exclude_filter, enable_color, false, result)?;
+            traverse_dir(&link, left_space + 1, 0, exclude_filter, enable_color, false, result)?;
             continue;
         } else {
             result.push_str(&format!("{}{}\n", prefix, file_name));
@@ -95,7 +96,7 @@ fn traverse_dir(
         if path.is_dir() {
             traverse_dir(
                 &path,
-                start_level,
+                left_space,
                 depth + 1,
                 exclude_filter,
                 enable_color,
@@ -110,18 +111,21 @@ fn traverse_dir(
 pub(crate) fn tree_with_filter(
     root: &Path,
     exclude_filter: &Vec<Regex>,
-    start_level: usize,
     enable_color: bool,
 ) -> Result<String, Box<dyn Error>> {
     let mut real_root = root.to_path_buf();
+
     while real_root.is_symlink() {
         real_root = real_root.read_link()?;
     }
+
     if !real_root.is_dir() {
-        return Err(IOErr::ExpectDir.into());
+        return Err(IOErr::new(IOErrType::ExpectDir, &real_root).into());
     }
+
     let mut result = String::new();
-    traverse_dir(&real_root, start_level, 0, exclude_filter, enable_color, false, &mut result)?;
+    traverse_dir(&real_root, 0, 0, exclude_filter, enable_color, false, &mut result)?;
+
     if result.ends_with('\n') {
         result.pop();
     }
@@ -130,29 +134,13 @@ pub(crate) fn tree_with_filter(
 
 #[cfg(test)]
 mod tests {
-
-    use std::fs;
-    use std::path::Path;
-
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::util;
+    use crate::util::fs_utils::create_symlink;
+    use crate::util::test_utils;
     use crate::util::test_utils::gen_unique_temp_dir;
 
-    fn create_structure(base: &Path, structure: &[(&str, &[&str])]) {
-        for (dir, files) in structure {
-            let dir_path = base.join(dir);
-            fs::create_dir_all(&dir_path).unwrap();
-            for file in *files {
-                fs::File::create(dir_path.join(file)).unwrap();
-            }
-        }
-    }
-
-    fn remove_test_dir(base: &Path) {
-        fs::remove_dir_all(base).unwrap();
-    }
     #[test]
     fn tree_normal_case() {
         // Create directory structure as below:
@@ -167,16 +155,16 @@ mod tests {
         //     │   └── dir5
         //     └── file5
         let root = gen_unique_temp_dir();
-        let structure: &[(&str, &[&str])] = &[
-            ("dir1", &["file1", "file2"][..]),
-            ("dir2", &["file3", "file4"][..]),
-            ("dir3", &["file5"][..]),
-            ("dir3/dir4", &[][..]),
-            ("dir3/dir4/dir5", &[][..]),
+        let structure: &[(Option<&str>, &[&str])] = &[
+            (Some("dir1"), &["file1", "file2"][..]),
+            (Some("dir2"), &["file3", "file4"][..]),
+            (Some("dir3"), &["file5"][..]),
+            (Some("dir3/dir4"), &[][..]),
+            (Some("dir3/dir4/dir5"), &[][..]),
         ];
-        create_structure(&root, &structure);
+        test_utils::create_dir_structure(&root, structure);
 
-        let result = tree_with_filter(&root, &Vec::new(), 0, false).unwrap();
+        let result = tree_with_filter(&root, &Vec::new(), false).unwrap();
         assert_eq!(
             result,
             r#"├── dir1
@@ -190,7 +178,7 @@ mod tests {
     └── dir4
         └── dir5"#
         );
-        remove_test_dir(&root);
+        test_utils::cleanup_test_dir(&root);
     }
 
     #[test]
@@ -202,15 +190,17 @@ mod tests {
         // │   └── file2
         // └── dir3
         let root = gen_unique_temp_dir();
-        let structure: &[(&str, &[&str])] =
-            &[("dir1", &["file1"][..]), ("dir2", &["file2"][..]), ("dir3", &[][..])];
-        create_structure(&root, &structure);
+        let structure: &[(Option<&str>, &[&str])] = &[
+            (Some("dir1"), &["file1"][..]),
+            (Some("dir2"), &["file2"][..]),
+            (Some("dir3"), &[][..]),
+        ];
+        test_utils::create_dir_structure(&root, structure);
 
         // This case, only dir2 and file1 should be filtered
         let result = tree_with_filter(
             &root,
             &vec![Regex::new(r"dir2").unwrap(), Regex::new(r"file1").unwrap()],
-            0,
             false,
         )
         .unwrap();
@@ -222,7 +212,7 @@ mod tests {
 
         // This case, nothing should be filtered
         let result =
-            tree_with_filter(&root, &vec![Regex::new(r"dir114514").unwrap()], 0, false).unwrap();
+            tree_with_filter(&root, &vec![Regex::new(r"dir114514").unwrap()], false).unwrap();
         assert_eq!(
             result,
             r#"├── dir1
@@ -240,13 +230,12 @@ mod tests {
                 Regex::new(r"dir2").unwrap(),
                 Regex::new(r"dir3").unwrap(),
             ],
-            0,
             false,
         )
         .unwrap();
         assert_eq!(result, "");
 
-        remove_test_dir(&root);
+        test_utils::cleanup_test_dir(&root);
     }
 
     #[test]
@@ -256,7 +245,9 @@ mod tests {
         // ├── dir1
         // │   └── file1
         // └── dir2 -> root2
+        //
         // --------------------------------
+        //
         // root2
         // ├── dir3
         // │   └── file2
@@ -264,13 +255,14 @@ mod tests {
 
         let root1 = gen_unique_temp_dir();
         let root2 = gen_unique_temp_dir();
-        let structure1: &[(&str, &[&str])] = &[("dir1", &["file1"][..])];
-        let structure2: &[(&str, &[&str])] = &[("dir3", &["file2"][..]), ("dir4", &[][..])];
-        create_structure(&root1, &structure1);
-        create_structure(&root2, &structure2);
-        util::fs_utils::create_symlink(&root2, &root1.join("dir2")).unwrap();
+        let structure1: &[(Option<&str>, &[&str])] = &[(Some("dir1"), &["file1"][..])];
+        let structure2: &[(Option<&str>, &[&str])] =
+            &[(Some("dir3"), &["file2"][..]), (Some("dir4"), &[][..])];
+        test_utils::create_dir_structure(&root1, structure1);
+        test_utils::create_dir_structure(&root2, structure2);
+        create_symlink(&root2, &root1.join("dir2")).unwrap();
 
-        let result = tree_with_filter(&root1, &Vec::new(), 0, false).unwrap();
+        let result = tree_with_filter(&root1, &Vec::new(), false).unwrap();
         assert_eq!(
             result,
             format!(
@@ -284,7 +276,61 @@ mod tests {
             )
         );
 
-        remove_test_dir(&root1);
-        remove_test_dir(&root2);
+        test_utils::cleanup_test_dir(&root1);
+        test_utils::cleanup_test_dir(&root2);
+
+        // Create directory structure as below:
+        // root1
+        // ├── dir1
+        // │   └── file1
+        // ├── dir2 -> root2
+        // ├── dir3
+        // ├── dir4
+        // └── file114514
+        //
+        // --------------------------------
+        //
+        // root2
+        // ├── dir3
+        // │   └── file2
+        // └── dir4
+        let root1 = gen_unique_temp_dir();
+        let root2 = gen_unique_temp_dir();
+        let structure1: &[(Option<&str>, &[&str])] = &[
+            (Some("dir1"), &["file1"][..]),
+            (Some("dir3"), &[][..]),
+            (Some("dir4"), &[][..]),
+            (None, &["file114514"][..]),
+        ];
+        let structure2: &[(Option<&str>, &[&str])] =
+            &[(Some("dir3"), &["file2"][..]), (Some("dir4"), &[][..])];
+        test_utils::create_dir_structure(&root1, structure1);
+        test_utils::create_dir_structure(&root2, structure2);
+        create_symlink(&root2, &root1.join("dir2")).unwrap();
+
+        let result = tree_with_filter(&root1, &Vec::new(), false).unwrap();
+        assert_eq!(
+            result,
+            format!(
+                r#"├── dir1
+│   └── file1
+├── dir3
+├── dir4
+├── file114514
+└── dir2 -> {}
+    ├── dir3
+    │   └── file2
+    └── dir4"#,
+                root2.to_str().unwrap()
+            )
+        );
+
+        test_utils::cleanup_test_dir(&root1);
+        test_utils::cleanup_test_dir(&root2);
     }
+
+    // #[test]
+    // fn test_all_cases() {
+    //     todo!("combine all cases below");
+    // }
 }

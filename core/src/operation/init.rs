@@ -6,10 +6,11 @@ use secrecy::ExposeSecret;
 
 use crate::gpg::utils::{check_recipient_type, user_email_to_fingerprint, RecipientType};
 use crate::gpg::GPGClient;
-use crate::util::fs_utils::{backup_encrypted_file, process_files_recursively};
-use crate::IOErr;
+use crate::util::fs_utils::{backup_encrypted_file, path_to_str, process_files_recursively};
+use crate::{IOErr, IOErrType};
 
 const FPR_FILENAME: &str = ".gpg-id";
+
 pub fn init(
     client: &GPGClient,
     root_path: &PathBuf,
@@ -45,16 +46,12 @@ pub fn init(
         let filename = entry.file_name();
         let filepath = entry.path();
         if !filepath.is_file() {
-            return Err(IOErr::ExpectFile.into());
+            return Err(IOErr::new(IOErrType::ExpectFile, &filepath).into());
         }
         if filename == FPR_FILENAME {
-            let content =
-                client.decrypt_stdin(filename.to_str().ok_or_else(|| IOErr::InvalidPath)?)?;
+            let content = client.decrypt_stdin(path_to_str(&filepath)?)?;
             let backup_path = backup_encrypted_file(&filepath)?;
-            client.encrypt(
-                content.expose_secret(),
-                filepath.to_str().ok_or_else(|| IOErr::InvalidPath)?,
-            )?;
+            client.encrypt(content.expose_secret(), path_to_str(&filepath)?)?;
             fs::remove_file(backup_path)?;
             return Ok(());
         }
