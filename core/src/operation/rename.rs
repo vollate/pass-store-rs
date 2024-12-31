@@ -1,11 +1,7 @@
 use std::error::Error;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::str::from_utf8;
-use std::{fs, path};
 
-use crate::util::fs_utils::get_path_separator;
 use crate::{IOErr, IOErrType};
 
 pub fn rename_io<I, O, E>(
@@ -33,10 +29,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::io::{self, Read, Write};
 
-    use pretty_assertions::{assert_eq, assert_ne};
+    use std::io::{self};
+
+    use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::util::fs_utils::get_path_separator;

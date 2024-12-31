@@ -1,9 +1,6 @@
 use std::error::Error;
 use std::fmt::Display;
 use std::path::Path;
-use std::sync::Arc;
-
-use crate::gpg::GPGErr;
 
 mod bundle;
 mod git;
@@ -26,7 +23,7 @@ struct IOErr {
 }
 
 impl IOErr {
-    pub fn new(err_type: IOErrType, path:& Path) -> Self {
+    pub fn new(err_type: IOErrType, path: &Path) -> Self {
         Self { err_type, path: Box::from(path.to_path_buf()) }
     }
 }
