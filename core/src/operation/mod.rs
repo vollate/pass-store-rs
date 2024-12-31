@@ -9,6 +9,3 @@ mod ls;
 mod rename;
 mod rm;
 mod show;
-
-pub use init::init;
-pub use ls::ls_interact;
