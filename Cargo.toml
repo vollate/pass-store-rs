@@ -7,5 +7,5 @@ edition = "2021"
 pass-store-rs-core = { path = "core" }
 
 [profile.release]
-opt-level = "z"
 lto = "fat"
+opt-level = "z"
