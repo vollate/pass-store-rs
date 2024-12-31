@@ -60,7 +60,10 @@ fn traverse_dir(
     for (i, entry) in entries_filtered.into_iter().enumerate() {
         let path = entry.path();
 
-        let file_name = path_to_str(&path)?;
+        let file_name = path
+            .file_name()
+            .ok_or_else(|| IOErr::new(IOErrType::InvalidPath, &path))?
+            .to_string_lossy();
         let is_local_last = i == total - 1;
 
         let mut prefix: String = String::new();
