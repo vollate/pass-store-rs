@@ -7,6 +7,8 @@ use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
+use crate::{IOErr, IOErrType};
+
 const BACKUP_EXTENSION: &str = "rsbak";
 pub(crate) fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
@@ -62,6 +64,17 @@ where
         }
     }
     Ok(())
+}
+
+pub(crate) fn get_path_separator() -> char {
+    #[cfg(unix)]
+    {
+        '/'
+    }
+    #[cfg(windows)]
+    {
+        '\\'
+    }
 }
 
 pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
@@ -122,4 +135,8 @@ pub fn create_symlink<P: AsRef<Path>>(original: P, link: P) -> Result<(), Box<dy
             Ok(symlink_file(original, link)?)
         }
     }
+}
+
+pub(crate) fn path_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
+    Ok(path.to_str().ok_or_else(|| IOErr::new(IOErrType::InvalidPath, path))?)
 }

@@ -1,5 +1,5 @@
-use std::env;
 use std::process::{Command, Stdio};
+use std::{env, fs};
 
 pub fn get_test_username() -> String {
     env::var("PASS_RS_TEST_USERNAME").unwrap_or_else(|_| "rs-pass-test".into())
@@ -15,6 +15,8 @@ pub fn get_test_executable() -> String {
 pub fn get_test_password() -> String {
     env::var("PASS_RS_TEST_PASSWORD").unwrap_or("password".to_string())
 }
+
+use std::path::Path;
 
 use rand::{thread_rng, Rng};
 
@@ -74,4 +76,23 @@ pub fn gen_unique_temp_dir() -> std::path::PathBuf {
             return path;
         }
     }
+}
+
+pub fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&str])]) {
+    for (dir, files) in structure {
+        let dir_path = match dir {
+            Some(subdir) => base.join(subdir),
+            None => base.to_path_buf(),
+        };
+        if !dir_path.exists() {
+            fs::create_dir_all(&dir_path).unwrap();
+        }
+        for file in *files {
+            fs::File::create(dir_path.join(file)).unwrap();
+        }
+    }
+}
+
+pub fn cleanup_test_dir(base: &Path) {
+    fs::remove_dir_all(base).unwrap();
 }

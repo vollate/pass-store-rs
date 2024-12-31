@@ -6,7 +6,7 @@ mod grep;
 mod init;
 mod insert;
 mod ls;
-mod mv;
+mod rename;
 mod rm;
 mod show;
 
