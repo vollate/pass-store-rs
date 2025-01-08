@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::{fs, path};
 
-use crate::util::fs_utils::{is_subpath_of, path_to_str, rename_or_copy};
+use crate::util::fs_utils::{better_rename, copy_dir_recursive, is_subpath_of};
 use crate::{IOErr, IOErrType};
 
 fn handle_overwrite_delete<I, O, E>(
@@ -39,7 +39,8 @@ where
     Ok(true)
 }
 
-fn handle_form_file<I, O, E>(
+fn copy_rename_file<I, O, E>(
+    copy: bool,
     from: &Path,
     to: &Path,
     extension: &str,
@@ -65,7 +66,11 @@ where
                     return Ok(());
                 }
             }
-            rename_or_copy(from.with_extension(extension), sub_file)?;
+            if copy {
+                fs::copy(from, sub_file)?;
+            } else {
+                better_rename(from.with_extension(extension), sub_file)?;
+            }
             Ok(())
         } else {
             Err(IOErr::new(IOErrType::InvalidFileType, to).into())
@@ -83,11 +88,16 @@ where
             return Err(IOErr::new(IOErrType::InvalidFileType, &to).into());
         }
     }
-    rename_or_copy(from.with_extension(extension), to)?;
+    if copy {
+        fs::copy(from, to)?;
+    } else {
+        better_rename(from.with_extension(extension), to)?;
+    }
     Ok(())
 }
 
-fn handle_form_dir<I, O, E>(
+fn copy_rename_dir<I, O, E>(
+    copy: bool,
     from: &Path,
     to: &Path,
     force: bool,
@@ -110,12 +120,20 @@ where
                     return Ok(());
                 }
             }
-            rename_or_copy(from, sub_dir)?;
+            if copy {
+                copy_dir_recursive(from, sub_dir)?;
+            } else {
+                better_rename(from, sub_dir)?;
+            }
         } else if to.is_file() {
             if !handle_overwrite_delete(to, force, stdin, stdout, stderr)? {
                 return Ok(());
             }
-            rename_or_copy(from, to)?;
+            if copy {
+                copy_dir_recursive(from, to)?;
+            } else {
+                better_rename(from, to)?;
+            }
         } else {
             return Err(IOErr::new(IOErrType::InvalidFileType, to).into());
         }
@@ -123,7 +141,8 @@ where
     Ok(())
 }
 
-pub fn rename_io<I, O, E>(
+pub fn copy_rename_io<I, O, E>(
+    copy: bool,
     root: &Path,
     from: &str,
     to: &str,
@@ -170,18 +189,18 @@ where
         }
     }
 
-    return if from_path.is_file() {
-        handle_form_file(&from_path, &to_path, extension, force, stdin, stdout, stderr)
+    if from_path.is_file() {
+        copy_rename_file(copy, &from_path, &to_path, extension, force, stdin, stdout, stderr)
     } else if from_path.is_dir() {
-        handle_form_dir(&from_path, &to_path, force, stdin, stdout, stderr)
+        copy_rename_dir(copy, &from_path, &to_path, force, stdin, stdout, stderr)
     } else {
         Err(IOErr::new(IOErrType::InvalidFileType, &from_path).into())
-    };
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self, stdin, Cursor};
+    use std::io::{self};
     use std::thread::sleep;
 
     use os_pipe::pipe;
@@ -191,7 +210,7 @@ mod tests {
     use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
 
     #[test]
-    fn normal_tests() {
+    fn rename_tests() {
         let (mut stdin, mut stdin_w) = pipe().unwrap();
         let mut stdout = io::stdout().lock();
         let mut stderr = io::stderr().lock();
@@ -208,7 +227,8 @@ mod tests {
         create_dir_structure(&root, structure);
 
         // Rename a.gpg to c.gpg
-        rename_io(&root, "a", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr).unwrap();
+        copy_rename_io(false, &root, "a", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr)
+            .unwrap();
         assert_eq!(false, root.join("a.gpg").exists());
         assert_eq!(true, root.join("c.gpg").exists());
 
@@ -217,16 +237,19 @@ mod tests {
             sleep(std::time::Duration::from_secs(1));
             stdin_w.write_all("n\n".as_bytes()).unwrap();
         });
-        rename_io(&root, "b", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr).unwrap();
+        copy_rename_io(false, &root, "b", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr)
+            .unwrap();
         assert_eq!(true, root.join("b.gpg").exists());
 
         // Rename b.gpg to c.gpg, with force
-        rename_io(&root, "b", "c", "gpg", true, &mut stdin, &mut stdout, &mut stderr).unwrap();
+        copy_rename_io(false, &root, "b", "c", "gpg", true, &mut stdin, &mut stdout, &mut stderr)
+            .unwrap();
         assert_eq!(false, root.join("b.gpg").exists());
         assert_eq!(true, root.join("c.gpg").exists());
 
         // Now, try to rename file into a dir(end with path separator)
-        rename_io(
+        copy_rename_io(
+            false,
             &root,
             "c",
             &format!("d_dir{}", std::path::MAIN_SEPARATOR_STR),
@@ -241,9 +264,96 @@ mod tests {
         assert_eq!(true, root.join("d_dir").join("c.gpg").exists());
 
         // Try to rename d_dir to e_dir, should be e_dir/d_dir
-        rename_io(&root, "d_dir", "e_dir", "gpg", false, &mut stdin, &mut stdout, &mut stderr)
-            .unwrap();
+        copy_rename_io(
+            false,
+            &root,
+            "d_dir",
+            "e_dir",
+            "gpg",
+            false,
+            &mut stdin,
+            &mut stdout,
+            &mut stderr,
+        )
+        .unwrap();
         assert_eq!(false, root.join("d_dir").exists());
+        assert_eq!(true, root.join("e_dir").join("d_dir").exists());
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn copy_tests() {
+        let (mut stdin, mut stdin_w) = pipe().unwrap();
+        let mut stdout = io::stdout().lock();
+        let mut stderr = io::stderr().lock();
+
+        // Original structure:
+        // root
+        // ├── a.gpg
+        // ├── d_dir/
+        // ├── e_dir/
+        // └── b.gpg
+        let root = gen_unique_temp_dir();
+        let structure: &[(Option<&str>, &[&str])] =
+            &[(None, &["a.gpg", "b.gpg"][..]), (Some("d_dir"), &[][..]), (Some("e_dir"), &[][..])];
+        create_dir_structure(&root, structure);
+
+        // Copy a.gpg to c.gpg
+        fs::write(root.join("a.gpg"), "foo_a").unwrap();
+        assert_eq!(false, root.join("c.gpg").exists());
+        copy_rename_io(true, &root, "a", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr)
+            .unwrap();
+        assert_eq!(true, root.join("a.gpg").exists());
+        assert_eq!(true, root.join("c.gpg").exists());
+        assert_eq!("foo_a", fs::read_to_string(root.join("c.gpg")).unwrap());
+
+        // Copy b.gpg to c.gpg, without force, input "n" interactively
+        fs::write(root.join("b.gpg"), "foo_b").unwrap();
+        std::thread::spawn(move || {
+            sleep(std::time::Duration::from_secs(1));
+            stdin_w.write_all("n\n".as_bytes()).unwrap();
+        });
+        copy_rename_io(true, &root, "b", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr)
+            .unwrap();
+        assert_ne!("foo_b", fs::read_to_string(root.join("c.gpg")).unwrap());
+
+        // Copy b.gpg to c.gpg, with force, overwrite the content of c.gpg
+        copy_rename_io(true, &root, "b", "c", "gpg", true, &mut stdin, &mut stdout, &mut stderr)
+            .unwrap();
+        assert_eq!("foo_b", fs::read_to_string(root.join("c.gpg")).unwrap());
+
+        // Now, try to copy file into a dir(end with path separator)
+        fs::write(root.join("c.gpg"), "foo_c").unwrap();
+        copy_rename_io(
+            true,
+            &root,
+            "c",
+            &format!("d_dir{}", std::path::MAIN_SEPARATOR_STR),
+            "gpg",
+            false,
+            &mut stdin,
+            &mut stdout,
+            &mut stderr,
+        )
+        .unwrap();
+        assert_eq!(true, root.join("c.gpg").exists());
+        assert_eq!("foo_c", fs::read_to_string(root.join("c.gpg")).unwrap());
+
+        // Try to copy d_dir to e_dir, should be e_dir/d_dir
+        copy_rename_io(
+            true,
+            &root,
+            "d_dir",
+            "e_dir",
+            "gpg",
+            false,
+            &mut stdin,
+            &mut stdout,
+            &mut stderr,
+        )
+        .unwrap();
+        assert_eq!(true, root.join("d_dir").exists());
         assert_eq!(true, root.join("e_dir").join("d_dir").exists());
 
         cleanup_test_dir(&root);
@@ -261,9 +371,17 @@ mod tests {
         // └── a.gpg
         let root = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] = &[(None, &["a.gpg"][..])];
-        if let Ok(_) =
-            rename_io(&root, "../../a", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr)
-        {
+        if let Ok(_) = copy_rename_io(
+            false,
+            &root,
+            "../../a",
+            "c",
+            "gpg",
+            false,
+            &mut stdin,
+            &mut stdout,
+            &mut stderr,
+        ) {
             panic!("Should not be able to access parent directory: {}/../../a", root.display());
         }
     }
