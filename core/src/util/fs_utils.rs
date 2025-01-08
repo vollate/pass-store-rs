@@ -5,17 +5,20 @@ use std::os::unix::fs::symlink;
 #[cfg(windows)]
 use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{env, fs, io, path};
+
+use fs_extra::dir::{self, CopyOptions};
 
 use crate::{IOErr, IOErrType};
 
 const BACKUP_EXTENSION: &str = "rsbak";
+
 pub(crate) fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
         for path in env::split_paths(&paths) {
             let full_path = path.join(executable);
 
-            if is_executable(&full_path) {
+            if is_executable(&full_path).is_ok() {
                 return Some(full_path);
             }
         }
@@ -24,22 +27,52 @@ pub(crate) fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     None
 }
 
+pub(crate) fn rename_or_copy<P: AsRef<Path>, Q: AsRef<Path>>(
+    from: P,
+    to: Q,
+) -> Result<(), Box<dyn Error>> {
+    let from = from.as_ref();
+    let to = to.as_ref();
+    if let Err(err) = fs::rename(from, to) {
+        if err.kind() == io::ErrorKind::CrossesDevices {
+            if from.is_dir() {
+                dir::copy(from, to, &CopyOptions::new())?;
+                fs::remove_dir_all(from)?;
+            } else {
+                fs::copy(from, to)?;
+                fs::remove_file(from)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn get_home_dir() -> PathBuf {
-    if let Some(home_str) = env::var_os("HOME") {
-        PathBuf::from(home_str)
-    } else {
-        // #[cfg(windows)]
-        // {
-        //     if let Some(userprofile) = env::var_os("USERPROFILE").map(PathBuf::from) {
-        //         userprofile
-        //     } else {
-        //         PathBuf::from("~")
-        //     }
-        // }
-        // #[cfg(unix)]
-        // {
-        // }
-        //TODO: fix this
+    #[cfg(unix)]
+    {
+        if let Some(home_str) = env::var_os("HOME") {
+            PathBuf::from(home_str)
+        } else {
+            PathBuf::from("~")
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        if let Some(userprofile) = env::var_os("USERPROFILE") {
+            PathBuf::from(userprofile)
+        } else if let (Some(homedrive), Some(homepath)) =
+            (env::var_os("HOMEDRIVE"), env::var_os("HOMEPATH"))
+        {
+            PathBuf::from(format!("{}{}", homedrive.to_string_lossy(), homepath.to_string_lossy()))
+        } else {
+            PathBuf::from("~")
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
         PathBuf::from("~")
     }
 }
@@ -66,17 +99,6 @@ where
     Ok(())
 }
 
-pub(crate) fn get_path_separator() -> char {
-    #[cfg(unix)]
-    {
-        '/'
-    }
-    #[cfg(windows)]
-    {
-        '\\'
-    }
-}
-
 pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let extension = format!(
         "{}.{}",
@@ -100,24 +122,25 @@ pub(crate) fn restore_encrypted_file(file_path: &Path) -> Result<(), Box<dyn Err
     Err("Fild does not has extension".into())
 }
 
-fn is_executable(path: &Path) -> bool {
+fn is_executable(path: &Path) -> Result<bool, Box<dyn Error>> {
     if path.is_file() {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            fs::metadata(path)
-                .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
-                .unwrap_or(false)
+            Ok(fs::metadata(path).map(|metadata| metadata.permissions().mode() & 0o111 != 0)?)
         }
 
         #[cfg(windows)]
         {
-            path.extension()
-                .map(|ext| ext == "exe" || ext == "bat" || ext == "cmd")
-                .unwrap_or(false)
+            Ok(path.extension().map(|ext| ext == "exe" || ext == "bat" || ext == "cmd")?)
+        }
+
+        #[cfg(not(any(unix, windows)))]
+        {
+            Ok(false)
         }
     } else {
-        false
+        Ok(false)
     }
 }
 
@@ -135,8 +158,19 @@ pub fn create_symlink<P: AsRef<Path>>(original: P, link: P) -> Result<(), Box<dy
             Ok(symlink_file(original, link)?)
         }
     }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        Err("Symlinks are not supported on this platform".into())
+    }
 }
 
 pub(crate) fn path_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
     Ok(path.to_str().ok_or_else(|| IOErr::new(IOErrType::InvalidPath, path))?)
+}
+
+pub(crate) fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool, Box<dyn Error>> {
+    let parent = path::absolute(parent)?;
+    let child = path::absolute(child)?;
+    Ok(child.starts_with(&parent))
 }
