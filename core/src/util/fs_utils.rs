@@ -27,7 +27,7 @@ pub(crate) fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     None
 }
 
-pub(crate) fn rename_or_copy<P: AsRef<Path>, Q: AsRef<Path>>(
+pub(crate) fn better_rename<P: AsRef<Path>, Q: AsRef<Path>>(
     from: P,
     to: Q,
 ) -> Result<(), Box<dyn Error>> {
@@ -45,6 +45,17 @@ pub(crate) fn rename_or_copy<P: AsRef<Path>, Q: AsRef<Path>>(
         }
     }
 
+    Ok(())
+}
+
+pub(crate) fn copy_dir_recursive<P: AsRef<Path>, Q: AsRef<Path>>(
+    from: P,
+    to: Q,
+) -> Result<(), Box<dyn Error>> {
+    let mut options = CopyOptions::new();
+    options.overwrite = false;
+    options.copy_inside = true;
+    dir::copy(from, to, &options)?;
     Ok(())
 }
 
