@@ -12,6 +12,7 @@ mod util;
 enum IOErrType {
     PathNotExist,
     InvalidPath,
+    CannotGetFileName,
     InvalidFileType,
     ExpectFile,
     ExpectDir,
@@ -33,6 +34,7 @@ impl Display for IOErr {
         use IOErrType::*;
         match self.err_type {
             PathNotExist => write!(f, "Path not exist: {:?}", self.path),
+            CannotGetFileName => write!(f, "Cannot get file name: {:?}", self.path),
             InvalidPath => write!(f, "Invalid path: {:?}", self.path),
             InvalidFileType => write!(f, "Invalid file type: {:?}", self.path),
             ExpectFile => write!(f, "Expect to be a file: {:?}", self.path),

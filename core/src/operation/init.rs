@@ -58,7 +58,6 @@ pub fn init(
         Ok(())
     })?;
 
-    //TODO: auto commit change or init git repo(if the .password-store is newly created)
     Ok(())
 }
 
