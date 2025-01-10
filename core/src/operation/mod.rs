@@ -6,5 +6,5 @@ mod init;
 mod insert;
 mod ls;
 mod rename_or_copy;
-mod rm;
+mod remove;
 mod show;
