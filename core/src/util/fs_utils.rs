@@ -185,3 +185,11 @@ pub(crate) fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool,
     let child = path::absolute(child)?;
     Ok(child.starts_with(&parent))
 }
+
+pub(crate) fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<(), Box<dyn Error>> {
+    let metadata = fs::metadata(path.as_ref())?;
+    let mut permissions = metadata.permissions();
+    permissions.set_readonly(readonly);
+    fs::set_permissions(path, permissions)?;
+    Ok(())
+}

@@ -1,11 +1,12 @@
 use std::error::Error;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{fs, path};
 
 use crate::util::fs_utils::{better_rename, copy_dir_recursive, is_subpath_of};
 use crate::{IOErr, IOErrType};
 
+// Currently, we do not support cross repo rename/copy
 fn handle_overwrite_delete<I, O, E>(
     path_to_overwrite: &Path,
     force: bool,
@@ -20,7 +21,7 @@ where
 {
     if !force {
         stdout.write_fmt(format_args!(
-            "File {} already exists, overwrite? (y/N): ",
+            "File {} already exists, overwrite? [y/N]: ",
             path_to_overwrite.to_string_lossy()
         ))?;
         stdout.flush()?;
@@ -157,13 +158,18 @@ where
     O: Write,
     E: Write,
 {
-    let mut from_path = root.join(from);
+    let mut from_path = {
+        if Path::new(from).is_absolute() {
+            PathBuf::from(from)
+        } else {
+            root.join(from)
+        }
+    };
+
     if !is_subpath_of(root, &from_path)? {
-        return Err(format!(
-            "The path to rename is not a subpath of the root path: {}",
-            from_path.display()
-        )
-        .into());
+        let err_msg = format!("'{}' is not the subpath of the root path '{}'", to, root.display());
+        writeln!(stderr, "{}", err_msg)?;
+        return Err(err_msg.into());
     }
     if !from_path.exists() {
         let try_path = from_path.with_extension(extension);
@@ -175,16 +181,21 @@ where
 
     let to_path = root.join(to);
     if !is_subpath_of(root, &to_path)? {
-        return Err(format!(
-            "The path to rename is not a subpath of the root path: {}",
-            to_path.display()
-        )
-        .into());
+        let err_msg = format!("'{}' is not the subpath of the root path '{}'", to, root.display());
+        writeln!(stderr, "{}", err_msg)?;
+        return Err(err_msg.into());
     }
 
     let to_is_dir = to.ends_with(path::MAIN_SEPARATOR);
     if to_is_dir {
         if !to_path.exists() || !to_path.is_dir() {
+            writeln!(
+                stderr,
+                "Cannot {} '{}' to '{}': No such directory",
+                if copy { "copy" } else { "rename" },
+                from,
+                to
+            )?;
             return Err(IOErr::new(IOErrType::PathNotExist, &to_path).into());
         }
     }
@@ -201,14 +212,13 @@ where
 #[cfg(test)]
 mod tests {
     use std::io::{self};
-    use std::thread::sleep;
+    use std::thread::{self, sleep};
 
     use os_pipe::pipe;
     use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
-
     #[test]
     fn rename_tests() {
         let (mut stdin, mut stdin_w) = pipe().unwrap();
@@ -233,9 +243,9 @@ mod tests {
         assert_eq!(true, root.join("c.gpg").exists());
 
         // Rename b.gpg to c.gpg, without force, input "n" interactively
-        std::thread::spawn(move || {
-            sleep(std::time::Duration::from_secs(1));
-            stdin_w.write_all("n\n".as_bytes()).unwrap();
+        thread::spawn(move || {
+            sleep(std::time::Duration::from_millis(100));
+            stdin_w.write_all(b"n\n").unwrap();
         });
         copy_rename_io(false, &root, "b", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr)
             .unwrap();
@@ -310,9 +320,9 @@ mod tests {
 
         // Copy b.gpg to c.gpg, without force, input "n" interactively
         fs::write(root.join("b.gpg"), "foo_b").unwrap();
-        std::thread::spawn(move || {
-            sleep(std::time::Duration::from_secs(1));
-            stdin_w.write_all("n\n".as_bytes()).unwrap();
+        thread::spawn(move || {
+            sleep(std::time::Duration::from_millis(100));
+            stdin_w.write_all(b"n\n").unwrap();
         });
         copy_rename_io(true, &root, "b", "c", "gpg", false, &mut stdin, &mut stdout, &mut stderr)
             .unwrap();
@@ -383,6 +393,19 @@ mod tests {
             &mut stderr,
         ) {
             panic!("Should not be able to access parent directory: {}/../../a", root.display());
+        }
+        if let Ok(_) = copy_rename_io(
+            false,
+            &root,
+            "a",
+            "../../c",
+            "gpg",
+            false,
+            &mut stdin,
+            &mut stdout,
+            &mut stderr,
+        ) {
+            panic!("Should not be able to access parent directory: {}/../../c", root.display());
         }
     }
 }
