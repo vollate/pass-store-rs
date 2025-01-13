@@ -4,7 +4,7 @@ use std::process::{Child, Command};
 
 use regex::Regex;
 
-use crate::gpg::GPGClient;
+use crate::pgp::PGPClient;
 
 pub(crate) fn user_email_to_fingerprint(
     executable: &str,
@@ -84,14 +84,14 @@ pub(super) fn wait_child_process(cmd: &mut Child) -> Result<(), Box<dyn Error>> 
     }
 }
 
-impl GPGClient {
+impl PGPClient {
     pub(crate) fn new(
         executable: String,
         key_fpr: Option<String>,
         username: Option<String>,
         email: Option<String>,
     ) -> Self {
-        let mut gpg_client = GPGClient { executable, key_fpr, username, email };
+        let mut gpg_client = PGPClient { executable, key_fpr, username, email };
         let _ = gpg_client.update_info();
         gpg_client
     }
@@ -157,7 +157,7 @@ mod gpg_client_tests {
     use serial_test::serial;
 
     use super::user_email_to_fingerprint;
-    use crate::gpg::GPGClient;
+    use crate::pgp::PGPClient;
     use crate::util::test_utils::{
         clean_up_test_key, get_test_email, get_test_executable, get_test_username,
         gpg_key_gen_example_batch,
@@ -166,7 +166,7 @@ mod gpg_client_tests {
     #[test]
     #[serial]
     fn test_email_to_fingerprints() {
-        let mut test_client = GPGClient::new(
+        let mut test_client = PGPClient::new(
             get_test_executable(),
             None,
             Some(get_test_username()),

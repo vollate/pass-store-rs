@@ -20,7 +20,7 @@ use std::path::Path;
 
 use rand::{thread_rng, Rng};
 
-use crate::gpg::utils::user_email_to_fingerprint;
+use crate::pgp::utils::user_email_to_fingerprint;
 pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         if let Ok(fingerprint) = user_email_to_fingerprint(executable, email) {

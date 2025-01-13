@@ -4,13 +4,13 @@ use std::path::Path;
 use regex::Regex;
 use secrecy::ExposeSecret;
 
-use crate::gpg::GPGClient;
+use crate::pgp::PGPClient;
 use crate::util::fs_utils::path_to_str;
 use crate::util::tree::{tree_with_filter, TreeColorConfig};
 use crate::{IOErr, IOErrType};
 
 pub fn ls_interact(
-    client: &GPGClient,
+    client: &PGPClient,
     root_path: &Path,
     target_path: &str,
     ignore_list: &Vec<Regex>,

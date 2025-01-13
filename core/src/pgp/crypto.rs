@@ -4,8 +4,8 @@ use std::process::{Command, Stdio};
 
 use secrecy::{ExposeSecret, SecretString};
 
-use super::{GPGClient, GPGErr};
-impl GPGClient {
+use super::{PGPClient, PGPErr};
+impl PGPClient {
     pub fn encrypt(
         &self,
         plaintext: &str,
@@ -44,7 +44,7 @@ impl GPGClient {
             .args(&[
                 "--decrypt",
                 "--recipient",
-                self.key_fpr.as_ref().ok_or_else(|| GPGErr::NoneFingerprint)?,
+                self.key_fpr.as_ref().ok_or_else(|| PGPErr::NoneFingerprint)?,
                 file_path,
             ])
             .output()?;
@@ -72,7 +72,7 @@ impl GPGClient {
                 "--passphrase-fd",
                 "0",
                 "--recipient",
-                self.key_fpr.as_ref().ok_or_else(|| GPGErr::NoneFingerprint)?,
+                self.key_fpr.as_ref().ok_or_else(|| PGPErr::NoneFingerprint)?,
                 file_path,
             ])
             .stdin(Stdio::piped())
@@ -84,7 +84,7 @@ impl GPGClient {
             input.write_all(passwd.expose_secret().as_bytes())?;
             input.flush()?;
         } else {
-            return Err(GPGErr::CannotTakeStdin.into());
+            return Err(PGPErr::CannotTakeStdin.into());
         }
         let output = cmd.wait_with_output()?;
 
@@ -118,7 +118,7 @@ mod tests {
         let plaintext = "Hello, world!\nThis is a test message.";
         let output_dest = "encrypt.gpg";
 
-        let mut test_client = GPGClient::new(
+        let mut test_client = PGPClient::new(
             executable.to_string(),
             None,
             Some(get_test_username()),
@@ -146,7 +146,7 @@ mod tests {
 
         let _ = fs::remove_file(output_dest);
 
-        let mut test_client = GPGClient::new(
+        let mut test_client = PGPClient::new(
             executable.to_string(),
             None,
             Some(get_test_username()),
@@ -168,7 +168,7 @@ mod tests {
 
         let _ = fs::remove_file(output_dest);
 
-        let mut test_client = GPGClient::new(
+        let mut test_client = PGPClient::new(
             get_test_executable(),
             None,
             Some(get_test_username()),
