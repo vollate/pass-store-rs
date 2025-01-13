@@ -2,8 +2,8 @@ use std::error::Error;
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 
-use crate::gpg::utils::wait_child_process;
-use crate::gpg::{GPGClient, GPGErr};
+use crate::pgp::utils::wait_child_process;
+use crate::pgp::{PGPClient, PGPErr};
 
 fn run_gpg_batched_child(
     executable: &str,
@@ -39,7 +39,7 @@ fn run_gpg_inherited_child(executable: &str, args: &[&str]) -> Result<(), Box<dy
     }
 }
 
-impl GPGClient {
+impl PGPClient {
     pub fn key_gen_stdin(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let gpg_args = ["--gen-key"];
         run_gpg_inherited_child(&self.executable, &gpg_args)
@@ -47,7 +47,7 @@ impl GPGClient {
 
     pub fn key_edit_stdin(&self) -> Result<(), Box<dyn Error>> {
         let gpg_args =
-            ["--edit-key", self.key_fpr.as_ref().ok_or_else(|| GPGErr::NoneFingerprint)?];
+            ["--edit-key", self.key_fpr.as_ref().ok_or_else(|| PGPErr::NoneFingerprint)?];
         run_gpg_inherited_child(&self.executable, &gpg_args)
     }
 
@@ -64,7 +64,7 @@ impl GPGClient {
             "--status-fd",
             "1",
             "--edit-key",
-            self.key_fpr.as_ref().ok_or_else(|| GPGErr::NoneFingerprint)?,
+            self.key_fpr.as_ref().ok_or_else(|| PGPErr::NoneFingerprint)?,
         ];
         run_gpg_batched_child(&self.executable, &gpg_args, batch_input)
     }
@@ -93,7 +93,7 @@ mod tests {
     #[ignore = "need run interactively"]
     fn test_gpg_key_gen_stdin() {
         let executable = get_test_executable();
-        let mut gpg_client = GPGClient::new(executable, None, None, None);
+        let mut gpg_client = PGPClient::new(executable, None, None, None);
         gpg_client.key_gen_stdin().unwrap();
     }
 
@@ -102,7 +102,7 @@ mod tests {
     fn test_gpg_key_gen_batch() {
         let executable = get_test_executable();
         let mut gpg_client =
-            GPGClient::new(executable, None, Some(get_test_username()), Some(get_test_email()));
+            PGPClient::new(executable, None, Some(get_test_username()), Some(get_test_email()));
         gpg_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
         clean_up_test_key(gpg_client.get_executable(), &get_test_email()).unwrap();
     }
@@ -112,7 +112,7 @@ mod tests {
     fn test_gpg_key_edit_batch() {
         let executable = get_test_executable();
         let mut gpg_client =
-            GPGClient::new(executable, None, Some(get_test_username()), Some(get_test_email()));
+            PGPClient::new(executable, None, Some(get_test_username()), Some(get_test_email()));
         gpg_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
         gpg_client.update_info().unwrap();
         gpg_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();

@@ -5,6 +5,6 @@ mod grep;
 mod init;
 mod insert;
 mod ls;
-mod rename_or_copy;
 mod remove;
+mod rename_or_copy;
 mod show;

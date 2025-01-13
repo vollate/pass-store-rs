@@ -5,7 +5,7 @@ pub mod utils;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-pub struct GPGClient {
+pub struct PGPClient {
     executable: String,
     // master key
     key_fpr: Option<String>,
@@ -14,16 +14,16 @@ pub struct GPGClient {
 }
 
 #[derive(Debug)]
-pub(crate) enum GPGErr {
+pub(crate) enum PGPErr {
     NoneFingerprint,
     CannotTakeStdin,
     CannotTakeStdout,
     CannotTakeStderr,
 }
 
-impl Display for GPGErr {
+impl Display for PGPErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        use GPGErr::*;
+        use PGPErr::*;
 
         match self {
             NoneFingerprint => write!(f, "Key fingerprint is None"),
@@ -34,4 +34,4 @@ impl Display for GPGErr {
     }
 }
 
-impl Error for GPGErr {}
+impl Error for PGPErr {}

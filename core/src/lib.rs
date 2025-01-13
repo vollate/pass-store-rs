@@ -4,7 +4,7 @@ use std::path::Path;
 
 mod bundle;
 mod git;
-mod gpg;
+mod pgp;
 mod operation;
 mod util;
 
