@@ -51,7 +51,8 @@ pub fn init(
         if filename == FPR_FILENAME {
             let content = client.decrypt_stdin(path_to_str(&filepath)?)?;
             let backup_path = backup_encrypted_file(&filepath)?;
-            client.encrypt(content.expose_secret(), path_to_str(&filepath)?)?;
+            todo!("fix me");
+            // client.encrypt(content.expose_secret(), path_to_str(&filepath)?)?;
             fs::remove_file(backup_path)?;
             return Ok(());
         }

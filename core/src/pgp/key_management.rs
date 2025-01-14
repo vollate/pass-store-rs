@@ -20,7 +20,7 @@ fn run_gpg_batched_child(
         input.write_all(batch_input.as_bytes())?;
         input.flush()?;
     } else {
-        return Err("Failed to open stdin for GPG key generation".into());
+        return Err("Failed to open stdin for PGP key generation".into());
     }
     wait_child_process(&mut cmd)
 }
@@ -35,7 +35,7 @@ fn run_gpg_inherited_child(executable: &str, args: &[&str]) -> Result<(), Box<dy
     if status.success() {
         Ok(())
     } else {
-        Err(format!("Failed to generate GPG key, code {:?}", status).into())
+        Err(format!("Failed to generate PGP key, code {:?}", status).into())
     }
 }
 
@@ -93,29 +93,29 @@ mod tests {
     #[ignore = "need run interactively"]
     fn test_gpg_key_gen_stdin() {
         let executable = get_test_executable();
-        let mut gpg_client = PGPClient::new(executable, None, None, None);
-        gpg_client.key_gen_stdin().unwrap();
+        let mut pgp_client = PGPClient::new(executable, None, None, None);
+        pgp_client.key_gen_stdin().unwrap();
     }
 
     #[test]
     #[serial]
     fn test_gpg_key_gen_batch() {
         let executable = get_test_executable();
-        let mut gpg_client =
+        let mut pgp_client =
             PGPClient::new(executable, None, Some(get_test_username()), Some(get_test_email()));
-        gpg_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-        clean_up_test_key(gpg_client.get_executable(), &get_test_email()).unwrap();
+        pgp_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        clean_up_test_key(pgp_client.get_executable(), &get_test_email()).unwrap();
     }
 
     #[test]
     #[serial]
     fn test_gpg_key_edit_batch() {
         let executable = get_test_executable();
-        let mut gpg_client =
+        let mut pgp_client =
             PGPClient::new(executable, None, Some(get_test_username()), Some(get_test_email()));
-        gpg_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-        gpg_client.update_info().unwrap();
-        gpg_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
-        clean_up_test_key(gpg_client.get_executable(), &get_test_email()).unwrap();
+        pgp_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+        pgp_client.update_info().unwrap();
+        pgp_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+        clean_up_test_key(pgp_client.get_executable(), &get_test_email()).unwrap();
     }
 }
