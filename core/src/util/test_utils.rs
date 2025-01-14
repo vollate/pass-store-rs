@@ -70,7 +70,7 @@ save
     .to_string()
 }
 
-pub fn gen_unique_temp_dir() -> std::path::PathBuf {
+pub(crate) fn gen_unique_temp_dir() -> std::path::PathBuf {
     let base_dir = temp_dir().join("pass-rs-test");
     if !base_dir.exists() {
         fs::create_dir(&base_dir).unwrap();
@@ -79,7 +79,7 @@ pub fn gen_unique_temp_dir() -> std::path::PathBuf {
     dir.path().to_path_buf()
 }
 
-pub fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&str])]) {
+pub(crate) fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&str])]) {
     for (dir, files) in structure {
         let dir_path = match dir {
             Some(subdir) => base.join(subdir),
@@ -94,7 +94,7 @@ pub fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&str])]) 
     }
 }
 
-pub fn cleanup_test_dir(base: &Path) {
+pub(crate) fn cleanup_test_dir(base: &Path) {
     fs::remove_dir_all(base).unwrap();
 }
 

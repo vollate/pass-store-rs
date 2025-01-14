@@ -42,7 +42,7 @@ pub(crate) fn fingerprint_to_email(
             return Ok(email.to_string());
         }
     }
-    Err(format!("No email found for {}", fingerprint).into()) 
+    Err(format!("No email found for {}", fingerprint).into())
 }
 
 #[derive(Eq, PartialEq)]
