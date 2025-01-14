@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs::DirEntry;
 use std::path::Path;
 
@@ -59,7 +60,15 @@ fn traverse_dir(
     for (i, entry) in entries_filtered.into_iter().enumerate() {
         let path = entry.path();
 
-        let file_name = path
+        let print_path = {
+            if path.is_file() && path.extension() == Some(OsStr::new("gpg")) {
+                path.with_extension("")
+            } else {
+                path.clone()
+            }
+        };
+
+        let file_name = print_path
             .file_name()
             .ok_or_else(|| IOErr::new(IOErrType::InvalidPath, &path))?
             .to_string_lossy();
@@ -84,8 +93,7 @@ fn traverse_dir(
             prefix.push_str("├── ");
         }
 
-        let sym_path = path.is_symlink();
-        if sym_path {
+        if path.is_symlink() {
             let link = path.read_link()?;
             let link_str = link.to_string_lossy();
             result.push_str(&format!("{}{} -> {}\n", prefix, file_name, link_str));
@@ -141,7 +149,7 @@ mod tests {
     use super::*;
     use crate::util::fs_utils::create_symlink;
     use crate::util::test_utils;
-    use crate::util::test_utils::gen_unique_temp_dir;
+    use crate::util::test_utils::{create_dir_structure, gen_unique_temp_dir};
 
     #[test]
     fn tree_normal_case() {
@@ -164,7 +172,7 @@ mod tests {
             (Some("dir3/dir4"), &[][..]),
             (Some("dir3/dir4/dir5"), &[][..]),
         ];
-        test_utils::create_dir_structure(&root, structure);
+        create_dir_structure(&root, structure);
 
         let result = tree_with_filter(&root, &Vec::new(), false).unwrap();
         assert_eq!(
@@ -197,7 +205,7 @@ mod tests {
             (Some("dir2"), &["file2"][..]),
             (Some("dir3"), &[][..]),
         ];
-        test_utils::create_dir_structure(&root, structure);
+        create_dir_structure(&root, structure);
 
         // This case, only dir2 and file1 should be filtered
         let result = tree_with_filter(
@@ -260,8 +268,8 @@ mod tests {
         let structure1: &[(Option<&str>, &[&str])] = &[(Some("dir1"), &["file1"][..])];
         let structure2: &[(Option<&str>, &[&str])] =
             &[(Some("dir3"), &["file2"][..]), (Some("dir4"), &[][..])];
-        test_utils::create_dir_structure(&root1, structure1);
-        test_utils::create_dir_structure(&root2, structure2);
+        create_dir_structure(&root1, structure1);
+        create_dir_structure(&root2, structure2);
         create_symlink(&root2, &root1.join("dir2")).unwrap();
 
         let result = tree_with_filter(&root1, &Vec::new(), false).unwrap();
@@ -306,8 +314,8 @@ mod tests {
         ];
         let structure2: &[(Option<&str>, &[&str])] =
             &[(Some("dir3"), &["file2"][..]), (Some("dir4"), &[][..])];
-        test_utils::create_dir_structure(&root1, structure1);
-        test_utils::create_dir_structure(&root2, structure2);
+        create_dir_structure(&root1, structure1);
+        create_dir_structure(&root2, structure2);
         create_symlink(&root2, &root1.join("dir2")).unwrap();
 
         let result = tree_with_filter(&root1, &Vec::new(), false).unwrap();
@@ -330,9 +338,4 @@ mod tests {
         test_utils::cleanup_test_dir(&root1);
         test_utils::cleanup_test_dir(&root2);
     }
-
-    // #[test]
-    // fn test_all_cases() {
-    //     todo!("combine all cases below");
-    // }
 }
