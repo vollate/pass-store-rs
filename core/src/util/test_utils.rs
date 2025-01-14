@@ -19,6 +19,8 @@ pub fn get_test_password() -> String {
 use std::path::Path;
 
 use rand::{thread_rng, Rng};
+use tempfile::env::temp_dir;
+use tempfile::TempDir;
 
 use crate::pgp::utils::user_email_to_fingerprint;
 pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -32,7 +34,7 @@ pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn st
                 .status()?;
 
             if !delete_status.success() {
-                return Err("Failed to delete GPG key".into());
+                return Err("Failed to delete PGP key".into());
             }
         } else {
             return Ok(());
@@ -69,13 +71,12 @@ save
 }
 
 pub fn gen_unique_temp_dir() -> std::path::PathBuf {
-    loop {
-        let path =
-            std::env::temp_dir().join("pass_rs_test").join(thread_rng().gen::<u64>().to_string());
-        if !path.exists() {
-            return path;
-        }
+    let base_dir = temp_dir().join("pass-rs-test");
+    if !base_dir.exists() {
+        fs::create_dir(&base_dir).unwrap();
     }
+    let dir = TempDir::new_in(base_dir).unwrap();
+    dir.path().to_path_buf()
 }
 
 pub fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&str])]) {
@@ -96,3 +97,14 @@ pub fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&str])]) 
 pub fn cleanup_test_dir(base: &Path) {
     fs::remove_dir_all(base).unwrap();
 }
+
+macro_rules! test_with_cleanup {
+    ($test:block, $cleanup:block) => {{
+        let result = std::panic::catch_unwind(|| $test);
+        $cleanup;
+        if let Err(err) = result {
+            std::panic::resume_unwind(err);
+        }
+    }};
+}
+pub(crate) use test_with_cleanup;

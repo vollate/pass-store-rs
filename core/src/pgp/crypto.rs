@@ -1,8 +1,9 @@
 use std::error::Error;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 
 use secrecy::{ExposeSecret, SecretString};
+use zeroize::Zeroize;
 
 use super::{PGPClient, PGPErr};
 impl PGPClient {
@@ -16,11 +17,13 @@ impl PGPClient {
                 "--batch",
                 "--encrypt",
                 "--recipient",
-                self.key_fpr.as_ref().ok_or_else(|| "")?,
+                self.get_key_fpr().ok_or_else(|| PGPErr::NoneFingerprint)?,
                 "--output",
                 output_path,
             ])
             .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()?;
 
         if let Some(mut stdin) = child.stdin.take() {
@@ -29,17 +32,14 @@ impl PGPClient {
 
         let status = child.wait()?;
         if status.success() {
-            println!("File encrypted successfully: {}", output_path);
+            println!("File encrypted successfully: {}", output_path); //TODO: remove
             Ok(())
         } else {
-            Err("GPG encryption failed".into())
+            Err("PGP encryption failed".into())
         }
     }
 
-    pub fn decrypt_stdin(
-        &self,
-        file_path: &str,
-    ) -> Result<SecretString, Box<dyn std::error::Error>> {
+    pub fn decrypt_stdin(&self, file_path: &str) -> Result<SecretString, Box<dyn Error>> {
         let output = Command::new(&self.executable)
             .args(&[
                 "--decrypt",
@@ -53,14 +53,14 @@ impl PGPClient {
             Ok(String::from_utf8(output.stdout)?.into())
         } else {
             let error_message = String::from_utf8_lossy(&output.stderr);
-            Err(format!("GPG decryption failed: {}", error_message).into())
+            Err(format!("PGP decryption failed: {}", error_message).into())
         }
     }
 
     pub fn decrypt_with_password(
         &self,
         file_path: &str,
-        passwd: SecretString,
+        mut passwd: SecretString,
     ) -> Result<SecretString, Box<dyn Error>> {
         let mut cmd = Command::new(&self.executable)
             //TODO: match each version
@@ -83,6 +83,7 @@ impl PGPClient {
         if let Some(mut input) = cmd.stdin.take() {
             input.write_all(passwd.expose_secret().as_bytes())?;
             input.flush()?;
+            passwd.zeroize();
         } else {
             return Err(PGPErr::CannotTakeStdin.into());
         }
@@ -92,16 +93,20 @@ impl PGPClient {
             Ok(String::from_utf8(output.stdout)?.into())
         } else {
             let error_message = String::from_utf8_lossy(&output.stderr);
-            Err(format!("GPG decryption failed: {}", error_message).into())
+            Err(format!("PGP decryption failed: {}", error_message).into())
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::io::{stderr, stdin, stdout};
     use std::path::Path;
+    use std::thread::sleep;
+    use std::time::Duration;
+    use std::{fs, thread};
 
+    use os_pipe::pipe;
     use pretty_assertions::assert_eq;
     use serial_test::serial;
 
@@ -109,30 +114,38 @@ mod tests {
     use crate::util::test_utils::{
         clean_up_test_key, get_test_email, get_test_executable, get_test_password,
         get_test_username, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
+        test_with_cleanup,
     };
     #[test]
     #[serial]
+
     fn test_encrypt_with_key() {
         let executable = &get_test_executable();
         let email = &get_test_email();
         let plaintext = "Hello, world!\nThis is a test message.";
         let output_dest = "encrypt.gpg";
+        test_with_cleanup!(
+            {
+                let mut test_client = PGPClient::new(
+                    executable.to_string(),
+                    None,
+                    Some(get_test_username()),
+                    Some(email.to_string()),
+                );
+                test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+                test_client.update_info().unwrap();
 
-        let mut test_client = PGPClient::new(
-            executable.to_string(),
-            None,
-            Some(get_test_username()),
-            Some(email.to_string()),
+                test_client.encrypt(plaintext, output_dest).unwrap();
+
+                if !Path::new(output_dest).exists() {
+                    panic!("Encrypted file not found");
+                }
+                let _ = fs::remove_file(output_dest);
+            },
+            {
+                clean_up_test_key(&executable, &email).unwrap();
+            }
         );
-        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-        test_client.update_info().unwrap();
-        test_client.encrypt(plaintext, output_dest).unwrap();
-
-        if !Path::new(output_dest).exists() {
-            panic!("Encrypted file not found");
-        }
-        clean_up_test_key(&executable, &email).unwrap();
-        fs::remove_file(output_dest).unwrap();
     }
 
     #[test]
@@ -143,22 +156,28 @@ mod tests {
         let email = &get_test_email();
         let plaintext = "Hello, world!\nThis is a test message.\n";
         let output_dest = "decrypt.gpg";
-
         let _ = fs::remove_file(output_dest);
+        test_with_cleanup!(
+            {
+                let mut test_client = PGPClient::new(
+                    executable.to_string(),
+                    None,
+                    Some(get_test_username()),
+                    Some(email.to_string()),
+                );
+                test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+                test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+                test_client.update_info().unwrap();
 
-        let mut test_client = PGPClient::new(
-            executable.to_string(),
-            None,
-            Some(get_test_username()),
-            Some(email.to_string()),
-        );
-        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-        test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
-        test_client.encrypt(plaintext, output_dest).unwrap();
-        let decrypted = test_client.decrypt_stdin(output_dest).unwrap();
-        assert_eq!(decrypted.expose_secret(), plaintext);
-        clean_up_test_key(executable, email).unwrap();
-        fs::remove_file(output_dest).unwrap();
+                test_client.encrypt(plaintext, output_dest).unwrap();
+                let decrypted = test_client.decrypt_stdin(output_dest).unwrap();
+                assert_eq!(decrypted.expose_secret(), plaintext);
+                fs::remove_file(output_dest).unwrap();
+            },
+            {
+                clean_up_test_key(executable, email).unwrap();
+            }
+        )
     }
     #[test]
     #[serial]
@@ -168,20 +187,28 @@ mod tests {
 
         let _ = fs::remove_file(output_dest);
 
-        let mut test_client = PGPClient::new(
-            get_test_executable(),
-            None,
-            Some(get_test_username()),
-            Some(get_test_email()),
-        );
-        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-        test_client.update_info().unwrap();
-        test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
-        test_client.encrypt(plaintext, output_dest).unwrap();
-        let decrypted =
-            test_client.decrypt_with_password(output_dest, get_test_password().into()).unwrap();
-        assert_eq!(decrypted.expose_secret(), plaintext);
-        clean_up_test_key(test_client.get_executable(), test_client.get_email().unwrap()).unwrap();
-        fs::remove_file(output_dest).unwrap();
+        test_with_cleanup!(
+            {
+                let mut test_client = PGPClient::new(
+                    get_test_executable(),
+                    None,
+                    Some(get_test_username()),
+                    Some(get_test_email()),
+                );
+                test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+                test_client.update_info().unwrap();
+                test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+                test_client.encrypt(plaintext, output_dest).unwrap();
+                let decrypted = test_client
+                    .decrypt_with_password(output_dest, get_test_password().into())
+                    .unwrap();
+                assert_eq!(decrypted.expose_secret(), plaintext);
+
+                fs::remove_file(output_dest).unwrap();
+            },
+            {
+                clean_up_test_key(&get_test_executable(), &get_test_email()).unwrap();
+            }
+        )
     }
 }

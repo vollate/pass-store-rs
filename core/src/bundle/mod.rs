@@ -1,4 +1,4 @@
-#[cfg(feature = "gpg")]
-mod gpg;
+#[cfg(feature = "pgp")]
+mod pgp;
 #[cfg(feature = "git")]
 mod sync;

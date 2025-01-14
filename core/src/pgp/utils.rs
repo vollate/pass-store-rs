@@ -13,7 +13,7 @@ pub(crate) fn user_email_to_fingerprint(
     let output =
         Command::new(executable).args(&["--list-keys", "--with-colons", email]).output()?;
     if !output.status.success() {
-        return Err("Failed to get GPG key".into());
+        return Err("Failed to get PGP key".into());
     }
     let info = String::from_utf8(output.stdout)?;
     for line in info.lines() {
@@ -23,7 +23,7 @@ pub(crate) fn user_email_to_fingerprint(
             }
         }
     }
-    Err("No GPG key found".into())
+    Err("No PGP key found".into())
 }
 
 pub(crate) fn fingerprint_to_email(
@@ -33,7 +33,7 @@ pub(crate) fn fingerprint_to_email(
     let output =
         Command::new(executable).args(&["--list-keys", "--with-colons", fingerprint]).output()?;
     if !output.status.success() {
-        return Err("Failed to get GPG key".into());
+        return Err("Failed to get PGP key".into());
     }
     let info = String::from_utf8(output.stdout)?;
     for line in info.lines() {
@@ -42,7 +42,7 @@ pub(crate) fn fingerprint_to_email(
             return Ok(email.to_string());
         }
     }
-    Err(format!("No email found for {}", fingerprint).into())
+    Err(format!("No email found for {}", fingerprint).into()) 
 }
 
 #[derive(Eq, PartialEq)]
@@ -80,7 +80,7 @@ pub(super) fn wait_child_process(cmd: &mut Child) -> Result<(), Box<dyn Error>> 
             }
             None => return Err("Failed to read stderr".into()),
         };
-        Err(format!("Failed to edit GPG key, code: {:?}\nError: {}", status, err_msg).into())
+        Err(format!("Failed to edit PGP key, code: {:?}\nError: {}", status, err_msg).into())
     }
 }
 

@@ -2,11 +2,12 @@ use std::error::Error;
 use std::fmt::Display;
 use std::path::Path;
 
+mod util;
+
 mod bundle;
 mod git;
-mod pgp;
 mod operation;
-mod util;
+mod pgp;
 
 #[derive(Debug)]
 enum IOErrType {
