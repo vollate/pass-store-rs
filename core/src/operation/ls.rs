@@ -1,20 +1,18 @@
 use std::error::Error;
 use std::path::Path;
 
-use regex::Regex;
 use secrecy::ExposeSecret;
 
 use crate::pgp::PGPClient;
 use crate::util::fs_utils::path_to_str;
-use crate::util::tree::{tree_with_filter, TreeColorConfig};
+use crate::util::tree::{tree_directory, TreeConfig};
 use crate::{IOErr, IOErrType};
 
 pub fn ls_interact(
     client: &PGPClient,
     root_path: &Path,
     target_path: &str,
-    filters: &Vec<Regex>,
-    color_config: Option<TreeColorConfig>,
+    config: &TreeConfig,
 ) -> Result<String, Box<dyn Error>> {
     let mut full_path = root_path.join(target_path);
 
@@ -23,7 +21,7 @@ pub fn ls_interact(
     }
 
     if full_path.is_dir() {
-        let result = tree_with_filter(&full_path, filters, color_config.is_some())?;
+        let result = tree_directory(&full_path, config)?;
         if target_path.is_empty() {
             Ok(format!("Password Store\n{}", result))
         } else {
@@ -41,8 +39,7 @@ pub fn ls_interact(
 pub fn ls_dir(
     root_path: &Path,
     target_path: &Path,
-    filters: &Vec<Regex>,
-    color_config: Option<TreeColorConfig>,
+    config: &TreeConfig,
 ) -> Result<String, Box<dyn Error>> {
     let mut full_path = root_path.join(target_path);
 
@@ -51,7 +48,7 @@ pub fn ls_dir(
     }
 
     if full_path.is_dir() {
-        let result = tree_with_filter(&full_path, filters, color_config.is_some())?;
+        let result = tree_directory(&full_path, config)?;
         if target_path.as_os_str().is_empty() {
             Ok(format!("Password Store\n{}", result))
         } else {
@@ -93,7 +90,8 @@ mod tests {
 
         defer_cleanup!(
             {
-                let res = ls_dir(&root, Path::new("dir1"), &vec![], None).unwrap();
+                let config = TreeConfig::default();
+                let res = ls_dir(&root, Path::new("dir1"), &config).unwrap();
                 assert_eq!(
                     res,
                     r#"dir1
@@ -101,7 +99,7 @@ mod tests {
 └── file2"#
                 );
 
-                let res = ls_dir(&root, Path::new("dir2"), &vec![], None).unwrap();
+                let res = ls_dir(&root, Path::new("dir2"), &config).unwrap();
                 assert_eq!(
                     res,
                     r#"dir2
@@ -109,7 +107,7 @@ mod tests {
 └── file4"#
                 );
 
-                let res = ls_dir(&root, Path::new(""), &vec![], None).unwrap();
+                let res = ls_dir(&root, Path::new(""), &config).unwrap();
                 assert_eq!(
                     res,
                     r#"Password Store
