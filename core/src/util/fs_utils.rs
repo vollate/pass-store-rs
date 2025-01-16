@@ -121,16 +121,17 @@ pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn
     Ok(backup_path)
 }
 
-pub(crate) fn restore_encrypted_file(file_path: &Path) -> Result<(), Box<dyn Error>> {
+pub(crate) fn restore_backup_file(file_path: &Path) -> Result<(), Box<dyn Error>> {
     if let Some(extension) = file_path.extension() {
         if extension == BACKUP_EXTENSION {
             let original_path = file_path.with_extension("");
             fs::rename(file_path, original_path)?;
+            return Ok(());
         } else {
             return Err(format!("File extension is not {}", BACKUP_EXTENSION).into());
         }
     }
-    Err("Fild does not has extension".into())
+    Err("File does not has extension".into())
 }
 
 fn is_executable(path: &Path) -> Result<bool, Box<dyn Error>> {
