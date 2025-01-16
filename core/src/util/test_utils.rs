@@ -18,7 +18,6 @@ pub fn get_test_password() -> String {
 
 use std::path::Path;
 
-use rand::{thread_rng, Rng};
 use tempfile::env::temp_dir;
 use tempfile::TempDir;
 
@@ -98,7 +97,7 @@ pub(crate) fn cleanup_test_dir(base: &Path) {
     fs::remove_dir_all(base).unwrap();
 }
 
-macro_rules! test_with_cleanup {
+macro_rules! defer_cleanup {
     ($test:block, $cleanup:block) => {{
         let result = std::panic::catch_unwind(|| $test);
         $cleanup;
@@ -107,4 +106,4 @@ macro_rules! test_with_cleanup {
         }
     }};
 }
-pub(crate) use test_with_cleanup;
+pub(crate) use defer_cleanup;

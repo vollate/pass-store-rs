@@ -37,6 +37,7 @@ pub fn ls_interact(
     }
 }
 
+// Maybe unused
 pub fn ls_dir(
     root_path: &Path,
     target_path: &Path,
@@ -66,9 +67,10 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::util::test_utils::{create_dir_structure, gen_unique_temp_dir};
-
-    //TDOO: check interactive mode
+    use crate::util::test_utils::{
+        cleanup_test_dir, create_dir_structure, defer_cleanup, gen_unique_temp_dir,
+    };
+    //TODO: check interactive mode
     #[test]
     fn test_ls_dir() {
         // Structure
@@ -89,26 +91,28 @@ mod tests {
         ];
         create_dir_structure(&root, structure);
 
-        let res = ls_dir(&root, Path::new("dir1"), &vec![], None).unwrap();
-        assert_eq!(
-            res,
-            r#"dir1
+        defer_cleanup!(
+            {
+                let res = ls_dir(&root, Path::new("dir1"), &vec![], None).unwrap();
+                assert_eq!(
+                    res,
+                    r#"dir1
 ├── file1
 └── file2"#
-        );
+                );
 
-        let res = ls_dir(&root, Path::new("dir2"), &vec![], None).unwrap();
-        assert_eq!(
-            res,
-            r#"dir2
+                let res = ls_dir(&root, Path::new("dir2"), &vec![], None).unwrap();
+                assert_eq!(
+                    res,
+                    r#"dir2
 ├── file3
 └── file4"#
-        );
+                );
 
-        let res = ls_dir(&root, Path::new(""), &vec![], None).unwrap();
-        assert_eq!(
-            res,
-            r#"Password Store
+                let res = ls_dir(&root, Path::new(""), &vec![], None).unwrap();
+                assert_eq!(
+                    res,
+                    r#"Password Store
 ├── dir1
 │   ├── file1
 │   └── file2
@@ -116,6 +120,11 @@ mod tests {
 │   ├── file3
 │   └── file4
 └── test.py"#
-        );
+                );
+            },
+            {
+                cleanup_test_dir(&root);
+            }
+        )
     }
 }

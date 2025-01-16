@@ -130,7 +130,7 @@ impl PGPClient {
         Ok(())
     }
 
-    pub(super) fn update_info(&mut self) -> Result<(), Box<dyn Error>> {
+    pub(crate) fn update_info(&mut self) -> Result<(), Box<dyn Error>> {
         //TODO: update username
         match (&self.key_fpr, &self.username, &self.email) {
             (Some(_), Some(_), Some(_)) => {}

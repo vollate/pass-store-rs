@@ -100,21 +100,17 @@ impl PGPClient {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{stderr, stdin, stdout};
-    use std::path::Path;
-    use std::thread::sleep;
-    use std::time::Duration;
-    use std::{fs, thread};
 
-    use os_pipe::pipe;
+    use std::fs;
+    use std::path::Path;
+
     use pretty_assertions::assert_eq;
     use serial_test::serial;
 
     use super::*;
     use crate::util::test_utils::{
-        clean_up_test_key, get_test_email, get_test_executable, get_test_password,
+        clean_up_test_key, defer_cleanup, get_test_email, get_test_executable, get_test_password,
         get_test_username, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
-        test_with_cleanup,
     };
     #[test]
     #[serial]
@@ -124,7 +120,7 @@ mod tests {
         let email = &get_test_email();
         let plaintext = "Hello, world!\nThis is a test message.";
         let output_dest = "encrypt.gpg";
-        test_with_cleanup!(
+        defer_cleanup!(
             {
                 let mut test_client = PGPClient::new(
                     executable.to_string(),
@@ -157,7 +153,7 @@ mod tests {
         let plaintext = "Hello, world!\nThis is a test message.\n";
         let output_dest = "decrypt.gpg";
         let _ = fs::remove_file(output_dest);
-        test_with_cleanup!(
+        defer_cleanup!(
             {
                 let mut test_client = PGPClient::new(
                     executable.to_string(),
@@ -187,7 +183,7 @@ mod tests {
 
         let _ = fs::remove_file(output_dest);
 
-        test_with_cleanup!(
+        defer_cleanup!(
             {
                 let mut test_client = PGPClient::new(
                     get_test_executable(),

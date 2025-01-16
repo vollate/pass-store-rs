@@ -3,8 +3,6 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
-use fs_extra::dir::{self, remove};
-
 use crate::util::fs_utils::is_subpath_of;
 use crate::{IOErr, IOErrType};
 
@@ -107,7 +105,6 @@ where
 #[cfg(test)]
 mod test {
     use core::panic;
-    use std::sync::{Arc, Mutex};
     use std::thread::sleep;
     use std::time::Duration;
     use std::{io, thread};
@@ -117,7 +114,9 @@ mod test {
 
     use super::*;
     use crate::util::fs_utils::set_readonly;
-    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_utils::{
+        cleanup_test_dir, create_dir_structure, defer_cleanup, gen_unique_temp_dir,
+    };
 
     fn enter_input_with_delay<T>(
         input_str: &str,
@@ -136,9 +135,6 @@ mod test {
 
     #[test]
     fn test_remove_io() {
-        let mut stdout = io::stdout().lock();
-        let mut stderr = io::stderr().lock();
-
         // Origin structure:
         // root
         // ├── dir1
@@ -150,60 +146,78 @@ mod test {
         let structure: &[(Option<&str>, &[&str])] =
             &[(Some("dir1"), &["file1", "file2"]), (Some("dir2"), &[]), (None, &["file3"])];
         create_dir_structure(&root, structure);
-        // set_readonly(&root.join("file3"), true).unwrap();
-        // set_readonly(&root.join("dir1").join("file1"), true).unwrap();
+        set_readonly(&root.join("file3"), true).unwrap();
+        set_readonly(&root.join("dir1").join("file1"), true).unwrap();
 
-        // Test remove a file
-        let dist = "file3";
-        let (mut stdin, stdin_w) = pipe().unwrap();
-        let input_thread = enter_input_with_delay("n\n", Duration::from_millis(100), stdin_w);
-        remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
-        assert_eq!(true, root.join(dist).exists());
-        input_thread.join().unwrap();
+        defer_cleanup!(
+            {
+                let mut stdout = io::stdout().lock();
+                let mut stderr = io::stderr().lock();
 
-        remove_io(&root, dist, false, true, &mut stdin, &mut stdout, &mut stderr).unwrap();
-        assert_eq!(false, root.join(dist).exists());
+                // Test remove a file
+                let dist = "file3";
+                let (mut stdin, stdin_w) = pipe().unwrap();
+                let input_thread =
+                    enter_input_with_delay("n\n", Duration::from_millis(100), stdin_w);
+                remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
+                assert_eq!(true, root.join(dist).exists());
+                input_thread.join().unwrap();
 
-        // Test remove a directory
-        // Remove an empty directory, without recursive option
-        let dist = "dir2";
-        let (mut stdin, stdin_w) = pipe().unwrap();
-        let input_thread = enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
-        if let Ok(_) = remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr) {
-            panic!("Expect fail to remove a non-empty directory without recursive option.");
-        }
-        input_thread.join().unwrap();
+                remove_io(&root, dist, false, true, &mut stdin, &mut stdout, &mut stderr).unwrap();
+                assert_eq!(false, root.join(dist).exists());
 
-        // With recursive option
-        let (mut stdin, stdin_w) = pipe().unwrap();
-        let input_thread = enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
-        remove_io(&root, dist, true, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
-        assert_eq!(false, root.join(dist).exists());
-        input_thread.join().unwrap();
+                // Test remove a directory
+                // Remove an empty directory, without recursive option
+                let dist = "dir2";
+                let (mut stdin, stdin_w) = pipe().unwrap();
+                let input_thread =
+                    enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
+                if let Ok(_) =
+                    remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr)
+                {
+                    panic!("Expect fail to remove a non-empty directory without recursive option.");
+                }
+                input_thread.join().unwrap();
 
-        // Remove a non-empty directory with some read-only files, without force option
-        let dist = "dir1";
-        let (mut stdin, stdin_w) = pipe().unwrap();
-        let input_thread = enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
-        remove_io(&root, dist, true, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
-        assert_eq!(false, root.join(dist).exists());
-        input_thread.join().unwrap();
+                // With recursive option
+                let (mut stdin, stdin_w) = pipe().unwrap();
+                let input_thread =
+                    enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
+                remove_io(&root, dist, true, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
+                assert_eq!(false, root.join(dist).exists());
+                input_thread.join().unwrap();
 
-        // Test remove a non-exist file
-        let dist = "non-exist-file";
-        let (mut stdin, stdin_w) = pipe().unwrap();
-        let input_thread = enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
-        if let Ok(_) = remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr) {
-            panic!("Expect to fail to remove a non-exist file without force option.");
-        }
-        input_thread.join().unwrap();
+                // Remove a non-empty directory with some read-only files, without force option
+                let dist = "dir1";
+                let (mut stdin, stdin_w) = pipe().unwrap();
+                let input_thread =
+                    enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
+                remove_io(&root, dist, true, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
+                assert_eq!(false, root.join(dist).exists());
+                input_thread.join().unwrap();
 
-        // With force option
-        let (mut stdin, stdin_w) = pipe().unwrap();
-        let input_thread = enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
-        remove_io(&root, dist, false, true, &mut stdin, &mut stdout, &mut stderr).unwrap();
-        input_thread.join().unwrap();
+                // Test remove a non-exist file
+                let dist = "non-exist-file";
+                let (mut stdin, stdin_w) = pipe().unwrap();
+                let input_thread =
+                    enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
+                if let Ok(_) =
+                    remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr)
+                {
+                    panic!("Expect to fail to remove a non-exist file without force option.");
+                }
+                input_thread.join().unwrap();
 
-        cleanup_test_dir(&root);
+                // With force option
+                let (mut stdin, stdin_w) = pipe().unwrap();
+                let input_thread =
+                    enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
+                remove_io(&root, dist, false, true, &mut stdin, &mut stdout, &mut stderr).unwrap();
+                input_thread.join().unwrap();
+            },
+            {
+                cleanup_test_dir(&root);
+            }
+        )
     }
 }
