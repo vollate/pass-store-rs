@@ -13,6 +13,7 @@ mod pgp;
 enum IOErrType {
     PathNotExist,
     InvalidPath,
+    InvalidName,
     CannotGetFileName,
     InvalidFileType,
     ExpectFile,
@@ -37,6 +38,7 @@ impl Display for IOErr {
             PathNotExist => write!(f, "Path not exist: {:?}", self.path),
             CannotGetFileName => write!(f, "Cannot get file name: {:?}", self.path),
             InvalidPath => write!(f, "Invalid path: {:?}", self.path),
+            InvalidName => write!(f, "Invalid name: {:?}", self.path),
             InvalidFileType => write!(f, "Invalid file type: {:?}", self.path),
             ExpectFile => write!(f, "Expect to be a file: {:?}", self.path),
             ExpectDir => write!(f, "Expect to be a directory: {:?}", self.path),

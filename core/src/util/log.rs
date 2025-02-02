@@ -38,3 +38,8 @@ pub fn set_log_level(level: LevelFilter) {
     *LOG_LEVEL.write() = level;
     println!("Log level set to {:?}", level);
 }
+
+pub fn init_debug_logger(){
+    init_logger();
+    set_log_level(LevelFilter::Debug);
+}
