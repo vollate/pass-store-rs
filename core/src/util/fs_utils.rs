@@ -181,6 +181,14 @@ pub(crate) fn path_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
     Ok(path.to_str().ok_or_else(|| IOErr::new(IOErrType::InvalidPath, path))?)
 }
 
+pub(crate) fn filename_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
+    Ok(path
+        .file_name()
+        .ok_or_else(|| IOErr::new(IOErrType::InvalidPath, path))?
+        .to_str()
+        .ok_or_else(|| IOErr::new(IOErrType::InvalidName, path))?)
+}
+
 pub(crate) fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool, Box<dyn Error>> {
     let parent = path::absolute(parent)?;
     let child = path::absolute(child)?;

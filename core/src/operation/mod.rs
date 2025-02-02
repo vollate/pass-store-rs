@@ -1,9 +1,9 @@
 mod edit;
-mod find;
+//mod find;
 mod generate;
 mod grep;
 mod init;
 mod insert;
-mod ls;
+//mod ls;
 mod remove;
 mod rename_or_copy;
