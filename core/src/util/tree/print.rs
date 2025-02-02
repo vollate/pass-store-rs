@@ -1,13 +1,7 @@
-use std::cmp::max;
 use std::collections::VecDeque;
 use std::error::Error;
-use std::ffi::OsStr;
-use std::fs::DirEntry;
-use std::path::Path;
 
-use chrono::format;
-use colored::{Color, Colorize};
-use fs_extra::file;
+use colored::Colorize;
 use log::debug;
 
 use super::{DirTree, NodeType, PrintConfig};
@@ -115,7 +109,7 @@ mod tests {
 
     use super::*;
     use crate::util::fs_utils::create_symlink;
-    use crate::util::log::{init_debug_logger, init_logger, set_log_level};
+    
     use crate::util::test_utils;
     use crate::util::test_utils::{create_dir_structure, gen_unique_temp_dir};
     use crate::util::tree::{FilterType, TreeConfig};

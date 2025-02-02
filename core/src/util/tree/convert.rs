@@ -1,64 +1,62 @@
-use std::cell::{Ref, RefCell};
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
-use std::fs::{canonicalize, DirEntry, FileType, ReadDir};
+use std::fs::{canonicalize, ReadDir};
 use std::iter::Fuse;
 use std::mem;
-use std::os::unix::process::parent_id;
-use std::path::{self, Path, PathBuf};
-use std::rc::Rc;
+use std::path::{Path, PathBuf};
 
-use bumpalo::collections::{vec, Vec as BumpVec};
+use bumpalo::collections::Vec as BumpVec;
 use bumpalo::Bump;
 use log::debug;
 use regex::Regex;
 
-use super::{DirTree, FilterType, NodeType, TreeConfig, TreeNode};
+use super::{DirTree, FilterType, TreeConfig, TreeNode};
 use crate::util::fs_utils::{filename_to_str, path_to_str};
-use crate::{IOErr, IOErrType};
 
 impl<'a> DirTree<'a> {
     pub fn new(config: &TreeConfig<'a>, bump: &'a Bump) -> Result<Self, Box<dyn Error>> {
         let mut tree = DirTree::build_tree(config, bump)?;
-        Self::handle_whitelist(&config, &mut tree);
+        Self::apply_whitelist(&config, &mut tree);
         Self::shrink_tree(&mut tree);
         Ok(tree)
     }
 
-    fn handle_whitelist(config: &&TreeConfig, tree: &mut DirTree) {
-        if config.filter_type == FilterType::Include {
-            let mut stack: VecDeque<(usize, usize)> = VecDeque::<(usize, usize)>::new();
-            stack.push_back((tree.root, 0));
-            while let Some((node_idx, vec_idx)) = stack.pop_back() {
-                let child_idx = {
-                    let parent = &tree.map[node_idx];
-                    if vec_idx >= parent.children.len() {
-                        continue;
-                    }
-                    parent.children[vec_idx]
-                };
-                let child_node = &mut tree.map[child_idx];
-                if !Self::filter_match(&config.filters, &child_node.name) {
-                    child_node.visiable = false;
-                    if !child_node.children.is_empty() {
-                        stack.push_back((node_idx, vec_idx + 1));
-                        stack.push_back((child_idx, 0));
-                    }
-                } else {
-                    let mut parent_idx = node_idx;
-                    loop {
-                        let parent = &mut tree.map[parent_idx];
-                        if parent.visiable {
-                            break;
-                        }
-                        parent.visiable = true;
-                        if parent.parent.is_none() {
-                            break;
-                        }
-                        parent_idx = parent.parent.unwrap();
-                    }
-                    stack.push_back((node_idx, vec_idx + 1));
+    fn apply_whitelist(config: &&TreeConfig, tree: &mut DirTree) {
+        if config.filter_type != FilterType::Include {
+            return;
+        }
+        let mut stack: VecDeque<(usize, usize)> = VecDeque::<(usize, usize)>::new();
+        stack.push_back((tree.root, 0));
+
+        while let Some((node_idx, vec_idx)) = stack.pop_back() {
+            let child_idx = {
+                let parent = &tree.map[node_idx];
+                if vec_idx >= parent.children.len() {
+                    continue;
                 }
+                parent.children[vec_idx]
+            };
+            let child_node = &mut tree.map[child_idx];
+            if !Self::filter_match(&config.filters, &child_node.name) {
+                child_node.visiable = false;
+                stack.push_back((node_idx, vec_idx + 1));
+                if !child_node.children.is_empty() {
+                    stack.push_back((child_idx, 0));
+                }
+            } else {
+                let mut parent_idx = node_idx;
+                loop {
+                    let parent = &mut tree.map[parent_idx];
+                    if parent.visiable {
+                        break;
+                    }
+                    parent.visiable = true;
+                    if parent.parent.is_none() {
+                        break;
+                    }
+                    parent_idx = parent.parent.unwrap();
+                }
+                stack.push_back((node_idx, vec_idx + 1));
             }
         }
     }
@@ -157,9 +155,9 @@ impl<'a> DirTree<'a> {
         }
     }
 
-    fn filter_match(filters: &Vec<Regex>, path_str: &str) -> bool {
+    fn filter_match(filters: &Vec<Regex>, target: &str) -> bool {
         for filter in filters {
-            if filter.is_match(path_str) {
+            if filter.is_match(target) {
                 return true;
             }
         }

@@ -39,7 +39,7 @@ pub fn set_log_level(level: LevelFilter) {
     println!("Log level set to {:?}", level);
 }
 
-pub fn init_debug_logger(){
+pub fn init_debug_logger() {
     init_logger();
     set_log_level(LevelFilter::Debug);
 }

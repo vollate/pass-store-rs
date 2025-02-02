@@ -1,13 +1,10 @@
 mod convert;
 mod print;
 
-use std::error::Error;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::path::Path;
 
 use bumpalo::collections::Vec as BumpVec;
-use bumpalo::Bump;
-use colored::{Color, Colorize};
+use colored::Color;
 use regex::Regex;
 
 #[derive(PartialEq, Eq, Clone, Copy)]

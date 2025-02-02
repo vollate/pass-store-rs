@@ -1,31 +1,35 @@
 use std::error::Error;
-use std::path::Path;
 
+use bumpalo::Bump;
 use secrecy::ExposeSecret;
 
 use crate::pgp::PGPClient;
 use crate::util::fs_utils::path_to_str;
-use crate::util::tree::{tree_directory, TreeConfig};
+use crate::util::str;
+use crate::util::str::remove_lines_postfix;
+use crate::util::tree::{DirTree, PrintConfig, TreeConfig};
 use crate::{IOErr, IOErrType};
 
 pub fn ls_interact(
     client: &PGPClient,
-    root_path: &Path,
-    target_path: &str,
-    config: &TreeConfig,
+    tree_cfg: &TreeConfig,
+    print_cfg: &PrintConfig,
 ) -> Result<String, Box<dyn Error>> {
-    let mut full_path = root_path.join(target_path);
+    let mut full_path = tree_cfg.root.join(tree_cfg.target);
 
     while full_path.is_symlink() {
         full_path = full_path.read_link()?;
     }
 
     if full_path.is_dir() {
-        let result = tree_directory(&full_path, config)?;
-        if target_path.is_empty() {
+        let bump = Bump::new();
+        let tree = DirTree::new(&tree_cfg, &bump)?;
+        let result = tree.print_tree(print_cfg)?;
+        let result = remove_lines_postfix(&result, ".gpg");
+        if tree_cfg.target.is_empty() {
             Ok(format!("Password Store\n{}", result))
         } else {
-            Ok(format!("{}\n{}", target_path, result))
+            Ok(format!("{}\n{}", tree_cfg.target, result))
         }
     } else if full_path.is_file() {
         let data = client.decrypt_stdin(path_to_str(&full_path)?)?;
@@ -36,23 +40,22 @@ pub fn ls_interact(
 }
 
 // Maybe unused
-pub fn ls_dir(
-    root_path: &Path,
-    target_path: &Path,
-    config: &TreeConfig,
-) -> Result<String, Box<dyn Error>> {
-    let mut full_path = root_path.join(target_path);
+pub fn ls_dir(tree_cfg: &TreeConfig, print_cfg: &PrintConfig) -> Result<String, Box<dyn Error>> {
+    let mut full_path = tree_cfg.root.join(tree_cfg.target);
 
     while full_path.is_symlink() {
         full_path = full_path.read_link()?;
     }
 
     if full_path.is_dir() {
-        let result = tree_directory(&full_path, config)?;
-        if target_path.as_os_str().is_empty() {
+        let bump = Bump::new();
+        let tree = DirTree::new(&tree_cfg, &bump)?;
+        let result = tree.print_tree(print_cfg)?;
+        let result = str::remove_lines_postfix(&result, ".gpg");
+        if tree_cfg.target.is_empty() {
             Ok(format!("Password Store\n{}", result))
         } else {
-            Ok(format!("{}\n{}", path_to_str(target_path)?, result))
+            Ok(format!("{}\n{}", tree_cfg.target, result))
         }
     } else {
         Err(IOErr::new(IOErrType::InvalidFileType, &full_path).into())
@@ -67,6 +70,8 @@ mod tests {
     use crate::util::test_utils::{
         cleanup_test_dir, create_dir_structure, defer_cleanup, gen_unique_temp_dir,
     };
+    use crate::util::tree::FilterType;
+
     //TODO: check interactive mode
     #[test]
     fn test_ls_dir() {
@@ -90,8 +95,21 @@ mod tests {
 
         defer_cleanup!(
             {
-                let config = TreeConfig::default();
-                let res = ls_dir(&root, Path::new("dir1"), &config).unwrap();
+                let mut config = TreeConfig {
+                    root: &root,
+                    target: "",
+                    filter_type: FilterType::Disable,
+                    filters: Vec::new(),
+                };
+                let print_cfg = PrintConfig {
+                    dir_color: None,
+                    file_color: None,
+                    symbol_color: None,
+                    tree_color: None,
+                };
+
+                config.target = "dir1";
+                let res = ls_dir(&config, &print_cfg).unwrap();
                 assert_eq!(
                     res,
                     r#"dir1
@@ -99,7 +117,8 @@ mod tests {
 └── file2"#
                 );
 
-                let res = ls_dir(&root, Path::new("dir2"), &config).unwrap();
+                config.target = "dir2";
+                let res = ls_dir(&config, &print_cfg).unwrap();
                 assert_eq!(
                     res,
                     r#"dir2
@@ -107,7 +126,8 @@ mod tests {
 └── file4"#
                 );
 
-                let res = ls_dir(&root, Path::new(""), &config).unwrap();
+                config.target = "";
+                let res = ls_dir(&config, &print_cfg).unwrap();
                 assert_eq!(
                     res,
                     r#"Password Store
