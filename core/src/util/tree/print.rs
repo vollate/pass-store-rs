@@ -109,7 +109,6 @@ mod tests {
 
     use super::*;
     use crate::util::fs_utils::create_symlink;
-    
     use crate::util::test_utils;
     use crate::util::test_utils::{create_dir_structure, gen_unique_temp_dir};
     use crate::util::tree::{FilterType, TreeConfig};
