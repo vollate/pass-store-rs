@@ -7,6 +7,7 @@ use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::path::{Path, PathBuf};
 use std::{env, fs, io, path};
 
+use clean_path::Clean;
 use fs_extra::dir::{self, CopyOptions};
 
 use crate::{IOErr, IOErrType};
@@ -190,9 +191,9 @@ pub(crate) fn filename_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
 }
 
 pub(crate) fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool, Box<dyn Error>> {
-    let parent = path::absolute(parent)?;
-    let child = path::absolute(child)?;
-    Ok(child.starts_with(&parent))
+    let child_clean = child.as_ref().clean();
+    let parent_clean = parent.as_ref().clean();
+    Ok(child_clean.starts_with(&parent_clean))
 }
 
 pub(crate) fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<(), Box<dyn Error>> {
