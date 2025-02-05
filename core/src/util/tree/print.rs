@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 use std::error::Error;
 
 use colored::Colorize;
-use log::debug;
 
 use super::{DirTree, NodeType, PrintConfig};
 use crate::util::test_utils::log_test;
@@ -106,9 +105,9 @@ mod tests {
     use bumpalo::Bump;
     use pretty_assertions::assert_eq;
     use regex::Regex;
-    use tests::test_utils::defer_cleanup;
 
     use super::*;
+    use crate::util::defer::cleanup;
     use crate::util::fs_utils::create_symlink;
     use crate::util::test_utils;
     use crate::util::test_utils::{create_dir_structure, gen_unique_temp_dir};
@@ -138,7 +137,7 @@ mod tests {
             (Some("dir3/dir4/dir5"), &[][..]),
         ];
         create_dir_structure(&root, structure);
-        defer_cleanup!(
+        cleanup!(
             {
                 let config = TreeConfig {
                     root: &root,
@@ -188,7 +187,7 @@ mod tests {
         create_dir_structure(&root, structure);
 
         // This case, only dir2 and file1 should be filtered
-        defer_cleanup!(
+        cleanup!(
             {
                 let mut config = TreeConfig {
                     root: &root,
@@ -276,7 +275,7 @@ mod tests {
         create_dir_structure(&root2, structure2);
         create_symlink(&root2, &root1.join("dir2")).unwrap();
 
-        defer_cleanup!(
+        cleanup!(
             {
                 let config = TreeConfig {
                     root: &root1,
@@ -334,7 +333,7 @@ mod tests {
         create_dir_structure(&root1, structure1);
         create_dir_structure(&root2, structure2);
         create_symlink(&root2, &root1.join("dir2")).unwrap();
-        defer_cleanup!(
+        cleanup!(
             {
                 let config = TreeConfig {
                     root: &root1,
@@ -366,5 +365,10 @@ mod tests {
                 test_utils::cleanup_test_dir(&root2);
             }
         )
+    }
+
+    #[test]
+    fn test_recursive_detection() {
+        todo!("test recursive symbol link detection")
     }
 }

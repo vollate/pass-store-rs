@@ -97,17 +97,6 @@ pub(crate) fn cleanup_test_dir(base: &Path) {
     fs::remove_dir_all(base).unwrap();
 }
 
-macro_rules! defer_cleanup {
-    ($test:block, $cleanup:block) => {{
-        let result = std::panic::catch_unwind(|| $test);
-        $cleanup;
-        if let Err(err) = result {
-            std::panic::resume_unwind(err);
-        }
-    }};
-}
-pub(crate) use defer_cleanup;
-
 macro_rules! log_test {
     ($($arg:tt)*) => {
         #[cfg(test)]

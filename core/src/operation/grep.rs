@@ -42,10 +42,11 @@ mod tests {
     use serial_test::serial;
 
     use crate::pgp::PGPClient;
+    use crate::util::defer::cleanup;
     use crate::util::test_utils::{
-        clean_up_test_key, cleanup_test_dir, create_dir_structure, defer_cleanup,
-        gen_unique_temp_dir, get_test_email, get_test_executable, get_test_password,
-        get_test_username, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
+        clean_up_test_key, cleanup_test_dir, create_dir_structure, gen_unique_temp_dir,
+        get_test_email, get_test_executable, get_test_password, get_test_username,
+        gpg_key_edit_example_batch, gpg_key_gen_example_batch,
     };
 
     #[test]
@@ -58,8 +59,8 @@ mod tests {
         let structure: &[(Option<&str>, &[&str])] =
             &[(Some("dir1"), &[][..]), (Some("dir2"), &[][..])];
         create_dir_structure(&root, &structure);
-        
-        defer_cleanup!(
+
+        cleanup!(
             {
                 let mut test_client = PGPClient::new(
                     executable.to_string(),

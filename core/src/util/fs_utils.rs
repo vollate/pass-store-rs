@@ -5,7 +5,7 @@ use std::os::unix::fs::symlink;
 #[cfg(windows)]
 use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::path::{Path, PathBuf};
-use std::{env, fs, io, path};
+use std::{env, fs, io};
 
 use clean_path::Clean;
 use fs_extra::dir::{self, CopyOptions};

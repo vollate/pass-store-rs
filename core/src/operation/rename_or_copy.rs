@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::{fs, path};
 
 use crate::util::fs_utils::{better_rename, copy_dir_recursive, is_subpath_of};
@@ -215,12 +215,11 @@ mod tests {
     use serial_test::serial;
 
     use super::*;
-    use crate::util::test_utils::{
-        cleanup_test_dir, create_dir_structure, defer_cleanup, gen_unique_temp_dir,
-    };
+    use crate::util::defer::cleanup;
+    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
 
     #[test]
-    fn rename_tests() {
+    fn rename_test() {
         // Original structure:
         // root
         // ├── a.gpg
@@ -232,7 +231,7 @@ mod tests {
             &[(None, &["a.gpg", "b.gpg"][..]), (Some("d_dir"), &[][..]), (Some("e_dir"), &[][..])];
         create_dir_structure(&root, structure);
 
-        defer_cleanup!(
+        cleanup!(
             {
                 let (mut stdin, mut stdin_w) = pipe().unwrap();
                 let mut stdout = io::stdout().lock();
@@ -328,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn copy_tests() {
+    fn copy_test() {
         // Original structure:
         // root
         // ├── a.gpg
@@ -340,7 +339,7 @@ mod tests {
             &[(None, &["a.gpg", "b.gpg"][..]), (Some("d_dir"), &[][..]), (Some("e_dir"), &[][..])];
         create_dir_structure(&root, structure);
 
-        defer_cleanup!(
+        cleanup!(
             {
                 let (mut stdin, mut stdin_w) = pipe().unwrap();
                 let mut stdout = io::stdout().lock();
@@ -450,7 +449,7 @@ mod tests {
         let structure: &[(Option<&str>, &[&str])] = &[(None, &["a.gpg"][..])];
         create_dir_structure(&root, &structure);
 
-        defer_cleanup!(
+        cleanup!(
             {
                 let mut stdin = io::stdin().lock();
                 let mut stdout = io::stdout().lock();
