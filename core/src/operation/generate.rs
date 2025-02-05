@@ -29,7 +29,7 @@ where
     E: Write,
 {
     let pass_path = root.join(pass_name);
-    
+
     if !is_subpath_of(root, &pass_path)? {
         let err_msg =
             format!("'{}' is not the subpath of the root path '{}'", pass_name, root.display());
@@ -43,6 +43,5 @@ where
         return Err(err_msg.into());
     }
 
-    
     todo!()
 }

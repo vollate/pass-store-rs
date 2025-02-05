@@ -39,8 +39,10 @@ pub fn grep(client: &PGPClient, root: &Path, target: &str) -> Result<Vec<String>
 #[cfg(test)]
 mod tests {
 
+    use pretty_assertions::assert_eq;
     use serial_test::serial;
 
+    use super::*;
     use crate::pgp::PGPClient;
     use crate::util::defer::cleanup;
     use crate::util::test_utils::{
@@ -51,30 +53,55 @@ mod tests {
 
     #[test]
     #[serial]
-    #[ignore = "need run interactively"]
     fn test_grep() {
         let executable = &get_test_executable();
         let email = &get_test_email();
+        let username = &get_test_username();
         let root = gen_unique_temp_dir();
+
+        let file1_content = "test password\nfoo bar\nsecret content\nnullptr";
+        let file2_content = "another password\ntest line\nmore content";
+
         let structure: &[(Option<&str>, &[&str])] =
             &[(Some("dir1"), &[][..]), (Some("dir2"), &[][..])];
-        create_dir_structure(&root, &structure);
+        create_dir_structure(&root, structure);
 
         cleanup!(
             {
+                // Setup GPG client
                 let mut test_client = PGPClient::new(
                     executable.to_string(),
                     None,
-                    Some(get_test_username()),
+                    Some(username.to_string()),
                     Some(email.to_string()),
                 );
                 test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
                 test_client.update_info().unwrap();
                 test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+
+                // Create and encrypt test files
+                test_client
+                    .encrypt(file1_content, root.join("dir1/test_pass.gpg").to_str().unwrap())
+                    .unwrap();
+                test_client
+                    .encrypt(file2_content, root.join("dir2/normal_file.gpg").to_str().unwrap())
+                    .unwrap();
+
+                // Test 1: Content matching
+                let results = grep(&test_client, &root, "null").unwrap();
+                assert_eq!(results, vec!["dir1/test_pass.gpg:", "nullptr",]);
+
+                // Test 2: Filename matching
+                let results = grep(&test_client, &root, "secret").unwrap();
+                assert_eq!(results, vec!["dir1/test_pass.gpg:", "secret content"]);
+
+                // Test 3: No matches
+                let results = grep(&test_client, &root, "nonexistent").unwrap();
+                assert!(results.is_empty());
             },
             {
-                clean_up_test_key(executable, email).unwrap();
                 cleanup_test_dir(&root);
+                clean_up_test_key(executable, email).unwrap();
             }
         );
     }
