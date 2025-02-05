@@ -5,10 +5,11 @@ use colored::Colorize;
 use log::debug;
 
 use super::{DirTree, NodeType, PrintConfig};
+use crate::util::test_utils::log_test;
 
 impl<'a> DirTree<'a> {
     pub fn print_tree(&self, config: &PrintConfig) -> Result<String, Box<dyn Error>> {
-        debug!("Start to print tree: {:?}", self.map);
+        log_test!("Start to print tree: {:?}", self.map);
         let mut tree_builder = String::new(); //TODO(Vollate): we should use other structure for building string(huge dir case)
         let mut stack = VecDeque::<(usize, usize)>::new();
         stack.push_back((self.root, 0));
@@ -157,9 +158,9 @@ mod tests {
 │   ├── file3
 │   └── file4
 └── dir3
-    ├── file5
-    └── dir4
-        └── dir5"#
+    ├── dir4
+    │   └── dir5
+    └── file5"#
                 );
             },
             {
@@ -349,13 +350,13 @@ mod tests {
                     format!(
                         r#"├── dir1
 │   └── file1
+├── dir2 -> {}
+│   ├── dir3
+│   │   └── file2
+│   └── dir4
 ├── dir3
 ├── dir4
-├── file114514
-└── dir2 -> {}
-    ├── dir3
-    │   └── file2
-    └── dir4"#,
+└── file114514"#,
                         root2.to_str().unwrap()
                     )
                 );

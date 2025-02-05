@@ -107,3 +107,13 @@ macro_rules! defer_cleanup {
     }};
 }
 pub(crate) use defer_cleanup;
+
+macro_rules! log_test {
+    ($($arg:tt)*) => {
+        #[cfg(test)]
+        {
+            println!($($arg)*);
+        }
+    };
+}
+pub(crate) use log_test;
