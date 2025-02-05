@@ -7,6 +7,7 @@ use std::path::Path;
 mod util;
 
 mod bundle;
+mod clipboard;
 mod git;
 mod operation;
 mod pgp;

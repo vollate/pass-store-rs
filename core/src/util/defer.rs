@@ -15,3 +15,14 @@ impl<F: FnOnce()> Drop for Defer<F> {
         }
     }
 }
+
+macro_rules! cleanup {
+    ($test:block, $cleanup:block) => {{
+        let result = std::panic::catch_unwind(|| $test);
+        $cleanup;
+        if let Err(err) = result {
+            std::panic::resume_unwind(err);
+        }
+    }};
+}
+pub(crate) use cleanup;

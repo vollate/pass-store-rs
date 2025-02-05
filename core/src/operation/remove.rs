@@ -50,9 +50,12 @@ where
     };
 
     if !is_subpath_of(root, &dist_path)? {
-        return Err(
-            format!("'{}' is not the subpath of the root path '{}'", dist, root.display()).into()
-        );
+        return Err(format!(
+            "'{}' is not the sub-path of the root path '{}'",
+            dist,
+            root.display()
+        )
+        .into());
     }
 
     if !dist_path.exists() {
@@ -113,10 +116,9 @@ mod test {
     use pretty_assertions::assert_eq;
 
     use super::*;
+    use crate::util::defer::cleanup;
     use crate::util::fs_utils::set_readonly;
-    use crate::util::test_utils::{
-        cleanup_test_dir, create_dir_structure, defer_cleanup, gen_unique_temp_dir,
-    };
+    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
 
     fn enter_input_with_delay<T>(
         input_str: &str,
@@ -149,7 +151,7 @@ mod test {
         set_readonly(&root.join("file3"), true).unwrap();
         set_readonly(&root.join("dir1").join("file1"), true).unwrap();
 
-        defer_cleanup!(
+        cleanup!(
             {
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();

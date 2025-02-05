@@ -1,7 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
-use std::fs::{self, canonicalize, DirEntry, ReadDir};
-use std::iter::Fuse;
+use std::fs::{self, canonicalize, DirEntry};
 use std::path::{Path, PathBuf};
 use std::{io, mem};
 

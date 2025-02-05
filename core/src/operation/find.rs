@@ -34,9 +34,8 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::util::test_utils::{
-        cleanup_test_dir, create_dir_structure, defer_cleanup, gen_unique_temp_dir,
-    };
+    use crate::util::defer::cleanup;
+    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
 
     #[test]
     fn test_find_term() {
@@ -201,7 +200,7 @@ mod tests {
         ];
         create_dir_structure(&root, structure);
 
-        defer_cleanup!(
+        cleanup!(
             {
                 let config = TreeConfig {
                     root: &root,

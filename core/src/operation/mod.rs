@@ -1,6 +1,7 @@
 mod edit;
 mod find;
 mod generate;
+mod git;
 mod grep;
 mod init;
 mod insert;

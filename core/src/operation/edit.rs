@@ -82,14 +82,15 @@ pub fn edit(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::defer::cleanup;
     use crate::util::test_utils::{
-        clean_up_test_key, cleanup_test_dir, create_dir_structure, defer_cleanup,
-        gen_unique_temp_dir, get_test_email, get_test_executable, get_test_username,
-        gpg_key_edit_example_batch, gpg_key_gen_example_batch,
+        clean_up_test_key, cleanup_test_dir, create_dir_structure, gen_unique_temp_dir,
+        get_test_email, get_test_executable, get_test_username, gpg_key_edit_example_batch,
+        gpg_key_gen_example_batch,
     };
 
     #[test]
-    #[ignore = "Need to run interactively"]
+    #[ignore = "need run interactively"]
     fn test_edit() {
         let executable = &get_test_executable();
         let email = &get_test_email();
@@ -104,8 +105,8 @@ mod tests {
         create_dir_structure(&root, structure);
 
         let file1_content = "Sending in an eagle";
-        let file2_content = "Requsting orbital";
-        defer_cleanup!(
+        let file2_content = "Requesting orbital";
+        cleanup!(
             {
                 let mut test_client = PGPClient::new(
                     executable.to_string(),
