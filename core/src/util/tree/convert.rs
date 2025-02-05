@@ -1,17 +1,17 @@
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
-use std::fs::{canonicalize, ReadDir};
+use std::fs::{self, canonicalize, DirEntry, ReadDir};
 use std::iter::Fuse;
-use std::mem;
 use std::path::{Path, PathBuf};
+use std::{io, mem};
 
 use bumpalo::collections::Vec as BumpVec;
 use bumpalo::Bump;
-use log::debug;
 use regex::Regex;
 
 use super::{DirTree, FilterType, TreeConfig, TreeNode};
 use crate::util::fs_utils::{filename_to_str, path_to_str};
+use crate::util::test_utils::log_test;
 
 impl<'a> DirTree<'a> {
     pub fn new(config: &TreeConfig<'a>, bump: &'a Bump) -> Result<Self, Box<dyn Error>> {
@@ -97,8 +97,8 @@ impl<'a> DirTree<'a> {
 
         path_set.insert(canonicalize(&root)?);
 
-        let mut stack: VecDeque<(usize, Fuse<ReadDir>)> = VecDeque::<(usize, Fuse<ReadDir>)>::new();
-        stack.push_back((0, root.read_dir()?.fuse()));
+        let mut stack = VecDeque::<(usize, Box<dyn Iterator<Item = io::Result<DirEntry>>>)>::new();
+        stack.push_back((0, Box::new(Self::read_dir_sorted(&root)?)));
 
         while let Some((parent_idx, mut entry_iter)) = stack.pop_back() {
             if let Some(entry) = entry_iter.next() {
@@ -136,17 +136,27 @@ impl<'a> DirTree<'a> {
                     visiable: true,
                 });
                 let child_idx = tree.map.len() - 1;
-                debug!("Create tree node, Index {}: {:?}", child_idx, tree.map[child_idx]);
+                log_test!("Create tree node, Index {}: {:?}", child_idx, tree.map[child_idx]);
                 tree.map[parent_idx].children.push(child_idx);
 
                 stack.push_back((parent_idx, entry_iter));
                 if entry_type.is_dir() || (entry_type.is_symlink() && real_path.is_dir()) {
-                    stack.push_back((child_idx, entry.path().read_dir()?.fuse()));
+                    stack.push_back((child_idx, Box::new(Self::read_dir_sorted(entry.path())?)));
                 }
             }
         }
         Ok(tree)
     }
+
+    fn read_dir_sorted<P: AsRef<Path>>(
+        path: P,
+    ) -> io::Result<impl Iterator<Item = io::Result<DirEntry>>> {
+        let mut entries: Vec<DirEntry> =
+            fs::read_dir(path)?.collect::<Result<Vec<_>, io::Error>>()?;
+        entries.sort_by_key(|e| e.file_name().to_string_lossy().into_owned());
+        Ok(entries.into_iter().map(Ok).fuse())
+    }
+
     fn count_sub_entry(path: &Path) -> usize {
         if let Ok(dir) = path.read_dir() {
             dir.count()

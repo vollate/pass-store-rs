@@ -231,16 +231,16 @@ mod tests {
 ├── apple_banana_cherry
 └── nuts_and_seeds
     ├── almond_cashew_pistachio
-    ├── walnut_pecan_hazelnut
-    ├── sunflower_pumpkin_flax
+    ├── raw
+    │   ├── raw_almonds
+    │   ├── raw_cashews
+    │   └── raw_pumpkin_seeds
     ├── roasted
     │   ├── roasted_almonds
     │   ├── roasted_cashews
     │   └── roasted_pumpkin_seeds
-    └── raw
-        ├── raw_almonds
-        ├── raw_cashews
-        └── raw_pumpkin_seeds"#
+    ├── sunflower_pumpkin_flax
+    └── walnut_pecan_hazelnut"#
                 );
             },
             {
