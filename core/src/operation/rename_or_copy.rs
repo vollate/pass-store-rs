@@ -3,7 +3,8 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::{fs, path};
 
-use crate::util::fs_utils::{better_rename, copy_dir_recursive, is_subpath_of};
+use crate::util::fs_utils;
+use crate::util::fs_utils::{better_rename, copy_dir_recursive};
 use crate::{IOErr, IOErrType};
 
 // Currently, we do not support cross repo rename/copy
@@ -160,12 +161,7 @@ where
 {
     let mut from_path = root.join(from);
 
-    if !is_subpath_of(root, &from_path)? {
-        let err_msg =
-            format!("'{}' is not the subpath of the root path '{}'", from, root.display());
-        writeln!(stderr, "{}", err_msg)?;
-        return Err(err_msg.into());
-    }
+    fs_utils::path_attack_check(root, &from_path, from, stderr)?;
 
     if !from_path.exists() {
         let try_path = from_path.with_extension(extension);
@@ -176,11 +172,7 @@ where
     }
 
     let to_path = root.join(to);
-    if !is_subpath_of(root, &to_path)? {
-        let err_msg = format!("'{}' is not the subpath of the root path '{}'", to, root.display());
-        writeln!(stderr, "{}", err_msg)?;
-        return Err(err_msg.into());
-    }
+    fs_utils::path_attack_check(root, &to_path, to, stderr)?;
 
     let to_is_dir = to.ends_with(path::MAIN_SEPARATOR);
     if to_is_dir {
@@ -212,7 +204,6 @@ mod tests {
 
     use os_pipe::pipe;
     use pretty_assertions::assert_eq;
-    use serial_test::serial;
 
     use super::*;
     use crate::util::defer::cleanup;
@@ -226,7 +217,7 @@ mod tests {
         // ├── d_dir/
         // ├── e_dir/
         // └── b.gpg
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] =
             &[(None, &["a.gpg", "b.gpg"][..]), (Some("d_dir"), &[][..]), (Some("e_dir"), &[][..])];
         create_dir_structure(&root, structure);
@@ -334,7 +325,7 @@ mod tests {
         // ├── d_dir/
         // ├── e_dir/
         // └── b.gpg
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] =
             &[(None, &["a.gpg", "b.gpg"][..]), (Some("d_dir"), &[][..]), (Some("e_dir"), &[][..])];
         create_dir_structure(&root, structure);
@@ -445,7 +436,7 @@ mod tests {
         // Simple structure:
         // root
         // └── a.gpg
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] = &[(None, &["a.gpg"][..])];
         create_dir_structure(&root, &structure);
 

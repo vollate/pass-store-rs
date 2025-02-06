@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::io::{Read, Write};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use secrecy::{ExposeSecret, SecretString};
@@ -7,11 +8,7 @@ use zeroize::Zeroize;
 
 use super::{PGPClient, PGPErr};
 impl PGPClient {
-    pub fn encrypt(
-        &self,
-        plaintext: &str,
-        output_path: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn encrypt(&self, plaintext: &str, output_path: &str) -> Result<(), Box<dyn Error>> {
         let mut child = Command::new(&self.executable)
             .args(&[
                 "--batch",
@@ -35,12 +32,25 @@ impl PGPClient {
             println!("File encrypted successfully: {}", output_path); //TODO: remove
             Ok(())
         } else {
-            Err("PGP encryption failed".into())
+            let mut buffer = String::new();
+            let err_msg = match child.stderr.take() {
+                Some(mut err) => {
+                    let _ = err.read_to_string(&mut buffer);
+                    buffer
+                }
+                None => String::new(),
+            };
+            Err(format!("PGP encryption failed: {}", err_msg).into())
         }
     }
 
-    pub fn decrypt_stdin(&self, file_path: &str) -> Result<SecretString, Box<dyn Error>> {
+    pub fn decrypt_stdin(
+        &self,
+        work_dir: &Path,
+        file_path: &str,
+    ) -> Result<SecretString, Box<dyn Error>> {
         let output = Command::new(&self.executable)
+            .current_dir(work_dir)
             .args(&[
                 "--decrypt",
                 "--recipient",
@@ -100,7 +110,6 @@ impl PGPClient {
 
 #[cfg(test)]
 mod tests {
-
     use std::fs;
     use std::path::Path;
 
@@ -110,8 +119,9 @@ mod tests {
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::test_utils::{
-        clean_up_test_key, get_test_email, get_test_executable, get_test_password,
-        get_test_username, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
+        clean_up_test_key, cleanup_test_dir, gen_unique_temp_dir, get_test_email,
+        get_test_executable, get_test_password, get_test_username, gpg_key_edit_example_batch,
+        gpg_key_gen_example_batch,
     };
 
     #[test]
@@ -152,8 +162,9 @@ mod tests {
         let executable = &get_test_executable();
         let email = &get_test_email();
         let plaintext = "Hello, world!\nThis is a test message.\n";
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let output_dest = "decrypt.gpg";
-        let _ = fs::remove_file(output_dest);
+
         cleanup!(
             {
                 let mut test_client = PGPClient::new(
@@ -167,12 +178,13 @@ mod tests {
                 test_client.update_info().unwrap();
 
                 test_client.encrypt(plaintext, output_dest).unwrap();
-                let decrypted = test_client.decrypt_stdin(output_dest).unwrap();
+                let decrypted = test_client.decrypt_stdin(&root, output_dest).unwrap();
                 assert_eq!(decrypted.expose_secret(), plaintext);
                 fs::remove_file(output_dest).unwrap();
             },
             {
                 clean_up_test_key(executable, email).unwrap();
+                cleanup_test_dir(&root);
             }
         )
     }

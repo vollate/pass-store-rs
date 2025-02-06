@@ -90,7 +90,7 @@ impl<'a> DirTree<'a> {
             children: Vec::with_capacity(Self::count_sub_entry(&root)),
             node_type: root.as_path().into(),
             symlink_target: None, // No need to store root's symlink target
-            is_rescursive: false,
+            is_recursive: false,
             visiable: true,
         });
 
@@ -115,14 +115,17 @@ impl<'a> DirTree<'a> {
                     real_path = real_path.read_link()?;
                 }
                 let canonical_path = canonicalize(&real_path)?;
-                let is_recursive_link = path_set.contains(&canonical_path);
+                let is_recursive_link =
+                    path_set.contains(&canonical_path) && entry_type.is_symlink();
                 tree.map.push(TreeNode {
                     name: filename_to_str(&entry.path())?.to_string(),
                     parent: Some(parent_idx.clone()),
                     children: Vec::with_capacity(if is_recursive_link {
                         0
                     } else {
-                        path_set.insert(canonical_path);
+                        if canonical_path.is_dir() {
+                            path_set.insert(canonical_path);
+                        }
                         Self::count_sub_entry(&entry.path())
                     }),
                     node_type: entry.path().into(),
@@ -131,7 +134,7 @@ impl<'a> DirTree<'a> {
                     } else {
                         None
                     },
-                    is_rescursive: is_recursive_link,
+                    is_recursive: is_recursive_link,
                     visiable: true,
                 });
                 let child_idx = tree.map.len() - 1;
@@ -139,7 +142,9 @@ impl<'a> DirTree<'a> {
                 tree.map[parent_idx].children.push(child_idx);
 
                 stack.push_back((parent_idx, entry_iter));
-                if entry_type.is_dir() || (entry_type.is_symlink() && real_path.is_dir()) {
+                let need_iterate_child =
+                    entry_type.is_dir() || (entry_type.is_symlink() && real_path.is_dir());
+                if !is_recursive_link && need_iterate_child {
                     stack.push_back((child_idx, Box::new(Self::read_dir_sorted(entry.path())?)));
                 }
             }

@@ -144,7 +144,7 @@ mod test {
         // │   └── file2
         // ├ file3
         // └ dir2
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] =
             &[(Some("dir1"), &["file1", "file2"]), (Some("dir2"), &[]), (None, &["file3"])];
         create_dir_structure(&root, structure);

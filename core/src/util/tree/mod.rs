@@ -45,7 +45,7 @@ pub struct TreeNode {
     pub children: Vec<usize>,
     pub node_type: NodeType,
     pub symlink_target: Option<String>,
-    pub is_rescursive: bool,
+    pub is_recursive: bool,
     pub visiable: bool,
 }
 

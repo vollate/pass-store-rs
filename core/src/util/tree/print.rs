@@ -10,26 +10,33 @@ impl<'a> DirTree<'a> {
     pub fn print_tree(&self, config: &PrintConfig) -> Result<String, Box<dyn Error>> {
         log_test!("Start to print tree: {:?}", self.map);
         let mut tree_builder = String::new(); //TODO(Vollate): we should use other structure for building string(huge dir case)
-        let mut stack = VecDeque::<(usize, usize)>::new();
-        stack.push_back((self.root, 0));
-        let mut space_to_print = 0;
-        while let Some((parent_idx, vec_idx)) = stack.pop_back() {
+        let mut node_stack = VecDeque::<(usize, usize)>::new();
+        node_stack.push_back((self.root, 0));
+        let mut level_stack = VecDeque::<bool>::new();
+        while let Some((parent_idx, vec_idx)) = node_stack.pop_back() {
+            level_stack.pop_back();
             if vec_idx >= self.map[parent_idx].children.len() {
                 continue;
             }
             let child_idx = self.map[parent_idx].children[vec_idx];
             let child = &self.map[child_idx];
+
+            let is_local_last = vec_idx + 1 == self.map[parent_idx].children.len();
+            level_stack.push_back(is_local_last);
+            log_test!("{:?}", level_stack);
             if !child.visiable {
-                stack.push_back((parent_idx, vec_idx + 1));
+                node_stack.push_back((parent_idx, vec_idx + 1));
                 continue;
             }
             let is_local_last = vec_idx + 1 == self.map[parent_idx].children.len();
-
-            for _ in 0..space_to_print {
-                tree_builder.push_str("    ");
-            }
-            for _ in space_to_print..stack.len() {
-                tree_builder.push_str("│   ");
+            if level_stack.len() > 1 {
+                for i in 0..level_stack.len() - 1 {
+                    if level_stack[i] {
+                        tree_builder.push_str("    ");
+                    } else {
+                        tree_builder.push_str("│   ");
+                    }
+                }
             }
 
             if is_local_last {
@@ -38,13 +45,7 @@ impl<'a> DirTree<'a> {
                 tree_builder.push_str("├── ");
             }
 
-            if (space_to_print > 0 || parent_idx == self.root)
-                && is_local_last
-                && space_to_print == stack.len()
-            {
-                space_to_print += 1;
-            }
-            stack.push_back((parent_idx, vec_idx + 1));
+            node_stack.push_back((parent_idx, vec_idx + 1));
 
             match child.node_type {
                 NodeType::Symlink => {
@@ -57,13 +58,14 @@ impl<'a> DirTree<'a> {
                     } else {
                         format!("{} -> {}", child.name, child.symlink_target.as_ref().unwrap())
                     };
-                    if child.is_rescursive {
-                        line = format!("{} [rescursive]\n", line);
+                    if child.is_recursive {
+                        line = format!("{} [recursive, not followed]\n", line);
                     } else {
                         line.push('\n');
                     }
                     tree_builder.push_str(line.as_str());
-                    stack.push_back((child_idx, 0));
+                    node_stack.push_back((child_idx, 0));
+                    level_stack.push_back(false);
                 }
                 NodeType::Dir => {
                     let line = if let Some(color) = config.dir_color {
@@ -72,7 +74,8 @@ impl<'a> DirTree<'a> {
                         format!("{}\n", child.name)
                     };
                     tree_builder.push_str(line.as_str());
-                    stack.push_back((child_idx, 0));
+                    node_stack.push_back((child_idx, 0));
+                    level_stack.push_back(false);
                 }
                 NodeType::File => {
                     let line = if let Some(color) = config.file_color {
@@ -109,8 +112,9 @@ mod tests {
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::fs_utils::create_symlink;
-    use crate::util::test_utils;
-    use crate::util::test_utils::{create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_utils::{
+        self, cleanup_test_dir, create_dir_structure, gen_unique_temp_dir,
+    };
     use crate::util::tree::{FilterType, TreeConfig};
 
     #[test]
@@ -128,7 +132,7 @@ mod tests {
         //     ├── dir4
         //     │   └── dir5
         //     └── file5
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] = &[
             (Some("dir1"), &["file1", "file2"][..]),
             (Some("dir2"), &["file3", "file4"][..]),
@@ -163,7 +167,7 @@ mod tests {
                 );
             },
             {
-                test_utils::cleanup_test_dir(&root);
+                cleanup_test_dir(&root);
             }
         )
     }
@@ -178,7 +182,7 @@ mod tests {
         // ├── dir2
         // │   └── file2
         // └── dir3
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] = &[
             (Some("dir1"), &["file1"][..]),
             (Some("dir2"), &["file2"][..]),
@@ -244,7 +248,7 @@ mod tests {
                 );
             },
             {
-                test_utils::cleanup_test_dir(&root);
+                cleanup_test_dir(&root);
             }
         )
     }
@@ -266,8 +270,8 @@ mod tests {
         // │   └── file2
         // └── dir4
 
-        let root1 = gen_unique_temp_dir();
-        let root2 = gen_unique_temp_dir();
+        let (_tmp_dir, root1) = gen_unique_temp_dir();
+        let (_tmp_dir, root2) = gen_unique_temp_dir();
         let structure1: &[(Option<&str>, &[&str])] = &[(Some("dir1"), &["file1"][..])];
         let structure2: &[(Option<&str>, &[&str])] =
             &[(Some("dir3"), &["file2"][..]), (Some("dir4"), &[][..])];
@@ -300,8 +304,8 @@ mod tests {
                 );
             },
             {
-                test_utils::cleanup_test_dir(&root1);
-                test_utils::cleanup_test_dir(&root2);
+                cleanup_test_dir(&root1);
+                cleanup_test_dir(&root2);
             }
         );
 
@@ -320,8 +324,8 @@ mod tests {
         // ├── dir3
         // │   └── file2
         // └── dir4
-        let root1 = gen_unique_temp_dir();
-        let root2 = gen_unique_temp_dir();
+        let (_tmp_dir, root1) = gen_unique_temp_dir();
+        let (_tmp_dir, root2) = gen_unique_temp_dir();
         let structure1: &[(Option<&str>, &[&str])] = &[
             (Some("dir1"), &["file1"][..]),
             (Some("dir3"), &[][..]),
@@ -361,14 +365,112 @@ mod tests {
                 );
             },
             {
-                test_utils::cleanup_test_dir(&root1);
-                test_utils::cleanup_test_dir(&root2);
+                cleanup_test_dir(&root1);
+                cleanup_test_dir(&root2);
             }
         )
     }
 
     #[test]
     fn test_recursive_detection() {
-        todo!("test recursive symbol link detection")
+        let no_color_print =
+            PrintConfig { dir_color: None, file_color: None, symbol_color: None, tree_color: None };
+
+        // Test direct recursion
+        {
+            let (_tmp_dir, root) = gen_unique_temp_dir();
+            let structure: &[(Option<&str>, &[&str])] =
+                &[(Some("dir1"), &["file1.txt"][..]), (None, &["root_file.txt"][..])];
+            create_dir_structure(&root, structure);
+
+            cleanup!(
+                {
+                    // Create self-referential symlink
+                    create_symlink(&root.join("dir1"), &root.join("dir1/loop")).unwrap();
+
+                    let config = TreeConfig {
+                        root: &root,
+                        target: "",
+                        filter_type: FilterType::Exclude,
+                        filters: Vec::new(),
+                    };
+                    let bump = Bump::new();
+                    let tree = DirTree::new(&config, &bump).unwrap();
+                    let result = tree.print_tree(&no_color_print).unwrap();
+                    log_test!("{}", result);
+
+                    assert_eq!(
+                        result,
+                        format!(
+                            r#"├── dir1
+│   ├── file1.txt
+│   └── loop -> {} [recursive, not followed]
+└── root_file.txt"#,
+                            root.join("dir1").to_str().unwrap()
+                        )
+                    );
+                },
+                {
+                    cleanup_test_dir(&root);
+                }
+            );
+        }
+
+        // Test indirect recursion
+        {
+            let (_tmp_dir, root) = gen_unique_temp_dir();
+            let structure: &[(Option<&str>, &[&str])] = &[
+                (Some("dirA"), &["fileA.txt"][..]),
+                (Some("dirB"), &["fileB.txt"][..]),
+                (Some("dirC"), &["fileC.txt"][..]),
+            ];
+            create_dir_structure(&root, structure);
+
+            cleanup!(
+                {
+                    // Create circular reference: A -> B -> C -> A
+                    create_symlink(&root.join("dirB"), &root.join("dirA/linkB")).unwrap();
+                    create_symlink(&root.join("dirC"), &root.join("dirB/linkC")).unwrap();
+                    create_symlink(&root.join("dirA"), &root.join("dirC/linkA")).unwrap();
+
+                    let config = TreeConfig {
+                        root: &root,
+                        target: "",
+                        filter_type: FilterType::Exclude,
+                        filters: Vec::new(),
+                    };
+                    let bump = Bump::new();
+                    let tree = DirTree::new(&config, &bump).unwrap();
+                    let result = tree.print_tree(&no_color_print).unwrap();
+                    log_test!("{}", result);
+                    assert_eq!(
+                        result,
+                        format!(
+                            r#"├── dirA
+│   ├── fileA.txt
+│   └── linkB -> {}
+│       ├── fileB.txt
+│       └── linkC -> {}
+│           ├── fileC.txt
+│           └── linkA -> {} [recursive, not followed]
+├── dirB
+│   ├── fileB.txt
+│   └── linkC -> {} [recursive, not followed]
+└── dirC
+    ├── fileC.txt
+    └── linkA -> {} [recursive, not followed]"#,
+                            root.join("dirB").to_str().unwrap(),
+                            root.join("dirC").to_str().unwrap(),
+                            root.join("dirA").to_str().unwrap(),
+                            root.join("dirC").to_str().unwrap(),
+                            root.join("dirA").to_str().unwrap(),
+                        )
+                    );
+                },
+                {
+                    cleanup_test_dir(&root);
+                }
+            );
+        }
     }
 }

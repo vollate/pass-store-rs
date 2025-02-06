@@ -52,7 +52,7 @@ pub fn edit(
     let temp_filename = format!("{}-{}", rand_aplhabet_string(10), temp_filename.to_string_lossy());
     let temp_filepath = tmp_dir.join(temp_filename);
 
-    let mut content = client.decrypt_stdin(path_to_str(&target_path)?)?;
+    let mut content = client.decrypt_stdin(root, path_to_str(&target_path)?)?;
     fs::write(&temp_filepath, content.expose_secret())?;
     let _cleaner = Defer::new(|| {
         let _ = fs::remove_file(&temp_filepath);
@@ -100,7 +100,7 @@ mod tests {
         // ├── file1.gpg
         // └── dir
         //     └── file2.gpg
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] = &[(Some("dir"), &[][..])];
         create_dir_structure(&root, structure);
 
@@ -130,10 +130,8 @@ mod tests {
                 edit(&test_client, &root, "file1.gpg", "vim").unwrap();
                 edit(&test_client, &root, "dir/file2.gpg", "vim").unwrap();
 
-                let file1_new_content = test_client.decrypt_stdin(output).unwrap();
-                let file2_new_content = test_client
-                    .decrypt_stdin(path_to_str(&root.join("dir").join("file2.gpg")).unwrap())
-                    .unwrap();
+                let file1_new_content = test_client.decrypt_stdin(&root, output).unwrap();
+                let file2_new_content = test_client.decrypt_stdin(&root, "dir/file2.gpg").unwrap();
 
                 println!("file1.gpg new content:\n{}", file1_new_content.expose_secret());
                 println!("dir/file2.gpg new content:\n{}", file2_new_content.expose_secret());
