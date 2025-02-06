@@ -4,7 +4,6 @@ on:
   push:
     branches: [ "main" ]
   pull_request:
-    # The branches below must be a subset of the branches above
     branches: [ "main" ]
   schedule:
     - cron: '30 0 * * 0'  # Runs at 00:30 UTC every Sunday
@@ -14,7 +13,10 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
 
-    # Minimal permissions required for the CodeQL Action
+    # Set the environment variable at the job level so every step inherits it.
+    env:
+      CODEQL_EXPERIMENTAL_RUST: true
+
     permissions:
       actions: read
       contents: read
@@ -23,6 +25,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Specify the languages to be analyzed.
+        # Note: CodeQL support for Rust is experimental.
         language: [ "rust" ]
 
     steps:
@@ -33,9 +37,13 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          # Optionally, specify a custom queries directory:
+          # queries: ./codeql-queries
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
+        # If you need a custom build command, for example:
+        # run: cargo build --verbose
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
