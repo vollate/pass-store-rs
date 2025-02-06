@@ -32,7 +32,7 @@ pub fn ls_interact(
             Ok(format!("{}\n{}", tree_cfg.target, result))
         }
     } else if full_path.is_file() {
-        let data = client.decrypt_stdin(path_to_str(&full_path)?)?;
+        let data = client.decrypt_stdin(tree_cfg.root, path_to_str(&full_path)?)?;
         return Ok(data.expose_secret().to_string());
     } else {
         return Err(IOErr::new(IOErrType::InvalidFileType, &full_path).into());
@@ -84,7 +84,7 @@ mod tests {
         // │   └── file4.gpg
         // └── test.py
 
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] = &[
             (Some("dir1"), &["file1.gpg", "file2.gpg"][..]),
             (Some("dir2"), &["file3.gpg", "file4.gpg"][..]),

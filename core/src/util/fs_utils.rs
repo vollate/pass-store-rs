@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fs::DirEntry;
+use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 #[cfg(windows)]
@@ -202,4 +203,23 @@ pub(crate) fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<()
     permissions.set_readonly(readonly);
     fs::set_permissions(path, permissions)?;
     Ok(())
+}
+
+pub fn path_attack_check<E>(
+    root: &Path,
+    child: &Path,
+    child_name: &str,
+    err_stream: &mut E,
+) -> Result<(), Box<dyn Error>>
+where
+    E: Write,
+{
+    if !is_subpath_of(root, &child)? {
+        let err_msg =
+            format!("'{}' is not the subpath of the root path '{}'", child_name, root.display());
+        writeln!(err_stream, "{}", err_msg)?;
+        Err(err_msg.into())
+    } else {
+        Ok(())
+    }
 }

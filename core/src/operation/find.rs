@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_find_term() {
-        let root = gen_unique_temp_dir();
+        let (_tmp_dir, root) = gen_unique_temp_dir();
         // structure:
         // root
         // ├── apple_banana_cherry.gpg

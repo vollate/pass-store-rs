@@ -25,4 +25,6 @@ macro_rules! cleanup {
         }
     }};
 }
+
+#[allow(unused_imports)]
 pub(crate) use cleanup;

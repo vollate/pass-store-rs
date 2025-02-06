@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::{env, fs};
 
@@ -69,19 +70,20 @@ save
     .to_string()
 }
 
-pub(crate) fn gen_unique_temp_dir() -> std::path::PathBuf {
+pub(crate) fn gen_unique_temp_dir() -> (TempDir, PathBuf) {
     let base_dir = temp_dir().join("pass-rs-test");
     if !base_dir.exists() {
         fs::create_dir(&base_dir).unwrap();
     }
     let dir = TempDir::new_in(base_dir).unwrap();
-    dir.path().to_path_buf()
+    let path = dir.path().to_path_buf();
+    (dir, path)
 }
 
 pub(crate) fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&str])]) {
     for (dir, files) in structure {
         let dir_path = match dir {
-            Some(subdir) => base.join(subdir),
+            Some(sub_dir) => base.join(sub_dir),
             None => base.to_path_buf(),
         };
         if !dir_path.exists() {
@@ -94,7 +96,7 @@ pub(crate) fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&s
 }
 
 pub(crate) fn cleanup_test_dir(base: &Path) {
-    fs::remove_dir_all(base).unwrap();
+    let _ = fs::remove_dir_all(base);
 }
 
 macro_rules! log_test {
