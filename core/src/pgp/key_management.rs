@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::process::{Command, Stdio};
 
 use crate::pgp::utils::wait_child_process;

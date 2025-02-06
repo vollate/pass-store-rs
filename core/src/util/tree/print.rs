@@ -112,9 +112,7 @@ mod tests {
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::fs_utils::create_symlink;
-    use crate::util::test_utils::{
-        self, cleanup_test_dir, create_dir_structure, gen_unique_temp_dir,
-    };
+    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
     use crate::util::tree::{FilterType, TreeConfig};
 
     #[test]

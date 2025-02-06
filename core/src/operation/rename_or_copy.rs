@@ -13,7 +13,7 @@ fn handle_overwrite_delete<I, O, E>(
     force: bool,
     stdin: &mut I,
     stdout: &mut O,
-    stderr: &mut E,
+    _stderr: &mut E,
 ) -> Result<bool, Box<dyn Error>>
 where
     I: Read,

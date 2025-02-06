@@ -131,13 +131,13 @@ impl PGPClient {
     }
 
     pub(crate) fn update_info(&mut self) -> Result<(), Box<dyn Error>> {
-        //TODO: update username
+        //TODO(Vollate): update username
         match (&self.key_fpr, &self.username, &self.email) {
             (Some(_), Some(_), Some(_)) => {}
             (Some(k), _, _) => {
                 self.email = Some(fingerprint_to_email(&self.executable, k)?);
             }
-            (_, Some(u), Some(m)) => {
+            (_, Some(_u), Some(m)) => {
                 self.key_fpr = Some(user_email_to_fingerprint(&self.executable, m)?);
             }
             (None, None, None) => {

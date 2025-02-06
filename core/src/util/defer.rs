@@ -16,6 +16,7 @@ impl<F: FnOnce()> Drop for Defer<F> {
     }
 }
 
+#[cfg(test)]
 macro_rules! cleanup {
     ($test:block, $cleanup:block) => {{
         let result = std::panic::catch_unwind(|| $test);
@@ -26,5 +27,5 @@ macro_rules! cleanup {
     }};
 }
 
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use cleanup;
