@@ -6,7 +6,7 @@ use std::path::Path;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::pgp::PGPClient;
-use crate::util::fs_utils::{
+use crate::util::fs_util::{
     backup_encrypted_file, is_subpath_of, path_to_str, restore_backup_file,
 };
 
@@ -95,7 +95,7 @@ mod tests {
 
     use super::*;
     use crate::util::defer::cleanup;
-    use crate::util::test_utils::*;
+    use crate::util::test_util::*;
 
     fn setup_test_environment() -> (String, String, PGPClient, TempDir, PathBuf) {
         let executable = get_test_executable();

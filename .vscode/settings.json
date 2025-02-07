@@ -2,6 +2,6 @@
 {
   "rust-analyzer.linkedProjects": [
     "${workspaceFolder}/core/Cargo.toml",
-    "${workspaceFolder}/Cargo.toml"
+    "${workspaceFolder}/cli/Cargo.toml"
   ]
 }

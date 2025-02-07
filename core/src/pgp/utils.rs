@@ -158,7 +158,7 @@ mod gpg_client_tests {
 
     use super::user_email_to_fingerprint;
     use crate::pgp::PGPClient;
-    use crate::util::test_utils::{
+    use crate::util::test_util::{
         clean_up_test_key, get_test_email, get_test_executable, get_test_username,
         gpg_key_gen_example_batch,
     };

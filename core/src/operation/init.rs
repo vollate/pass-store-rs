@@ -6,7 +6,7 @@ use secrecy::ExposeSecret;
 
 use crate::pgp::utils::{check_recipient_type, user_email_to_fingerprint, RecipientType};
 use crate::pgp::PGPClient;
-use crate::util::fs_utils::{backup_encrypted_file, path_to_str, process_files_recursively};
+use crate::util::fs_util::{backup_encrypted_file, path_to_str, process_files_recursively};
 use crate::{IOErr, IOErrType};
 
 const FPR_FILENAME: &str = ".gpg-id";

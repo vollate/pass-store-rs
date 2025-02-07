@@ -4,7 +4,7 @@ use bumpalo::Bump;
 use secrecy::ExposeSecret;
 
 use crate::pgp::PGPClient;
-use crate::util::fs_utils::path_to_str;
+use crate::util::fs_util::path_to_str;
 use crate::util::str;
 use crate::util::str::remove_lines_postfix;
 use crate::util::tree::{DirTree, PrintConfig, TreeConfig};
@@ -68,7 +68,7 @@ mod tests {
 
     use super::*;
     use crate::util::defer::cleanup;
-    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_util::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
     use crate::util::tree::FilterType;
 
     //TODO: check interactive mode

@@ -9,8 +9,8 @@ use bumpalo::Bump;
 use regex::Regex;
 
 use super::{DirTree, FilterType, TreeConfig, TreeNode};
-use crate::util::fs_utils::{filename_to_str, path_to_str};
-use crate::util::test_utils::log_test;
+use crate::util::fs_util::{filename_to_str, path_to_str};
+use crate::util::test_util::log_test;
 
 impl<'a> DirTree<'a> {
     pub fn new(config: &TreeConfig<'a>, bump: &'a Bump) -> Result<Self, Box<dyn Error>> {

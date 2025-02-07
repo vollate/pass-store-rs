@@ -3,8 +3,8 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::{fs, path};
 
-use crate::util::fs_utils;
-use crate::util::fs_utils::{better_rename, copy_dir_recursive};
+use crate::util::fs_util;
+use crate::util::fs_util::{better_rename, copy_dir_recursive};
 use crate::{IOErr, IOErrType};
 
 // Currently, we do not support cross repo rename/copy
@@ -161,7 +161,7 @@ where
 {
     let mut from_path = root.join(from);
 
-    fs_utils::path_attack_check(root, &from_path, from, stderr)?;
+    fs_util::path_attack_check(root, &from_path, from, stderr)?;
 
     if !from_path.exists() {
         let try_path = from_path.with_extension(extension);
@@ -172,7 +172,7 @@ where
     }
 
     let to_path = root.join(to);
-    fs_utils::path_attack_check(root, &to_path, to, stderr)?;
+    fs_util::path_attack_check(root, &to_path, to, stderr)?;
 
     let to_is_dir = to.ends_with(path::MAIN_SEPARATOR);
     if to_is_dir {
@@ -207,7 +207,7 @@ mod tests {
 
     use super::*;
     use crate::util::defer::cleanup;
-    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_util::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
 
     #[test]
     fn rename_test() {

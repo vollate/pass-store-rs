@@ -1,12 +1,6 @@
-[package]
-name = "pass-store"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-fs_extra = "1.3.0"
-pass-store-rs-core = { path = "core" }
-
 [profile.release]
 lto = "fat"
 opt-level = "z"
+
+[workspace]
+members = ["cli","core"]

@@ -7,7 +7,7 @@ use passwords::PasswordGenerator;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::pgp::PGPClient;
-use crate::util::fs_utils::{
+use crate::util::fs_util::{
     backup_encrypted_file, path_attack_check, path_to_str, restore_backup_file,
 };
 
@@ -125,7 +125,7 @@ mod tests {
 
     use super::*;
     use crate::util::defer::cleanup;
-    use crate::util::test_utils::*;
+    use crate::util::test_util::*;
 
     fn setup_test_client() -> PGPClient {
         let mut test_client = PGPClient::new(

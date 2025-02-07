@@ -4,7 +4,7 @@ use std::error::Error;
 use colored::Colorize;
 
 use super::{DirTree, NodeType, PrintConfig};
-use crate::util::test_utils::log_test;
+use crate::util::test_util::log_test;
 
 impl<'a> DirTree<'a> {
     pub fn print_tree(&self, config: &PrintConfig) -> Result<String, Box<dyn Error>> {
@@ -111,8 +111,8 @@ mod tests {
 
     use super::*;
     use crate::util::defer::cleanup;
-    use crate::util::fs_utils::create_symlink;
-    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::fs_util::create_symlink;
+    use crate::util::test_util::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
     use crate::util::tree::{FilterType, TreeConfig};
 
     #[test]

@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
-use crate::util::fs_utils::is_subpath_of;
+use crate::util::fs_util::is_subpath_of;
 use crate::{IOErr, IOErrType};
 
 fn remove_dir_recursive<E>(dir: &Path, stderr: &mut E) -> io::Result<()>
@@ -117,8 +117,8 @@ mod test {
 
     use super::*;
     use crate::util::defer::cleanup;
-    use crate::util::fs_utils::set_readonly;
-    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::fs_util::set_readonly;
+    use crate::util::test_util::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
 
     fn enter_input_with_delay<T>(
         input_str: &str,

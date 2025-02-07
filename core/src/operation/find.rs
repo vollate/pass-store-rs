@@ -35,7 +35,7 @@ mod tests {
 
     use super::*;
     use crate::util::defer::cleanup;
-    use crate::util::test_utils::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_util::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
 
     #[test]
     fn test_find_term() {
