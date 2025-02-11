@@ -18,6 +18,9 @@ pub struct CliParser {
     /// Optional arguments if no explicit command is provided.
     #[arg(trailing_var_arg = true)]
     pub args: Vec<String>,
+
+    #[arg(short = 'r', long = "repo", global = true)]
+    pub base_dir: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -185,33 +188,34 @@ pub enum Commands {
 pub fn handle_cli(cli: CliParser) {
     match cli.command {
         Some(Commands::Init { path, gpg_ids }) => {
-            command::init::cmd_init(path.as_deref(), &gpg_ids);
+            command::init::cmd_init(cli.base_dir, path.as_deref(), &gpg_ids);
         }
         Some(Commands::Ls { subfolder }) => {
-            command::ls::cmd_ls(subfolder.as_deref());
+            command::ls::cmd_ls(cli.base_dir, subfolder.as_deref());
         }
         Some(Commands::Grep { args }) => {
             if let Some(search_string) = args.last() {
                 let grep_options = &args[..args.len() - 1];
-                command::grep::cmd_grep(grep_options, search_string);
+                command::grep::cmd_grep(cli.base_dir, grep_options, search_string);
             } else {
                 eprintln!("Error: grep requires at least a search string.");
             }
         }
         Some(Commands::Find { names }) => {
-            command::find::cmd_find(&names);
+            command::find::cmd_find(cli.base_dir, &names);
         }
         Some(Commands::Show { clip, qrcode, pass_name }) => {
-            command::show::cmd_show(clip, qrcode, &pass_name);
+            command::show::cmd_show(cli.base_dir, clip, qrcode, &pass_name);
         }
         Some(Commands::Insert { pass_name, echo, multiline, force }) => {
-            command::insert::cmd_insert(&pass_name, echo, multiline, force);
+            command::insert::cmd_insert(cli.base_dir, &pass_name, echo, multiline, force);
         }
         Some(Commands::Edit { pass_name }) => {
-            command::edit::cmd_edit(&pass_name);
+            command::edit::cmd_edit(cli.base_dir, &pass_name);
         }
         Some(Commands::Generate { no_symbols, clip, in_place, force, pass_name, pass_length }) => {
             command::generate::cmd_generate(
+                cli.base_dir,
                 no_symbols,
                 clip,
                 in_place,
@@ -221,16 +225,16 @@ pub fn handle_cli(cli: CliParser) {
             );
         }
         Some(Commands::Rm { recursive, force, pass_name }) => {
-            command::rm::cmd_rm(recursive, force, &pass_name);
+            command::rm::cmd_rm(cli.base_dir, recursive, force, &pass_name);
         }
         Some(Commands::Mv { force, old_path, new_path }) => {
-            command::mv::cmd_mv(force, &old_path, &new_path);
+            command::mv::cmd_mv(cli.base_dir, force, &old_path, &new_path);
         }
         Some(Commands::Cp { force, old_path, new_path }) => {
-            command::cp::cmd_cp(force, &old_path, &new_path);
+            command::cp::cmd_cp(cli.base_dir, force, &old_path, &new_path);
         }
         Some(Commands::Git { args }) => {
-            command::git::cmd_git(&args);
+            command::git::cmd_git(cli.base_dir, &args);
         }
         None => {
             CliParser::command().print_help().unwrap();

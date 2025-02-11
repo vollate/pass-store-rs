@@ -24,6 +24,9 @@ os_pipe = "1.2.1"
 serial_test = "3.2.0"
 pretty_assertions = "1.4.1"
 clean-path = "0.2.1"
+config = "0.15.8"
+toml = "0.8.20"
+serde = { version = "1.0.217", features = ["derive"] }
 
 
 [features]

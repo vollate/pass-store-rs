@@ -1,5 +1,7 @@
 mod command;
+mod constants;
 mod parser;
+mod util;
 
 use clap::Parser;
 use parser::CliParser;

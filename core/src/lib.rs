@@ -8,6 +8,7 @@ mod util;
 
 mod bundle;
 mod clipboard;
+mod config;
 mod git;
 mod operation;
 mod pgp;

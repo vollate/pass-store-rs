@@ -1,4 +1,5 @@
 pub fn cmd_generate(
+    base_dir: Option<String>,
     no_symbols: bool,
     clip: bool,
     in_place: bool,
