@@ -29,15 +29,13 @@ pub fn save_config<P: AsRef<Path>>(config: &ParsConfig, path: P) -> Result<(), B
 mod tests {
 
     use pretty_assertions::assert_eq;
-    
-
-    use crate::util::test_util::gen_unique_temp_dir;
 
     use super::*;
+    use crate::util::test_util::gen_unique_temp_dir;
 
     #[test]
     fn test_save_and_load_config() {
-        let (_temp_dir,root) = gen_unique_temp_dir();
+        let (_temp_dir, root) = gen_unique_temp_dir();
         let config_path = root.join("config.toml");
 
         let test_config = ParsConfig::default();

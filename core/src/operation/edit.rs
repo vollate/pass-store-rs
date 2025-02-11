@@ -84,8 +84,8 @@ mod tests {
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::test_util::{
-        clean_up_test_key, cleanup_test_dir, create_dir_structure, gen_unique_temp_dir,
-        get_test_email, get_test_executable, get_test_username, gpg_key_edit_example_batch,
+        clean_up_test_key, create_dir_structure, gen_unique_temp_dir, get_test_email,
+        get_test_executable, get_test_username, gpg_key_edit_example_batch,
         gpg_key_gen_example_batch,
     };
 
@@ -137,7 +137,6 @@ mod tests {
                 println!("dir/file2.gpg new content:\n{}", file2_new_content.expose_secret());
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );

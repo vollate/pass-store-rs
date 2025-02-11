@@ -220,7 +220,6 @@ mod tests {
                 assert_eq!(password.expose_secret().len(), 114);
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -274,7 +273,6 @@ mod tests {
                 assert_eq!(lines[2], "for super earth");
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -322,7 +320,6 @@ mod tests {
                 assert_eq!(content.expose_secret(), password.expose_secret());
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -364,7 +361,6 @@ mod tests {
                 assert!(!password.expose_secret().contains(|c: char| !c.is_alphanumeric()));
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -405,7 +401,6 @@ mod tests {
                 assert!(result.is_err());
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -446,7 +441,6 @@ mod tests {
                 assert!(result.is_err());
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );

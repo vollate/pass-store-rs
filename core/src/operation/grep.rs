@@ -89,7 +89,6 @@ mod tests {
                 assert_eq!(results, vec!["dir1/test_pass.gpg:", "nullptr"]);
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -107,7 +106,6 @@ mod tests {
                 assert_eq!(results, vec!["dir1/test_pass.gpg:", "secret content"]);
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -125,7 +123,6 @@ mod tests {
                 assert!(results.is_empty());
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );

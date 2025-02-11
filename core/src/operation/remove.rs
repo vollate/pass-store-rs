@@ -118,7 +118,7 @@ mod test {
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::fs_util::set_readonly;
-    use crate::util::test_util::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_util::{create_dir_structure, gen_unique_temp_dir};
 
     fn enter_input_with_delay<T>(
         input_str: &str,
@@ -217,9 +217,7 @@ mod test {
                 remove_io(&root, dist, false, true, &mut stdin, &mut stdout, &mut stderr).unwrap();
                 input_thread.join().unwrap();
             },
-            {
-                cleanup_test_dir(&root);
-            }
+            {}
         )
     }
 }

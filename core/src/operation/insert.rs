@@ -150,7 +150,6 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "password");
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -190,7 +189,6 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "line1\nline2\nline3");
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -235,7 +233,6 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "new_password");
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );
@@ -268,7 +265,6 @@ mod tests {
                 assert!(result.is_err());
             },
             {
-                cleanup_test_dir(&root);
                 clean_up_test_key(&executable, &email).unwrap();
             }
         );

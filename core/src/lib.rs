@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 use std::error::Error;
 use std::fmt::Display;
 use std::path::Path;

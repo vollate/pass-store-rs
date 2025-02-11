@@ -112,7 +112,7 @@ mod tests {
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::fs_util::create_symlink;
-    use crate::util::test_util::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_util::{create_dir_structure, gen_unique_temp_dir};
     use crate::util::tree::{FilterType, TreeConfig};
 
     #[test]
@@ -164,9 +164,7 @@ mod tests {
     └── file5"#
                 );
             },
-            {
-                cleanup_test_dir(&root);
-            }
+            {}
         )
     }
 
@@ -245,9 +243,7 @@ mod tests {
     └── file2"#
                 );
             },
-            {
-                cleanup_test_dir(&root);
-            }
+            {}
         )
     }
 
@@ -301,10 +297,7 @@ mod tests {
                     )
                 );
             },
-            {
-                cleanup_test_dir(&root1);
-                cleanup_test_dir(&root2);
-            }
+            {}
         );
 
         // Create directory structure as below:
@@ -362,10 +355,7 @@ mod tests {
                     )
                 );
             },
-            {
-                cleanup_test_dir(&root1);
-                cleanup_test_dir(&root2);
-            }
+            {}
         )
     }
 
@@ -408,9 +398,7 @@ mod tests {
                         )
                     );
                 },
-                {
-                    cleanup_test_dir(&root);
-                }
+                {}
             );
         }
 
@@ -465,9 +453,7 @@ mod tests {
                         )
                     );
                 },
-                {
-                    cleanup_test_dir(&root);
-                }
+                {}
             );
         }
     }

@@ -207,7 +207,7 @@ mod tests {
 
     use super::*;
     use crate::util::defer::cleanup;
-    use crate::util::test_util::{cleanup_test_dir, create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_util::{create_dir_structure, gen_unique_temp_dir};
 
     #[test]
     fn rename_test() {
@@ -311,9 +311,7 @@ mod tests {
                 assert_eq!(false, root.join("d_dir").exists());
                 assert_eq!(true, root.join("e_dir").join("d_dir").exists());
             },
-            {
-                cleanup_test_dir(&root);
-            }
+            {}
         );
     }
 
@@ -424,9 +422,7 @@ mod tests {
                 assert_eq!(true, root.join("d_dir").exists());
                 assert_eq!(true, root.join("e_dir").join("d_dir").exists());
             },
-            {
-                cleanup_test_dir(&root);
-            }
+            {}
         );
     }
 
@@ -479,9 +475,7 @@ mod tests {
                     );
                 }
             },
-            {
-                cleanup_test_dir(&root);
-            }
+            {}
         );
     }
 }
