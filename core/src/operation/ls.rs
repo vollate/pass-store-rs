@@ -23,7 +23,7 @@ pub fn ls_interact(
 
     if full_path.is_dir() {
         let bump = Bump::new();
-        let tree = DirTree::new(&tree_cfg, &bump)?;
+        let tree = DirTree::new(tree_cfg, &bump)?;
         let result = tree.print_tree(print_cfg)?;
         let result = remove_lines_postfix(&result, ".gpg");
         if tree_cfg.target.is_empty() {
@@ -49,7 +49,7 @@ pub fn ls_dir(tree_cfg: &TreeConfig, print_cfg: &PrintConfig) -> Result<String, 
 
     if full_path.is_dir() {
         let bump = Bump::new();
-        let tree = DirTree::new(&tree_cfg, &bump)?;
+        let tree = DirTree::new(tree_cfg, &bump)?;
         let result = tree.print_tree(print_cfg)?;
         let result = str::remove_lines_postfix(&result, ".gpg");
         if tree_cfg.target.is_empty() {

@@ -81,7 +81,7 @@ impl<'a> DirTree<'a> {
     fn build_tree<'b>(config: &'b TreeConfig<'a>, bump: &'a Bump) -> Result<Self, Box<dyn Error>> {
         let root = config.root.join(config.target);
 
-        let mut tree = DirTree { map: BumpVec::new_in(&bump), root: 0 };
+        let mut tree = DirTree { map: BumpVec::new_in(bump), root: 0 };
         let mut path_set = HashSet::<PathBuf>::new();
 
         tree.map.push(TreeNode {
@@ -103,7 +103,7 @@ impl<'a> DirTree<'a> {
             if let Some(entry) = entry_iter.next() {
                 let entry = entry?;
                 if config.filter_type == FilterType::Exclude
-                    && Self::filter_match(&config.filters, &filename_to_str(&entry.path())?)
+                    && Self::filter_match(&config.filters, filename_to_str(&entry.path())?)
                 {
                     stack.push_back((parent_idx, entry_iter));
                     continue;
@@ -119,7 +119,7 @@ impl<'a> DirTree<'a> {
                     path_set.contains(&canonical_path) && entry_type.is_symlink();
                 tree.map.push(TreeNode {
                     name: filename_to_str(&entry.path())?.to_string(),
-                    parent: Some(parent_idx.clone()),
+                    parent: Some(parent_idx),
                     children: Vec::with_capacity(if is_recursive_link {
                         0
                     } else {

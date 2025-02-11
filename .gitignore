@@ -1,2 +1,3 @@
 target/
 .idea/
+.rustc_info.json

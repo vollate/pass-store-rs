@@ -46,8 +46,7 @@ impl PGPClient {
     }
 
     pub fn key_edit_stdin(&self) -> Result<(), Box<dyn Error>> {
-        let gpg_args =
-            ["--edit-key", self.key_fpr.as_ref().ok_or_else(|| PGPErr::NoneFingerprint)?];
+        let gpg_args = ["--edit-key", self.key_fpr.as_ref().ok_or(PGPErr::NoneFingerprint)?];
         run_gpg_inherited_child(&self.executable, &gpg_args)
     }
 
@@ -64,7 +63,7 @@ impl PGPClient {
             "--status-fd",
             "1",
             "--edit-key",
-            self.key_fpr.as_ref().ok_or_else(|| PGPErr::NoneFingerprint)?,
+            self.key_fpr.as_ref().ok_or(PGPErr::NoneFingerprint)?,
         ];
         run_gpg_batched_child(&self.executable, &gpg_args, batch_input)
     }

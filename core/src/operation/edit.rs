@@ -137,7 +137,7 @@ mod tests {
                 println!("dir/file2.gpg new content:\n{}", file2_new_content.expose_secret());
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(executable, email).unwrap();
             }
         );
     }

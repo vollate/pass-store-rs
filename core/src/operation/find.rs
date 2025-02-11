@@ -17,7 +17,7 @@ pub fn find_term(
     config.filters = terms.iter().map(|term| Regex::new(term)).collect::<Result<Vec<_>, _>>()?;
     let bump = Bump::new();
     let tree = DirTree::new(&config, &bump)?;
-    let result = tree.print_tree(&print_cfg)?;
+    let result = tree.print_tree(print_cfg)?;
     let mut header = String::from_str("Search Terms: ")?;
     for term in terms {
         header.push_str(term);

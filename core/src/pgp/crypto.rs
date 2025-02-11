@@ -10,11 +10,11 @@ use super::{PGPClient, PGPErr};
 impl PGPClient {
     pub fn encrypt(&self, plaintext: &str, output_path: &str) -> Result<(), Box<dyn Error>> {
         let mut child = Command::new(&self.executable)
-            .args(&[
+            .args([
                 "--batch",
                 "--encrypt",
                 "--recipient",
-                self.get_key_fpr().ok_or_else(|| PGPErr::NoneFingerprint)?,
+                self.get_key_fpr().ok_or(PGPErr::NoneFingerprint)?,
                 "--output",
                 output_path,
             ])
@@ -51,10 +51,10 @@ impl PGPClient {
     ) -> Result<SecretString, Box<dyn Error>> {
         let output = Command::new(&self.executable)
             .current_dir(work_dir)
-            .args(&[
+            .args([
                 "--decrypt",
                 "--recipient",
-                self.key_fpr.as_ref().ok_or_else(|| PGPErr::NoneFingerprint)?,
+                self.key_fpr.as_ref().ok_or(PGPErr::NoneFingerprint)?,
                 file_path,
             ])
             .output()?;
@@ -74,7 +74,7 @@ impl PGPClient {
     ) -> Result<SecretString, Box<dyn Error>> {
         let mut cmd = Command::new(&self.executable)
             //TODO: match each version
-            .args(&[
+            .args([
                 "--batch",         // this is required after 2.0
                 "--pinentry-mode", //this is required after 2.1
                 "loopback",
@@ -82,7 +82,7 @@ impl PGPClient {
                 "--passphrase-fd",
                 "0",
                 "--recipient",
-                self.key_fpr.as_ref().ok_or_else(|| PGPErr::NoneFingerprint)?,
+                self.key_fpr.as_ref().ok_or(PGPErr::NoneFingerprint)?,
                 file_path,
             ])
             .stdin(Stdio::piped())
@@ -150,7 +150,7 @@ mod tests {
                 let _ = fs::remove_file(output_dest);
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(executable, email).unwrap();
             }
         );
     }

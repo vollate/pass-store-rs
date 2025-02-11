@@ -49,7 +49,7 @@ pub fn init(
             return Err(IOErr::new(IOErrType::ExpectFile, &filepath).into());
         }
         if filename == FPR_FILENAME {
-            let content = client.decrypt_stdin(&root_path, path_to_str(&filepath)?)?;
+            let content = client.decrypt_stdin(root_path, path_to_str(&filepath)?)?;
             let backup_path = backup_encrypted_file(&filepath)?;
             client.encrypt(content.expose_secret(), path_to_str(&filepath)?)?;
             fs::remove_file(backup_path)?;

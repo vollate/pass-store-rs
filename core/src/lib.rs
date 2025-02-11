@@ -3,14 +3,13 @@ use std::error::Error;
 use std::fmt::Display;
 use std::path::Path;
 
-mod util;
-
-mod bundle;
-mod clipboard;
-mod config;
-mod git;
-mod operation;
-mod pgp;
+pub mod bundle;
+pub mod clipboard;
+pub mod config;
+pub mod git;
+pub mod operation;
+pub mod pgp;
+pub mod util;
 
 #[derive(Debug)]
 enum IOErrType {

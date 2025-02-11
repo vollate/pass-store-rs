@@ -6,7 +6,7 @@ use colored::Colorize;
 use super::{DirTree, NodeType, PrintConfig};
 use crate::util::test_util::log_test;
 
-impl<'a> DirTree<'a> {
+impl DirTree<'_> {
     pub fn print_tree(&self, config: &PrintConfig) -> Result<String, Box<dyn Error>> {
         log_test!("Start to print tree: {:?}", self.map);
         let mut tree_builder = String::new(); //TODO(Vollate): we should use other structure for building string(huge dir case)

@@ -10,8 +10,7 @@ pub(crate) fn user_email_to_fingerprint(
     executable: &str,
     email: &str,
 ) -> Result<String, Box<dyn Error>> {
-    let output =
-        Command::new(executable).args(&["--list-keys", "--with-colons", email]).output()?;
+    let output = Command::new(executable).args(["--list-keys", "--with-colons", email]).output()?;
     if !output.status.success() {
         return Err("Failed to get PGP key".into());
     }
@@ -31,14 +30,14 @@ pub(crate) fn fingerprint_to_email(
     fingerprint: &str,
 ) -> Result<String, Box<dyn Error>> {
     let output =
-        Command::new(executable).args(&["--list-keys", "--with-colons", fingerprint]).output()?;
+        Command::new(executable).args(["--list-keys", "--with-colons", fingerprint]).output()?;
     if !output.status.success() {
         return Err("Failed to get PGP key".into());
     }
     let info = String::from_utf8(output.stdout)?;
     for line in info.lines() {
         if line.starts_with("uid") {
-            let email = line.split('<').nth(1).unwrap().split('>').nth(0).unwrap();
+            let email = line.split('<').nth(1).unwrap().split('>').next().unwrap();
             return Ok(email.to_string());
         }
     }
@@ -179,7 +178,7 @@ mod gpg_client_tests {
         )
         .unwrap();
         let status = Command::new(test_client.get_executable())
-            .args(&["--list-keys", "--with-colons", &fpr])
+            .args(["--list-keys", "--with-colons", &fpr])
             .stdout(Stdio::null())
             .status()
             .unwrap();

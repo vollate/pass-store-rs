@@ -16,7 +16,7 @@ pub fn grep(client: &PGPClient, root: &Path, target: &str) -> Result<Vec<String>
             let relative_path = entry.path().strip_prefix(root)?;
             let relative_path_str = relative_path.to_string_lossy();
 
-            let decrypted = client.decrypt_stdin(&root, path_to_str(entry.path())?)?;
+            let decrypted = client.decrypt_stdin(root, path_to_str(entry.path())?)?;
 
             let matching_lines: Vec<String> = decrypted
                 .expose_secret()

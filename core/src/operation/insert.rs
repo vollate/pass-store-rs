@@ -71,7 +71,7 @@ where
             }
             Err(e) => {
                 restore_backup_file(&backup)?;
-                return Err(e.into());
+                return Err(e);
             }
         }
     } else {
@@ -208,7 +208,7 @@ mod tests {
 
                 // Create initial file
                 test_client
-                    .encrypt("old_password", &root.join("test3.gpg").to_str().unwrap())
+                    .encrypt("old_password", root.join("test3.gpg").to_str().unwrap())
                     .unwrap();
 
                 thread::spawn(move || {

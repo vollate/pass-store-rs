@@ -3,18 +3,19 @@ use std::process::{Command, Stdio};
 use std::{env, fs};
 
 pub fn get_test_username() -> String {
-    env::var("PASS_RS_TEST_USERNAME").unwrap_or_else(|_| "rs-pass-test".into())
+    env::var("PASS_RS_TEST_USERNAME").unwrap_or("rs-pass-test".into())
 }
+
 pub fn get_test_email() -> String {
-    env::var("PASS_RS_TEST_EMAIL").unwrap_or("foo@rs.pass".to_string())
+    env::var("PASS_RS_TEST_EMAIL").unwrap_or("foo@rs.pass".into())
 }
 
 pub fn get_test_executable() -> String {
-    env::var("PASS_RS_TEST_EXECUTABLE").unwrap_or("gpg".to_string())
+    env::var("PASS_RS_TEST_EXECUTABLE").unwrap_or("gpg".into())
 }
 
 pub fn get_test_password() -> String {
-    env::var("PASS_RS_TEST_PASSWORD").unwrap_or("password".to_string())
+    env::var("PASS_RS_TEST_PASSWORD").unwrap_or("password".into())
 }
 
 use std::path::Path;
@@ -27,7 +28,7 @@ pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn st
     loop {
         if let Ok(fingerprint) = user_email_to_fingerprint(executable, email) {
             let delete_status = Command::new(executable)
-                .args(&["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
+                .args(["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
                 .stdin(Stdio::null())
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit())

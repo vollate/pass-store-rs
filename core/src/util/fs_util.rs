@@ -15,7 +15,7 @@ use crate::{IOErr, IOErrType};
 
 const BACKUP_EXTENSION: &str = "rsbak";
 
-pub(crate) fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
+pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
         for path in env::split_paths(&paths) {
             let full_path = path.join(executable);
@@ -29,10 +29,7 @@ pub(crate) fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     None
 }
 
-pub(crate) fn better_rename<P: AsRef<Path>, Q: AsRef<Path>>(
-    from: P,
-    to: Q,
-) -> Result<(), Box<dyn Error>> {
+pub fn better_rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(), Box<dyn Error>> {
     let from = from.as_ref();
     let to = to.as_ref();
     if let Err(err) = fs::rename(from, to) {
@@ -50,7 +47,7 @@ pub(crate) fn better_rename<P: AsRef<Path>, Q: AsRef<Path>>(
     Ok(())
 }
 
-pub(crate) fn copy_dir_recursive<P: AsRef<Path>, Q: AsRef<Path>>(
+pub fn copy_dir_recursive<P: AsRef<Path>, Q: AsRef<Path>>(
     from: P,
     to: Q,
 ) -> Result<(), Box<dyn Error>> {
@@ -61,39 +58,11 @@ pub(crate) fn copy_dir_recursive<P: AsRef<Path>, Q: AsRef<Path>>(
     Ok(())
 }
 
-pub(crate) fn get_home_dir() -> PathBuf {
-    #[cfg(unix)]
-    {
-        if let Some(home_str) = env::var_os("HOME") {
-            PathBuf::from(home_str)
-        } else {
-            PathBuf::from("~")
-        }
-    }
-
-    #[cfg(windows)]
-    {
-        if let Some(userprofile) = env::var_os("USERPROFILE") {
-            PathBuf::from(userprofile)
-        } else if let (Some(homedrive), Some(homepath)) =
-            (env::var_os("HOMEDRIVE"), env::var_os("HOMEPATH"))
-        {
-            PathBuf::from(format!("{}{}", homedrive.to_string_lossy(), homepath.to_string_lossy()))
-        } else {
-            PathBuf::from("~")
-        }
-    }
-
-    #[cfg(not(any(unix, windows)))]
-    {
-        PathBuf::from("~")
-    }
+pub fn get_home_dir() -> PathBuf {
+    dirs::home_dir().unwrap_or(PathBuf::from("~"))
 }
 
-pub(crate) fn process_files_recursively<F>(
-    path: &PathBuf,
-    process: &F,
-) -> Result<(), Box<dyn Error>>
+pub fn process_files_recursively<F>(path: &PathBuf, process: &F) -> Result<(), Box<dyn Error>>
 where
     F: Fn(&DirEntry) -> Result<(), Box<dyn Error>>,
 {
@@ -112,7 +81,7 @@ where
     Ok(())
 }
 
-pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
+pub fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let extension = format!(
         "{}.{}",
         file_path.extension().unwrap_or_default().to_string_lossy(),
@@ -123,7 +92,7 @@ pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn
     Ok(backup_path)
 }
 
-pub(crate) fn restore_backup_file(file_path: &Path) -> Result<(), Box<dyn Error>> {
+pub fn restore_backup_file(file_path: &Path) -> Result<(), Box<dyn Error>> {
     if let Some(extension) = file_path.extension() {
         if extension == BACKUP_EXTENSION {
             let original_path = file_path.with_extension("");
@@ -179,11 +148,11 @@ pub fn create_symlink<P: AsRef<Path>>(original: P, link: P) -> Result<(), Box<dy
     }
 }
 
-pub(crate) fn path_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
+pub fn path_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
     Ok(path.to_str().ok_or_else(|| IOErr::new(IOErrType::InvalidPath, path))?)
 }
 
-pub(crate) fn filename_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
+pub fn filename_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
     Ok(path
         .file_name()
         .ok_or_else(|| IOErr::new(IOErrType::InvalidPath, path))?
@@ -191,13 +160,13 @@ pub(crate) fn filename_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
         .ok_or_else(|| IOErr::new(IOErrType::InvalidName, path))?)
 }
 
-pub(crate) fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool, Box<dyn Error>> {
+pub fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool, Box<dyn Error>> {
     let child_clean = child.as_ref().clean();
     let parent_clean = parent.as_ref().clean();
     Ok(child_clean.starts_with(&parent_clean))
 }
 
-pub(crate) fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<(), Box<dyn Error>> {
+pub fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<(), Box<dyn Error>> {
     let metadata = fs::metadata(path.as_ref())?;
     let mut permissions = metadata.permissions();
     permissions.set_readonly(readonly);
@@ -214,7 +183,7 @@ pub fn path_attack_check<E>(
 where
     E: Write,
 {
-    if !is_subpath_of(root, &child)? {
+    if !is_subpath_of(root, child)? {
         let err_msg =
             format!("'{}' is not the subpath of the root path '{}'", child_name, root.display());
         writeln!(err_stream, "{}", err_msg)?;

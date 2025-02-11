@@ -63,10 +63,10 @@ where
     if to.exists() {
         return if to.is_dir() {
             let sub_file = to.join(file_name).with_extension(extension);
-            if sub_file.exists() {
-                if !handle_overwrite_delete(&sub_file, force, stdin, stdout, stderr)? {
-                    return Ok(());
-                }
+            if sub_file.exists()
+                && !handle_overwrite_delete(&sub_file, force, stdin, stdout, stderr)?
+            {
+                return Ok(());
             }
             if copy {
                 fs::copy(from, sub_file)?;
@@ -117,10 +117,9 @@ where
     if to.exists() {
         if to.is_dir() {
             let sub_dir = to.join(file_name);
-            if sub_dir.exists() {
-                if !handle_overwrite_delete(&sub_dir, force, stdin, stdout, stderr)? {
-                    return Ok(());
-                }
+            if sub_dir.exists() && !handle_overwrite_delete(&sub_dir, force, stdin, stdout, stderr)?
+            {
+                return Ok(());
             }
             if copy {
                 copy_dir_recursive(from, sub_dir)?;
@@ -175,17 +174,15 @@ where
     fs_util::path_attack_check(root, &to_path, to, stderr)?;
 
     let to_is_dir = to.ends_with(path::MAIN_SEPARATOR);
-    if to_is_dir {
-        if !to_path.exists() || !to_path.is_dir() {
-            writeln!(
-                stderr,
-                "Cannot {} '{}' to '{}': No such directory",
-                if copy { "copy" } else { "rename" },
-                from,
-                to
-            )?;
-            return Err(IOErr::new(IOErrType::PathNotExist, &to_path).into());
-        }
+    if to_is_dir && (!to_path.exists() || !to_path.is_dir()) {
+        writeln!(
+            stderr,
+            "Cannot {} '{}' to '{}': No such directory",
+            if copy { "copy" } else { "rename" },
+            from,
+            to
+        )?;
+        return Err(IOErr::new(IOErrType::PathNotExist, &to_path).into());
     }
 
     if from_path.is_file() {
@@ -434,14 +431,14 @@ mod tests {
         // └── a.gpg
         let (_tmp_dir, root) = gen_unique_temp_dir();
         let structure: &[(Option<&str>, &[&str])] = &[(None, &["a.gpg"][..])];
-        create_dir_structure(&root, &structure);
+        create_dir_structure(&root, structure);
 
         cleanup!(
             {
                 let mut stdin = io::stdin().lock();
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();
-                if let Ok(_) = copy_rename_io(
+                if copy_rename_io(
                     false,
                     &root,
                     "../../a",
@@ -451,7 +448,9 @@ mod tests {
                     &mut stdin,
                     &mut stdout,
                     &mut stderr,
-                ) {
+                )
+                .is_ok()
+                {
                     panic!(
                         "Should not be able to access parent directory: {}/../../a",
                         root.display()

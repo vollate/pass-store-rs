@@ -43,18 +43,21 @@ where
 {
     let pass_path = root.join(pass_name);
 
-    path_attack_check(&root, &pass_path, pass_name, stderr)?;
+    path_attack_check(root, &pass_path, pass_name, stderr)?;
 
     if config.in_place && config.force {
         let err_msg = "Cannot use both [--in-place] and [--force]";
         writeln!(stderr, "{}", err_msg)?;
         return Err(err_msg.into());
     }
-    if pass_path.exists() && !config.force && !config.in_place {
-        if !prompt_overwrite(stdin, stderr, pass_name)? {
-            writeln!(stdout, "Operation cancelled.")?;
-            return Ok(SecretString::new("".to_string().into()));
-        }
+
+    if pass_path.exists()
+        && !config.force
+        && !config.in_place
+        && !prompt_overwrite(stdin, stderr, pass_name)?
+    {
+        writeln!(stdout, "Operation cancelled.")?;
+        return Ok(SecretString::new("".to_string().into()));
     }
 
     let pg = PasswordGenerator::new()
@@ -70,7 +73,7 @@ where
     let password = SecretString::new(pg.generate_one()?.into());
 
     if config.in_place && pass_path.exists() {
-        let existing = client.decrypt_stdin(&root, path_to_str(&pass_path)?)?;
+        let existing = client.decrypt_stdin(root, path_to_str(&pass_path)?)?;
         let mut content = existing.expose_secret().lines().collect::<Vec<_>>();
 
         if !content.is_empty() {

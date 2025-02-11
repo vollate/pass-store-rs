@@ -148,8 +148,8 @@ mod test {
         let structure: &[(Option<&str>, &[&str])] =
             &[(Some("dir1"), &["file1", "file2"]), (Some("dir2"), &[]), (None, &["file3"])];
         create_dir_structure(&root, structure);
-        set_readonly(&root.join("file3"), true).unwrap();
-        set_readonly(&root.join("dir1").join("file1"), true).unwrap();
+        set_readonly(root.join("file3"), true).unwrap();
+        set_readonly(root.join("dir1").join("file1"), true).unwrap();
 
         cleanup!(
             {
@@ -174,8 +174,8 @@ mod test {
                 let (mut stdin, stdin_w) = pipe().unwrap();
                 let input_thread =
                     enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
-                if let Ok(_) =
-                    remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr)
+                if remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr)
+                    .is_ok()
                 {
                     panic!("Expect fail to remove a non-empty directory without recursive option.");
                 }
@@ -203,8 +203,8 @@ mod test {
                 let (mut stdin, stdin_w) = pipe().unwrap();
                 let input_thread =
                     enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
-                if let Ok(_) =
-                    remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr)
+                if remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr)
+                    .is_ok()
                 {
                     panic!("Expect to fail to remove a non-exist file without force option.");
                 }
