@@ -20,9 +20,6 @@ zeroize = "1.8.1"
 bumpalo = { version = "3.17.0", features = ["collections"] }
 walkdir = "2.5.0"
 os_pipe = "1.2.1"
-
-serial_test = "3.2.0"
-pretty_assertions = "1.4.1"
 clean-path = "0.2.1"
 config = "0.15.8"
 toml = "0.8.20"
@@ -36,3 +33,5 @@ bundle_git = []
 bundle_pgp = ["pgp"]
 
 [dev-dependencies]
+serial_test = "3.2.0"
+pretty_assertions = "1.4.1"

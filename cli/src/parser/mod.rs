@@ -1,7 +1,9 @@
 pub(crate) mod sub_command;
 
+use std::error::Error;
+
 use clap::{CommandFactory, Parser};
-use pass_store_rs_core::util::fs_util::get_home_dir;
+use pass_store_rs_core::config::ParsConfig;
 use sub_command::SubCommands;
 
 use crate::command;
@@ -25,9 +27,7 @@ pub struct CliParser {
     pub base_dir: Option<String>,
 }
 
-pub fn handle_cli(cli: CliParser) {
-    let config_path = get_home_dir();
-
+pub fn handle_cli(config: ParsConfig, cli: CliParser) -> Result<(), Box<dyn Error>> {
     match cli.command {
         Some(SubCommands::Init { path, gpg_ids }) => {
             command::init::cmd_init(cli.base_dir, path.as_deref(), &gpg_ids);
@@ -89,4 +89,5 @@ pub fn handle_cli(cli: CliParser) {
             command::ls::cmd_ls(cli.base_dir, None);
         }
     }
+    Ok(())
 }

@@ -2,13 +2,15 @@ use std::collections::VecDeque;
 use std::error::Error;
 
 use colored::Colorize;
+use log::debug;
 
 use super::{DirTree, NodeType, PrintConfig};
 use crate::util::test_util::log_test;
 
 impl DirTree<'_> {
     pub fn print_tree(&self, config: &PrintConfig) -> Result<String, Box<dyn Error>> {
-        log_test!("Start to print tree: {:?}", self.map);
+        log_test!("Start to print tree:\n{:?}", self.map);
+        debug!("Start to print tree:\n{:?}", self.map);
         let mut tree_builder = String::new(); //TODO(Vollate): we should use other structure for building string(huge dir case)
         let mut node_stack = VecDeque::<(usize, usize)>::new();
         node_stack.push_back((self.root, 0));
@@ -23,15 +25,14 @@ impl DirTree<'_> {
 
             let is_local_last = vec_idx + 1 == self.map[parent_idx].children.len();
             level_stack.push_back(is_local_last);
-            log_test!("{:?}", level_stack);
-            if !child.visiable {
+            if !child.visible {
                 node_stack.push_back((parent_idx, vec_idx + 1));
                 continue;
             }
             let is_local_last = vec_idx + 1 == self.map[parent_idx].children.len();
             if level_stack.len() > 1 {
-                for i in 0..level_stack.len() - 1 {
-                    if level_stack[i] {
+                for level_status in level_stack.iter().take(level_stack.len() - 1) {
+                    if *level_status {
                         tree_builder.push_str("    ");
                     } else {
                         tree_builder.push_str("│   ");

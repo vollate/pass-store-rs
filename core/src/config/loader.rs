@@ -7,10 +7,6 @@ use config::{Config as ConfigLoader, File};
 use super::ParsConfig;
 use crate::util::fs_util::path_to_str;
 
-/// Loads the configuration from the given file path.
-///
-/// If the file is not found, the configuration source is not required (and you may choose
-/// to fall back to default values).
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<ParsConfig, Box<dyn Error>> {
     let file_path = path_to_str(path.as_ref())?;
     let cfg_loader =
@@ -18,7 +14,6 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<ParsConfig, Box<dyn Error>
     Ok(cfg_loader.try_deserialize::<ParsConfig>()?)
 }
 
-/// Saves the configuration to the given file path using TOML format.
 pub fn save_config<P: AsRef<Path>>(config: &ParsConfig, path: P) -> Result<(), Box<dyn Error>> {
     let toml_str = toml::to_string_pretty(config)?;
     fs::write(path, toml_str)?;

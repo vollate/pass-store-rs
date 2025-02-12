@@ -74,7 +74,7 @@ save
 pub(crate) fn gen_unique_temp_dir() -> (TempDir, PathBuf) {
     let base_dir = temp_dir().join("pass-rs-test");
     if !base_dir.exists() {
-        fs::create_dir(&base_dir).unwrap();
+        let _ = fs::create_dir(&base_dir);
     }
     let dir = TempDir::new_in(base_dir).unwrap();
     let path = dir.path().to_path_buf();

@@ -1,6 +1,7 @@
 mod convert;
 mod print;
 
+use std::error::Error;
 use std::path::Path;
 
 use bumpalo::collections::Vec as BumpVec;
@@ -46,7 +47,7 @@ pub struct TreeNode {
     pub node_type: NodeType,
     pub symlink_target: Option<String>,
     pub is_recursive: bool,
-    pub visiable: bool,
+    pub visible: bool,
 }
 
 pub struct DirTree<'a> {
@@ -68,5 +69,18 @@ impl<T: AsRef<Path>> From<T> for NodeType {
         } else {
             NodeType::Other
         }
+    }
+}
+
+pub fn string_to_color_opt(color_str: &Option<String>) -> Result<Option<Color>, Box<dyn Error>> {
+    match color_str {
+        Some(color) => {
+            let color_res: Result<Color, ()> = color.as_str().parse();
+            match color_res {
+                Ok(color) => Ok(Some(color)),
+                Err(_) => Err(format!("Invalid color '{}'", color).into()),
+            }
+        }
+        None => Ok(None),
     }
 }

@@ -6,6 +6,7 @@ use std::{io, mem};
 
 use bumpalo::collections::Vec as BumpVec;
 use bumpalo::Bump;
+use log::debug;
 use regex::Regex;
 
 use super::{DirTree, FilterType, TreeConfig, TreeNode};
@@ -37,7 +38,7 @@ impl<'a> DirTree<'a> {
             };
             let child_node = &mut tree.map[child_idx];
             if !Self::filter_match(&config.filters, &child_node.name) {
-                child_node.visiable = false;
+                child_node.visible = false;
                 stack.push_back((node_idx, vec_idx + 1));
                 if !child_node.children.is_empty() {
                     stack.push_back((child_idx, 0));
@@ -46,10 +47,10 @@ impl<'a> DirTree<'a> {
                 let mut parent_idx = node_idx;
                 loop {
                     let parent = &mut tree.map[parent_idx];
-                    if parent.visiable {
+                    if parent.visible {
                         break;
                     }
-                    parent.visiable = true;
+                    parent.visible = true;
                     if parent.parent.is_none() {
                         break;
                     }
@@ -67,7 +68,7 @@ impl<'a> DirTree<'a> {
         while let Some(node_idx) = queue.pop_front() {
             let mut children = mem::take(&mut tree.map[node_idx].children);
             children.retain(|child_idx| {
-                if tree.map[*child_idx].visiable {
+                if tree.map[*child_idx].visible {
                     queue.push_back(*child_idx);
                     true
                 } else {
@@ -91,7 +92,7 @@ impl<'a> DirTree<'a> {
             node_type: root.as_path().into(),
             symlink_target: None, // No need to store root's symlink target
             is_recursive: false,
-            visiable: true,
+            visible: true,
         });
 
         path_set.insert(canonicalize(&root)?);
@@ -135,10 +136,11 @@ impl<'a> DirTree<'a> {
                         None
                     },
                     is_recursive: is_recursive_link,
-                    visiable: true,
+                    visible: true,
                 });
                 let child_idx = tree.map.len() - 1;
                 log_test!("Create tree node, Index {}: {:?}", child_idx, tree.map[child_idx]);
+                debug!("Create tree node, Index {}: {:?}", child_idx, tree.map[child_idx]);
                 tree.map[parent_idx].children.push(child_idx);
 
                 stack.push_back((parent_idx, entry_iter));
