@@ -42,7 +42,15 @@ mod tests {
     #[test]
     fn test_save_config_invalid_path() {
         let test_config = ParsConfig::default();
-        let result = save_config(&test_config, "/.invalid.toml");
+
+        let result = if cfg!(unix) {
+            save_config(&test_config, "/.invalid.toml")
+        } else if cfg!(windows) {
+            save_config(&test_config, "A:\\invalid.toml")
+        } else {
+            Err(Box::from("Unsupported OS"))
+        };
+
         assert!(result.is_err());
     }
 }

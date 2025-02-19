@@ -115,7 +115,7 @@ fn is_executable(path: &Path) -> Result<bool, Box<dyn Error>> {
 
         #[cfg(windows)]
         {
-            Ok(path.extension().map(|ext| ext == "exe" || ext == "bat" || ext == "cmd")?)
+            Ok(path.extension().is_some_and(|ext| ext == "exe" || ext == "bat" || ext == "cmd"))
         }
 
         #[cfg(not(any(unix, windows)))]
