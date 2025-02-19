@@ -10,7 +10,7 @@ use zeroize::Zeroize;
 use crate::pgp::PGPClient;
 use crate::util::defer::Defer;
 use crate::util::fs_util::{backup_encrypted_file, path_to_str, restore_backup_file};
-use crate::util::rand::rand_aplhabet_string;
+use crate::util::rand::rand_alphabet_string;
 use crate::{IOErr, IOErrType};
 
 pub fn edit(
@@ -49,7 +49,7 @@ pub fn edit(
     let temp_filename = temp_filename
         .file_name()
         .ok_or_else(|| IOErr::new(IOErrType::CannotGetFileName, &target_path))?;
-    let temp_filename = format!("{}-{}", rand_aplhabet_string(10), temp_filename.to_string_lossy());
+    let temp_filename = format!("{}-{}", rand_alphabet_string(10), temp_filename.to_string_lossy());
     let temp_filepath = tmp_dir.join(temp_filename);
 
     let mut content = client.decrypt_stdin(root, path_to_str(&target_path)?)?;

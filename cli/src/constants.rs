@@ -1,4 +1,4 @@
-use pass_store_rs_core::util::fs_util::{get_home_dir, path_to_str};
+use pars_core::util::fs_util::{get_home_dir, path_to_str};
 
 pub fn default_config_path() -> String {
     let path = get_home_dir().join(".config/pars/config.toml");

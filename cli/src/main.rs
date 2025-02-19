@@ -6,8 +6,8 @@ use std::env;
 
 use clap::Parser;
 use constants::ParsExitCode;
+use pars_core::config::loader::load_config;
 use parser::CliParser;
-use pass_store_rs_core::config::loader::load_config;
 
 use crate::constants::default_config_path;
 

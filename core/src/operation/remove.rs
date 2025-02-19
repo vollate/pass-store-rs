@@ -6,24 +6,24 @@ use std::path::{Path, PathBuf};
 use crate::util::fs_util::is_subpath_of;
 use crate::{IOErr, IOErrType};
 
-fn remove_dir_recursive<E>(dir: &Path, stderr: &mut E) -> io::Result<()>
+fn remove_dir_recursive<O>(dir: &Path, stdout: &mut O) -> io::Result<()>
 where
-    E: Write,
+    O: Write,
 {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let entry_path = entry.path();
 
         if entry_path.is_dir() {
-            remove_dir_recursive(&entry_path, stderr)?;
+            remove_dir_recursive(&entry_path, stdout)?;
         } else {
             fs::remove_file(&entry_path)?;
-            writeln!(stderr, "Removed file '{}'", entry_path.display())?;
+            writeln!(stdout, "Removed file '{}'", entry_path.display())?;
         }
     }
 
     fs::remove_dir(dir)?;
-    writeln!(stderr, "Removed directory '{}'", dir.display())?;
+    writeln!(stdout, "Removed directory '{}'", dir.display())?;
     Ok(())
 }
 
@@ -90,7 +90,7 @@ where
         writeln!(stderr, "Removed '{}'", dist)?;
     } else if dist_path.is_dir() {
         if recursive {
-            remove_dir_recursive(&dist_path, stderr)?;
+            remove_dir_recursive(&dist_path, stdout)?;
         } else {
             let err_msg = format!("Cannot remove '{}': Is a directory.", dist);
             writeln!(stderr, "{}", err_msg)?;

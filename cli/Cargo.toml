@@ -5,12 +5,9 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.28", features = ["derive"] }
-pass-store-rs-core = { path = "../core" }
+pars-core = { path = "../core" }
 
-[profile.release]
-lto = "fat"
-opt-level = "z"
 
 [[bin]]
 name = "pars"
-path ="src/main.rs"
+path = "src/main.rs"

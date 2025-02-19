@@ -4,3 +4,4 @@ opt-level = "z"
 
 [workspace]
 members = ["cli","core"]
+resolver = "2"

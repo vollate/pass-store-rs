@@ -1,9 +1,5 @@
-use rand::{self, Rng};
+use rand::{self, distr, Rng};
 
-pub(crate) fn rand_aplhabet_string(length: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(length)
-        .map(char::from)
-        .collect()
+pub(crate) fn rand_alphabet_string(length: usize) -> String {
+    rand::rng().sample_iter(&distr::Alphanumeric).take(length).map(char::from).collect()
 }
