@@ -18,4 +18,77 @@ pub fn default_config_path() -> String {
 pub enum ParsExitCode {
     Success = 0,
     Error = 1,
+    InvalidArgs = 2,
+    CommandNotFound = 127,
+    PermissionDenied = 5,
+    NotExecutable = 126,
+    Timeout = 124,
+    OutOfMemory = 137,
+    ConfigError = 100,
+    NetworkError = 101,
+    PGPError = 199,
+    GitError = 120,
+}
+
+#[cfg(target_os = "linux")]
+impl Into<i32> for ParsExitCode {
+    fn into(self) -> i32 {
+        match self {
+            ParsExitCode::Success => 0,
+            ParsExitCode::Error => 1,
+            ParsExitCode::InvalidArgs => 2,
+            ParsExitCode::CommandNotFound => 127,
+            ParsExitCode::PermissionDenied => 13,
+            ParsExitCode::NotExecutable => 126,
+            ParsExitCode::Timeout => 124,
+            ParsExitCode::OutOfMemory => 137,
+            ParsExitCode::ConfigError => 100,
+            ParsExitCode::NetworkError => 101,
+            ParsExitCode::PGPError => 199,
+            ParsExitCode::GitError => 120,
+            _ => 1,
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Into<i32> for ParsExitCode {
+    fn into(self) -> i32 {
+        match self {
+            ParsExitCode::Success => 0,
+            ParsExitCode::Error => 1,
+            ParsExitCode::InvalidArgs => 2,
+            ParsExitCode::CommandNotFound => 1,
+            ParsExitCode::PermissionDenied => 5,
+            ParsExitCode::NotExecutable => 3,
+            ParsExitCode::Timeout => 1,
+            ParsExitCode::OutOfMemory => 8,
+            ParsExitCode::ConfigError => 100,
+            ParsExitCode::NetworkError => 101,
+            ParsExitCode::PGPError => 199,
+            ParsExitCode::GitError => 120,
+            _ => 1,
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Into<i32> for ParsExitCode {
+    fn into(self) -> i32 {
+        match self {
+            ParsExitCode::Success => 0,
+            ParsExitCode::Error => 1,
+            ParsExitCode::InvalidArgs => 2,
+            ParsExitCode::CommandNotFound => 127,
+            ParsExitCode::PermissionDenied => 13,
+            ParsExitCode::NotExecutable => 126,
+            ParsExitCode::Timeout => 124,
+            ParsExitCode::OutOfMemory => 137,
+            ParsExitCode::ConfigError => 100,
+            ParsExitCode::NetworkError => 101,
+            ParsExitCode::PGPError => 199,
+            ParsExitCode::GitError => 120,
+            _ => 1,
+        }
+    }
 }

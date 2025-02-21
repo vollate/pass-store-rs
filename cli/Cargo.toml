@@ -11,3 +11,7 @@ pars-core = { path = "../core" }
 [[bin]]
 name = "pars"
 path = "src/main.rs"
+
+[dev-dependencies]
+assert_cmd = "2.0.16"
+predicates = "3.1.3"

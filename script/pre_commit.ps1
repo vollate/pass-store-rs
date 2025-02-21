@@ -12,13 +12,6 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "Cleaning cargo..."
-cargo clean
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to clean cargo"
-    exit 1
-}
-
 Write-Host "Fixing cargo issues..."
 cargo fix --allow-staged -q
 if ($LASTEXITCODE -ne 0) {

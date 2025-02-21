@@ -84,7 +84,7 @@ pub(super) fn wait_child_process(cmd: &mut Child) -> Result<(), Box<dyn Error>> 
 }
 
 impl PGPClient {
-    pub(crate) fn new(
+    pub fn new(
         executable: String,
         key_fpr: Option<String>,
         username: Option<String>,
@@ -95,23 +95,23 @@ impl PGPClient {
         gpg_client
     }
 
-    pub(crate) fn get_executable(&self) -> &str {
+    pub fn get_executable(&self) -> &str {
         &self.executable
     }
 
-    pub(crate) fn get_key_fpr(&self) -> Option<&str> {
+    pub fn get_key_fpr(&self) -> Option<&str> {
         self.key_fpr.as_deref()
     }
 
-    pub(crate) fn get_username(&self) -> Option<&str> {
+    pub fn get_username(&self) -> Option<&str> {
         self.username.as_deref()
     }
 
-    pub(crate) fn get_email(&self) -> Option<&str> {
+    pub fn get_email(&self) -> Option<&str> {
         self.email.as_deref()
     }
 
-    pub(crate) fn set_email(&mut self, email: String) -> Result<(), Box<dyn Error>> {
+    pub fn set_email(&mut self, email: String) -> Result<(), Box<dyn Error>> {
         self.email = Some(email);
         if let Err(e) = self.update_info() {
             self.username = None;
@@ -120,7 +120,7 @@ impl PGPClient {
         Ok(())
     }
 
-    pub(crate) fn set_username(&mut self, username: String) -> Result<(), Box<dyn Error>> {
+    pub fn set_username(&mut self, username: String) -> Result<(), Box<dyn Error>> {
         self.username = Some(username);
         if let Err(e) = self.update_info() {
             self.username = None;
@@ -129,7 +129,7 @@ impl PGPClient {
         Ok(())
     }
 
-    pub(crate) fn update_info(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn update_info(&mut self) -> Result<(), Box<dyn Error>> {
         //TODO(Vollate): update username
         match (&self.key_fpr, &self.username, &self.email) {
             (Some(_), Some(_), Some(_)) => {}

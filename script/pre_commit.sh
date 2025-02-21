@@ -7,7 +7,6 @@ if not [ -d '.git' ]; then
 fi
 
 git add -A
-cargo clean
 cargo fix --allow-staged -q
 cargo fmt
 

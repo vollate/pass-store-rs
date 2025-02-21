@@ -1,7 +1,6 @@
 mod convert;
 mod print;
 
-use std::error::Error;
 use std::path::Path;
 
 use bumpalo::collections::Vec as BumpVec;
@@ -72,15 +71,9 @@ impl<T: AsRef<Path>> From<T> for NodeType {
     }
 }
 
-pub fn string_to_color_opt(color_str: &Option<String>) -> Result<Option<Color>, Box<dyn Error>> {
-    match color_str {
-        Some(color) => {
-            let color_res: Result<Color, ()> = color.as_str().parse();
-            match color_res {
-                Ok(color) => Ok(Some(color)),
-                Err(_) => Err(format!("Invalid color '{}'", color).into()),
-            }
-        }
-        None => Ok(None),
+pub fn string_to_color_opt(color_str: &str) -> Option<Color> {
+    match color_str.parse::<Color>() {
+        Ok(color) => Some(color),
+        Err(_) => None,
     }
 }

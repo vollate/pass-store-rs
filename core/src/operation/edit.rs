@@ -49,7 +49,8 @@ pub fn edit(
     let temp_filename = temp_filename
         .file_name()
         .ok_or_else(|| IOErr::new(IOErrType::CannotGetFileName, &target_path))?;
-    let temp_filename = format!("{}-{}", rand_alphabet_string(10), temp_filename.to_string_lossy());
+    let temp_filename =
+        format!(".{}-{}", rand_alphabet_string(10), temp_filename.to_string_lossy());
     let temp_filepath = tmp_dir.join(temp_filename);
 
     let mut content = client.decrypt_stdin(root, path_to_str(&target_path)?)?;

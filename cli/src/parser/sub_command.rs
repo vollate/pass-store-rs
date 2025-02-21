@@ -3,11 +3,11 @@ use clap::Subcommand;
 #[derive(Subcommand)]
 pub enum SubCommands {
     Init {
-        #[arg(short, long, value_name = "sub-folder")]
+        #[arg(short = 'p', long = "path", value_name = "sub-folder")]
         path: Option<String>,
 
         #[arg(required = true)]
-        gpg_ids: Vec<String>,
+        gpg_ids: String,
     },
 
     #[command(alias = "list")]

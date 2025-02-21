@@ -4,8 +4,7 @@ use std::path::PathBuf;
 
 use secrecy::ExposeSecret;
 
-use crate::pgp::utils::{check_recipient_type, user_email_to_fingerprint, RecipientType};
-use crate::pgp::PGPClient;
+use crate::pgp::{PGPClient, PGPErr};
 use crate::util::fs_util::{backup_encrypted_file, path_to_str, process_files_recursively};
 use crate::{IOErr, IOErrType};
 
@@ -15,18 +14,11 @@ pub fn init(
     client: &PGPClient,
     root_path: &PathBuf,
     target_path: &str,
-    recipient: &str,
 ) -> Result<(), Box<dyn Error>> {
     if !root_path.exists() {
         fs::create_dir_all(root_path)?;
     }
-    let fpr = {
-        if RecipientType::Fingerprint != check_recipient_type(recipient)? {
-            user_email_to_fingerprint(client.get_executable(), recipient)?
-        } else {
-            recipient.to_string()
-        }
-    };
+    let fpr = client.get_key_fpr().ok_or(PGPErr::NoneFingerprint)?;
 
     let target_path = root_path.join(target_path);
     if !target_path.exists() {

@@ -1,6 +1,7 @@
 mod command;
-pub mod constants;
+mod constants;
 mod parser;
+mod util;
 
 use std::env;
 
@@ -20,18 +21,18 @@ fn process_cli(config_path: &str) {
     let config = match load_config(config_path) {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("Error: {}", e);
+            eprintln!("Failed to load config file: {}", e);
             std::process::exit(ParsExitCode::Error as i32);
         }
     };
 
-    let cli = CliParser::parse();
+    let cli_args = CliParser::parse();
 
-    match parser::handle_cli(config, cli) {
+    match parser::handle_cli(config, cli_args) {
         Ok(_) => {}
-        Err(e) => {
+        Err((code, e)) => {
             eprintln!("Error: {}", e);
-            std::process::exit(ParsExitCode::Error as i32);
+            std::process::exit(code);
         }
     }
 }
