@@ -33,7 +33,7 @@ mod tests {
         let (_temp_dir, root) = gen_unique_temp_dir();
         let config_path = root.join("config.toml");
 
-        let test_config: ParsConfig = ParsConfigSerializable::default().into();
+        let test_config = ParsConfig::default();
         save_config(&test_config, &config_path).unwrap();
         let loaded_config = load_config(&config_path).unwrap();
         assert_eq!(test_config, loaded_config);
@@ -41,8 +41,7 @@ mod tests {
 
     #[test]
     fn test_save_config_invalid_path() {
-        let test_config: ParsConfig = ParsConfigSerializable::default().into();
-
+        let test_config = ParsConfig::default();
         let result = if cfg!(unix) {
             save_config(&test_config, "/.invalid.toml")
         } else if cfg!(windows) {

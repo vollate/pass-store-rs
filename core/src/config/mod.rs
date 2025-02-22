@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::util::tree::{self, string_to_color_opt};
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct ParsConfig {
     pub print_config: PrintConfig,
     pub path_config: PathConfig,
@@ -16,7 +16,7 @@ pub struct ParsConfigSerializable {
     pub path_config: PathConfigSerializable,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct PrintConfig {
     pub dir_color: String,
     pub file_color: String,
@@ -46,6 +46,24 @@ pub struct PathConfigSerializable {
     pub repos: Option<Vec<String>>,
 }
 
+impl Default for PathConfig {
+    fn default() -> Self {
+        PathConfig {
+            pgp_executable: "gpg".into(),
+            default_repo: {
+                #[cfg(unix)]
+                {
+                    "~/.password-store".into()
+                }
+                #[cfg(windows)]
+                {
+                    "~\\.password-store".into()
+                }
+            },
+            repos: Vec::default(),
+        }
+    }
+}
 impl TryInto<tree::PrintConfig> for PrintConfig {
     type Error = Box<dyn Error>;
 
@@ -59,68 +77,68 @@ impl TryInto<tree::PrintConfig> for PrintConfig {
     }
 }
 
-impl Into<ParsConfig> for ParsConfigSerializable {
-    fn into(self) -> ParsConfig {
-        ParsConfig { print_config: self.print_config.into(), path_config: self.path_config.into() }
+impl From<ParsConfigSerializable> for ParsConfig {
+    fn from(val: ParsConfigSerializable) -> Self {
+        ParsConfig { print_config: val.print_config.into(), path_config: val.path_config.into() }
     }
 }
 
-impl Into<PrintConfig> for PrintConfigSerializable {
-    fn into(self) -> PrintConfig {
+impl From<PrintConfigSerializable> for PrintConfig {
+    fn from(val: PrintConfigSerializable) -> Self {
         PrintConfig {
-            dir_color: self.dir_color.unwrap_or_default(),
-            file_color: self.file_color.unwrap_or_default(),
-            symbol_color: self.symbol_color.unwrap_or_default(),
-            tree_color: self.tree_color.unwrap_or_default(),
+            dir_color: val.dir_color.unwrap_or_default(),
+            file_color: val.file_color.unwrap_or_default(),
+            symbol_color: val.symbol_color.unwrap_or_default(),
+            tree_color: val.tree_color.unwrap_or_default(),
         }
     }
 }
 
-impl Into<PathConfig> for PathConfigSerializable {
-    fn into(self) -> PathConfig {
+impl From<PathConfigSerializable> for PathConfig {
+    fn from(val: PathConfigSerializable) -> Self {
         PathConfig {
-            pgp_executable: self.pgp_executable.unwrap_or("gpg".to_string()),
-            default_repo: self.default_repo.unwrap_or(
+            pgp_executable: val.pgp_executable.unwrap_or("gpg".into()),
+            default_repo: val.default_repo.unwrap_or(
                 #[cfg(unix)]
                 {
-                    "~/.password-store".to_string()
+                    "~/.password-store".into()
                 },
                 #[cfg(windows)]
                 {
-                    "~\\.password-store".to_string()
+                    "~\\.password-store".into()
                 },
             ),
-            repos: self.repos.unwrap_or_default(),
+            repos: val.repos.unwrap_or_default(),
         }
     }
 }
 
-impl Into<ParsConfigSerializable> for ParsConfig {
-    fn into(self) -> ParsConfigSerializable {
+impl From<ParsConfig> for ParsConfigSerializable {
+    fn from(val: ParsConfig) -> Self {
         ParsConfigSerializable {
-            print_config: self.print_config.into(),
-            path_config: self.path_config.into(),
+            print_config: val.print_config.into(),
+            path_config: val.path_config.into(),
         }
     }
 }
 
-impl Into<PrintConfigSerializable> for PrintConfig {
-    fn into(self) -> PrintConfigSerializable {
+impl From<PrintConfig> for PrintConfigSerializable {
+    fn from(val: PrintConfig) -> Self {
         PrintConfigSerializable {
-            dir_color: Some(self.dir_color),
-            file_color: Some(self.file_color),
-            symbol_color: Some(self.symbol_color),
-            tree_color: Some(self.tree_color),
+            dir_color: Some(val.dir_color),
+            file_color: Some(val.file_color),
+            symbol_color: Some(val.symbol_color),
+            tree_color: Some(val.tree_color),
         }
     }
 }
 
-impl Into<PathConfigSerializable> for PathConfig {
-    fn into(self) -> PathConfigSerializable {
+impl From<PathConfig> for PathConfigSerializable {
+    fn from(val: PathConfig) -> Self {
         PathConfigSerializable {
-            pgp_executable: Some(self.pgp_executable),
-            default_repo: Some(self.default_repo),
-            repos: Some(self.repos),
+            pgp_executable: Some(val.pgp_executable),
+            default_repo: Some(val.default_repo),
+            repos: Some(val.repos),
         }
     }
 }

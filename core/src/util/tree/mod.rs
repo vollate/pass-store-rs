@@ -72,8 +72,5 @@ impl<T: AsRef<Path>> From<T> for NodeType {
 }
 
 pub fn string_to_color_opt(color_str: &str) -> Option<Color> {
-    match color_str.parse::<Color>() {
-        Ok(color) => Some(color),
-        Err(_) => None,
-    }
+    color_str.parse::<Color>().ok()
 }

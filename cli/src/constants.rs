@@ -28,12 +28,13 @@ pub enum ParsExitCode {
     NetworkError = 101,
     PGPError = 199,
     GitError = 120,
+    InvalidEncoding = 121,
 }
 
 #[cfg(target_os = "linux")]
-impl Into<i32> for ParsExitCode {
-    fn into(self) -> i32 {
-        match self {
+impl From<ParsExitCode> for i32 {
+    fn from(val: ParsExitCode) -> Self {
+        match val {
             ParsExitCode::Success => 0,
             ParsExitCode::Error => 1,
             ParsExitCode::InvalidArgs => 2,
@@ -46,15 +47,16 @@ impl Into<i32> for ParsExitCode {
             ParsExitCode::NetworkError => 101,
             ParsExitCode::PGPError => 199,
             ParsExitCode::GitError => 120,
+            ParsExitCode::InvalidEncoding => 121,
             _ => 1,
         }
     }
 }
 
 #[cfg(target_os = "windows")]
-impl Into<i32> for ParsExitCode {
-    fn into(self) -> i32 {
-        match self {
+impl From<ParsExitCode> for i32 {
+    fn from(val: ParsExitCode) -> Self {
+        match val {
             ParsExitCode::Success => 0,
             ParsExitCode::Error => 1,
             ParsExitCode::InvalidArgs => 2,
@@ -67,15 +69,16 @@ impl Into<i32> for ParsExitCode {
             ParsExitCode::NetworkError => 101,
             ParsExitCode::PGPError => 199,
             ParsExitCode::GitError => 120,
+            ParsExitCode::InvalidEncoding => 121,
             _ => 1,
         }
     }
 }
 
 #[cfg(target_os = "macos")]
-impl Into<i32> for ParsExitCode {
-    fn into(self) -> i32 {
-        match self {
+impl From<ParsExitCode> for i32 {
+    fn from(val: ParsExitCode) -> Self {
+        match val {
             ParsExitCode::Success => 0,
             ParsExitCode::Error => 1,
             ParsExitCode::InvalidArgs => 2,
@@ -88,6 +91,7 @@ impl Into<i32> for ParsExitCode {
             ParsExitCode::NetworkError => 101,
             ParsExitCode::PGPError => 199,
             ParsExitCode::GitError => 120,
+            ParsExitCode::InvalidEncoding => 121,
             _ => 1,
         }
     }

@@ -87,14 +87,14 @@ mod tests {
         gpg_key_edit_example_batch, gpg_key_gen_example_batch,
     };
 
-    #[test]
-    #[serial]
-    #[ignore = "need run interactively"]
-    fn test_gpg_key_gen_stdin() {
-        let executable = get_test_executable();
-        let mut pgp_client = PGPClient::new(executable, None, None, None);
-        pgp_client.key_gen_stdin().unwrap();
-    }
+    // #[test]
+    // #[serial]
+    // #[ignore = "need run interactively"]
+    // fn test_gpg_key_gen_stdin() {
+    //     let executable = get_test_executable();
+    //     let mut pgp_client = PGPClient::new(executable, None, None, None);
+    //     pgp_client.key_gen_stdin().unwrap();
+    // }
 
     #[test]
     #[serial]

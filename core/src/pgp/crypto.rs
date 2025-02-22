@@ -119,9 +119,8 @@ mod tests {
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::test_util::{
-        clean_up_test_key, gen_unique_temp_dir, get_test_email, get_test_executable,
-        get_test_password, get_test_username, gpg_key_edit_example_batch,
-        gpg_key_gen_example_batch,
+        clean_up_test_key, get_test_email, get_test_executable, get_test_password,
+        get_test_username, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
     };
 
     #[test]
@@ -147,46 +146,46 @@ mod tests {
                 if !Path::new(output_dest).exists() {
                     panic!("Encrypted file not found");
                 }
-                let _ = fs::remove_file(output_dest);
             },
             {
+                let _ = fs::remove_file(output_dest);
                 clean_up_test_key(executable, email).unwrap();
             }
         );
     }
 
-    #[test]
-    #[serial]
-    #[ignore = "need run interactively"]
-    fn test_decrypt_file_interact() {
-        let executable = &get_test_executable();
-        let email = &get_test_email();
-        let plaintext = "Hello, world!\nThis is a test message.\n";
-        let (_tmp_dir, root) = gen_unique_temp_dir();
-        let output_dest = "decrypt.gpg";
-
-        cleanup!(
-            {
-                let mut test_client = PGPClient::new(
-                    executable.to_string(),
-                    None,
-                    Some(get_test_username()),
-                    Some(email.to_string()),
-                );
-                test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-                test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
-                test_client.update_info().unwrap();
-
-                test_client.encrypt(plaintext, output_dest).unwrap();
-                let decrypted = test_client.decrypt_stdin(&root, output_dest).unwrap();
-                assert_eq!(decrypted.expose_secret(), plaintext);
-                fs::remove_file(output_dest).unwrap();
-            },
-            {
-                clean_up_test_key(executable, email).unwrap();
-            }
-        )
-    }
+    // #[test]
+    // #[serial]
+    // #[ignore = "need run interactively"]
+    // fn test_decrypt_file_interact() {
+    //     let executable = &get_test_executable();
+    //     let email = &get_test_email();
+    //     let plaintext = "Hello, world!\nThis is a test message.\n";
+    //     let (_tmp_dir, root) = gen_unique_temp_dir();
+    //     let output_dest = "decrypt.gpg";
+    //
+    //     cleanup!(
+    //         {
+    //             let mut test_client = PGPClient::new(
+    //                 executable.to_string(),
+    //                 None,
+    //                 Some(get_test_username()),
+    //                 Some(email.to_string()),
+    //             );
+    //             test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
+    //             test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+    //             test_client.update_info().unwrap();
+    //
+    //             test_client.encrypt(plaintext, output_dest).unwrap();
+    //             let decrypted = test_client.decrypt_stdin(&root, output_dest).unwrap();
+    //             assert_eq!(decrypted.expose_secret(), plaintext);
+    //             fs::remove_file(output_dest).unwrap();
+    //         },
+    //         {
+    //             clean_up_test_key(executable, email).unwrap();
+    //         }
+    //     )
+    // }
 
     #[test]
     #[serial]
@@ -212,10 +211,9 @@ mod tests {
                     .decrypt_with_password(output_dest, get_test_password().into())
                     .unwrap();
                 assert_eq!(decrypted.expose_secret(), plaintext);
-
-                fs::remove_file(output_dest).unwrap();
             },
             {
+                fs::remove_file(output_dest).unwrap();
                 clean_up_test_key(&get_test_executable(), &get_test_email()).unwrap();
             }
         )

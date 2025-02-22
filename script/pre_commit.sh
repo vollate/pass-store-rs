@@ -13,7 +13,7 @@ cargo fmt
 for dir in "${TARGET_DIRS[@]}"; do
     cd "$dir" || exit
     echo -e "\n\n============================== Testing $dir ==============================\n\n"
-    cargo clippy
+    cargo clippy --fix --allow-dirty
     cargo test
     cd ..
 done

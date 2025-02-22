@@ -35,7 +35,7 @@ foreach ($dir in $TARGET_DIRS) {
     }
     Write-Host "============================== Testing $dir =============================="
     Write-Host "Running cargo clippy in $dir..."
-    cargo clippy
+    cargo clippy --fix --allow-dirty
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to run cargo clippy in $dir"
         exit 1

@@ -457,7 +457,7 @@ mod tests {
                     );
                 }
 
-                if let Ok(_) = copy_rename_io(
+                if copy_rename_io(
                     true,
                     &root,
                     "a",
@@ -467,7 +467,9 @@ mod tests {
                     &mut stdin,
                     &mut stdout,
                     &mut stderr,
-                ) {
+                )
+                .is_ok()
+                {
                     panic!(
                         "Should not be able to access parent directory: {}/../../c",
                         root.display()

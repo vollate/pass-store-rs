@@ -14,8 +14,10 @@ pub struct PGPClient {
 }
 
 #[derive(Debug)]
-pub(crate) enum PGPErr {
+pub enum PGPErr {
     NoneFingerprint,
+    NoneUsername,
+    NoneEmail,
     CannotTakeStdin,
     CannotTakeStdout,
     CannotTakeStderr,
@@ -27,6 +29,8 @@ impl Display for PGPErr {
 
         match self {
             NoneFingerprint => write!(f, "Key fingerprint is None"),
+            NoneUsername => write!(f, "Username is None"),
+            NoneEmail => write!(f, "Email is None"),
             CannotTakeStdin => write!(f, "Cannot take child's stdin"),
             CannotTakeStdout => write!(f, "Cannot take child's stdout"),
             CannotTakeStderr => write!(f, "Cannot take child's stderr"),

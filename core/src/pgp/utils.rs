@@ -2,6 +2,7 @@ use std::error::Error;
 use std::io::Read;
 use std::process::{Child, Command};
 
+use log::debug;
 use regex::Regex;
 
 use crate::pgp::PGPClient;
@@ -25,23 +26,40 @@ pub(crate) fn user_email_to_fingerprint(
     Err("No PGP key found".into())
 }
 
-pub(crate) fn fingerprint_to_email(
+pub(crate) fn fingerprint_to_user_info(
     executable: &str,
     fingerprint: &str,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<(String, String), Box<dyn Error>> {
     let output =
         Command::new(executable).args(["--list-keys", "--with-colons", fingerprint]).output()?;
     if !output.status.success() {
         return Err("Failed to get PGP key".into());
     }
     let info = String::from_utf8(output.stdout)?;
+    debug!("fingerprint output: {}", info);
+    let username: String;
     for line in info.lines() {
         if line.starts_with("uid") {
-            let email = line.split('<').nth(1).unwrap().split('>').next().unwrap();
-            return Ok(email.to_string());
+            if let Some(before_at) = line.split_once(" <") {
+                let name_part = before_at.0;
+
+                if let Some(name) = name_part.rsplit(':').next() {
+                    username = name.to_string();
+                } else {
+                    return Err("Failed to parse username".into());
+                }
+            } else {
+                return Err("Failed to parse username".into());
+            }
+            let email = line
+                .split('<')
+                .nth(1)
+                .and_then(|part| part.split('>').next())
+                .ok_or("Failed to parse email")?;
+            return Ok((username, email.to_string()));
         }
     }
-    Err(format!("No email found for {}", fingerprint).into())
+    Err(format!("No userinfo found for {}", fingerprint).into())
 }
 
 #[derive(Eq, PartialEq)]
@@ -134,7 +152,9 @@ impl PGPClient {
         match (&self.key_fpr, &self.username, &self.email) {
             (Some(_), Some(_), Some(_)) => {}
             (Some(k), _, _) => {
-                self.email = Some(fingerprint_to_email(&self.executable, k)?);
+                let (name, email) = fingerprint_to_user_info(&self.executable, k)?;
+                self.username = Some(name);
+                self.email = Some(email);
             }
             (_, Some(_u), Some(m)) => {
                 self.key_fpr = Some(user_email_to_fingerprint(&self.executable, m)?);

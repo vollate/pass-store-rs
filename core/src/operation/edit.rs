@@ -82,6 +82,8 @@ pub fn edit(
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::test_util::{
@@ -91,6 +93,7 @@ mod tests {
     };
 
     #[test]
+    #[serial]
     #[ignore = "need run interactively"]
     fn test_edit() {
         let executable = &get_test_executable();
