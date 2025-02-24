@@ -2,7 +2,7 @@ use std::error::Error;
 
 use pars_core::config::ParsConfig;
 use pars_core::operation::init::init;
-use pars_core::pgp::{PGPClient, PGPErr};
+use pars_core::pgp::PGPClient;
 use pars_core::util::fs_util::path_to_str;
 
 use crate::constants::ParsExitCode;
@@ -12,23 +12,20 @@ pub fn cmd_init(
     config: &ParsConfig,
     base_dir: Option<&str>,
     path: Option<&str>,
-    pgp_id: &str,
+    pgp_id: &Vec<String>,
 ) -> Result<(), (i32, Box<dyn Error>)> {
     let root = unwrap_root_path(base_dir, config);
-    //TODO(Vollate): support email+username
-    let mut pgp_client =
-        PGPClient::new(config.path_config.pgp_executable.clone(), Some(pgp_id.into()), None, None);
-
-    if let Err(e) = pgp_client.update_info() {
-        return Err((ParsExitCode::PGPError.into(), e));
-    }
+    eprintln!("TODO: support email+username");
+    let pgp_client = PGPClient::new(
+        config.path_config.pgp_executable.clone(),
+        &pgp_id.iter().map(|id| id.as_str()).collect(),
+    )
+    .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
     println!(
-        "Init password store for {} {} at '{}'",
-        pgp_client
-            .get_username()
-            .ok_or((ParsExitCode::PGPError.into(), PGPErr::NoneUsername.into()))?,
-        pgp_client.get_email().ok_or((ParsExitCode::PGPError.into(), PGPErr::NoneEmail.into()))?,
+        "Init password store for {:?} {:?} at '{}'",
+        pgp_client.get_usernames(),
+        pgp_client.get_email(),
         path_to_str(&root).map_err(|e| (ParsExitCode::InvalidEncoding.into(), e))?,
     );
 
@@ -36,5 +33,7 @@ pub fn cmd_init(
         return Err((ParsExitCode::PGPError.into(), e));
     }
 
+    //TODO(Vollate): init git repo if the root is a new dir
+    eprintln!("TODO!!!: need to init git repository");
     Ok(())
 }

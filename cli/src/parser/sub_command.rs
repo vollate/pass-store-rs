@@ -7,7 +7,7 @@ pub enum SubCommands {
         path: Option<String>,
 
         #[arg(required = true)]
-        gpg_ids: String,
+        gpg_ids: Vec<String>,
     },
 
     #[command(alias = "list")]

@@ -85,11 +85,11 @@ mod tests {
     use serial_test::serial;
 
     use super::*;
+    use crate::pgp::key_management::key_gen_batch;
     use crate::util::defer::cleanup;
     use crate::util::test_util::{
         clean_up_test_key, create_dir_structure, gen_unique_temp_dir, get_test_email,
-        get_test_executable, get_test_username, gpg_key_edit_example_batch,
-        gpg_key_gen_example_batch,
+        get_test_executable, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
     };
 
     #[test]
@@ -112,14 +112,8 @@ mod tests {
         let file2_content = "Requesting orbital";
         cleanup!(
             {
-                let mut test_client = PGPClient::new(
-                    executable.to_string(),
-                    None,
-                    Some(get_test_username()),
-                    Some(email.to_string()),
-                );
-                test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-                test_client.update_info().unwrap();
+                key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
+                let test_client = PGPClient::new(executable, &vec![email]).unwrap();
                 test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
                 let new_dir = root.join("file1.gpg");
                 let output = path_to_str(&new_dir).unwrap();
@@ -141,7 +135,7 @@ mod tests {
                 println!("dir/file2.gpg new content:\n{}", file2_new_content.expose_secret());
             },
             {
-                clean_up_test_key(executable, email).unwrap();
+                clean_up_test_key(executable, &vec![email]).unwrap();
             }
         );
     }

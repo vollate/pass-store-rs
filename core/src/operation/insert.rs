@@ -94,6 +94,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::pgp::key_management::key_gen_batch;
     use crate::util::defer::cleanup;
     use crate::util::test_util::*;
 
@@ -102,15 +103,8 @@ mod tests {
         let email = get_test_email();
         let (tmp_dir, root) = gen_unique_temp_dir();
 
-        let mut test_client = PGPClient::new(
-            executable.clone(),
-            None,
-            Some(get_test_username()),
-            Some(email.clone()),
-        );
-
-        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-        test_client.update_info().unwrap();
+        key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
+        let test_client = PGPClient::new(executable.clone(), &vec![&email]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
 
         (executable, email, test_client, tmp_dir, root)
@@ -150,7 +144,7 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "password");
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
@@ -189,7 +183,7 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "line1\nline2\nline3");
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
@@ -233,7 +227,7 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "new_password");
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
@@ -265,7 +259,7 @@ mod tests {
                 assert!(result.is_err());
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }

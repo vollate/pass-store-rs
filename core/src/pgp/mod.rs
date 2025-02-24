@@ -5,12 +5,14 @@ pub mod utils;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+pub struct PGPKey {
+    key_fpr: String,
+    username: String,
+    email: String,
+}
 pub struct PGPClient {
     executable: String,
-    // master key
-    key_fpr: Option<String>,
-    username: Option<String>,
-    email: Option<String>,
+    keys: Vec<PGPKey>,
 }
 
 #[derive(Debug)]

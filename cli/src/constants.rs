@@ -14,6 +14,8 @@ pub fn default_config_path() -> String {
     }
 }
 
+pub const DEFAULT_LOG_LEVEL: &str = "debug";
+
 #[repr(i32)]
 pub enum ParsExitCode {
     Success = 0,

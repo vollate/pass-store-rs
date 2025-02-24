@@ -9,15 +9,18 @@ use zeroize::Zeroize;
 use super::{PGPClient, PGPErr};
 impl PGPClient {
     pub fn encrypt(&self, plaintext: &str, output_path: &str) -> Result<(), Box<dyn Error>> {
+        let fprs = self.get_key_fprs();
+        let prefix = vec!["--batch", "--encrypt"];
+        let mut args = Vec::with_capacity(prefix.len() + fprs.len() * 2 + 2);
+        args.extend(prefix);
+        fprs.into_iter().for_each(|fpr| {
+            args.push("--recipient");
+            args.push(fpr);
+        });
+        args.push("--output");
+        args.push(output_path);
         let mut child = Command::new(&self.executable)
-            .args([
-                "--batch",
-                "--encrypt",
-                "--recipient",
-                self.get_key_fpr().ok_or(PGPErr::NoneFingerprint)?,
-                "--output",
-                output_path,
-            ])
+            .args(&args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -49,15 +52,14 @@ impl PGPClient {
         work_dir: &Path,
         file_path: &str,
     ) -> Result<SecretString, Box<dyn Error>> {
-        let output = Command::new(&self.executable)
-            .current_dir(work_dir)
-            .args([
-                "--decrypt",
-                "--recipient",
-                self.key_fpr.as_ref().ok_or(PGPErr::NoneFingerprint)?,
-                file_path,
-            ])
-            .output()?;
+        let mut args = Vec::with_capacity(1 + 2 * self.keys.len() + 1);
+        args.push("--decrypt");
+        for key in &self.keys {
+            args.push("--recipient");
+            args.push(&key.key_fpr);
+        }
+        args.push(file_path);
+        let output = Command::new(&self.executable).current_dir(work_dir).args(&args).output()?;
 
         if output.status.success() {
             Ok(String::from_utf8(output.stdout)?.into())
@@ -72,19 +74,24 @@ impl PGPClient {
         file_path: &str,
         mut passwd: SecretString,
     ) -> Result<SecretString, Box<dyn Error>> {
+        //TODO: match each version
+        let prefix = vec![
+            "--batch",         // this is required after 2.0
+            "--pinentry-mode", //this is required after 2.1
+            "loopback",
+            "--decrypt",
+            "--passphrase-fd",
+            "0",
+        ];
+        let mut args = Vec::with_capacity(prefix.len() + 2 * self.keys.len() + 1);
+        args.extend(prefix);
+        for key in &self.keys {
+            args.push("--recipient");
+            args.push(&key.key_fpr);
+        }
+        args.push(file_path);
         let mut cmd = Command::new(&self.executable)
-            //TODO: match each version
-            .args([
-                "--batch",         // this is required after 2.0
-                "--pinentry-mode", //this is required after 2.1
-                "loopback",
-                "--decrypt",
-                "--passphrase-fd",
-                "0",
-                "--recipient",
-                self.key_fpr.as_ref().ok_or(PGPErr::NoneFingerprint)?,
-                file_path,
-            ])
+            .args(&args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -117,10 +124,11 @@ mod tests {
     use serial_test::serial;
 
     use super::*;
+    use crate::pgp::key_management::key_gen_batch;
     use crate::util::defer::cleanup;
     use crate::util::test_util::{
         clean_up_test_key, get_test_email, get_test_executable, get_test_password,
-        get_test_username, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
+        gpg_key_edit_example_batch, gpg_key_gen_example_batch,
     };
 
     #[test]
@@ -132,15 +140,8 @@ mod tests {
         let output_dest = "encrypt.gpg";
         cleanup!(
             {
-                let mut test_client = PGPClient::new(
-                    executable.to_string(),
-                    None,
-                    Some(get_test_username()),
-                    Some(email.to_string()),
-                );
-                test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-                test_client.update_info().unwrap();
-
+                key_gen_batch(executable, &gpg_key_gen_example_batch()).unwrap();
+                let test_client = PGPClient::new(executable, &vec![email]).unwrap();
                 test_client.encrypt(plaintext, output_dest).unwrap();
 
                 if !Path::new(output_dest).exists() {
@@ -149,7 +150,7 @@ mod tests {
             },
             {
                 let _ = fs::remove_file(output_dest);
-                clean_up_test_key(executable, email).unwrap();
+                clean_up_test_key(executable, &vec![email]).unwrap();
             }
         );
     }
@@ -197,14 +198,9 @@ mod tests {
 
         cleanup!(
             {
-                let mut test_client = PGPClient::new(
-                    get_test_executable(),
-                    None,
-                    Some(get_test_username()),
-                    Some(get_test_email()),
-                );
-                test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-                test_client.update_info().unwrap();
+                key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
+                let test_client =
+                    PGPClient::new(get_test_executable(), &vec![&get_test_email()]).unwrap();
                 test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
                 test_client.encrypt(plaintext, output_dest).unwrap();
                 let decrypted = test_client
@@ -214,7 +210,7 @@ mod tests {
             },
             {
                 fs::remove_file(output_dest).unwrap();
-                clean_up_test_key(&get_test_executable(), &get_test_email()).unwrap();
+                clean_up_test_key(&get_test_executable(), &vec![&get_test_email()]).unwrap();
             }
         )
     }

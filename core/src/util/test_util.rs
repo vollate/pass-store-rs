@@ -23,24 +23,29 @@ use std::path::Path;
 use tempfile::env::temp_dir;
 use tempfile::TempDir;
 
-use crate::pgp::utils::user_email_to_fingerprint;
-pub fn clean_up_test_key(executable: &str, email: &str) -> Result<(), Box<dyn std::error::Error>> {
-    loop {
-        if let Ok(fingerprint) = user_email_to_fingerprint(executable, email) {
-            let delete_status = Command::new(executable)
-                .args(["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
-                .stdin(Stdio::null())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .status()?;
+pub fn clean_up_test_key(
+    executable: &str,
+    emails: &Vec<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    for email in emails {
+        loop {
+            if let Ok((fingerprint, _, _)) = get_pgp_key_info(executable, email) {
+                let delete_status = Command::new(executable)
+                    .args(["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .status()?;
 
-            if !delete_status.success() {
-                return Err("Failed to delete PGP key".into());
+                if !delete_status.success() {
+                    return Err("Failed to delete PGP key".into());
+                }
+            } else {
+                break;
             }
-        } else {
-            return Ok(());
         }
     }
+    Ok(())
 }
 
 pub fn gpg_key_gen_example_batch() -> String {
@@ -109,3 +114,5 @@ macro_rules! log_test {
     };
 }
 pub(crate) use log_test;
+
+use crate::pgp::utils::get_pgp_key_info;

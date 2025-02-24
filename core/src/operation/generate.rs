@@ -127,18 +127,13 @@ mod tests {
     use serial_test::serial;
 
     use super::*;
+    use crate::pgp::key_management::key_gen_batch;
     use crate::util::defer::cleanup;
     use crate::util::test_util::*;
 
     fn setup_test_client() -> PGPClient {
-        let mut test_client = PGPClient::new(
-            get_test_executable(),
-            None,
-            Some(get_test_username()),
-            Some(get_test_email()),
-        );
-        test_client.key_gen_batch(&gpg_key_gen_example_batch()).unwrap();
-        test_client.update_info().unwrap();
+        key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
+        let test_client = PGPClient::new(get_test_executable(), &vec![&get_test_email()]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         test_client
     }
@@ -223,7 +218,7 @@ mod tests {
                 assert_eq!(password.expose_secret().len(), 114);
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
@@ -276,7 +271,7 @@ mod tests {
                 assert_eq!(lines[2], "for super earth");
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
@@ -323,7 +318,7 @@ mod tests {
                 assert_eq!(content.expose_secret(), password.expose_secret());
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
@@ -364,7 +359,7 @@ mod tests {
                 assert!(!password.expose_secret().contains(|c: char| !c.is_alphanumeric()));
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
@@ -404,7 +399,7 @@ mod tests {
                 assert!(result.is_err());
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
@@ -444,7 +439,7 @@ mod tests {
                 assert!(result.is_err());
             },
             {
-                clean_up_test_key(&executable, &email).unwrap();
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
             }
         );
     }
