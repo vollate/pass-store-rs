@@ -73,7 +73,7 @@ mod tests {
 
     //TODO: check interactive mode
     #[test]
-    fn test_ls_dir() {
+    fn tree_dir() {
         // Structure
         // root
         // ├── dir1

@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_encrypt_with_key() {
+    fn encrypt_with_key() {
         let executable = &get_test_executable();
         let email = &get_test_email();
         let plaintext = "Hello, world!\nThis is a test message.";
@@ -158,7 +158,7 @@ mod tests {
     // #[test]
     // #[serial]
     // #[ignore = "need run interactively"]
-    // fn test_decrypt_file_interact() {
+    // fn decrypt_file_interact() {
     //     let executable = &get_test_executable();
     //     let email = &get_test_email();
     //     let plaintext = "Hello, world!\nThis is a test message.\n";
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_decrypt_file() {
+    fn decrypt_file() {
         let plaintext = "Hello, world!\nThis is a test message.\n";
         let output_dest = "decrypt.gpg";
 

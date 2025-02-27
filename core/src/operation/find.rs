@@ -38,7 +38,7 @@ mod tests {
     use crate::util::test_util::{create_dir_structure, gen_unique_temp_dir};
 
     #[test]
-    fn test_find_term() {
+    fn basic() {
         let (_tmp_dir, root) = gen_unique_temp_dir();
         // structure:
         // root

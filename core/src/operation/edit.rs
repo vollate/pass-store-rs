@@ -21,9 +21,9 @@ pub fn edit(
 ) -> Result<(), Box<dyn Error>> {
     let target_path = root.join(target);
     if !target_path.exists() {
-        return Err(IOErr::new(crate::IOErrType::PathNotExist, &target_path).into());
+        return Err(IOErr::new(IOErrType::PathNotExist, &target_path).into());
     } else if !target_path.is_file() {
-        return Err(IOErr::new(crate::IOErrType::ExpectFile, &target_path).into());
+        return Err(IOErr::new(IOErrType::ExpectFile, &target_path).into());
     }
 
     let tmp_dir: PathBuf = {
@@ -82,6 +82,7 @@ pub fn edit(
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_ne;
     use serial_test::serial;
 
     use super::*;
@@ -95,7 +96,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_edit() {
+    fn basic() {
         let executable = &get_test_executable();
         let email = &get_test_email();
 
@@ -131,8 +132,8 @@ mod tests {
                 let file1_new_content = test_client.decrypt_stdin(&root, output).unwrap();
                 let file2_new_content = test_client.decrypt_stdin(&root, "dir/file2.gpg").unwrap();
 
-                println!("file1.gpg new content:\n{}", file1_new_content.expose_secret());
-                println!("dir/file2.gpg new content:\n{}", file2_new_content.expose_secret());
+                assert_ne!(file1_new_content.expose_secret(), file1_content);
+                assert_ne!(file2_new_content.expose_secret(), file2_content);
             },
             {
                 clean_up_test_key(executable, &vec![email]).unwrap();

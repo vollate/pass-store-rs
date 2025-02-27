@@ -8,7 +8,9 @@ use log::debug;
 use secrecy::ExposeSecret;
 
 use crate::pgp::PGPClient;
-use crate::util::fs_util::{backup_encrypted_file, path_to_str, process_files_recursively};
+use crate::util::fs_util::{
+    backup_encrypted_file, get_dir_gpg_id_content, path_to_str, process_files_recursively,
+};
 use crate::{IOErr, IOErrType};
 
 const FPR_FILENAME: &str = ".gpg-id";
@@ -21,7 +23,6 @@ pub fn init(
     if !root_path.exists() {
         fs::create_dir_all(root_path)?;
     }
-    let new_fprs = client.get_key_fprs();
 
     let target_path = root_path.join(target_path);
     if !target_path.exists() {
@@ -29,6 +30,9 @@ pub fn init(
     }
 
     let gpg_id_path = target_path.join(FPR_FILENAME);
+
+    let mut new_fprs = client.get_key_fprs();
+    let first_init = !root_path.join(".gpg-id").exists();
     if !gpg_id_path.exists() {
         let file = OpenOptions::new().write(true).create(true).open(&gpg_id_path)?;
         let content = new_fprs.iter().enumerate().fold(String::new(), |mut acc, (i, line)| {
@@ -41,22 +45,23 @@ pub fn init(
             acc
         });
         write!(&file, "{}", content)?;
+    }
+
+    if first_init {
         return Ok(());
     }
 
-    let old_id_content = fs::read_to_string(&gpg_id_path)?;
-    let old_fprs: Vec<&str> = old_id_content
-        .split('\n')
-        .map(|line| line.trim())
-        .filter(|line| !line.is_empty())
-        .collect();
-
-    if old_fprs == new_fprs {
-        println!("New fingrainters are the same as the old one, no need to update.");
+    let mut old_fprs = get_dir_gpg_id_content(root_path, &target_path)?;
+    old_fprs.sort();
+    let cmp_old: Vec<&str> = old_fprs.iter().map(|str| str.as_str()).collect();
+    new_fprs.sort();
+    if cmp_old == new_fprs {
+        println!("New finger print are the same as the old one, no need to update.");
         return Ok(());
     }
 
     debug!("Old fpr <{:?}>, replace with <{:?}>", old_fprs, new_fprs);
+    let old_client = PGPClient::new(client.get_executable(), &cmp_old)?;
     process_files_recursively(&target_path, &|entry| {
         let filename = entry.file_name();
         let filepath = entry.path();
@@ -64,7 +69,7 @@ pub fn init(
             return Err(IOErr::new(IOErrType::ExpectFile, &filepath).into());
         }
         if filename != FPR_FILENAME {
-            let content = client.decrypt_stdin(root_path, path_to_str(&filepath)?)?;
+            let content = old_client.decrypt_stdin(root_path, path_to_str(&filepath)?)?;
             let backup_path = backup_encrypted_file(&filepath)?;
             client.encrypt(content.expose_secret(), path_to_str(&filepath)?)?;
             fs::remove_file(backup_path)?;
@@ -77,4 +82,10 @@ pub fn init(
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+    #[test]
+    fn init_empty_repo() {
+        unimplemented!("fuck me")
+    }
+}

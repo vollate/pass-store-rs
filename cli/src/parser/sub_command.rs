@@ -63,7 +63,7 @@ pub enum SubCommands {
     },
 
     Edit {
-        pass_name: String,
+        target_pass: String,
     },
 
     Generate {

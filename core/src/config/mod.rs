@@ -35,6 +35,7 @@ pub struct PrintConfigSerializable {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PathConfig {
     pub pgp_executable: String,
+    pub editor_executable: String,
     pub default_repo: String,
     pub repos: Vec<String>,
 }
@@ -42,6 +43,7 @@ pub struct PathConfig {
 #[derive(Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct PathConfigSerializable {
     pub pgp_executable: Option<String>,
+    pub editor_executable: Option<String>,
     pub default_repo: Option<String>,
     pub repos: Option<Vec<String>>,
 }
@@ -50,6 +52,16 @@ impl Default for PathConfig {
     fn default() -> Self {
         PathConfig {
             pgp_executable: "gpg".into(),
+            editor_executable: {
+                #[cfg(unix)]
+                {
+                    "vim".into()
+                }
+                #[cfg(windows)]
+                {
+                    "notepad".into()
+                }
+            },
             default_repo: {
                 #[cfg(unix)]
                 {
@@ -98,6 +110,16 @@ impl From<PathConfigSerializable> for PathConfig {
     fn from(val: PathConfigSerializable) -> Self {
         PathConfig {
             pgp_executable: val.pgp_executable.unwrap_or("gpg".into()),
+            editor_executable: val.editor_executable.unwrap_or({
+                #[cfg(unix)]
+                {
+                    "vim".into()
+                }
+                #[cfg(windows)]
+                {
+                    "notepad".into()
+                }
+            }),
             default_repo: val.default_repo.unwrap_or(
                 #[cfg(unix)]
                 {
@@ -137,6 +159,7 @@ impl From<PathConfig> for PathConfigSerializable {
     fn from(val: PathConfig) -> Self {
         PathConfigSerializable {
             pgp_executable: Some(val.pgp_executable),
+            editor_executable: Some(val.editor_executable),
             default_repo: Some(val.default_repo),
             repos: Some(val.repos),
         }

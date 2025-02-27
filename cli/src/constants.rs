@@ -1,3 +1,4 @@
+use log::LevelFilter;
 use pars_core::util::fs_util::{get_home_dir, path_to_str};
 
 pub fn default_config_path() -> String {
@@ -14,7 +15,8 @@ pub fn default_config_path() -> String {
     }
 }
 
-pub const DEFAULT_LOG_LEVEL: &str = "debug";
+pub const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Debug;
+pub const SECRET_POSTFIX: &str = "gpg";
 
 #[repr(i32)]
 pub enum ParsExitCode {
@@ -35,6 +37,7 @@ pub enum ParsExitCode {
 
 #[cfg(target_os = "linux")]
 impl From<ParsExitCode> for i32 {
+    #[allow(unreachable_patterns)]
     fn from(val: ParsExitCode) -> Self {
         match val {
             ParsExitCode::Success => 0,
@@ -57,6 +60,8 @@ impl From<ParsExitCode> for i32 {
 
 #[cfg(target_os = "windows")]
 impl From<ParsExitCode> for i32 {
+    #[allow(unreachable_patterns)]
+
     fn from(val: ParsExitCode) -> Self {
         match val {
             ParsExitCode::Success => 0,
@@ -79,6 +84,8 @@ impl From<ParsExitCode> for i32 {
 
 #[cfg(target_os = "macos")]
 impl From<ParsExitCode> for i32 {
+    #[allow(unreachable_patterns)]
+
     fn from(val: ParsExitCode) -> Self {
         match val {
             ParsExitCode::Success => 0,

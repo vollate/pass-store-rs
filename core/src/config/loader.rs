@@ -29,7 +29,7 @@ mod tests {
     use crate::util::test_util::gen_unique_temp_dir;
 
     #[test]
-    fn test_save_and_load_config() {
+    fn load_save_test() {
         let (_temp_dir, root) = gen_unique_temp_dir();
         let config_path = root.join("config.toml");
 
@@ -40,7 +40,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_config_invalid_path() {
+    fn invalid_path_test() {
         let test_config = ParsConfig::default();
         let result = if cfg!(unix) {
             save_config(&test_config, "/home/user/\0file.txt")

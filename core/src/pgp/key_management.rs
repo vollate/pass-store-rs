@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_gpg_key_gen_batch() {
+    fn pgp_key_gen_batch() {
         let executable = get_test_executable();
         key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
         let pgp_client = PGPClient::new(executable, &vec![&get_test_email()]).unwrap();
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_gpg_key_edit_batch() {
+    fn pgp_key_edit_batch() {
         let executable = get_test_executable();
         let email = get_test_email();
         key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();

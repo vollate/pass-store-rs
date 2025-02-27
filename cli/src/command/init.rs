@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use log::info;
 use pars_core::config::ParsConfig;
 use pars_core::operation::init::init;
 use pars_core::pgp::PGPClient;
@@ -15,25 +16,22 @@ pub fn cmd_init(
     pgp_id: &Vec<String>,
 ) -> Result<(), (i32, Box<dyn Error>)> {
     let root = unwrap_root_path(base_dir, config);
-    eprintln!("TODO: support email+username");
     let pgp_client = PGPClient::new(
         config.path_config.pgp_executable.clone(),
         &pgp_id.iter().map(|id| id.as_str()).collect(),
     )
     .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
-    println!(
+    info!(
         "Init password store for {:?} {:?} at '{}'",
         pgp_client.get_usernames(),
         pgp_client.get_email(),
         path_to_str(&root).map_err(|e| (ParsExitCode::InvalidEncoding.into(), e))?,
     );
 
-    if let Err(e) = init(&pgp_client, &root, path.unwrap_or_default()) {
-        return Err((ParsExitCode::PGPError.into(), e));
-    }
+    init(&pgp_client, &root, path.unwrap_or_default())
+        .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
-    //TODO(Vollate): init git repo if the root is a new dir
     eprintln!("TODO!!!: need to init git repository");
     Ok(())
 }

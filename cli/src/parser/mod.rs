@@ -2,7 +2,7 @@ pub(crate) mod sub_command;
 
 use std::error::Error;
 
-use clap::{CommandFactory, Parser};
+use clap::Parser;
 use pars_core::config::ParsConfig;
 use sub_command::SubCommands;
 
@@ -75,8 +75,8 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, B
                 force,
             )?;
         }
-        Some(SubCommands::Edit { pass_name }) => {
-            command::edit::cmd_edit(&config, cli_args.base_dir.as_deref(), &pass_name)?;
+        Some(SubCommands::Edit { target_pass }) => {
+            command::edit::cmd_edit(&config, cli_args.base_dir.as_deref(), &target_pass)?;
         }
         Some(SubCommands::Generate {
             no_symbols,

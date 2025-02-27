@@ -113,7 +113,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_basic_insert() {
+    fn basic_insert() {
         let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_multiline_insert() {
+    fn multiline_insert() {
         let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_force_overwrite() {
+    fn force_overwrite() {
         let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
@@ -235,7 +235,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_invalid_path() {
+    fn invalid_path() {
         let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(

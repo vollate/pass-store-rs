@@ -77,7 +77,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_grep_content_match() {
+    fn grep_content_match() {
         let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
@@ -94,7 +94,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_grep_filename_match() {
+    fn grep_filename_match() {
         let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_grep_no_matches() {
+    fn grep_no_matches() {
         let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(

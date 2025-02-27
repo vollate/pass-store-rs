@@ -141,7 +141,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_basic_password_generation() {
+    fn basic_password_generation() {
         let executable = get_test_executable();
         let email = get_test_email();
         let (_tmp_dir, root) = gen_unique_temp_dir();
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_inplace_generation() {
+    fn inplace_generation() {
         let executable = get_test_executable();
         let email = get_test_email();
         let (_tmp_dir, root) = gen_unique_temp_dir();
@@ -279,7 +279,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_force_overwrite() {
+    fn force_overwrite() {
         let executable = get_test_executable();
         let email = get_test_email();
         let (_tmp_dir, root) = gen_unique_temp_dir();
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_no_symbols() {
+    fn no_symbols() {
         let executable = get_test_executable();
         let email = get_test_email();
         let (_tmp_dir, root) = gen_unique_temp_dir();
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_invalid_path() {
+    fn invalid_path() {
         let executable = get_test_executable();
         let email = get_test_email();
         let (_tmp_dir, root) = gen_unique_temp_dir();
@@ -407,7 +407,7 @@ mod tests {
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
-    fn test_invalid_flag_combination() {
+    fn invalid_flag() {
         let executable = get_test_executable();
         let email = get_test_email();
         let (_tmp_dir, root) = gen_unique_temp_dir();

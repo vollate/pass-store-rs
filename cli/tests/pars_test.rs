@@ -4,7 +4,7 @@ mod tests {
     use predicates::prelude::predicate;
 
     #[test]
-    fn test_init() {
+    fn cmd_init_test() {
         let mut cmd = Command::cargo_bin("pars").unwrap();
         cmd.arg("--help")
             .env("PASS_CONFIG_PATH", "tests/test-config.toml")

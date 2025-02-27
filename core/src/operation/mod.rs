@@ -1,3 +1,4 @@
+pub mod copy_or_rename;
 pub mod edit;
 pub mod find;
 pub mod generate;
@@ -7,4 +8,3 @@ pub mod init;
 pub mod insert;
 pub mod ls;
 pub mod remove;
-pub mod rename_or_copy;

@@ -28,20 +28,16 @@ pub fn clean_up_test_key(
     emails: &Vec<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for email in emails {
-        loop {
-            if let Ok((fingerprint, _, _)) = get_pgp_key_info(executable, email) {
-                let delete_status = Command::new(executable)
-                    .args(["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
-                    .status()?;
+        while let Ok((fingerprint, _, _)) = get_pgp_key_info(executable, email) {
+            let delete_status = Command::new(executable)
+                .args(["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
+                .stdin(Stdio::null())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .status()?;
 
-                if !delete_status.success() {
-                    return Err("Failed to delete PGP key".into());
-                }
-            } else {
-                break;
+            if !delete_status.success() {
+                return Err("Failed to delete PGP key".into());
             }
         }
     }

@@ -13,7 +13,7 @@ use fs_extra::dir::{self, CopyOptions};
 
 use crate::{IOErr, IOErrType};
 
-const BACKUP_EXTENSION: &str = "rsbak";
+const BACKUP_EXTENSION: &str = "parsbak";
 
 pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
@@ -62,7 +62,49 @@ pub fn get_home_dir() -> PathBuf {
     dirs::home_dir().unwrap_or(PathBuf::from("~"))
 }
 
-pub fn process_files_recursively<F>(path: &PathBuf, process: &F) -> Result<(), Box<dyn Error>>
+pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>, Box<dyn Error>> {
+    let mut check_dir = cur_dir.to_path_buf();
+
+    while check_dir != root {
+        if !check_dir.is_dir() {
+            match check_dir.parent() {
+                Some(parent) => check_dir = parent.to_path_buf(),
+                None => break,
+            }
+            let key_file = check_dir.join(".gpg-id");
+            if key_file.exists() && key_file.is_file() {
+                if let Ok(key) = fs::read_to_string(key_file) {
+                    return Ok(key
+                        .split('\n')
+                        .map(|line| line.trim())
+                        .filter(|line| !line.is_empty())
+                        .map(|line| line.to_string())
+                        .collect());
+                }
+            }
+        }
+    }
+
+    if root.is_dir() {
+        let key_file = root.join(".gpg-id");
+        if key_file.exists() && key_file.is_file() {
+            if let Ok(key) = fs::read_to_string(key_file) {
+                return Ok(key
+                    .split('\n')
+                    .map(|line| line.trim())
+                    .filter(|line| !line.is_empty())
+                    .map(|line| line.to_string())
+                    .collect());
+            }
+        }
+    }
+    Err(format!("Cannot find '.gpg-id' for {:?}", cur_dir).into())
+}
+
+pub(crate) fn process_files_recursively<F>(
+    path: &PathBuf,
+    process: &F,
+) -> Result<(), Box<dyn Error>>
 where
     F: Fn(&DirEntry) -> Result<(), Box<dyn Error>>,
 {
@@ -81,7 +123,7 @@ where
     Ok(())
 }
 
-pub fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
+pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let extension = format!(
         "{}.{}",
         file_path.extension().unwrap_or_default().to_string_lossy(),
@@ -92,15 +134,15 @@ pub fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn Error>
     Ok(backup_path)
 }
 
-pub fn restore_backup_file(file_path: &Path) -> Result<(), Box<dyn Error>> {
+pub(crate) fn restore_backup_file(file_path: &Path) -> Result<(), Box<dyn Error>> {
     if let Some(extension) = file_path.extension() {
-        if extension == BACKUP_EXTENSION {
+        return if extension == BACKUP_EXTENSION {
             let original_path = file_path.with_extension("");
             fs::rename(file_path, original_path)?;
-            return Ok(());
+            Ok(())
         } else {
-            return Err(format!("File extension is not {}", BACKUP_EXTENSION).into());
-        }
+            Err(format!("File extension is not {}", BACKUP_EXTENSION).into())
+        };
     }
     Err("File does not has extension".into())
 }

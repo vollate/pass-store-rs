@@ -136,7 +136,7 @@ mod test {
     }
 
     #[test]
-    fn test_remove_io() {
+    fn remove_io_test() {
         // Origin structure:
         // root
         // ├── dir1
