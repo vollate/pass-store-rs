@@ -7,7 +7,11 @@ use walkdir::WalkDir;
 use crate::pgp::PGPClient;
 use crate::util::fs_util::path_to_str;
 
-pub fn grep(client: &PGPClient, root: &Path, target: &str) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn grep(
+    client: &PGPClient,
+    root: &Path,
+    search_str: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let mut results = Vec::new();
 
     for entry in WalkDir::new(root) {
@@ -21,11 +25,11 @@ pub fn grep(client: &PGPClient, root: &Path, target: &str) -> Result<Vec<String>
             let matching_lines: Vec<String> = decrypted
                 .expose_secret()
                 .lines()
-                .filter(|line| line.contains(target))
+                .filter(|line| line.contains(search_str))
                 .map(|s| s.to_string())
                 .collect();
 
-            if relative_path_str.contains(target) || !matching_lines.is_empty() {
+            if relative_path_str.contains(search_str) || !matching_lines.is_empty() {
                 results.push(format!("{}:", relative_path_str));
                 results.extend(matching_lines);
             }

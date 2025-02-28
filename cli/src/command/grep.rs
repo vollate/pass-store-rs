@@ -11,5 +11,6 @@ pub fn cmd_grep(
     search_string: &String,
 ) -> Result<(), (i32, Box<dyn Error>)> {
     let root = unwrap_root_path(base_dir, config);
+
     Ok(())
 }

@@ -34,7 +34,7 @@ pub enum SubCommands {
             default_missing_value = "1",
             num_args = 0..=1
         )]
-        clip: Option<u32>,
+        clip: Option<usize>,
 
         #[arg(
             short = 'q',
@@ -43,7 +43,7 @@ pub enum SubCommands {
             default_missing_value = "1",
             num_args = 0..=1
         )]
-        qrcode: Option<u32>,
+        qrcode: Option<usize>,
 
         pass_name: String,
     },
@@ -81,7 +81,7 @@ pub enum SubCommands {
 
         pass_name: String,
 
-        pass_length: Option<u32>,
+        pass_length: Option<usize>,
     },
 
     #[command(alias = "remove", alias = "delete")]

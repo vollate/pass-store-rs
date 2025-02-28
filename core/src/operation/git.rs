@@ -6,9 +6,9 @@ pub fn git_io(executable: &str, work_dir: &Path, args: &[&str]) -> Result<(), Bo
     let status = Command::new(executable)
         .args(args)
         .current_dir(work_dir)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .spawn()?
         .wait()?;
 

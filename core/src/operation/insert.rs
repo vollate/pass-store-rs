@@ -7,20 +7,20 @@ use secrecy::{ExposeSecret, SecretString};
 
 use crate::pgp::PGPClient;
 use crate::util::fs_util::{
-    backup_encrypted_file, is_subpath_of, path_to_str, restore_backup_file,
+    backup_encrypted_file, path_attack_check, path_to_str, restore_backup_file,
 };
 
 pub struct PasswdInsertConfig {
-    echo: bool,
-    multiline: bool,
-    force: bool,
+    pub echo: bool,
+    pub multiline: bool,
+    pub force: bool,
 }
 
 pub fn insert_io<I, O, E>(
     client: &PGPClient,
     root: &Path,
     pass_name: &str,
-    config: PasswdInsertConfig,
+    config: &PasswdInsertConfig,
     stdin: &mut I,
     stdout: &mut O,
     stderr: &mut E,
@@ -32,12 +32,7 @@ where
 {
     let pass_path = root.join(pass_name);
 
-    if !is_subpath_of(root, &pass_path)? {
-        let err_msg = format!("'{}' is not in the password store", pass_name);
-        writeln!(stderr, "{}", err_msg)?;
-        return Err(err_msg.into());
-    }
-
+    path_attack_check(root, &pass_path)?;
     if pass_path.exists() && !config.force {
         let err_msg =
             format!("An entry already exists for {}. Use -f to force overwrite.", pass_name);
@@ -133,7 +128,7 @@ mod tests {
                     &test_client,
                     &root,
                     "test1.gpg",
-                    config,
+                    &config,
                     &mut BufReader::new(&mut stdin),
                     &mut stdout,
                     &mut stderr,
@@ -172,7 +167,7 @@ mod tests {
                     &test_client,
                     &root,
                     "test2.gpg",
-                    config,
+                    &config,
                     &mut BufReader::new(&mut stdin),
                     &mut stdout,
                     &mut stderr,
@@ -216,7 +211,7 @@ mod tests {
                     &test_client,
                     &root,
                     "test3.gpg",
-                    config,
+                    &config,
                     &mut BufReader::new(&mut stdin),
                     &mut stdout,
                     &mut stderr,
@@ -250,7 +245,7 @@ mod tests {
                     &test_client,
                     &root,
                     "../outside.gpg",
-                    config,
+                    &config,
                     &mut BufReader::new(&mut stdin),
                     &mut stdout,
                     &mut stderr,

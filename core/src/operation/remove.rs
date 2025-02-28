@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
-use crate::util::fs_util::is_subpath_of;
+use crate::util::fs_util::path_attack_check;
 use crate::{IOErr, IOErrType};
 
 fn remove_dir_recursive<O>(dir: &Path, stdout: &mut O) -> io::Result<()>
@@ -49,14 +49,7 @@ where
         }
     };
 
-    if !is_subpath_of(root, &dist_path)? {
-        return Err(format!(
-            "'{}' is not the sub-path of the root path '{}'",
-            dist,
-            root.display()
-        )
-        .into());
-    }
+    path_attack_check(root, &dist_path)?;
 
     if !dist_path.exists() {
         let with_extension = dist_path.with_extension("gpg");

@@ -14,9 +14,11 @@ pub fn cmd_cp(
     new_path: &str,
 ) -> Result<(), (i32, Box<dyn Error>)> {
     let root = unwrap_root_path(base_dir, config);
+
     let mut stdin = std::io::stdin().lock();
     let mut stdout = std::io::stdout().lock();
     let mut stderr = std::io::stderr().lock();
+
     if let Err(e) = copy_rename_io(
         true,
         &root,

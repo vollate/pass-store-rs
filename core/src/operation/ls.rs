@@ -10,7 +10,7 @@ use crate::util::str::remove_lines_postfix;
 use crate::util::tree::{DirTree, PrintConfig, TreeConfig};
 use crate::{IOErr, IOErrType};
 
-pub fn ls_interact(
+pub fn ls_io(
     client: &PGPClient,
     tree_cfg: &TreeConfig,
     print_cfg: &PrintConfig,
@@ -39,7 +39,6 @@ pub fn ls_interact(
     }
 }
 
-// Maybe unused
 pub fn ls_dir(tree_cfg: &TreeConfig, print_cfg: &PrintConfig) -> Result<String, Box<dyn Error>> {
     let mut full_path = tree_cfg.root.join(tree_cfg.target);
 

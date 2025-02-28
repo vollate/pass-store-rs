@@ -9,7 +9,9 @@ use zeroize::Zeroize;
 
 use crate::pgp::PGPClient;
 use crate::util::defer::Defer;
-use crate::util::fs_util::{backup_encrypted_file, path_to_str, restore_backup_file};
+use crate::util::fs_util::{
+    backup_encrypted_file, path_attack_check, path_to_str, restore_backup_file,
+};
 use crate::util::rand::rand_alphabet_string;
 use crate::{IOErr, IOErrType};
 
@@ -20,6 +22,7 @@ pub fn edit(
     editor: &str,
 ) -> Result<(), Box<dyn Error>> {
     let target_path = root.join(target);
+    path_attack_check(root, &target_path)?;
     if !target_path.exists() {
         return Err(IOErr::new(IOErrType::PathNotExist, &target_path).into());
     } else if !target_path.is_file() {
@@ -64,6 +67,13 @@ pub fn edit(
     let status = cmd.wait()?;
     if status.success() {
         let new_content = fs::read_to_string(&temp_filepath)?;
+        let mut old_content = client.decrypt_stdin(root, path_to_str(&target_path)?)?;
+        if old_content.expose_secret() == new_content {
+            println!("Password unchanged");
+            return Ok(());
+        }
+        old_content.zeroize();
+
         let backup_file = backup_encrypted_file(&target_path)?;
         match client.encrypt(&new_content, path_to_str(&target_path)?) {
             Ok(_) => {
@@ -74,6 +84,7 @@ pub fn edit(
                 return Err(e);
             }
         }
+        println!("Edit password for {} in repo {} using {}.", target, root.display(), editor);
         Ok(())
     } else {
         Err("Failed to edit file".into())

@@ -3,8 +3,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::{fs, path};
 
-use crate::util::fs_util;
-use crate::util::fs_util::{better_rename, copy_dir_recursive};
+use crate::util::fs_util::{better_rename, copy_dir_recursive, path_attack_check};
 use crate::{IOErr, IOErrType};
 
 // Currently, we do not support cross repo rename/copy
@@ -160,7 +159,7 @@ where
 {
     let mut from_path = root.join(from);
 
-    fs_util::path_attack_check(root, &from_path, from, stderr)?;
+    path_attack_check(root, &from_path)?;
 
     if !from_path.exists() {
         let try_path = from_path.with_extension(extension);
@@ -171,7 +170,7 @@ where
     }
 
     let to_path = root.join(to);
-    fs_util::path_attack_check(root, &to_path, to, stderr)?;
+    path_attack_check(root, &to_path)?;
 
     let to_is_dir = to.ends_with(path::MAIN_SEPARATOR);
     if to_is_dir && (!to_path.exists() || !to_path.is_dir()) {
@@ -281,7 +280,7 @@ mod tests {
                     false,
                     &root,
                     "c",
-                    &format!("d_dir{}", std::path::MAIN_SEPARATOR_STR),
+                    &format!("d_dir{}", path::MAIN_SEPARATOR_STR),
                     "gpg",
                     false,
                     &mut stdin,
@@ -392,7 +391,7 @@ mod tests {
                     true,
                     &root,
                     "c",
-                    &format!("d_dir{}", std::path::MAIN_SEPARATOR_STR),
+                    &format!("d_dir{}", path::MAIN_SEPARATOR_STR),
                     "gpg",
                     false,
                     &mut stdin,

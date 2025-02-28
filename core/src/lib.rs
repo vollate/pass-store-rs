@@ -20,6 +20,7 @@ enum IOErrType {
     InvalidFileType,
     ExpectFile,
     ExpectDir,
+    PathNotInRepo,
 }
 #[derive(Debug)]
 struct IOErr {
@@ -42,8 +43,9 @@ impl Display for IOErr {
             InvalidPath => write!(f, "Invalid path: {:?}", self.path),
             InvalidName => write!(f, "Invalid name: {:?}", self.path),
             InvalidFileType => write!(f, "Invalid file type: {:?}", self.path),
-            ExpectFile => write!(f, "Expect to be a file: {:?}", self.path),
-            ExpectDir => write!(f, "Expect to be a directory: {:?}", self.path),
+            ExpectFile => write!(f, "Expect'{:?}' to be a file", self.path),
+            ExpectDir => write!(f, "Expect '{:?}' to be a directory ", self.path),
+            PathNotInRepo => write!(f, "Path '{:?}' not belong to repo", self.path),
         }
     }
 }

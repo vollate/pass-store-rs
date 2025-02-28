@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use log::info;
 use pars_core::config::ParsConfig;
 use pars_core::operation::init::init;
 use pars_core::pgp::PGPClient;
@@ -17,12 +16,12 @@ pub fn cmd_init(
 ) -> Result<(), (i32, Box<dyn Error>)> {
     let root = unwrap_root_path(base_dir, config);
     let pgp_client = PGPClient::new(
-        config.path_config.pgp_executable.clone(),
+        config.executable_config.pgp_executable.clone(),
         &pgp_id.iter().map(|id| id.as_str()).collect(),
     )
     .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
-    info!(
+    println!(
         "Init password store for {:?} {:?} at '{}'",
         pgp_client.get_usernames(),
         pgp_client.get_email(),

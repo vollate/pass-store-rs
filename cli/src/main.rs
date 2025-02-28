@@ -40,7 +40,7 @@ fn process_cli(config_path: &str) {
     let cli_args = CliParser::parse();
 
     if let Err((code, e)) = parser::handle_cli(config, cli_args) {
-        eprintln!("{}", e);
+        eprintln!("pars exit with error: {}", e);
         std::process::exit(code);
     }
 }

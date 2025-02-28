@@ -1,19 +1,17 @@
-use std::error::Error;
-
 use serde::{Deserialize, Serialize};
-
-use crate::util::tree::{self, string_to_color_opt};
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct ParsConfig {
     pub print_config: PrintConfig,
     pub path_config: PathConfig,
+    pub executable_config: ExecutableConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct ParsConfigSerializable {
     pub print_config: PrintConfigSerializable,
     pub path_config: PathConfigSerializable,
+    pub executable_config: ExecutableConfigSerializable,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -34,23 +32,32 @@ pub struct PrintConfigSerializable {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PathConfig {
-    pub pgp_executable: String,
-    pub editor_executable: String,
     pub default_repo: String,
     pub repos: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct PathConfigSerializable {
-    pub pgp_executable: Option<String>,
-    pub editor_executable: Option<String>,
     pub default_repo: Option<String>,
     pub repos: Option<Vec<String>>,
 }
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecutableConfig {
+    pub pgp_executable: String,
+    pub editor_executable: String,
+    pub git_executable: String,
+}
 
-impl Default for PathConfig {
+#[derive(Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct ExecutableConfigSerializable {
+    pub pgp_executable: Option<String>,
+    pub editor_executable: Option<String>,
+    pub git_executable: Option<String>,
+}
+
+impl Default for ExecutableConfig {
     fn default() -> Self {
-        PathConfig {
+        Self {
             pgp_executable: "gpg".into(),
             editor_executable: {
                 #[cfg(unix)]
@@ -62,6 +69,13 @@ impl Default for PathConfig {
                     "notepad".into()
                 }
             },
+            git_executable: "git".into(),
+        }
+    }
+}
+impl Default for PathConfig {
+    fn default() -> Self {
+        PathConfig {
             default_repo: {
                 #[cfg(unix)]
                 {
@@ -76,22 +90,14 @@ impl Default for PathConfig {
         }
     }
 }
-impl TryInto<tree::PrintConfig> for PrintConfig {
-    type Error = Box<dyn Error>;
-
-    fn try_into(self) -> Result<tree::PrintConfig, Self::Error> {
-        Ok(tree::PrintConfig {
-            dir_color: string_to_color_opt(&self.dir_color),
-            file_color: string_to_color_opt(&self.file_color),
-            symbol_color: string_to_color_opt(&self.symbol_color),
-            tree_color: string_to_color_opt(&self.tree_color),
-        })
-    }
-}
 
 impl From<ParsConfigSerializable> for ParsConfig {
     fn from(val: ParsConfigSerializable) -> Self {
-        ParsConfig { print_config: val.print_config.into(), path_config: val.path_config.into() }
+        ParsConfig {
+            print_config: val.print_config.into(),
+            path_config: val.path_config.into(),
+            executable_config: val.executable_config.into(),
+        }
     }
 }
 
@@ -108,18 +114,7 @@ impl From<PrintConfigSerializable> for PrintConfig {
 
 impl From<PathConfigSerializable> for PathConfig {
     fn from(val: PathConfigSerializable) -> Self {
-        PathConfig {
-            pgp_executable: val.pgp_executable.unwrap_or("gpg".into()),
-            editor_executable: val.editor_executable.unwrap_or({
-                #[cfg(unix)]
-                {
-                    "vim".into()
-                }
-                #[cfg(windows)]
-                {
-                    "notepad".into()
-                }
-            }),
+        Self {
             default_repo: val.default_repo.unwrap_or(
                 #[cfg(unix)]
                 {
@@ -135,11 +130,31 @@ impl From<PathConfigSerializable> for PathConfig {
     }
 }
 
+impl From<ExecutableConfigSerializable> for ExecutableConfig {
+    fn from(val: ExecutableConfigSerializable) -> Self {
+        Self {
+            pgp_executable: val.pgp_executable.unwrap_or("gpg".into()),
+            editor_executable: val.editor_executable.unwrap_or({
+                #[cfg(unix)]
+                {
+                    "vim".into()
+                }
+                #[cfg(windows)]
+                {
+                    "notepad".into()
+                }
+            }),
+            git_executable: val.git_executable.unwrap_or("git".into()),
+        }
+    }
+}
+
 impl From<ParsConfig> for ParsConfigSerializable {
     fn from(val: ParsConfig) -> Self {
         ParsConfigSerializable {
             print_config: val.print_config.into(),
             path_config: val.path_config.into(),
+            executable_config: val.executable_config.into(),
         }
     }
 }
@@ -157,11 +172,16 @@ impl From<PrintConfig> for PrintConfigSerializable {
 
 impl From<PathConfig> for PathConfigSerializable {
     fn from(val: PathConfig) -> Self {
-        PathConfigSerializable {
+        PathConfigSerializable { default_repo: Some(val.default_repo), repos: Some(val.repos) }
+    }
+}
+
+impl From<ExecutableConfig> for ExecutableConfigSerializable {
+    fn from(val: ExecutableConfig) -> Self {
+        Self {
             pgp_executable: Some(val.pgp_executable),
             editor_executable: Some(val.editor_executable),
-            default_repo: Some(val.default_repo),
-            repos: Some(val.repos),
+            git_executable: Some(val.git_executable),
         }
     }
 }

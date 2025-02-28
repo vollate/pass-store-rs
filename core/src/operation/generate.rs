@@ -12,10 +12,10 @@ use crate::util::fs_util::{
 };
 
 pub struct PasswdGenerateConfig {
-    no_symbols: bool,
-    in_place: bool,
-    force: bool,
-    length: usize,
+    pub no_symbols: bool,
+    pub in_place: bool,
+    pub force: bool,
+    pub pass_length: usize,
 }
 fn prompt_overwrite<R: Read, W: Write>(
     stdin: &mut R,
@@ -43,7 +43,7 @@ where
 {
     let pass_path = root.join(pass_name);
 
-    path_attack_check(root, &pass_path, pass_name, stderr)?;
+    path_attack_check(root, &pass_path)?;
 
     if config.in_place && config.force {
         let err_msg = "Cannot use both [--in-place] and [--force]";
@@ -61,7 +61,7 @@ where
     }
 
     let pg = PasswordGenerator::new()
-        .length(config.length)
+        .length(config.pass_length)
         .numbers(true)
         .lowercase_letters(true)
         .uppercase_letters(true)
@@ -158,7 +158,7 @@ mod tests {
                     no_symbols: false,
                     in_place: false,
                     force: false,
-                    length: 16,
+                    pass_length: 16,
                 };
 
                 let password = generate_io(
@@ -178,7 +178,7 @@ mod tests {
                 assert_eq!(secret.expose_secret(), password.expose_secret());
 
                 // Now test interactive overwrite
-                config.length = 114;
+                config.pass_length = 114;
                 thread::spawn(move || {
                     let mut stdin = stdin_w;
                     stdin.write_all(b"n").unwrap();
@@ -249,7 +249,7 @@ mod tests {
                     no_symbols: false,
                     in_place: true,
                     force: false,
-                    length: 12,
+                    pass_length: 12,
                 };
 
                 let password = generate_io(
@@ -299,7 +299,7 @@ mod tests {
                     no_symbols: false,
                     in_place: false,
                     force: true,
-                    length: 8,
+                    pass_length: 8,
                 };
 
                 let password = generate_io(
@@ -342,7 +342,7 @@ mod tests {
                     no_symbols: true,
                     in_place: false,
                     force: false,
-                    length: 10,
+                    pass_length: 10,
                 };
 
                 let password = generate_io(
@@ -383,7 +383,7 @@ mod tests {
                     no_symbols: false,
                     in_place: false,
                     force: false,
-                    length: 16,
+                    pass_length: 16,
                 };
 
                 let result = generate_io(
@@ -423,7 +423,7 @@ mod tests {
                     no_symbols: false,
                     in_place: true,
                     force: true,
-                    length: 16,
+                    pass_length: 16,
                 };
 
                 let result = generate_io(

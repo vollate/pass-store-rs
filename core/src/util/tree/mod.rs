@@ -7,6 +7,8 @@ use bumpalo::collections::Vec as BumpVec;
 use colored::Color;
 use regex::Regex;
 
+use crate::config;
+
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum FilterType {
     Include,
@@ -29,6 +31,16 @@ pub struct PrintConfig {
     pub tree_color: Option<Color>,
 }
 
+impl From<config::PrintConfig> for PrintConfig {
+    fn from(config: config::PrintConfig) -> Self {
+        Self {
+            dir_color: string_to_color_opt(&config.dir_color),
+            file_color: string_to_color_opt(&config.file_color),
+            symbol_color: string_to_color_opt(&config.symbol_color),
+            tree_color: string_to_color_opt(&config.tree_color),
+        }
+    }
+}
 #[derive(Debug)]
 pub enum NodeType {
     File,

@@ -19,11 +19,12 @@ pub fn cmd_edit(
     let key_fprs = get_dir_gpg_id_content(&root, &target_path)
         .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
     let client = PGPClient::new(
-        config.path_config.pgp_executable.clone(),
+        config.executable_config.pgp_executable.clone(),
         &key_fprs.iter().map(|s| s.as_str()).collect(),
     )
     .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
-    let editor = env::var("PARS_EDITOR").unwrap_or(config.path_config.editor_executable.clone());
+    let editor =
+        env::var("PARS_EDITOR").unwrap_or(config.executable_config.editor_executable.clone());
     edit(&client, &root, target_pass, &editor).map_err(|e| (ParsExitCode::PGPError.into(), e))?;
     eprintln!("GIT op!!!!");
     Ok(())

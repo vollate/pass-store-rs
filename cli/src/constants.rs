@@ -17,6 +17,7 @@ pub fn default_config_path() -> String {
 
 pub const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Debug;
 pub const SECRET_POSTFIX: &str = "gpg";
+pub const DEFAULT_PASS_LENGTH: usize = 20;
 
 #[repr(i32)]
 pub enum ParsExitCode {
