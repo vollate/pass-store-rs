@@ -25,6 +25,7 @@ config = "0.15.8"
 toml = "0.8.20"
 serde = { version = "1.0.217", features = ["derive"] }
 dirs = "6.0.0"
+qrcodegen = "1.8.0"
 
 
 [features]

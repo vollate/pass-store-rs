@@ -10,11 +10,6 @@ pub enum SubCommands {
         gpg_ids: Vec<String>,
     },
 
-    #[command(alias = "list")]
-    Ls {
-        subfolder: Option<String>,
-    },
-
     Grep {
         #[arg(trailing_var_arg = true, required = true)]
         args: Vec<String>,
@@ -26,7 +21,8 @@ pub enum SubCommands {
         names: Vec<String>,
     },
 
-    Show {
+    #[command(alias = "show", alias = "list")]
+    Ls {
         #[arg(
             short = 'c',
             long = "clip",
@@ -45,7 +41,7 @@ pub enum SubCommands {
         )]
         qrcode: Option<usize>,
 
-        pass_name: String,
+        pass_name: Option<String>,
     },
 
     #[command(alias = "add")]

@@ -7,6 +7,7 @@ use pars_core::config::ParsConfig;
 use sub_command::SubCommands;
 
 use crate::command;
+use crate::constants::ParsExitCode;
 
 #[derive(Parser)]
 #[command(
@@ -37,9 +38,6 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, B
                 &pgp_id,
             )?;
         }
-        Some(SubCommands::Ls { subfolder }) => {
-            command::ls::cmd_ls(&config, cli_args.base_dir.as_deref(), subfolder.as_deref())?;
-        }
         Some(SubCommands::Grep { args }) => {
             if let Some(search_string) = args.last() {
                 let grep_options = &args[..args.len() - 1];
@@ -50,19 +48,22 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, B
                     search_string,
                 )?;
             } else {
-                return Err((0, "Error: grep requires at least a search string.".into()));
+                return Err((
+                    ParsExitCode::Success.into(),
+                    format!("Usage: {} grep [OPTIONS] <ARGS>...", env!("CARGO_BIN_NAME")).into(),
+                ));
             }
         }
         Some(SubCommands::Find { names }) => {
             command::find::cmd_find(&config, cli_args.base_dir.as_deref(), &names)?;
         }
-        Some(SubCommands::Show { clip, qrcode, pass_name }) => {
-            command::show::cmd_show(
+        Some(SubCommands::Ls { clip, qrcode, pass_name }) => {
+            command::ls::cmd_ls(
                 &config,
                 cli_args.base_dir.as_deref(),
                 clip,
                 qrcode,
-                &pass_name,
+                pass_name.as_deref(),
             )?;
         }
         Some(SubCommands::Insert { pass_name, echo, multiline, force }) => {
@@ -128,7 +129,7 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, B
             command::git::cmd_git(&config, cli_args.base_dir.as_deref(), &args)?;
         }
         None => {
-            command::ls::cmd_ls(&config, cli_args.base_dir.as_deref(), None)?;
+            command::ls::cmd_ls(&config, cli_args.base_dir.as_deref(), None, None, None)?;
         }
     }
     Ok(())

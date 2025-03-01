@@ -9,4 +9,3 @@ pub mod insert;
 pub mod ls;
 pub mod mv;
 pub mod rm;
-pub mod show;

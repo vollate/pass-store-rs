@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use bumpalo::Bump;
-use secrecy::ExposeSecret;
+use secrecy::SecretString;
 
 use crate::pgp::PGPClient;
 use crate::util::fs_util::path_to_str;
@@ -10,11 +10,15 @@ use crate::util::str::remove_lines_postfix;
 use crate::util::tree::{DirTree, PrintConfig, TreeConfig};
 use crate::{IOErr, IOErrType};
 
+pub enum LsOrShow {
+    Password(SecretString),
+    DirTree(String),
+}
 pub fn ls_io(
     client: &PGPClient,
     tree_cfg: &TreeConfig,
     print_cfg: &PrintConfig,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<LsOrShow, Box<dyn Error>> {
     let mut full_path = tree_cfg.root.join(tree_cfg.target);
 
     while full_path.is_symlink() {
@@ -26,16 +30,17 @@ pub fn ls_io(
         let tree = DirTree::new(tree_cfg, &bump)?;
         let result = tree.print_tree(print_cfg)?;
         let result = remove_lines_postfix(&result, ".gpg");
-        if tree_cfg.target.is_empty() {
-            Ok(format!("Password Store\n{}", result))
+        let tree = if tree_cfg.target.is_empty() {
+            format!("Password Store\n{}", result)
         } else {
-            Ok(format!("{}\n{}", tree_cfg.target, result))
-        }
+            format!("{}\n{}", tree_cfg.target, result)
+        };
+        Ok(LsOrShow::DirTree(tree))
     } else if full_path.is_file() {
         let data = client.decrypt_stdin(tree_cfg.root, path_to_str(&full_path)?)?;
-        return Ok(data.expose_secret().to_string());
+        Ok(LsOrShow::Password(data))
     } else {
-        return Err(IOErr::new(IOErrType::InvalidFileType, &full_path).into());
+        Err(IOErr::new(IOErrType::InvalidFileType, &full_path).into())
     }
 }
 
