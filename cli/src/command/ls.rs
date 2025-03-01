@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use log::debug;
 use pars_core::config::ParsConfig;
 use pars_core::operation::ls::ls_io;
 use pars_core::pgp::PGPClient;
@@ -16,6 +17,7 @@ pub fn cmd_ls(
 ) -> Result<(), (i32, Box<dyn Error>)> {
     let root = unwrap_root_path(base_dir, config);
     let target_path = root.join(subfolder.unwrap_or_default());
+    debug!("cmd_ls: root {:?}, target_path {:?}", root, target_path);
     let tree_cfg = TreeConfig {
         root: &root,
         target: subfolder.unwrap_or_default(),

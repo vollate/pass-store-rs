@@ -1,6 +1,6 @@
 use chrono::Local;
 use lazy_static::lazy_static;
-use log::{info, LevelFilter, Log, Metadata, Record};
+use log::{debug, LevelFilter, Log, Metadata, Record};
 use parking_lot::RwLock;
 
 lazy_static! {
@@ -36,7 +36,7 @@ pub fn init_logger() {
 
 pub fn set_log_level(level: LevelFilter) {
     *LOG_LEVEL.write() = level;
-    info!("Log level set to {:?}!", level);
+    debug!("Log level set to {:?}!", level);
 }
 
 pub fn init_debug_logger() {

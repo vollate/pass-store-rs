@@ -1,3 +1,5 @@
+use std::{env, path};
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -73,17 +75,32 @@ impl Default for ExecutableConfig {
         }
     }
 }
+
 impl Default for PathConfig {
     fn default() -> Self {
         PathConfig {
             default_repo: {
-                #[cfg(unix)]
-                {
-                    "~/.password-store".into()
-                }
-                #[cfg(windows)]
-                {
-                    "~\\.password-store".into()
+                match dirs::home_dir() {
+                    Some(path) => {
+                        format!("{}{}.password-store", path.display(), path::MAIN_SEPARATOR)
+                    }
+                    None => {
+                        format!(
+                            "{}{}.password-store",
+                            env::var(
+                                #[cfg(unix)]
+                                {
+                                    "HOME"
+                                },
+                                #[cfg(windows)]
+                                {
+                                    "USERPROFILE"
+                                }
+                            )
+                            .unwrap_or("~".into()),
+                            path::MAIN_SEPARATOR
+                        )
+                    }
                 }
             },
             repos: Vec::default(),

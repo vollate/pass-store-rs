@@ -9,6 +9,7 @@ use std::{env, fs, io};
 
 use clean_path::Clean;
 use fs_extra::dir::{self, CopyOptions};
+use log::debug;
 
 use crate::{IOErr, IOErrType};
 
@@ -66,11 +67,8 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
 
     while check_dir != root {
         if !check_dir.is_dir() {
-            match check_dir.parent() {
-                Some(parent) => check_dir = parent.to_path_buf(),
-                None => break,
-            }
             let key_file = check_dir.join(".gpg-id");
+            debug!("Check '{:?}' for .gpg-id file", key_file);
             if key_file.exists() && key_file.is_file() {
                 if let Ok(key) = fs::read_to_string(key_file) {
                     return Ok(key
@@ -81,11 +79,16 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
                         .collect());
                 }
             }
+            match check_dir.parent() {
+                Some(parent) => check_dir = parent.to_path_buf(),
+                None => break,
+            }
         }
     }
 
     if root.is_dir() {
         let key_file = root.join(".gpg-id");
+        debug!("Check '{:?}' for .gpg-id file", key_file);
         if key_file.exists() && key_file.is_file() {
             if let Ok(key) = fs::read_to_string(key_file) {
                 return Ok(key

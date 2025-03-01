@@ -1,6 +1,9 @@
 use std::error::Error;
 
 use pars_core::config::ParsConfig;
+use pars_core::operation::show::show;
+
+use crate::util::unwrap_root_path;
 
 pub fn cmd_show(
     config: &ParsConfig,
@@ -9,8 +12,6 @@ pub fn cmd_show(
     qrcode: Option<usize>,
     pass_name: &str,
 ) -> Result<(), (i32, Box<dyn Error>)> {
-    // TODO: Implement decryption and display of the password.
-    //       If 'clip' or 'qrcode' is specified, handle accordingly.
-    unimplemented!();
+    let root = unwrap_root_path(base_dir, config);
     Ok(())
 }

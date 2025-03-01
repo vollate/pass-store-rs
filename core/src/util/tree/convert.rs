@@ -103,23 +103,28 @@ impl<'a> DirTree<'a> {
         while let Some((parent_idx, mut entry_iter)) = stack.pop_back() {
             if let Some(entry) = entry_iter.next() {
                 let entry = entry?;
-                if config.filter_type == FilterType::Exclude
-                    && Self::filter_match(&config.filters, filename_to_str(&entry.path())?)
-                {
+                let entry_type = entry.file_type()?;
+                let entry_name = filename_to_str(&entry.path())?.to_string();
+
+                let is_git_dir = &entry_name == ".git" && entry_type.is_dir();
+                let is_dot_gpg_id = &entry_name == ".gpg-id" && entry_type.is_file();
+                let match_blacklist = config.filter_type == FilterType::Exclude
+                    && Self::filter_match(&config.filters, filename_to_str(&entry.path())?);
+                if is_git_dir || is_dot_gpg_id || match_blacklist {
                     stack.push_back((parent_idx, entry_iter));
                     continue;
                 }
-                let entry_type = entry.file_type()?;
-                let mut real_path = entry.path();
 
+                let mut real_path = entry.path();
                 while real_path.is_symlink() {
                     real_path = real_path.read_link()?;
                 }
                 let canonical_path = canonicalize(&real_path)?;
                 let is_recursive_link =
                     path_set.contains(&canonical_path) && entry_type.is_symlink();
+
                 tree.map.push(TreeNode {
-                    name: filename_to_str(&entry.path())?.to_string(),
+                    name: entry_name,
                     parent: Some(parent_idx),
                     children: Vec::with_capacity(if is_recursive_link {
                         0
