@@ -41,7 +41,7 @@ foreach ($dir in $TARGET_DIRS) {
         exit 1
     }
     Write-Host "Running cargo test in $dir..."
-    cargo test
+    sudo cargo test
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to run cargo test in $dir"
         exit 1

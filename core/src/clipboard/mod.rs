@@ -1,6 +1,10 @@
+#[cfg(target_os = "macos")]
 mod mac;
+#[cfg(IS_UNIX_LIKE)]
 mod wayland;
+#[cfg(target_os = "windows")]
 mod windows;
+#[cfg(IS_UNIX_LIKE)]
 mod xorg;
 
 use std::error::Error;
