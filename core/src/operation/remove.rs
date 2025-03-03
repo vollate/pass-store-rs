@@ -1,7 +1,8 @@
-use std::error::Error;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+
+use anyhow::Result;
 
 use crate::util::fs_util::path_attack_check;
 use crate::{IOErr, IOErrType};
@@ -35,7 +36,7 @@ pub fn remove_io<I, O, E>(
     stdin: &mut I,
     stdout: &mut O,
     stderr: &mut E,
-) -> Result<(), Box<dyn Error>>
+) -> Result<()>
 where
     I: Read,
     O: Write,

@@ -1,5 +1,4 @@
-use std::error::Error;
-
+use anyhow::{Error, Result};
 use pars_core::config::ParsConfig;
 use pars_core::operation::git::git_io;
 
@@ -10,7 +9,7 @@ pub fn cmd_git(
     config: &ParsConfig,
     base_dir: Option<&str>,
     args: &Vec<String>,
-) -> Result<(), (i32, Box<dyn Error>)> {
+) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     git_io(
         &config.executable_config.git_executable,

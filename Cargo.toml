@@ -3,5 +3,5 @@ lto = "fat"
 opt-level = "z"
 
 [workspace]
-members = ["cli","core"]
+members = ["cli", "core"]
 resolver = "2"

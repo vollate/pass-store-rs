@@ -1,15 +1,12 @@
-use std::error::Error;
 use std::io::Write;
 use std::process::{Command, Stdio};
+
+use anyhow::{Error, Result};
 
 use crate::pgp::utils::wait_child_process;
 use crate::pgp::PGPClient;
 
-fn run_gpg_batched_child(
-    executable: &str,
-    args: &[&str],
-    batch_input: &str,
-) -> Result<(), Box<dyn Error>> {
+fn run_gpg_batched_child(executable: &str, args: &[&str], batch_input: &str) -> Result<()> {
     let mut cmd = Command::new(executable)
         .args(args)
         .stdin(Stdio::piped())
@@ -20,12 +17,12 @@ fn run_gpg_batched_child(
         input.write_all(batch_input.as_bytes())?;
         input.flush()?;
     } else {
-        return Err("Failed to open stdin for PGP key generation".into());
+        return Err(Error::msg("Failed to open stdin for PGP key generation"));
     }
     wait_child_process(&mut cmd)
 }
 
-fn run_gpg_inherited_child(executable: &str, args: &[&str]) -> Result<(), Box<dyn Error>> {
+fn run_gpg_inherited_child(executable: &str, args: &[&str]) -> Result<()> {
     let status = Command::new(executable)
         .args(args)
         .stdin(Stdio::inherit())
@@ -35,26 +32,26 @@ fn run_gpg_inherited_child(executable: &str, args: &[&str]) -> Result<(), Box<dy
     if status.success() {
         Ok(())
     } else {
-        Err(format!("Failed to generate PGP key, code {:?}", status).into())
+        Err(Error::msg(format!("Failed to generate PGP key, code {:?}", status)))
     }
 }
 
-pub fn key_gen_stdin(pgp_exe: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn key_gen_stdin(pgp_exe: &str) -> Result<()> {
     let gpg_args = ["--gen-key"];
     run_gpg_inherited_child(pgp_exe, &gpg_args)
 }
 
-pub fn key_edit_stdin(pgp_exe: &str, key_fpr: &str) -> Result<(), Box<dyn Error>> {
+pub fn key_edit_stdin(pgp_exe: &str, key_fpr: &str) -> Result<()> {
     let gpg_args = ["--edit-key", key_fpr];
     run_gpg_inherited_child(pgp_exe, &gpg_args)
 }
-pub fn key_gen_batch(pgp_exe: &str, batch_input: &str) -> Result<(), Box<dyn Error>> {
+pub fn key_gen_batch(pgp_exe: &str, batch_input: &str) -> Result<()> {
     let gpg_args = ["--batch", "--gen-key"];
     run_gpg_batched_child(pgp_exe, &gpg_args, batch_input)
 }
 
 impl PGPClient {
-    pub fn key_edit_batch(&self, batch_input: &str) -> Result<(), Box<dyn Error>> {
+    pub fn key_edit_batch(&self, batch_input: &str) -> Result<()> {
         for key in &self.keys {
             let gpg_args =
                 ["--batch", "--command-fd", "0", "--status-fd", "1", "--edit-key", &key.key_fpr];
@@ -63,11 +60,11 @@ impl PGPClient {
         Ok(())
     }
 
-    pub fn list_key_fingerprints(&self) -> Result<Vec<String>, Box<dyn Error>> {
+    pub fn list_key_fingerprints(&self) -> Result<Vec<String>> {
         todo!("impl this")
     }
 
-    pub fn list_all_user_emails(&self) -> Result<Vec<String>, Box<dyn Error>> {
+    pub fn list_all_user_emails(&self) -> Result<Vec<String>> {
         todo!("impl this")
     }
 }

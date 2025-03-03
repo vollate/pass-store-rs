@@ -15,7 +15,7 @@ pub fn default_config_path() -> String {
     }
 }
 
-pub const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Info;
+pub const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Debug;
 pub const SECRET_POSTFIX: &str = "gpg";
 pub const DEFAULT_PASS_LENGTH: usize = 20;
 
@@ -33,7 +33,7 @@ pub enum ParsExitCode {
     NetworkError = 101,
     PGPError = 199,
     GitError = 120,
-    InvalidEncoding = 121,
+    ClipboardError = 121,
 }
 
 #[cfg(target_os = "linux")]
@@ -53,7 +53,7 @@ impl From<ParsExitCode> for i32 {
             ParsExitCode::NetworkError => 101,
             ParsExitCode::PGPError => 199,
             ParsExitCode::GitError => 120,
-            ParsExitCode::InvalidEncoding => 121,
+            ParsExitCode::ClipboardError => 121,
             _ => 1,
         }
     }
@@ -77,7 +77,7 @@ impl From<ParsExitCode> for i32 {
             ParsExitCode::NetworkError => 101,
             ParsExitCode::PGPError => 199,
             ParsExitCode::GitError => 120,
-            ParsExitCode::InvalidEncoding => 121,
+            ParsExitCode::ClipboardError => 121,
             _ => 1,
         }
     }
@@ -101,7 +101,7 @@ impl From<ParsExitCode> for i32 {
             ParsExitCode::NetworkError => 101,
             ParsExitCode::PGPError => 199,
             ParsExitCode::GitError => 120,
-            ParsExitCode::InvalidEncoding => 121,
+            ParsExitCode::ClipboardError => 121,
             _ => 1,
         }
     }

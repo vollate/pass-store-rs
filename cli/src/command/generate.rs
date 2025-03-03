@@ -1,5 +1,5 @@
-use std::error::Error;
-
+use anyhow::Error;
+use pars_core::clipboard::copy_to_clipboard;
 use pars_core::config::ParsConfig;
 use pars_core::operation::generate::{generate_io, PasswdGenerateConfig};
 use pars_core::pgp::PGPClient;
@@ -19,7 +19,7 @@ pub fn cmd_generate(
     force: bool,
     pass_name: &str,
     pass_length: Option<usize>,
-) -> Result<(), (i32, Box<dyn Error>)> {
+) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let target_path = root.join(pass_name);
     let key_fprs =
@@ -42,8 +42,12 @@ pub fn cmd_generate(
     let mut res =
         generate_io(&pgp_client, &root, pass_name, &gen_cfg, &mut stdin, &mut stdout, &mut stderr)
             .map_err(|e| (ParsExitCode::Error.into(), e))?;
-    println!("The generated password for {} is:\n{}", pass_name, res.expose_secret());
-    res.zeroize();
+    if !clip {
+        println!("The generated password for {} is:\n{}", pass_name, res.expose_secret());
+        res.zeroize();
+    } else {
+        copy_to_clipboard(res, Some(45)).map_err(|e| (ParsExitCode::ClipboardError.into(), e))?;
+    }
     eprintln!("Handle clip!!!");
     Ok(())
 }

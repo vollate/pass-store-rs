@@ -1,7 +1,8 @@
-use std::error::Error;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::{fs, path};
+
+use anyhow::Result;
 
 use crate::util::fs_util::{better_rename, copy_dir_recursive, path_attack_check};
 use crate::{IOErr, IOErrType};
@@ -13,7 +14,7 @@ fn handle_overwrite_delete<I, O, E>(
     stdin: &mut I,
     stdout: &mut O,
     _stderr: &mut E,
-) -> Result<bool, Box<dyn Error>>
+) -> Result<bool>
 where
     I: Read,
     O: Write,
@@ -49,7 +50,7 @@ fn copy_rename_file<I, O, E>(
     stdin: &mut I,
     stdout: &mut O,
     stderr: &mut E,
-) -> Result<(), Box<dyn Error>>
+) -> Result<()>
 where
     I: Read,
     O: Write,
@@ -105,7 +106,7 @@ fn copy_rename_dir<I, O, E>(
     stdin: &mut I,
     stdout: &mut O,
     stderr: &mut E,
-) -> Result<(), Box<dyn Error>>
+) -> Result<()>
 where
     I: Read,
     O: Write,
@@ -151,7 +152,7 @@ pub fn copy_rename_io<I, O, E>(
     stdin: &mut I,
     stdout: &mut O,
     stderr: &mut E,
-) -> Result<(), Box<dyn Error>>
+) -> Result<()>
 where
     I: Read,
     O: Write,

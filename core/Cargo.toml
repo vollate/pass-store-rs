@@ -26,12 +26,18 @@ toml = "0.8.20"
 serde = { version = "1.0.217", features = ["derive"] }
 dirs = "6.0.0"
 qrcodegen = "1.8.0"
+anyhow = "1.0.97"
 
 
 [features]
 default = []
 bundle_git = []
 bundle_pgp = ["pgp"]
+x11_wayland = []
+
+[target.'cfg(any( target_os = "linux",target_os = "freebsd",target_os = "openbsd",target_os = "netbsd"))']
+x11_wayland = []
+
 
 [dev-dependencies]
 serial_test = "3.2.0"

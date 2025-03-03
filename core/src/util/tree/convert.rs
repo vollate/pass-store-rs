@@ -1,9 +1,9 @@
 use std::collections::{HashSet, VecDeque};
-use std::error::Error;
 use std::fs::{self, canonicalize, DirEntry};
 use std::path::{Path, PathBuf};
 use std::{io, mem};
 
+use anyhow::Result;
 use bumpalo::collections::Vec as BumpVec;
 use bumpalo::Bump;
 use log::debug;
@@ -11,10 +11,9 @@ use regex::Regex;
 
 use super::{DirTree, FilterType, TreeConfig, TreeNode};
 use crate::util::fs_util::{filename_to_str, path_to_str};
-use crate::util::test_util::log_test;
 
 impl<'a> DirTree<'a> {
-    pub fn new(config: &TreeConfig<'a>, bump: &'a Bump) -> Result<Self, Box<dyn Error>> {
+    pub fn new(config: &TreeConfig<'a>, bump: &'a Bump) -> Result<Self> {
         let mut tree = DirTree::build_tree(config, bump)?;
         Self::apply_whitelist(&config, &mut tree);
         Self::shrink_tree(&mut tree);
@@ -79,7 +78,7 @@ impl<'a> DirTree<'a> {
         }
     }
 
-    fn build_tree<'b>(config: &'b TreeConfig<'a>, bump: &'a Bump) -> Result<Self, Box<dyn Error>> {
+    fn build_tree<'b>(config: &'b TreeConfig<'a>, bump: &'a Bump) -> Result<Self> {
         let root = config.root.join(config.target);
 
         let mut tree = DirTree { map: BumpVec::new_in(bump), root: 0 };
@@ -144,7 +143,6 @@ impl<'a> DirTree<'a> {
                     visible: true,
                 });
                 let child_idx = tree.map.len() - 1;
-                log_test!("Create tree node, Index {}: {:?}", child_idx, tree.map[child_idx]);
                 debug!("Create tree node, Index {}: {:?}", child_idx, tree.map[child_idx]);
                 tree.map[parent_idx].children.push(child_idx);
 

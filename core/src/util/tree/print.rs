@@ -1,15 +1,13 @@
 use std::collections::VecDeque;
-use std::error::Error;
 
+use anyhow::Result;
 use colored::Colorize;
 use log::debug;
 
 use super::{DirTree, NodeType, PrintConfig};
-use crate::util::test_util::log_test;
 
 impl DirTree<'_> {
-    pub fn print_tree(&self, config: &PrintConfig) -> Result<String, Box<dyn Error>> {
-        log_test!("Start to print tree:\n{:?}", self.map);
+    pub fn print_tree(&self, config: &PrintConfig) -> Result<String> {
         debug!("Start to print tree:\n{:?}", self.map);
         let mut tree_builder = String::new(); //TODO(Vollate): we should use other structure for building string(huge dir case)
         let mut node_stack = VecDeque::<(usize, usize)>::new();
@@ -113,7 +111,7 @@ mod tests {
     use super::*;
     use crate::util::defer::cleanup;
     use crate::util::fs_util::create_symlink;
-    use crate::util::test_util::{create_dir_structure, gen_unique_temp_dir};
+    use crate::util::test_util::{create_dir_structure, gen_unique_temp_dir, log_test};
     use crate::util::tree::{FilterType, TreeConfig};
 
     #[test]

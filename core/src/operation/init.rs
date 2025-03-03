@@ -1,9 +1,9 @@
-use std::error::Error;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 
+use anyhow::Result;
 use log::debug;
 use secrecy::ExposeSecret;
 
@@ -15,11 +15,7 @@ use crate::{IOErr, IOErrType};
 
 const FPR_FILENAME: &str = ".gpg-id";
 
-pub fn init(
-    client: &PGPClient,
-    root_path: &PathBuf,
-    target_path: &str,
-) -> Result<(), Box<dyn Error>> {
+pub fn init(client: &PGPClient, root_path: &PathBuf, target_path: &str) -> Result<()> {
     if !root_path.exists() {
         fs::create_dir_all(root_path)?;
     }
@@ -34,7 +30,8 @@ pub fn init(
     let mut new_fprs = client.get_key_fprs();
     let first_init = !root_path.join(".gpg-id").exists();
     if !gpg_id_path.exists() {
-        let file = OpenOptions::new().write(true).create(true).open(&gpg_id_path)?;
+        let file =
+            OpenOptions::new().write(true).create(true).truncate(false).open(&gpg_id_path)?;
         let content = new_fprs.iter().enumerate().fold(String::new(), |mut acc, (i, line)| {
             if i == new_fprs.len() - 1 {
                 acc.push_str(line);

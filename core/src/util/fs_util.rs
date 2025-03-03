@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fs::DirEntry;
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
@@ -7,6 +6,7 @@ use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
+use anyhow::{Error, Result};
 use clean_path::Clean;
 use fs_extra::dir::{self, CopyOptions};
 use log::debug;
@@ -14,6 +14,23 @@ use log::debug;
 use crate::{IOErr, IOErrType};
 
 const BACKUP_EXTENSION: &str = "parsbak";
+
+pub fn get_new_line() -> &'static str {
+    #[cfg(target_os = "macos")]
+    {
+        "\r"
+    }
+
+    #[cfg(unix)]
+    {
+        "\n"
+    }
+
+    #[cfg(windows)]
+    {
+        "\r\n"
+    }
+}
 
 pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
@@ -29,7 +46,7 @@ pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     None
 }
 
-pub fn better_rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(), Box<dyn Error>> {
+pub fn better_rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
     let from = from.as_ref();
     let to = to.as_ref();
     if let Err(err) = fs::rename(from, to) {
@@ -47,10 +64,7 @@ pub fn better_rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(
     Ok(())
 }
 
-pub fn copy_dir_recursive<P: AsRef<Path>, Q: AsRef<Path>>(
-    from: P,
-    to: Q,
-) -> Result<(), Box<dyn Error>> {
+pub fn copy_dir_recursive<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
     let mut options = CopyOptions::new();
     options.overwrite = false;
     options.copy_inside = true;
@@ -62,35 +76,40 @@ pub fn get_home_dir() -> PathBuf {
     dirs::home_dir().unwrap_or(PathBuf::from("~"))
 }
 
-pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>, Box<dyn Error>> {
-    let mut check_dir = cur_dir.to_path_buf();
+pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>> {
+    path_attack_check(root, cur_dir)?;
+    let mut to_check = cur_dir.to_path_buf();
 
-    while check_dir != root {
-        if !check_dir.is_dir() {
-            let key_file = check_dir.join(".gpg-id");
-            debug!("Check '{:?}' for .gpg-id file", key_file);
+    while to_check != root {
+        if to_check.is_dir() {
+            let key_file = to_check.join(".gpg-id");
+            debug!("Check {:?} for .gpg-id file", key_file);
             if key_file.exists() && key_file.is_file() {
                 if let Ok(key) = fs::read_to_string(key_file) {
+                    debug!("Found key: {:?}", key);
                     return Ok(key
-                        .split('\n')
+                        .split(get_new_line())
                         .map(|line| line.trim())
                         .filter(|line| !line.is_empty())
                         .map(|line| line.to_string())
                         .collect());
                 }
             }
-            match check_dir.parent() {
-                Some(parent) => check_dir = parent.to_path_buf(),
-                None => break,
+        }
+        match to_check.parent() {
+            Some(parent) => {
+                to_check = parent.to_path_buf();
             }
+            None => break,
         }
     }
 
     if root.is_dir() {
         let key_file = root.join(".gpg-id");
-        debug!("Check '{:?}' for .gpg-id file", key_file);
+        debug!("Checking root {:?} for .gpg-id file", root);
         if key_file.exists() && key_file.is_file() {
             if let Ok(key) = fs::read_to_string(key_file) {
+                debug!("Found key: {:?}", key);
                 return Ok(key
                     .split('\n')
                     .map(|line| line.trim())
@@ -100,15 +119,12 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
             }
         }
     }
-    Err(format!("Cannot find '.gpg-id' for {:?}", cur_dir).into())
+    Err(Error::msg(format!("Cannot find '.gpg-id' for {:?}", cur_dir)))
 }
 
-pub(crate) fn process_files_recursively<F>(
-    path: &PathBuf,
-    process: &F,
-) -> Result<(), Box<dyn Error>>
+pub(crate) fn process_files_recursively<F>(path: &PathBuf, process: &F) -> Result<()>
 where
-    F: Fn(&DirEntry) -> Result<(), Box<dyn Error>>,
+    F: Fn(&DirEntry) -> Result<()>,
 {
     if path.is_dir() {
         for entry in fs::read_dir(path)? {
@@ -125,7 +141,7 @@ where
     Ok(())
 }
 
-pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn Error>> {
+pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf> {
     let extension = format!(
         "{}.{}",
         file_path.extension().unwrap_or_default().to_string_lossy(),
@@ -136,20 +152,20 @@ pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf, Box<dyn
     Ok(backup_path)
 }
 
-pub(crate) fn restore_backup_file(file_path: &Path) -> Result<(), Box<dyn Error>> {
+pub(crate) fn restore_backup_file(file_path: &Path) -> Result<()> {
     if let Some(extension) = file_path.extension() {
         return if extension == BACKUP_EXTENSION {
             let original_path = file_path.with_extension("");
             fs::rename(file_path, original_path)?;
             Ok(())
         } else {
-            Err(format!("File extension is not {}", BACKUP_EXTENSION).into())
+            Err(Error::msg(format!("File extension is not {}", BACKUP_EXTENSION)))
         };
     }
-    Err("File does not has extension".into())
+    Err(Error::msg("File does not has extension"))
 }
 
-fn is_executable(path: &Path) -> Result<bool, Box<dyn Error>> {
+fn is_executable(path: &Path) -> Result<bool> {
     if path.is_file() {
         #[cfg(unix)]
         {
@@ -171,7 +187,7 @@ fn is_executable(path: &Path) -> Result<bool, Box<dyn Error>> {
     }
 }
 
-pub fn create_symlink<P: AsRef<Path>>(original: P, link: P) -> Result<(), Box<dyn Error>> {
+pub fn create_symlink<P: AsRef<Path>>(original: P, link: P) -> Result<()> {
     #[cfg(unix)]
     {
         Ok(symlink(original, link)?)
@@ -192,11 +208,11 @@ pub fn create_symlink<P: AsRef<Path>>(original: P, link: P) -> Result<(), Box<dy
     }
 }
 
-pub fn path_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
+pub fn path_to_str(path: &Path) -> Result<&str> {
     Ok(path.to_str().ok_or_else(|| IOErr::new(IOErrType::InvalidPath, path))?)
 }
 
-pub fn filename_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
+pub fn filename_to_str(path: &Path) -> Result<&str> {
     Ok(path
         .file_name()
         .ok_or_else(|| IOErr::new(IOErrType::InvalidPath, path))?
@@ -204,13 +220,13 @@ pub fn filename_to_str(path: &Path) -> Result<&str, Box<dyn Error>> {
         .ok_or_else(|| IOErr::new(IOErrType::InvalidName, path))?)
 }
 
-pub fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool, Box<dyn Error>> {
+pub fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool> {
     let child_clean = child.as_ref().clean();
     let parent_clean = parent.as_ref().clean();
     Ok(child_clean.starts_with(&parent_clean))
 }
 
-pub fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<(), Box<dyn Error>> {
+pub fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<()> {
     let metadata = fs::metadata(path.as_ref())?;
     let mut permissions = metadata.permissions();
     permissions.set_readonly(readonly);
@@ -218,7 +234,7 @@ pub fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<(), Box<d
     Ok(())
 }
 
-pub fn path_attack_check(root: &Path, child: &Path) -> Result<(), Box<dyn Error>> {
+pub fn path_attack_check(root: &Path, child: &Path) -> Result<()> {
     if !is_subpath_of(root, child)? {
         Err(IOErr::new(IOErrType::PathNotInRepo, child).into())
     } else {

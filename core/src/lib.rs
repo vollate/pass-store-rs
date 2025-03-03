@@ -1,10 +1,3 @@
-const IS_UNIX_LIKE: bool = cfg!(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "openbsd",
-    target_os = "netbsd"
-));
-
 pub mod bundle;
 pub mod clipboard;
 pub mod config;
@@ -17,6 +10,7 @@ use std::error::Error;
 use std::fmt::Display;
 use std::path::Path;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 enum IOErrType {
     PathNotExist,

@@ -1,6 +1,6 @@
-use std::error::Error;
 use std::str::FromStr;
 
+use anyhow::Result;
 use bumpalo::Bump;
 use regex::Regex;
 
@@ -11,7 +11,7 @@ pub fn find_term(
     terms: &Vec<&str>,
     tree_cfg: &TreeConfig,
     print_cfg: &PrintConfig,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<String> {
     let mut config = tree_cfg.clone();
     config.filter_type = FilterType::Include;
     config.filters = terms.iter().map(|term| Regex::new(term)).collect::<Result<Vec<_>, _>>()?;

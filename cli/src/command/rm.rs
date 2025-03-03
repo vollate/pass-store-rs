@@ -1,5 +1,4 @@
-use std::error::Error;
-
+use anyhow::{Error, Result};
 use pars_core::config::ParsConfig;
 use pars_core::operation::remove::remove_io;
 
@@ -12,7 +11,7 @@ pub fn cmd_rm(
     recursive: bool,
     force: bool,
     pass_name: &str,
-) -> Result<(), (i32, Box<dyn Error>)> {
+) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let mut stdin = std::io::stdin().lock();
     let mut stdout = std::io::stdout().lock();

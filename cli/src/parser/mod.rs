@@ -1,7 +1,6 @@
 pub(crate) mod sub_command;
 
-use std::error::Error;
-
+use anyhow::{Error, Result};
 use clap::Parser;
 use pars_core::config::ParsConfig;
 use sub_command::SubCommands;
@@ -28,7 +27,7 @@ pub struct CliParser {
     pub base_dir: Option<String>,
 }
 
-pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, Box<dyn Error>)> {
+pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, Error)> {
     match cli_args.command {
         Some(SubCommands::Init { path, gpg_ids: pgp_id }) => {
             command::init::cmd_init(
@@ -50,7 +49,10 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, B
             } else {
                 return Err((
                     ParsExitCode::Success.into(),
-                    format!("Usage: {} grep [OPTIONS] <ARGS>...", env!("CARGO_BIN_NAME")).into(),
+                    Error::msg(format!(
+                        "Usage: {} grep [OPTIONS] <ARGS>...",
+                        env!("CARGO_BIN_NAME")
+                    )),
                 ));
             }
         }

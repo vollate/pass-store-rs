@@ -1,5 +1,4 @@
-use std::error::Error;
-
+use anyhow::{Error, Result};
 use log::debug;
 use pars_core::clipboard::copy_to_clipboard;
 use pars_core::config::ParsConfig;
@@ -19,7 +18,7 @@ pub fn cmd_ls(
     clip: Option<usize>,
     qrcode: Option<usize>,
     target: Option<&str>,
-) -> Result<(), (i32, Box<dyn Error>)> {
+) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let target_path = root.join(target.unwrap_or_default());
     debug!("cmd_ls: root {:?}, target_path {:?}", root, target_path);
@@ -58,17 +57,16 @@ pub fn cmd_ls(
                 } else {
                     return Err((
                         ParsExitCode::Error.into(),
-                        format!(
+                        Error::msg(format!(
                             "There is no password to put on the clipboard at line {}.",
                             line_num
-                        )
-                        .into(),
+                        )),
                     ));
                 }
             }
 
             if let Some(line_num) = qrcode {
-                if let Some(line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
+                if let Some(_line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
                     unimplemented!("QR code generation is not implemented yet.");
                     // let qr = qrcode::QrCode::new(line_content.as_bytes())?;
                     // let image = qr.render::<unicode_canvas::UnicodeCanvas>().dark_color('█').light_color(' ' ).build();
@@ -76,11 +74,10 @@ pub fn cmd_ls(
                 } else {
                     return Err((
                         ParsExitCode::Error.into(),
-                        format!(
+                        Error::msg(format!(
                             "There is no password to put on the clipboard at line {}.",
                             line_num
-                        )
-                        .into(),
+                        )),
                     ));
                 }
             }

@@ -1,13 +1,10 @@
-use std::error::Error;
 use std::process::Command;
 
+use anyhow::{Error, Result};
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
-pub(crate) fn copy_to_clip_board(
-    mut secret: SecretString,
-    timeout: Option<usize>,
-) -> Result<(), Box<dyn Error>> {
+pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
     let mut cmd = Command::new("powershell");
     let mut child = cmd
         .arg("-Command")
@@ -18,7 +15,7 @@ pub(crate) fn copy_to_clip_board(
 
     let exit_status = child.wait()?;
     if !exit_status.success() {
-        return Err(format!("wl-copy exit failed: {}", exit_status).into());
+        return Err(Error::msg(format!("wl-copy exit failed: {}", exit_status)));
     }
 
     if let Some(secs) = timeout {

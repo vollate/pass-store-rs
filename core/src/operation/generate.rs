@@ -1,8 +1,8 @@
-use std::error::Error;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 
+use anyhow::{Error, Result};
 use passwords::PasswordGenerator;
 use secrecy::{ExposeSecret, SecretString};
 
@@ -21,7 +21,7 @@ fn prompt_overwrite<R: Read, W: Write>(
     stdin: &mut R,
     stderr: &mut W,
     pass_name: &str,
-) -> Result<bool, Box<dyn Error>> {
+) -> Result<bool> {
     write!(stderr, "An entry already exists for {}. Overwrite? [y/N]: ", pass_name)?;
     let mut input = String::new();
     stdin.read_to_string(&mut input)?;
@@ -35,7 +35,7 @@ pub fn generate_io<I, O, E>(
     stdin: &mut I,
     stdout: &mut O,
     stderr: &mut E,
-) -> Result<SecretString, Box<dyn Error>>
+) -> Result<SecretString>
 where
     I: Read,
     O: Write,
@@ -48,7 +48,7 @@ where
     if config.in_place && config.force {
         let err_msg = "Cannot use both [--in-place] and [--force]";
         writeln!(stderr, "{}", err_msg)?;
-        return Err(err_msg.into());
+        return Err(Error::msg(err_msg));
     }
 
     if pass_path.exists()
@@ -70,7 +70,7 @@ where
         .exclude_similar_characters(true)
         .strict(true);
 
-    let password = SecretString::new(pg.generate_one()?.into());
+    let password = SecretString::new(pg.generate_one().map_err(Error::msg)?.into());
 
     if config.in_place && pass_path.exists() {
         let existing = client.decrypt_stdin(root, path_to_str(&pass_path)?)?;

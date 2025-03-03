@@ -1,6 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::{env, fs};
+
+use tempfile::env::temp_dir;
+use tempfile::TempDir;
 
 pub fn get_test_username() -> String {
     env::var("PASS_RS_TEST_USERNAME").unwrap_or("rs-pass-test".into())
@@ -17,11 +20,6 @@ pub fn get_test_executable() -> String {
 pub fn get_test_password() -> String {
     env::var("PASS_RS_TEST_PASSWORD").unwrap_or("password".into())
 }
-
-use std::path::Path;
-
-use tempfile::env::temp_dir;
-use tempfile::TempDir;
 
 pub fn clean_up_test_key(
     executable: &str,

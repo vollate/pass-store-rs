@@ -1,9 +1,8 @@
-use std::error::Error;
 use std::io::Read;
 use std::process::{Child, Command};
 
+use anyhow::{Error, Result};
 use log::debug;
-use regex::Regex;
 
 use super::PGPKey;
 use crate::pgp::PGPClient;
@@ -11,11 +10,11 @@ use crate::pgp::PGPClient;
 pub(crate) fn get_pgp_key_info(
     executable: &str,
     identifier: &str,
-) -> Result<(String, String, String), Box<dyn Error>> {
+) -> Result<(String, String, String)> {
     let output =
         Command::new(executable).args(["--list-keys", "--with-colons", identifier]).output()?;
     if !output.status.success() {
-        return Err("Failed to get PGP key".into());
+        return Err(Error::msg("Failed to get PGP key"));
     }
 
     let info = String::from_utf8(output.stdout)?;
@@ -28,7 +27,7 @@ pub(crate) fn get_pgp_key_info(
             if let Some(fingerprint) = line.split(':').nth(9) {
                 fpr = fingerprint.to_string();
             } else {
-                return Err("Failed to parse fingerprint".into());
+                return Err(Error::msg("Failed to parse fingerprint"));
             }
         } else if line.starts_with("uid") {
             if let Some(before_at) = line.split_once(" <") {
@@ -37,46 +36,24 @@ pub(crate) fn get_pgp_key_info(
                 if let Some(name) = name_part.rsplit(':').next() {
                     username = name.to_string();
                 } else {
-                    return Err("Failed to parse username".into());
+                    return Err(Error::msg("Failed to parse username"));
                 }
             } else {
-                return Err("Failed to parse username".into());
+                return Err(Error::msg("Failed to parse username"));
             }
 
             let email = line
                 .split('<')
                 .nth(1)
                 .and_then(|part| part.split('>').next())
-                .ok_or("Failed to parse email")?;
+                .ok_or(Error::msg("Failed to parse email"))?;
             return Ok((fpr, username, email.to_string()));
         }
     }
-    Err(format!("No userinfo found for {}", identifier).into())
+    Err(Error::msg(format!("No userinfo found for {}", identifier)))
 }
 
-#[derive(Eq, PartialEq)]
-pub(crate) enum RecipientType {
-    Fingerprint,
-    UserEmail,
-}
-
-pub(crate) fn check_recipient_type(recipient: &str) -> Result<RecipientType, Box<dyn Error>> {
-    let fpr_regex = Regex::new(r"^[A-Fa-f0-9]{40}$")?;
-    if fpr_regex.is_match(recipient) {
-        Ok(RecipientType::Fingerprint)
-    } else {
-        Ok(RecipientType::UserEmail)
-    }
-}
-
-pub(crate) fn recipient_to_fingerprint(recipient: &str) -> Result<String, Box<dyn Error>> {
-    match check_recipient_type(recipient)? {
-        RecipientType::Fingerprint => Ok(recipient.to_string()),
-        RecipientType::UserEmail => Ok(recipient.to_string()),
-    }
-}
-
-pub(super) fn wait_child_process(cmd: &mut Child) -> Result<(), Box<dyn Error>> {
+pub(super) fn wait_child_process(cmd: &mut Child) -> Result<()> {
     let status = cmd.wait()?;
     if status.success() {
         Ok(())
@@ -87,9 +64,9 @@ pub(super) fn wait_child_process(cmd: &mut Child) -> Result<(), Box<dyn Error>> 
                 stderr.read_to_string(&mut buf)?;
                 buf
             }
-            None => return Err("Failed to read stderr".into()),
+            None => return Err(Error::msg("Failed to read stderr")),
         };
-        Err(format!("Failed to edit PGP key, code: {:?}\nError: {}", status, err_msg).into())
+        Err(Error::msg(format!("Failed to edit PGP key, code: {:?}\nError: {}", status, err_msg)))
     }
 }
 
@@ -104,7 +81,7 @@ macro_rules! get_keys_field {
 }
 
 impl PGPClient {
-    pub fn new<S: AsRef<str>>(executable: S, infos: &Vec<&str>) -> Result<Self, Box<dyn Error>> {
+    pub fn new<S: AsRef<str>>(executable: S, infos: &Vec<&str>) -> Result<Self> {
         let mut gpg_client =
             PGPClient { executable: executable.as_ref().to_string(), keys: Vec::new() };
         gpg_client.update_info(infos)?;
@@ -127,7 +104,7 @@ impl PGPClient {
         get_keys_field!(self, email)
     }
 
-    fn update_info(&mut self, infos: &Vec<&str>) -> Result<(), Box<dyn Error>> {
+    fn update_info(&mut self, infos: &Vec<&str>) -> Result<()> {
         self.keys = Vec::with_capacity(infos.len());
         for info in infos {
             let (fpr, username, email) = get_pgp_key_info(&self.executable, info)?;

@@ -1,6 +1,6 @@
 use std::env;
-use std::error::Error;
 
+use anyhow::Error;
 use pars_core::config::ParsConfig;
 use pars_core::operation::edit::edit;
 use pars_core::pgp::PGPClient;
@@ -13,7 +13,7 @@ pub fn cmd_edit(
     config: &ParsConfig,
     base_dir: Option<&str>,
     target_pass: &str,
-) -> Result<(), (i32, Box<dyn Error>)> {
+) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let target_path = root.join(target_pass);
     let key_fprs = get_dir_gpg_id_content(&root, &target_path)

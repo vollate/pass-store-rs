@@ -1,5 +1,4 @@
-use std::error::Error;
-
+use anyhow::Error;
 use pars_core::config::ParsConfig;
 use pars_core::operation::insert::{insert_io, PasswdInsertConfig};
 use pars_core::pgp::PGPClient;
@@ -15,7 +14,7 @@ pub fn cmd_insert(
     echo: bool,
     multiline: bool,
     force: bool,
-) -> Result<(), (i32, Box<dyn Error>)> {
+) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let target_pass = root.join(pass_name);
     let pgp_id = get_dir_gpg_id_content(&root, &target_pass)

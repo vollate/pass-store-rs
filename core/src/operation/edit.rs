@@ -1,8 +1,8 @@
-use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
 
+use anyhow::{Error, Result};
 use secrecy::ExposeSecret;
 use tempfile::TempDir;
 use zeroize::Zeroize;
@@ -15,12 +15,7 @@ use crate::util::fs_util::{
 use crate::util::rand::rand_alphabet_string;
 use crate::{IOErr, IOErrType};
 
-pub fn edit(
-    client: &PGPClient,
-    root: &Path,
-    target: &str,
-    editor: &str,
-) -> Result<(), Box<dyn Error>> {
+pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Result<()> {
     let target_path = root.join(target);
     path_attack_check(root, &target_path)?;
     if !target_path.exists() {
@@ -87,7 +82,7 @@ pub fn edit(
         println!("Edit password for {} in repo {} using {}.", target, root.display(), editor);
         Ok(())
     } else {
-        Err("Failed to edit file".into())
+        Err(Error::msg("Failed to edit file"))
     }
 }
 

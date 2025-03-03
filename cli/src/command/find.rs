@@ -1,5 +1,4 @@
-use std::error::Error;
-
+use anyhow::{Error, Result};
 use pars_core::config::ParsConfig;
 use pars_core::operation::find::find_term;
 use pars_core::util::tree::{FilterType, TreeConfig};
@@ -11,7 +10,7 @@ pub fn cmd_find(
     config: &ParsConfig,
     base_dir: Option<&str>,
     names: &Vec<String>,
-) -> Result<(), (i32, Box<dyn Error>)> {
+) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let terms = names.iter().map(|s| s.as_str()).collect();
     let tree_cfg = TreeConfig {

@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use constants::{ParsExitCode, DEFAULT_LOG_LEVEL};
+use log::debug;
 use pars_core::config::loader::load_config;
 use pars_core::config::ParsConfig;
 use pars_core::util::log::{init_logger, set_log_level};
@@ -41,6 +42,7 @@ fn process_cli(config_path: &str) {
 
     if let Err((code, e)) = parser::handle_cli(config, cli_args) {
         eprintln!("pars exit with error: {}", e);
+        debug!("Error: {:?}", e);
         std::process::exit(code);
     }
 }

@@ -1,14 +1,15 @@
-use std::error::Error;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use anyhow::{Error, Result};
+use log::debug;
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
 use super::{PGPClient, PGPErr};
 impl PGPClient {
-    pub fn encrypt(&self, plaintext: &str, output_path: &str) -> Result<(), Box<dyn Error>> {
+    pub fn encrypt(&self, plaintext: &str, output_path: &str) -> Result<()> {
         let fprs = self.get_key_fprs();
         let prefix = vec!["--batch", "--encrypt"];
         let mut args = Vec::with_capacity(prefix.len() + fprs.len() * 2 + 2);
@@ -32,7 +33,7 @@ impl PGPClient {
 
         let status = child.wait()?;
         if status.success() {
-            println!("File encrypted successfully: {}", output_path); //TODO: remove
+            debug!("File encrypted successfully: {}", output_path);
             Ok(())
         } else {
             let mut buffer = String::new();
@@ -43,15 +44,11 @@ impl PGPClient {
                 }
                 None => String::new(),
             };
-            Err(format!("PGP encryption failed: {}", err_msg).into())
+            Err(Error::msg(format!("PGP encryption failed: {}", err_msg)))
         }
     }
 
-    pub fn decrypt_stdin(
-        &self,
-        work_dir: &Path,
-        file_path: &str,
-    ) -> Result<SecretString, Box<dyn Error>> {
+    pub fn decrypt_stdin(&self, work_dir: &Path, file_path: &str) -> Result<SecretString> {
         let mut args = Vec::with_capacity(1 + 2 * self.keys.len() + 1);
         args.push("--decrypt");
         for key in &self.keys {
@@ -65,7 +62,7 @@ impl PGPClient {
             Ok(String::from_utf8(output.stdout)?.into())
         } else {
             let error_message = String::from_utf8_lossy(&output.stderr);
-            Err(format!("PGP decryption failed: {}", error_message).into())
+            Err(Error::msg(format!("PGP decryption failed: {}", error_message)))
         }
     }
 
@@ -73,7 +70,7 @@ impl PGPClient {
         &self,
         file_path: &str,
         mut passwd: SecretString,
-    ) -> Result<SecretString, Box<dyn Error>> {
+    ) -> Result<SecretString> {
         //TODO: match each version
         let prefix = vec![
             "--batch",         // this is required after 2.0
@@ -110,7 +107,7 @@ impl PGPClient {
             Ok(String::from_utf8(output.stdout)?.into())
         } else {
             let error_message = String::from_utf8_lossy(&output.stderr);
-            Err(format!("PGP decryption failed: {}", error_message).into())
+            Err(Error::msg(format!("PGP decryption failed: {}", error_message)))
         }
     }
 }

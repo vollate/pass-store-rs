@@ -1,20 +1,17 @@
+#[allow(dead_code)]
 #[cfg(target_os = "macos")]
 mod mac;
-#[cfg(IS_UNIX_LIKE)]
+#[cfg(feature = "x11_wayland")]
 mod wayland;
 #[cfg(target_os = "windows")]
 mod windows;
-#[cfg(IS_UNIX_LIKE)]
+#[cfg(feature = "x11_wayland")]
 mod xorg;
 
-use std::error::Error;
-
+use anyhow::Result;
 use secrecy::SecretString;
 
-pub fn copy_to_clipboard(
-    content: SecretString,
-    sec_to_clear: Option<usize>,
-) -> Result<(), Box<dyn Error>> {
+pub fn copy_to_clipboard(content: SecretString, sec_to_clear: Option<usize>) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         mac::copy_to_clip_board(content, sec_to_clear)?;

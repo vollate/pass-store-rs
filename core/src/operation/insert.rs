@@ -1,8 +1,8 @@
-use std::error::Error;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 
+use anyhow::{Error, Result};
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::pgp::PGPClient;
@@ -24,7 +24,7 @@ pub fn insert_io<I, O, E>(
     stdin: &mut I,
     stdout: &mut O,
     stderr: &mut E,
-) -> Result<(), Box<dyn Error>>
+) -> Result<()>
 where
     I: Read + std::io::BufRead,
     O: Write,
@@ -37,7 +37,7 @@ where
         let err_msg =
             format!("An entry already exists for {}. Use -f to force overwrite.", pass_name);
         writeln!(stderr, "{}", err_msg)?;
-        return Err(err_msg.into());
+        return Err(Error::msg(err_msg));
     }
 
     if let Some(parent) = pass_path.parent() {
