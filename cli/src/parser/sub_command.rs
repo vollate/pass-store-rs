@@ -27,7 +27,7 @@ pub enum SubCommands {
             short = 'c',
             long = "clip",
             value_name = "line-number",
-            default_missing_value = "1",
+            default_missing_value = "0",
             num_args = 0..=1
         )]
         clip: Option<usize>,
@@ -36,7 +36,7 @@ pub enum SubCommands {
             short = 'q',
             long = "qrcode",
             value_name = "line-number",
-            default_missing_value = "1",
+            default_missing_value = "0",
             num_args = 0..=1
         )]
         qrcode: Option<usize>,

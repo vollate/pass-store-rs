@@ -7,6 +7,7 @@ use sub_command::SubCommands;
 
 use crate::command;
 use crate::constants::ParsExitCode;
+use crate::util::{to_relative_path, to_relative_path_opt};
 
 #[derive(Parser)]
 #[command(
@@ -60,6 +61,7 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             command::find::cmd_find(&config, cli_args.base_dir.as_deref(), &names)?;
         }
         Some(SubCommands::Ls { clip, qrcode, pass_name }) => {
+            let pass_name = to_relative_path_opt(pass_name);
             command::ls::cmd_ls(
                 &config,
                 cli_args.base_dir.as_deref(),
@@ -69,6 +71,7 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             )?;
         }
         Some(SubCommands::Insert { pass_name, echo, multiline, force }) => {
+            let pass_name = to_relative_path(pass_name);
             command::insert::cmd_insert(
                 &config,
                 cli_args.base_dir.as_deref(),
@@ -79,6 +82,7 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             )?;
         }
         Some(SubCommands::Edit { target_pass }) => {
+            let target_pass = to_relative_path(target_pass);
             command::edit::cmd_edit(&config, cli_args.base_dir.as_deref(), &target_pass)?;
         }
         Some(SubCommands::Generate {
@@ -89,6 +93,7 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             pass_name,
             pass_length,
         }) => {
+            let pass_name = to_relative_path(pass_name);
             command::generate::cmd_generate(
                 &config,
                 cli_args.base_dir.as_deref(),
@@ -101,6 +106,7 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             )?;
         }
         Some(SubCommands::Rm { recursive, force, pass_name }) => {
+            let pass_name = to_relative_path(pass_name);
             command::rm::cmd_rm(
                 &config,
                 cli_args.base_dir.as_deref(),
@@ -110,6 +116,8 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             )?;
         }
         Some(SubCommands::Mv { force, old_path, new_path }) => {
+            let old_path = to_relative_path(old_path);
+            let new_path = to_relative_path(new_path);
             command::mv::cmd_mv(
                 &config,
                 cli_args.base_dir.as_deref(),
@@ -119,6 +127,8 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             )?;
         }
         Some(SubCommands::Cp { force, old_path, new_path }) => {
+            let old_path = to_relative_path(old_path);
+            let new_path = to_relative_path(new_path);
             command::cp::cmd_cp(
                 &config,
                 cli_args.base_dir.as_deref(),
