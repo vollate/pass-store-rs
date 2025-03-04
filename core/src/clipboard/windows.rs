@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
@@ -15,7 +15,7 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
 
     let exit_status = child.wait()?;
     if !exit_status.success() {
-        return Err(Error::msg(format!("wl-copy exit failed: {}", exit_status)));
+        return Err(anyhow!(format!("wl-copy exit failed: {}", exit_status)));
     }
 
     if let Some(secs) = timeout {

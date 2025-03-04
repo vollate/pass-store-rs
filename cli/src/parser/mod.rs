@@ -6,17 +6,15 @@ use pars_core::config::ParsConfig;
 use sub_command::SubCommands;
 
 use crate::command;
-use crate::constants::ParsExitCode;
 use crate::util::{to_relative_path, to_relative_path_opt};
 
 #[derive(Parser)]
 #[command(
     name = "pars",
     about = "Stores, retrieves, generates, and synchronizes passwords securely",
-    version = "1.0",
+    version = "0.1.0",
     author = "Vollate <uint44t@gmail.com>"
 )]
-
 pub struct CliParser {
     #[command(subcommand)]
     pub command: Option<SubCommands>,
@@ -38,24 +36,8 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
                 &pgp_id,
             )?;
         }
-        Some(SubCommands::Grep { args }) => {
-            if let Some(search_string) = args.last() {
-                let grep_options = &args[..args.len() - 1];
-                command::grep::cmd_grep(
-                    &config,
-                    cli_args.base_dir.as_deref(),
-                    grep_options,
-                    search_string,
-                )?;
-            } else {
-                return Err((
-                    ParsExitCode::Success.into(),
-                    Error::msg(format!(
-                        "Usage: {} grep [OPTIONS] <ARGS>...",
-                        env!("CARGO_BIN_NAME")
-                    )),
-                ));
-            }
+        Some(SubCommands::Grep { search_string }) => {
+            command::grep::cmd_grep(&config, cli_args.base_dir.as_deref(), &search_string)?;
         }
         Some(SubCommands::Find { names }) => {
             command::find::cmd_find(&config, cli_args.base_dir.as_deref(), &names)?;

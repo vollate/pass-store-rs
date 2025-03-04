@@ -6,7 +6,7 @@ use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use clean_path::Clean;
 use fs_extra::dir::{self, CopyOptions};
 use log::debug;
@@ -119,7 +119,7 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
             }
         }
     }
-    Err(Error::msg(format!("Cannot find '.gpg-id' for {:?}", cur_dir)))
+    Err(anyhow!(format!("Cannot find '.gpg-id' for {:?}", cur_dir)))
 }
 
 pub(crate) fn process_files_recursively<F>(path: &PathBuf, process: &F) -> Result<()>
@@ -159,10 +159,10 @@ pub(crate) fn restore_backup_file(file_path: &Path) -> Result<()> {
             fs::rename(file_path, original_path)?;
             Ok(())
         } else {
-            Err(Error::msg(format!("File extension is not {}", BACKUP_EXTENSION)))
+            Err(anyhow!(format!("File extension is not {}", BACKUP_EXTENSION)))
         };
     }
-    Err(Error::msg("File does not has extension"))
+    Err(anyhow!("File does not has extension"))
 }
 
 fn is_executable(path: &Path) -> Result<bool> {

@@ -1,8 +1,7 @@
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use anyhow::{Error, Result};
-
+use anyhow::{anyhow, Result};
 pub fn git_io(executable: &str, work_dir: &Path, args: &[&str]) -> Result<()> {
     let status = Command::new(executable)
         .args(args)
@@ -16,6 +15,6 @@ pub fn git_io(executable: &str, work_dir: &Path, args: &[&str]) -> Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(Error::msg(format!("Failed to run git command, code {:?}", status)))
+        Err(anyhow!(format!("Failed to run git command, code {:?}", status)))
     }
 }

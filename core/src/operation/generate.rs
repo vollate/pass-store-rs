@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use passwords::PasswordGenerator;
 use secrecy::{ExposeSecret, SecretString};
 
@@ -48,7 +48,7 @@ where
     if config.in_place && config.force {
         let err_msg = "Cannot use both [--in-place] and [--force]";
         writeln!(stderr, "{}", err_msg)?;
-        return Err(Error::msg(err_msg));
+        return Err(anyhow!(err_msg));
     }
 
     if pass_path.exists()
@@ -70,7 +70,7 @@ where
         .exclude_similar_characters(true)
         .strict(true);
 
-    let password = SecretString::new(pg.generate_one().map_err(Error::msg)?.into());
+    let password = SecretString::new(pg.generate_one().map_err(|e| anyhow!(e))?.into());
 
     if config.in_place && pass_path.exists() {
         let existing = client.decrypt_stdin(root, path_to_str(&pass_path)?)?;

@@ -9,7 +9,7 @@ use crate::util::unwrap_root_path;
 pub fn cmd_find(
     config: &ParsConfig,
     base_dir: Option<&str>,
-    names: &Vec<String>,
+    names: &[String],
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let terms = names.iter().map(|s| s.as_str()).collect();

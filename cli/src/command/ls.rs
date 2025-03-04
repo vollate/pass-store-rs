@@ -1,4 +1,4 @@
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use log::debug;
 use pars_core::clipboard::copy_to_clipboard;
 use pars_core::config::ParsConfig;
@@ -57,7 +57,7 @@ pub fn cmd_ls(
                 } else {
                     return Err((
                         ParsExitCode::Error.into(),
-                        Error::msg(format!(
+                        anyhow!(format!(
                             "There is no password to put on the clipboard at line {}.",
                             line_num
                         )),
@@ -74,7 +74,7 @@ pub fn cmd_ls(
                 } else {
                     return Err((
                         ParsExitCode::Error.into(),
-                        Error::msg(format!(
+                        anyhow!(format!(
                             "There is no password to put on the clipboard at line {}.",
                             line_num
                         )),

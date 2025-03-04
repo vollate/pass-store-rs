@@ -11,8 +11,7 @@ pub enum SubCommands {
     },
 
     Grep {
-        #[arg(trailing_var_arg = true, required = true)]
-        args: Vec<String>,
+        search_string: String,
     },
 
     #[command(alias = "search")]

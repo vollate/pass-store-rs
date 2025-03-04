@@ -33,10 +33,7 @@ anyhow = "1.0.97"
 default = []
 bundle_git = []
 bundle_pgp = ["pgp"]
-x11_wayland = []
 
-[target.'cfg(any( target_os = "linux",target_os = "freebsd",target_os = "openbsd",target_os = "netbsd"))']
-x11_wayland = []
 
 
 [dev-dependencies]

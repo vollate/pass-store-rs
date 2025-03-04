@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use log::debug;
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
@@ -44,7 +44,7 @@ impl PGPClient {
                 }
                 None => String::new(),
             };
-            Err(Error::msg(format!("PGP encryption failed: {}", err_msg)))
+            Err(anyhow!(format!("PGP encryption failed: {}", err_msg)))
         }
     }
 
@@ -62,7 +62,7 @@ impl PGPClient {
             Ok(String::from_utf8(output.stdout)?.into())
         } else {
             let error_message = String::from_utf8_lossy(&output.stderr);
-            Err(Error::msg(format!("PGP decryption failed: {}", error_message)))
+            Err(anyhow!(format!("PGP decryption failed: {}", error_message)))
         }
     }
 
@@ -107,7 +107,7 @@ impl PGPClient {
             Ok(String::from_utf8(output.stdout)?.into())
         } else {
             let error_message = String::from_utf8_lossy(&output.stderr);
-            Err(Error::msg(format!("PGP decryption failed: {}", error_message)))
+            Err(anyhow!(format!("PGP decryption failed: {}", error_message)))
         }
     }
 }

@@ -8,7 +8,7 @@ use crate::util::unwrap_root_path;
 pub fn cmd_git(
     config: &ParsConfig,
     base_dir: Option<&str>,
-    args: &Vec<String>,
+    args: &[String],
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     git_io(

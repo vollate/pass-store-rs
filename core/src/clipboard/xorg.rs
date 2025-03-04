@@ -1,27 +1,24 @@
-use std::error::Error;
 use std::io::Write;
 use std::process::Command;
 
+use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
-pub(crate) fn copy_to_clip_board(
-    mut secret: SecretString,
-    timeout: Option<usize>,
-) -> Result<(), Box<dyn Error>> {
+pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
     let mut child = Command::new("xclip")
         .arg("-selection")
         .arg("clipboard")
         .stdin(std::process::Stdio::piped())
         .spawn()?;
 
-    let child_stdin = child.stdin.as_mut().ok_or("Cannot get stdin for 'xclip'")?;
+    let child_stdin = child.stdin.as_mut().ok_or(anyhow!("Cannot get stdin for 'xclip'"))?;
     child_stdin.write_all(secret.expose_secret().as_bytes())?;
     secret.zeroize();
 
     let exit_status = child.wait()?;
     if !exit_status.success() {
-        return Err(format!("xclip exit failed: {}", exit_status).into());
+        return Err(anyhow!(format!("xclip exit failed: {}", exit_status)));
     }
 
     if let Some(secs) = timeout {

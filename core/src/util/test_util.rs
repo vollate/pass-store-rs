@@ -95,10 +95,6 @@ pub(crate) fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&s
     }
 }
 
-pub(crate) fn cleanup_test_dir(base: &Path) {
-    let _ = fs::remove_dir_all(base);
-}
-
 macro_rules! log_test {
     ($($arg:tt)*) => {
         #[cfg(test)]

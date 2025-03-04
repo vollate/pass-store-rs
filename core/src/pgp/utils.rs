@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::process::{Child, Command};
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use log::debug;
 
 use super::PGPKey;
@@ -14,7 +14,7 @@ pub(crate) fn get_pgp_key_info(
     let output =
         Command::new(executable).args(["--list-keys", "--with-colons", identifier]).output()?;
     if !output.status.success() {
-        return Err(Error::msg("Failed to get PGP key"));
+        return Err(anyhow!("Failed to get PGP key"));
     }
 
     let info = String::from_utf8(output.stdout)?;
@@ -27,7 +27,7 @@ pub(crate) fn get_pgp_key_info(
             if let Some(fingerprint) = line.split(':').nth(9) {
                 fpr = fingerprint.to_string();
             } else {
-                return Err(Error::msg("Failed to parse fingerprint"));
+                return Err(anyhow!("Failed to parse fingerprint"));
             }
         } else if line.starts_with("uid") {
             if let Some(before_at) = line.split_once(" <") {
@@ -36,21 +36,21 @@ pub(crate) fn get_pgp_key_info(
                 if let Some(name) = name_part.rsplit(':').next() {
                     username = name.to_string();
                 } else {
-                    return Err(Error::msg("Failed to parse username"));
+                    return Err(anyhow!("Failed to parse username"));
                 }
             } else {
-                return Err(Error::msg("Failed to parse username"));
+                return Err(anyhow!("Failed to parse username"));
             }
 
             let email = line
                 .split('<')
                 .nth(1)
                 .and_then(|part| part.split('>').next())
-                .ok_or(Error::msg("Failed to parse email"))?;
+                .ok_or(anyhow!("Failed to parse email"))?;
             return Ok((fpr, username, email.to_string()));
         }
     }
-    Err(Error::msg(format!("No userinfo found for {}", identifier)))
+    Err(anyhow!(format!("No userinfo found for {}", identifier)))
 }
 
 pub(super) fn wait_child_process(cmd: &mut Child) -> Result<()> {
@@ -64,9 +64,9 @@ pub(super) fn wait_child_process(cmd: &mut Child) -> Result<()> {
                 stderr.read_to_string(&mut buf)?;
                 buf
             }
-            None => return Err(Error::msg("Failed to read stderr")),
+            None => return Err(anyhow!("Failed to read stderr")),
         };
-        Err(Error::msg(format!("Failed to edit PGP key, code: {:?}\nError: {}", status, err_msg)))
+        Err(anyhow!(format!("Failed to edit PGP key, code: {:?}\nError: {}", status, err_msg)))
     }
 }
 
@@ -109,6 +109,7 @@ impl PGPClient {
         for info in infos {
             let (fpr, username, email) = get_pgp_key_info(&self.executable, info)?;
             self.keys.push(PGPKey { key_fpr: fpr, username, email });
+            debug!("Add key: {:?}", self.keys.last().unwrap());
         }
         Ok(())
     }

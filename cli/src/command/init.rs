@@ -11,7 +11,7 @@ pub fn cmd_init(
     config: &ParsConfig,
     base_dir: Option<&str>,
     path: Option<&str>,
-    pgp_id: &Vec<String>,
+    pgp_id: &[String],
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let pgp_client = PGPClient::new(

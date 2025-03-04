@@ -1,29 +1,25 @@
-use std::error::Error;
 use std::io::Write;
 use std::process::Command;
 
+use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
-pub(crate) fn copy_to_clip_board(
-    mut secret: SecretString,
-    timeout: Option<usize>,
-) -> Result<(), Box<dyn Error>> {
+pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
     let mut cmd = Command::new("wl-copy");
     cmd.arg("-n");
 
     let mut child = cmd.stdin(std::process::Stdio::piped()).spawn()?;
 
-    let child_stdin = child.stdin.as_mut().ok_or("Cannot get stdin for 'wl-copy'")?;
+    let child_stdin = child.stdin.as_mut().ok_or(anyhow!("Cannot get stdin for 'wl-copy'"))?;
     child_stdin.write_all(secret.expose_secret().as_bytes())?;
     secret.zeroize();
 
     let exit_status = child.wait()?;
     if !exit_status.success() {
-        return Err(format!("wl-copy exit failed: {}", exit_status).into());
+        return Err(anyhow!(format!("wl-copy exit failed: {}", exit_status)));
     }
 
-    //TODO: handle gnome
     if let Some(secs) = timeout {
         Command::new("sh")
             .arg("-c")

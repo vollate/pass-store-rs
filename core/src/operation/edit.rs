@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use secrecy::ExposeSecret;
 use tempfile::TempDir;
 use zeroize::Zeroize;
@@ -82,7 +82,7 @@ pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Resu
         println!("Edit password for {} in repo {} using {}.", target, root.display(), editor);
         Ok(())
     } else {
-        Err(Error::msg("Failed to edit file"))
+        Err(anyhow!("Failed to edit file"))
     }
 }
 

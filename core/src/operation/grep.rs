@@ -1,24 +1,23 @@
-use std::error::Error;
 use std::path::Path;
 
+use anyhow::Result;
+use colored::Colorize;
+use regex::Regex;
 use secrecy::ExposeSecret;
 use walkdir::WalkDir;
 
 use crate::pgp::PGPClient;
 use crate::util::fs_util::path_to_str;
 
-pub fn grep(
-    client: &PGPClient,
-    root: &Path,
-    search_str: &str,
-) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn grep(client: &PGPClient, root: &Path, search_str: &str) -> Result<Vec<String>> {
     let mut results = Vec::new();
+    let search_regex = Regex::new(&regex::escape(search_str))?;
 
     for entry in WalkDir::new(root) {
         let entry = entry?;
-        if entry.file_type().is_file() {
+        if entry.file_type().is_file() && entry.path().extension().unwrap_or_default() == "gpg" {
             let relative_path = entry.path().strip_prefix(root)?;
-            let relative_path_str = relative_path.to_string_lossy();
+            let relative_path_str = path_to_str(relative_path)?;
 
             let decrypted = client.decrypt_stdin(root, path_to_str(entry.path())?)?;
 
@@ -26,11 +25,18 @@ pub fn grep(
                 .expose_secret()
                 .lines()
                 .filter(|line| line.contains(search_str))
-                .map(|s| s.to_string())
+                .map(|line| {
+                    search_regex
+                        .replace_all(line, |caps: &regex::Captures| {
+                            caps[0].bright_red().to_string()
+                        })
+                        .to_string()
+                })
                 .collect();
 
             if relative_path_str.contains(search_str) || !matching_lines.is_empty() {
-                results.push(format!("{}:", relative_path_str));
+                results
+                    .push(format!("{}:", &relative_path_str[..relative_path_str.len() - 4].cyan()));
                 results.extend(matching_lines);
             }
         }

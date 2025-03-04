@@ -17,7 +17,7 @@ pub struct ParsConfigSerializable {
     pub executable_config: ExecutableConfigSerializable,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PrintConfig {
     pub dir_color: String,
     pub file_color: String,
@@ -57,7 +57,16 @@ pub struct ExecutableConfigSerializable {
     pub editor_executable: Option<String>,
     pub git_executable: Option<String>,
 }
-
+impl Default for PrintConfig {
+    fn default() -> Self {
+        Self {
+            dir_color: "cyan".into(),
+            file_color: String::new(),
+            symbol_color: "bright green".into(),
+            tree_color: String::new(),
+        }
+    }
+}
 impl Default for ExecutableConfig {
     fn default() -> Self {
         Self {

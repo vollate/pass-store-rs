@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 
 use crate::pgp::utils::wait_child_process;
 use crate::pgp::PGPClient;
@@ -17,7 +17,7 @@ fn run_gpg_batched_child(executable: &str, args: &[&str], batch_input: &str) -> 
         input.write_all(batch_input.as_bytes())?;
         input.flush()?;
     } else {
-        return Err(Error::msg("Failed to open stdin for PGP key generation"));
+        return Err(anyhow!("Failed to open stdin for PGP key generation"));
     }
     wait_child_process(&mut cmd)
 }
@@ -32,7 +32,7 @@ fn run_gpg_inherited_child(executable: &str, args: &[&str]) -> Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(Error::msg(format!("Failed to generate PGP key, code {:?}", status)))
+        Err(anyhow!(format!("Failed to generate PGP key, code {:?}", status)))
     }
 }
 

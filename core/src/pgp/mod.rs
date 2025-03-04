@@ -6,6 +6,7 @@ pub mod utils;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+#[derive(Debug)]
 pub struct PGPKey {
     key_fpr: String,
     username: String,

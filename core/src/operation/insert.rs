@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::pgp::PGPClient;
@@ -37,7 +37,7 @@ where
         let err_msg =
             format!("An entry already exists for {}. Use -f to force overwrite.", pass_name);
         writeln!(stderr, "{}", err_msg)?;
-        return Err(Error::msg(err_msg));
+        return Err(anyhow!(err_msg));
     }
 
     if let Some(parent) = pass_path.parent() {
