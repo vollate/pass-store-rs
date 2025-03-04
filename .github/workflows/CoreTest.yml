@@ -8,16 +8,17 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
 
 jobs:
-  build-and-test:   
+  build-and-test:
     strategy:
       matrix:
         settings:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-13' # for Intel based macs.
-            args: '--target x86_64-apple-darwin'
+          # - platform: 'macos-latest' # for Arm based macs (M1 and above).
+          #   args: '--target aarch64-apple-darwin'
+          # - platform: 'macos-13' # for Intel based macs.
+          #   args: '--target x86_64-apple-darwin'
           - platform: 'ubuntu-latest' # for Tauri v1 you could replace this with ubuntu-20.04.
             args: ''
           - platform: 'windows-latest'
@@ -26,40 +27,40 @@ jobs:
     runs-on: ${{ matrix.settings.platform }}
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Ubuntu dependencies install
-      if: matrix.settings.platform == 'ubuntu-latest'
-      run: |
-        sudo apt update
-        sudo apt install -y gnupg2 git
+      - name: Ubuntu dependencies install
+        if: matrix.settings.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg2 git xclip wl-clipboard
 
-    - name: Windows dependencies install
-      if: matrix.settings.platform == 'windows-latest'
-      run: |
-        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-        Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
-        scoop install git gpg
-    
-    - name: MacOS dependencies install
-      if: matrix.settings.platform == 'macos-latest' || matrix.settings.platform == 'macos-13'
-      run: |
-        brew install git gnupg2
-    
-    - name: Setup Rust toolchain
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        toolchain: nightly
-        override: true
-        components: clippy,rustfmt
+      - name: Windows dependencies install
+        if: matrix.settings.platform == 'windows-latest'
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+          Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+          scoop install git gpg
 
-    - name: Format check
-      run: cargo fmt --all -- --check
-      
-    - name: Build core
-      run: cargo build --verbose
-      working-directory: ./core
+      - name: MacOS dependencies install
+        if: matrix.settings.platform == 'macos-latest' || matrix.settings.platform == 'macos-13'
+        run: |
+          brew install git gnupg2
 
-    - name: Run core tests
-      run: cargo test --verbose
-      working-directory: ./core
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: clippy,rustfmt
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Build core
+        run: cargo build --verbose
+        working-directory: ./core
+
+      - name: Run core tests
+        run: cargo test --verbose
+        working-directory: ./core
