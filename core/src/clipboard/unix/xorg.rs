@@ -35,6 +35,7 @@ mod tests {
 
     use super::*;
     #[test]
+    #[ignore = "Clipboard tests need desktop environment"]
     fn xorg_clipboard_test() {
         const TIMEOUT: usize = 1;
         let content = SecretString::new("Hello, pars".into());
