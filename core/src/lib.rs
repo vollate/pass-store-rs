@@ -1,6 +1,7 @@
 pub mod bundle;
 pub mod clipboard;
 pub mod config;
+pub(crate) mod constants;
 pub mod git;
 pub mod operation;
 pub mod pgp;

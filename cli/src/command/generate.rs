@@ -1,5 +1,5 @@
 use anyhow::Error;
-use pars_core::clipboard::copy_to_clipboard;
+use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
 use pars_core::config::ParsConfig;
 use pars_core::operation::generate::{generate_io, PasswdGenerateConfig};
 use pars_core::pgp::PGPClient;
@@ -46,8 +46,8 @@ pub fn cmd_generate(
         println!("The generated password for {} is:\n{}", pass_name, res.expose_secret());
         res.zeroize();
     } else {
-        copy_to_clipboard(res, Some(45)).map_err(|e| (ParsExitCode::ClipboardError.into(), e))?;
+        copy_to_clipboard(res, get_clip_time())
+            .map_err(|e| (ParsExitCode::ClipboardError.into(), e))?;
     }
-    eprintln!("Handle clip!!!");
     Ok(())
 }

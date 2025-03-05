@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Error, Result};
 use log::debug;
-use pars_core::clipboard::copy_to_clipboard;
+use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
 use pars_core::config::ParsConfig;
 use pars_core::operation::ls_or_show::{ls_io, LsOrShow};
 use pars_core::pgp::PGPClient;
@@ -51,8 +51,13 @@ pub fn cmd_ls(
             }
 
             if let Some(line_num) = clip {
-                if let Some(line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
-                    copy_to_clipboard(line_content.into(), Some(45))
+                if line_num == 0 {
+                    copy_to_clipboard(passwd.expose_secret().into(), get_clip_time())
+                        .map_err(|e| (ParsExitCode::Error.into(), e))?;
+                } else if let Some(line_content) =
+                    passwd.expose_secret().split('\n').nth(line_num - 1)
+                {
+                    copy_to_clipboard(line_content.into(), get_clip_time())
                         .map_err(|e| (ParsExitCode::Error.into(), e))?;
                 } else {
                     return Err((
@@ -66,7 +71,11 @@ pub fn cmd_ls(
             }
 
             if let Some(line_num) = qrcode {
-                if let Some(_line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
+                if line_num == 0 {
+                    unimplemented!("QR code generation is not implemented yet.");
+                } else if let Some(_line_content) =
+                    passwd.expose_secret().split('\n').nth(line_num - 1)
+                {
                     unimplemented!("QR code generation is not implemented yet.");
                     // let qr = qrcode::QrCode::new(line_content.as_bytes())?;
                     // let image = qr.render::<unicode_canvas::UnicodeCanvas>().dark_color('█').light_color(' ' ).build();

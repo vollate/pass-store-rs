@@ -24,13 +24,13 @@ mod unix {
 #[cfg(target_os = "windows")]
 mod windows;
 
-#[cfg(all(unix, not(target_os = "macos")))]
 use std::env;
 
 #[allow(unused_imports)]
 use anyhow::{anyhow, Result};
 use secrecy::SecretString;
 
+use crate::constants::PARS_DEFAULT_CLIP_TIME;
 #[cfg(all(unix, not(target_os = "macos")))]
 use crate::util::fs_util::find_executable_in_path;
 
@@ -59,6 +59,18 @@ pub fn copy_to_clipboard(content: SecretString, sec_to_clear: Option<usize>) -> 
     }
 
     Ok(())
+}
+
+pub fn get_clip_time() -> Option<usize> {
+    let time = match env::var("PARS_CLIP_TIME") {
+        Ok(val) => val.parse::<usize>().unwrap_or(PARS_DEFAULT_CLIP_TIME),
+        Err(_) => PARS_DEFAULT_CLIP_TIME,
+    };
+    if 0 == time {
+        None
+    } else {
+        Some(time)
+    }
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
