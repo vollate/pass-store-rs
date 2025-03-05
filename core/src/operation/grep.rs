@@ -10,6 +10,7 @@ use crate::pgp::PGPClient;
 use crate::util::fs_util::path_to_str;
 
 pub fn grep(client: &PGPClient, root: &Path, search_str: &str) -> Result<Vec<String>> {
+    //TODO: Add print config support
     let mut results = Vec::new();
     let search_regex = Regex::new(&regex::escape(search_str))?;
 

@@ -35,9 +35,9 @@ pub fn cmd_generate(
         force,
         pass_length: pass_length.unwrap_or(DEFAULT_PASS_LENGTH),
     };
-    let mut stdin = std::io::stdin().lock();
-    let mut stdout = std::io::stdout().lock();
-    let mut stderr = std::io::stderr().lock();
+    let mut stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+    let mut stderr = std::io::stderr();
 
     let mut res =
         generate_io(&pgp_client, &root, pass_name, &gen_cfg, &mut stdin, &mut stdout, &mut stderr)

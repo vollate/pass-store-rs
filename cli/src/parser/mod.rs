@@ -22,7 +22,7 @@ pub struct CliParser {
     #[arg(trailing_var_arg = true)]
     pub args: Vec<String>,
 
-    #[arg(short = 'r', long = "repo", global = true)]
+    #[arg(short = 'R', long = "repo", global = true)]
     pub base_dir: Option<String>,
 }
 

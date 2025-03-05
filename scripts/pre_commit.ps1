@@ -38,12 +38,14 @@ foreach ($dir in $TARGET_DIRS) {
     cargo clippy --fix --allow-dirty
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to run cargo clippy in $dir"
+        cd ..
         exit 1
     }
     Write-Host "Running cargo test in $dir..."
-    sudo cargo test
+    sudo cargo test -- --include-ignored
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to run cargo test in $dir"
+        cd ..
         exit 1
     }
     Write-Host "Changing back to root directory..."

@@ -1,8 +1,9 @@
 use std::fs;
-use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
+use std::io::{self, BufRead, Read, Write};
+use std::path::Path;
 
 use anyhow::Result;
+use log::debug;
 
 use crate::util::fs_util::path_attack_check;
 use crate::{IOErr, IOErrType};
@@ -38,42 +39,37 @@ pub fn remove_io<I, O, E>(
     stderr: &mut E,
 ) -> Result<()>
 where
-    I: Read,
+    I: Read + BufRead,
     O: Write,
     E: Write,
 {
-    let mut dist_path = {
-        if Path::new(dist).is_absolute() {
-            PathBuf::from(dist)
-        } else {
-            root.join(dist)
-        }
-    };
-
+    let mut dist_path = root.join(dist);
     path_attack_check(root, &dist_path)?;
 
-    if !dist_path.exists() {
-        let with_extension = dist_path.with_extension("gpg");
-        if !with_extension.exists() {
-            return if force {
-                Ok(())
-            } else {
-                writeln!(stderr, "Cannot remove '{}': No such file or directory", dist)?;
-                Err(IOErr::new(IOErrType::PathNotExist, &dist_path).into())
-            };
+    if !dist_path.exists() || !dist_path.is_dir() {
+        debug!("Try to delete dir {:?}, which not exist", dist_path);
+        dist_path = root.join(format!("{}.gpg", dist));
+        if !dist_path.exists() || !dist_path.is_file() {
+            if force {
+                writeln!(stdout, "Noting to remove")?;
+                return Ok(());
+            }
+            debug!("Try to delete file {:?}, which not exist", dist_path);
+            writeln!(stderr, "Cannot remove '{}': No such file or directory", dist)?;
+            return Err(IOErr::new(IOErrType::PathNotExist, &dist_path).into());
         }
-        dist_path = with_extension;
     }
 
-    let confirm_msg = format!(
-        "Are you sure you would like to delete {} at storage {}? [y/N]",
-        dist_path.display(),
-        root.display()
-    );
     if !force {
-        writeln!(stdout, "{}", confirm_msg)?;
+        let confirm_msg = format!(
+            "Are you sure you would like to delete '{}' in repo '{}'? [y/N]: ",
+            dist,
+            root.display()
+        );
+        write!(stdout, "{}", confirm_msg)?;
+        stdout.flush()?;
         let mut input = String::new();
-        stdin.read_to_string(&mut input)?;
+        stdin.read_line(&mut input)?;
         if !input.trim().to_lowercase().starts_with('y') {
             return Ok(());
         }
@@ -102,6 +98,7 @@ where
 #[cfg(test)]
 mod test {
     use core::panic;
+    use std::io::BufReader;
     use std::thread::sleep;
     use std::time::Duration;
     use std::{io, thread};
@@ -134,16 +131,19 @@ mod test {
         // Origin structure:
         // root
         // ├── dir1
-        // │   ├── file1
-        // │   └── file2
-        // ├ file3
+        // │   ├── file1.gpg
+        // │   └── file2.gpg
+        // ├ file3.gpg
         // └ dir2
         let (_tmp_dir, root) = gen_unique_temp_dir();
-        let structure: &[(Option<&str>, &[&str])] =
-            &[(Some("dir1"), &["file1", "file2"]), (Some("dir2"), &[]), (None, &["file3"])];
+        let structure: &[(Option<&str>, &[&str])] = &[
+            (Some("dir1"), &["file1.gpg", "file2.gpg"]),
+            (Some("dir2"), &[]),
+            (None, &["file3.gpg"]),
+        ];
         create_dir_structure(&root, structure);
-        set_readonly(root.join("file3"), true).unwrap();
-        set_readonly(root.join("dir1").join("file1"), true).unwrap();
+        set_readonly(root.join("file3.gpg"), true).unwrap();
+        set_readonly(root.join("dir1").join("file1.gpg"), true).unwrap();
 
         cleanup!(
             {
@@ -152,11 +152,13 @@ mod test {
 
                 // Test remove a file
                 let dist = "file3";
-                let (mut stdin, stdin_w) = pipe().unwrap();
+                let (stdin, stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+
                 let input_thread =
                     enter_input_with_delay("n\n", Duration::from_millis(100), stdin_w);
                 remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
-                assert_eq!(true, root.join(dist).exists());
+                assert_eq!(true, root.join(dist).with_extension("gpg").exists());
                 input_thread.join().unwrap();
 
                 remove_io(&root, dist, false, true, &mut stdin, &mut stdout, &mut stderr).unwrap();
@@ -165,7 +167,9 @@ mod test {
                 // Test remove a directory
                 // Remove an empty directory, without recursive option
                 let dist = "dir2";
-                let (mut stdin, stdin_w) = pipe().unwrap();
+                let (stdin, stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+
                 let input_thread =
                     enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
                 if remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr)
@@ -176,7 +180,9 @@ mod test {
                 input_thread.join().unwrap();
 
                 // With recursive option
-                let (mut stdin, stdin_w) = pipe().unwrap();
+                let (stdin, stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+
                 let input_thread =
                     enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
                 remove_io(&root, dist, true, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
@@ -185,7 +191,9 @@ mod test {
 
                 // Remove a non-empty directory with some read-only files, without force option
                 let dist = "dir1";
-                let (mut stdin, stdin_w) = pipe().unwrap();
+                let (stdin, stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+
                 let input_thread =
                     enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
                 remove_io(&root, dist, true, false, &mut stdin, &mut stdout, &mut stderr).unwrap();
@@ -194,7 +202,9 @@ mod test {
 
                 // Test remove a non-exist file
                 let dist = "non-exist-file";
-                let (mut stdin, stdin_w) = pipe().unwrap();
+                let (stdin, stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+
                 let input_thread =
                     enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
                 if remove_io(&root, dist, false, false, &mut stdin, &mut stdout, &mut stderr)
@@ -205,7 +215,9 @@ mod test {
                 input_thread.join().unwrap();
 
                 // With force option
-                let (mut stdin, stdin_w) = pipe().unwrap();
+                let (stdin, stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+
                 let input_thread =
                     enter_input_with_delay("y\n", Duration::from_millis(100), stdin_w);
                 remove_io(&root, dist, false, true, &mut stdin, &mut stdout, &mut stderr).unwrap();

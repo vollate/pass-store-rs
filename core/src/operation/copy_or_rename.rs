@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::path::Path;
 use std::{fs, path};
 
@@ -16,7 +16,7 @@ fn handle_overwrite_delete<I, O, E>(
     _stderr: &mut E,
 ) -> Result<bool>
 where
-    I: Read,
+    I: Read + BufRead,
     O: Write,
     E: Write,
 {
@@ -27,7 +27,7 @@ where
         ))?;
         stdout.flush()?;
         let mut input = String::new();
-        stdin.read_to_string(&mut input)?;
+        stdin.read_line(&mut input)?;
         if !input.trim().to_lowercase().starts_with('y') {
             stdout.write_all("Canceled\n".as_bytes())?;
             return Ok(false);
@@ -52,7 +52,7 @@ fn copy_rename_file<I, O, E>(
     stderr: &mut E,
 ) -> Result<()>
 where
-    I: Read,
+    I: Read + BufRead,
     O: Write,
     E: Write,
 {
@@ -108,7 +108,7 @@ fn copy_rename_dir<I, O, E>(
     stderr: &mut E,
 ) -> Result<()>
 where
-    I: Read,
+    I: Read + BufRead,
     O: Write,
     E: Write,
 {
@@ -154,7 +154,7 @@ pub fn copy_rename_io<I, O, E>(
     stderr: &mut E,
 ) -> Result<()>
 where
-    I: Read,
+    I: Read + BufRead,
     O: Write,
     E: Write,
 {
@@ -196,7 +196,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self};
+    use std::io::{self, BufReader};
     use std::thread::{self, sleep};
 
     use os_pipe::pipe;
@@ -221,7 +221,8 @@ mod tests {
 
         cleanup!(
             {
-                let (mut stdin, mut stdin_w) = pipe().unwrap();
+                let (stdin, mut stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();
 
@@ -327,7 +328,8 @@ mod tests {
 
         cleanup!(
             {
-                let (mut stdin, mut stdin_w) = pipe().unwrap();
+                let (stdin, mut stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();
 

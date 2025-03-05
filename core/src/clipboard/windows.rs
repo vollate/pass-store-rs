@@ -33,6 +33,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "Clipboard test is not stable in CI environment"]
     fn windows_clipboard_test() {
         const TIMEOUT: usize = 1;
         let content = SecretString::new("Hello, pars".into());
