@@ -20,8 +20,12 @@ pub enum SubCommands {
         names: Vec<String>,
     },
 
-    #[command(alias = "show", alias = "list")]
+    #[command(alias = "list")]
     Ls {
+        sub_folder: Option<String>,
+    },
+
+    Show {
         #[arg(
             short = 'c',
             long = "clip",
