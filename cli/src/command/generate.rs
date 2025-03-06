@@ -1,3 +1,5 @@
+use std::io::BufReader;
+
 use anyhow::Error;
 use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
 use pars_core::config::ParsConfig;
@@ -35,7 +37,7 @@ pub fn cmd_generate(
         force,
         pass_length: pass_length.unwrap_or(DEFAULT_PASS_LENGTH),
     };
-    let mut stdin = std::io::stdin();
+    let mut stdin = BufReader::new(std::io::stdin());
     let mut stdout = std::io::stdout();
     let mut stderr = std::io::stderr();
 
