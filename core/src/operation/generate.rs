@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
@@ -17,16 +17,18 @@ pub struct PasswdGenerateConfig {
     pub force: bool,
     pub pass_length: usize,
 }
-fn prompt_overwrite<R: Read, W: Write>(
+
+fn prompt_overwrite<R: Read + BufRead, W: Write>(
     stdin: &mut R,
     stderr: &mut W,
     pass_name: &str,
 ) -> Result<bool> {
     write!(stderr, "An entry already exists for {}. Overwrite? [y/N]: ", pass_name)?;
     let mut input = String::new();
-    stdin.read_to_string(&mut input)?;
+    stdin.read_line(&mut input)?;
     Ok(input.trim().eq_ignore_ascii_case("y"))
 }
+
 pub fn generate_io<I, O, E>(
     client: &PGPClient,
     root: &Path,
@@ -37,7 +39,7 @@ pub fn generate_io<I, O, E>(
     stderr: &mut E,
 ) -> Result<SecretString>
 where
-    I: Read,
+    I: Read + BufRead,
     O: Write,
     E: Write,
 {
@@ -119,7 +121,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use std::io::{stderr, stdout};
+    use std::io::{stderr, stdout, BufReader};
     use std::thread;
 
     use os_pipe::pipe;
@@ -149,7 +151,8 @@ mod tests {
         cleanup!(
             {
                 let test_client = setup_test_client();
-                let (mut stdin, stdin_w) = pipe().unwrap();
+                let (stdin, stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
 
                 let mut stderr = stderr().lock();
@@ -198,7 +201,8 @@ mod tests {
                 assert_eq!(password.expose_secret(), "");
                 assert_eq!(secret.expose_secret(), original_passwd.expose_secret());
 
-                let (mut stdin, stdin_w) = pipe().unwrap();
+                let (stdin, stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 thread::spawn(move || {
                     let mut stdin = stdin_w;
                     stdin.write_all(b"y").unwrap();
@@ -234,7 +238,8 @@ mod tests {
         cleanup!(
             {
                 let test_client = setup_test_client();
-                let (mut stdin, _) = pipe().unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
                 let mut stderr = stderr().lock();
 
@@ -287,7 +292,8 @@ mod tests {
         cleanup!(
             {
                 let test_client = setup_test_client();
-                let (mut stdin, _) = pipe().unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
                 let mut stderr = stderr().lock();
 
@@ -334,7 +340,8 @@ mod tests {
         cleanup!(
             {
                 let test_client = setup_test_client();
-                let (mut stdin, _) = pipe().unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
                 let mut stderr = stderr().lock();
 
@@ -375,7 +382,8 @@ mod tests {
         cleanup!(
             {
                 let test_client = setup_test_client();
-                let (mut stdin, _) = pipe().unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
                 let mut stderr = stderr().lock();
 
@@ -415,7 +423,8 @@ mod tests {
         cleanup!(
             {
                 let test_client = setup_test_client();
-                let (mut stdin, _) = pipe().unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
                 let mut stderr = stderr().lock();
 
