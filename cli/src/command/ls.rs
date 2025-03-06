@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Error, Result};
+use fast_qr::{self, QRBuilder};
 use log::debug;
 use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
 use pars_core::config::ParsConfig;
@@ -7,7 +8,7 @@ use pars_core::pgp::PGPClient;
 use pars_core::util::fs_util::get_dir_gpg_id_content;
 use pars_core::util::tree::{FilterType, TreeConfig};
 use secrecy::zeroize::Zeroize;
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 
 use crate::constants::ParsExitCode;
 use crate::util::unwrap_root_path;
@@ -72,14 +73,17 @@ pub fn cmd_ls(
 
             if let Some(line_num) = qrcode {
                 if line_num == 0 {
-                    unimplemented!("QR code generation is not implemented yet.");
-                } else if let Some(_line_content) =
+                    let mut qr_code =
+                        to_qr_code(passwd).map_err(|e| (ParsExitCode::Error.into(), e))?;
+                    println!("{}", qr_code.expose_secret());
+                    qr_code.zeroize();
+                } else if let Some(line_content) =
                     passwd.expose_secret().split('\n').nth(line_num - 1)
                 {
-                    unimplemented!("QR code generation is not implemented yet.");
-                    // let qr = qrcode::QrCode::new(line_content.as_bytes())?;
-                    // let image = qr.render::<unicode_canvas::UnicodeCanvas>().dark_color('█').light_color(' ' ).build();
-                    // println!("{}", image);
+                    let mut qr_code = to_qr_code(line_content.into())
+                        .map_err(|e| (ParsExitCode::Error.into(), e))?;
+                    println!("{}", qr_code.expose_secret());
+                    qr_code.zeroize();
                 } else {
                     return Err((
                         ParsExitCode::Error.into(),
@@ -94,4 +98,9 @@ pub fn cmd_ls(
             Ok(())
         }
     }
+}
+
+fn to_qr_code(secret: SecretString) -> anyhow::Result<SecretString> {
+    let qr = QRBuilder::new(secret.expose_secret()).build()?;
+    Ok(qr.to_str().into())
 }
