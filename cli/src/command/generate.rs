@@ -1,8 +1,11 @@
 use std::io::BufReader;
 
 use anyhow::Error;
+use log::debug;
 use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
 use pars_core::config::ParsConfig;
+use pars_core::git::add_and_commit;
+use pars_core::git::commit::{CommitType, GitCommit};
 use pars_core::operation::generate::{generate_io, PasswdGenerateConfig};
 use pars_core::pgp::PGPClient;
 use pars_core::util::fs_util::get_dir_gpg_id_content;
@@ -51,5 +54,15 @@ pub fn cmd_generate(
         copy_to_clipboard(res, get_clip_time())
             .map_err(|e| (ParsExitCode::ClipboardError.into(), e))?;
     }
+
+    let commit = GitCommit::new(&root, CommitType::Generate(pass_name.to_string()));
+    debug!("cmd_generate: commit {}", commit);
+    add_and_commit(
+        &config.executable_config.git_executable,
+        &root,
+        commit.get_commit_msg().as_str(),
+    )
+    .map_err(|e| (ParsExitCode::GitError.into(), e))?;
+
     Ok(())
 }
