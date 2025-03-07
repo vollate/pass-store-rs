@@ -1,7 +1,10 @@
 use std::io::BufReader;
 
 use anyhow::{Error, Result};
+use log::debug;
 use pars_core::config::ParsConfig;
+use pars_core::git::add_and_commit;
+use pars_core::git::commit::{CommitType, GitCommit};
 use pars_core::operation::copy_or_rename::copy_rename_io;
 
 use crate::constants::{ParsExitCode, SECRET_POSTFIX};
@@ -16,11 +19,11 @@ pub fn cmd_cp(
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
 
-    let mut stdin = BufReader::new(std::io::stdin());
+    let mut stdin: BufReader<std::io::Stdin> = BufReader::new(std::io::stdin());
     let mut stdout = std::io::stdout();
     let mut stderr = std::io::stderr();
 
-    if let Err(e) = copy_rename_io(
+    copy_rename_io(
         true,
         &root,
         old_path,
@@ -30,9 +33,18 @@ pub fn cmd_cp(
         &mut stdin,
         &mut stdout,
         &mut stderr,
-    ) {
-        return Err((ParsExitCode::Error.into(), e));
-    }
+    )
+    .map_err(|e| (ParsExitCode::Error.into(), e))?;
+
+    let commit =
+        GitCommit::new(&root, CommitType::Copy((old_path.to_string(), new_path.to_string())));
+    debug!("cmd_cp: commit {}", commit);
+    add_and_commit(
+        &config.executable_config.git_executable,
+        &root,
+        commit.get_commit_msg().as_str(),
+    )
+    .map_err(|e| (ParsExitCode::GitError.into(), e))?;
 
     Ok(())
 }

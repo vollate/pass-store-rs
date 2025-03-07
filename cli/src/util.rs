@@ -19,9 +19,9 @@ pub(crate) fn to_relative_path_opt(path: Option<String>) -> Option<String> {
 }
 
 pub(crate) fn to_relative_path(path: String) -> String {
-    let mut s = path.as_str();
+    let mut s = path;
     while s.starts_with('/') || s.starts_with('\\') {
-        s = &s[1..];
+        s = s[1..].to_string();
     }
-    s.to_string()
+    s
 }

@@ -15,7 +15,7 @@ use crate::util::fs_util::{
 use crate::util::rand::rand_alphabet_string;
 use crate::{IOErr, IOErrType};
 
-pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Result<()> {
+pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Result<bool> {
     let target_path = root.join(target);
     path_attack_check(root, &target_path)?;
     if !target_path.exists() {
@@ -65,7 +65,7 @@ pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Resu
         let mut old_content = client.decrypt_stdin(root, path_to_str(&target_path)?)?;
         if old_content.expose_secret() == new_content {
             println!("Password unchanged");
-            return Ok(());
+            return Ok(false);
         }
         old_content.zeroize();
 
@@ -80,7 +80,7 @@ pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Resu
             }
         }
         println!("Edit password for {} in repo {} using {}.", target, root.display(), editor);
-        Ok(())
+        Ok(true)
     } else {
         Err(anyhow!("Failed to edit file"))
     }
