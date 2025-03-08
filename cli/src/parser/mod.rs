@@ -1,5 +1,7 @@
 pub(crate) mod sub_command;
 
+use std::env;
+
 use anyhow::{Error, Result};
 use clap::Parser;
 use pars_core::config::ParsConfig;
@@ -12,7 +14,7 @@ use crate::util::{to_relative_path, to_relative_path_opt};
 #[command(
     name = "pars",
     about = "Stores, retrieves, generates, and synchronizes passwords securely",
-    version = "0.1.0",
+    version = env!("CARGO_PKG_VERSION"),
     author = "Vollate <uint44t@gmail.com>"
 )]
 pub struct CliParser {

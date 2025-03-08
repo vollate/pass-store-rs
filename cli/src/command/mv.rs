@@ -18,9 +18,7 @@ pub fn cmd_mv(
     new_path: &str,
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
-    let mut stdin = BufReader::new(std::io::stdin());
-    let mut stdout = std::io::stdout();
-    let mut stderr = std::io::stderr();
+
     copy_rename_io(
         false,
         &root,
@@ -28,9 +26,9 @@ pub fn cmd_mv(
         new_path,
         SECRET_POSTFIX,
         force,
-        &mut stdin,
-        &mut stdout,
-        &mut stderr,
+        &mut BufReader::new(std::io::stdin()),
+        &mut std::io::stdout(),
+        &mut std::io::stderr(),
     )
     .map_err(|e| (ParsExitCode::Error.into(), e))?;
 

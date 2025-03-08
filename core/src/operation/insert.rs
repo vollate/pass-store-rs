@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
@@ -23,10 +23,10 @@ pub fn insert_io<I, O, E>(
     config: &PasswdInsertConfig,
     stdin: &mut I,
     stdout: &mut O,
-    stderr: &mut E,
+    _stderr: &mut E,
 ) -> Result<()>
 where
-    I: Read + std::io::BufRead,
+    I: Read + BufRead,
     O: Write,
     E: Write,
 {
@@ -34,15 +34,18 @@ where
 
     path_attack_check(root, &pass_path)?;
     if pass_path.exists() && !config.force {
-        let err_msg =
-            format!("An entry already exists for {}. Use -f to force overwrite.", pass_name);
-        writeln!(stderr, "{}", err_msg)?;
-        return Err(anyhow!(err_msg));
+        return Err(anyhow!(format!(
+            "An entry already exists for {}. Use -f to force overwrite.",
+            pass_name
+        )));
     }
 
     if let Some(parent) = pass_path.parent() {
         fs::create_dir_all(parent)?;
     }
+
+    write!(stdout, "Enter password: ")?;
+    stdout.flush()?;
 
     let password = if config.multiline {
         let mut buffer = String::new();

@@ -19,10 +19,6 @@ pub fn cmd_cp(
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
 
-    let mut stdin: BufReader<std::io::Stdin> = BufReader::new(std::io::stdin());
-    let mut stdout = std::io::stdout();
-    let mut stderr = std::io::stderr();
-
     copy_rename_io(
         true,
         &root,
@@ -30,9 +26,9 @@ pub fn cmd_cp(
         new_path,
         SECRET_POSTFIX,
         force,
-        &mut stdin,
-        &mut stdout,
-        &mut stderr,
+        &mut BufReader::new(std::io::stdin()),
+        &mut std::io::stdout(),
+        &mut std::io::stderr(),
     )
     .map_err(|e| (ParsExitCode::Error.into(), e))?;
 

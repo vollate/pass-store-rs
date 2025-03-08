@@ -27,6 +27,7 @@ pub fn cmd_generate(
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let target_path = root.join(pass_name);
+
     let key_fprs =
         get_dir_gpg_id_content(&root, &target_path).map_err(|e| (ParsExitCode::Error.into(), e))?;
     let pgp_client = PGPClient::new(
@@ -34,19 +35,25 @@ pub fn cmd_generate(
         &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
     )
     .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
+
     let gen_cfg = PasswdGenerateConfig {
         no_symbols,
         in_place,
         force,
         pass_length: pass_length.unwrap_or(DEFAULT_PASS_LENGTH),
     };
-    let mut stdin = BufReader::new(std::io::stdin());
-    let mut stdout = std::io::stdout();
-    let mut stderr = std::io::stderr();
 
-    let mut res =
-        generate_io(&pgp_client, &root, pass_name, &gen_cfg, &mut stdin, &mut stdout, &mut stderr)
-            .map_err(|e| (ParsExitCode::Error.into(), e))?;
+    let mut res = generate_io(
+        &pgp_client,
+        &root,
+        pass_name,
+        &gen_cfg,
+        &mut BufReader::new(std::io::stdin()),
+        &mut std::io::stdout(),
+        &mut std::io::stderr(),
+    )
+    .map_err(|e| (ParsExitCode::Error.into(), e))?;
+
     if !clip {
         println!("The generated password for {} is:\n{}", pass_name, res.expose_secret());
         res.zeroize();

@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
@@ -21,7 +21,13 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
     if let Some(secs) = timeout {
         let cmd =
             format!("Start-Sleep -Seconds {} ; [Windows.ApplicationModel.DataTransfer.Clipboard, Windows, ContentType = WindowsRuntime]::ClearHistory()", secs);
-        Command::new("powershell").arg("-Command").arg(&cmd).spawn()?;
+        Command::new("powershell")
+            .arg("-Command")
+            .arg(&cmd)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
     }
     Ok(())
 }

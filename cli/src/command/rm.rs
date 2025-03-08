@@ -18,12 +18,18 @@ pub fn cmd_rm(
     pass_name: &str,
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
-    let mut stdin = BufReader::new(std::io::stdin());
-    let mut stdout = std::io::stdout();
-    let mut stderr = std::io::stderr();
 
-    remove_io(&root, pass_name, recursive, force, &mut stdin, &mut stdout, &mut stderr)
-        .map_err(|e| (ParsExitCode::Error.into(), e))?;
+    remove_io(
+        &root,
+        pass_name,
+        recursive,
+        force,
+        &mut BufReader::new(std::io::stdin()),
+        &mut std::io::stdout(),
+        &mut std::io::stderr(),
+    )
+    .map_err(|e| (ParsExitCode::Error.into(), e))?;
+
     let commit = GitCommit::new(&root, CommitType::Delete(pass_name.to_string()));
     debug!("cmd_rm: commit {}", commit);
     add_and_commit(
@@ -32,5 +38,6 @@ pub fn cmd_rm(
         commit.get_commit_msg().as_str(),
     )
     .map_err(|e| (ParsExitCode::GitError.into(), e))?;
+
     Ok(())
 }

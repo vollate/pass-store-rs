@@ -3,6 +3,7 @@ use std::path::Path;
 
 pub enum CommitType {
     Init(Vec<String>),
+    Insert(String),
     Generate(String),
     Update(String),
     Delete(String),
@@ -30,9 +31,10 @@ impl<'a> GitCommit<'a> {
                 }
                 msg
             }
-            CommitType::Generate(path) => format!("Generate password for {}", path),
-            CommitType::Update(path) => format!("Update password for {}", path),
-            CommitType::Delete(path) => format!("Delete password for {}", path),
+            CommitType::Insert(path) => format!("Insert password {}", path),
+            CommitType::Generate(path) => format!("Generate password {}", path),
+            CommitType::Update(path) => format!("Update password {}", path),
+            CommitType::Delete(path) => format!("Delete password {}", path),
             CommitType::Copy((src, dst)) => format!("Copy {} to {}", src, dst),
             CommitType::Rename((src, dst)) => format!("Rename {} to {}", src, dst),
         }

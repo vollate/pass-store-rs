@@ -114,6 +114,7 @@ where
 {
     let file_name =
         from.file_name().ok_or_else(|| IOErr::new(IOErrType::CannotGetFileName, from))?;
+
     if to.exists() {
         if to.is_dir() {
             let sub_dir = to.join(file_name);
@@ -147,7 +148,7 @@ pub fn copy_rename_io<I, O, E>(
     root: &Path,
     from: &str,
     to: &str,
-    extension: &str,
+    file_extension: &str,
     force: bool,
     stdin: &mut I,
     stdout: &mut O,
@@ -159,11 +160,10 @@ where
     E: Write,
 {
     let mut from_path = root.join(from);
-
     path_attack_check(root, &from_path)?;
 
     if !from_path.exists() {
-        let try_path = from_path.with_extension(extension);
+        let try_path = from_path.with_extension(file_extension);
         if !try_path.exists() {
             return Err(IOErr::new(IOErrType::PathNotExist, &from_path).into());
         }
@@ -186,7 +186,7 @@ where
     }
 
     if from_path.is_file() {
-        copy_rename_file(copy, &from_path, &to_path, extension, force, stdin, stdout, stderr)
+        copy_rename_file(copy, &from_path, &to_path, file_extension, force, stdin, stdout, stderr)
     } else if from_path.is_dir() {
         copy_rename_dir(copy, &from_path, &to_path, force, stdin, stdout, stderr)
     } else {
