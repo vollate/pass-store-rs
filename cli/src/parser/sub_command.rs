@@ -20,13 +20,17 @@ pub enum SubCommands {
         names: Vec<String>,
     },
 
-    #[command(alias = "show", alias = "list")]
+    #[command(alias = "list")]
     Ls {
+        sub_folder: Option<String>,
+    },
+
+    Show {
         #[arg(
             short = 'c',
             long = "clip",
             value_name = "line-number",
-            default_missing_value = "0",
+            default_missing_value = "1",
             num_args = 0..=1
         )]
         clip: Option<usize>,
@@ -35,7 +39,7 @@ pub enum SubCommands {
             short = 'q',
             long = "qrcode",
             value_name = "line-number",
-            default_missing_value = "0",
+            default_missing_value = "1",
             num_args = 0..=1
         )]
         qrcode: Option<usize>,
