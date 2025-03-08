@@ -19,6 +19,7 @@ pub fn cmd_find(
         filter_type: FilterType::Include,
         filters: Vec::new(),
     };
+
     let res = find_term(&terms, &tree_cfg, &config.print_config.clone().into())
         .map_err(|e| (ParsExitCode::Error.into(), e))?;
     println!("{}", res);
