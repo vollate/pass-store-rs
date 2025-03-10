@@ -41,7 +41,7 @@ fn process_cli(config_path: &str) {
     let cli_args = CliParser::parse();
 
     if let Err((code, e)) = parser::handle_cli(config, cli_args) {
-        eprintln!("pars exit with error: {}", e);
+        eprintln!("{}", e);
         debug!("Error: {:?}", e);
         std::process::exit(code);
     }

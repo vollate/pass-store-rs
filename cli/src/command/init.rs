@@ -1,5 +1,8 @@
 use anyhow::{Error, Result};
+use log::debug;
 use pars_core::config::ParsConfig;
+use pars_core::git::add_and_commit;
+use pars_core::git::commit::{CommitType, GitCommit};
 use pars_core::operation::init::init;
 use pars_core::pgp::PGPClient;
 use pars_core::util::fs_util::path_to_str;
@@ -30,6 +33,17 @@ pub fn cmd_init(
     init(&pgp_client, &root, path.unwrap_or_default())
         .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
-    eprintln!("TODO!!!: need to init git repository");
+    let commit = GitCommit::new(
+        &root,
+        CommitType::Init(pgp_client.get_key_fprs().iter().map(|f| f.to_string()).collect()),
+    );
+    debug!("cmd_init: commit {}", commit);
+    add_and_commit(
+        &config.executable_config.git_executable,
+        &root,
+        commit.get_commit_msg().as_str(),
+    )
+    .map_err(|e| (ParsExitCode::GitError.into(), e))?;
+
     Ok(())
 }

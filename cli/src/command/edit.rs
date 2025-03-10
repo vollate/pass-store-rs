@@ -2,6 +2,7 @@ use std::env;
 
 use anyhow::Error;
 use pars_core::config::ParsConfig;
+use pars_core::git::{add_and_commit, commit};
 use pars_core::operation::edit::edit;
 use pars_core::pgp::PGPClient;
 use pars_core::util::fs_util::get_dir_gpg_id_content;
@@ -25,7 +26,20 @@ pub fn cmd_edit(
     .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
     let editor =
         env::var("PARS_EDITOR").unwrap_or(config.executable_config.editor_executable.clone());
-    edit(&client, &root, target_pass, &editor).map_err(|e| (ParsExitCode::PGPError.into(), e))?;
-    eprintln!("GIT op!!!!");
+
+    let need_commit = edit(&client, &root, target_pass, &editor)
+        .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
+
+    if need_commit {
+        let commit =
+            commit::GitCommit::new(&root, commit::CommitType::Update(target_pass.to_string()));
+        add_and_commit(
+            &config.executable_config.git_executable,
+            &root,
+            commit.get_commit_msg().as_str(),
+        )
+        .map_err(|e| (ParsExitCode::GitError.into(), e))?;
+    }
+
     Ok(())
 }
