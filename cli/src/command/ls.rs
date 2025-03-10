@@ -23,6 +23,7 @@ pub fn cmd_ls(
     let root = unwrap_root_path(base_dir, config);
     let target_path = root.join(target.unwrap_or_default());
     debug!("cmd_ls: root {:?}, target_path {:?}", root, target_path);
+
     let tree_cfg = TreeConfig {
         root: &root,
         target: target.unwrap_or_default(),
@@ -64,7 +65,7 @@ fn handle_qr_code(
     qrcode: Option<usize>,
     passwd: secrecy::SecretBox<str>,
 ) -> Result<(), (i32, Error)> {
-    Ok(if let Some(line_num) = qrcode {
+    if let Some(line_num) = qrcode {
         if let Some(line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
             let mut qr_code =
                 to_qr_code(line_content.into()).map_err(|e| (ParsExitCode::Error.into(), e))?;
@@ -76,11 +77,12 @@ fn handle_qr_code(
                 anyhow!(format!("There is no password to show at line {}.", line_num)),
             ));
         }
-    })
+    };
+    Ok(())
 }
 
 fn handle_clip(clip: Option<usize>, passwd: &secrecy::SecretBox<str>) -> Result<(), (i32, Error)> {
-    Ok(if let Some(line_num) = clip {
+    if let Some(line_num) = clip {
         if let Some(line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
             copy_to_clipboard(line_content.into(), get_clip_time())
                 .map_err(|e| (ParsExitCode::Error.into(), e))?;
@@ -93,7 +95,8 @@ fn handle_clip(clip: Option<usize>, passwd: &secrecy::SecretBox<str>) -> Result<
                 )),
             ));
         }
-    })
+    };
+    Ok(())
 }
 
 fn to_qr_code(secret: SecretString) -> anyhow::Result<SecretString> {

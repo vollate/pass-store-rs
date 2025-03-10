@@ -1,7 +1,8 @@
 use std::io::Write;
 use std::process::Command;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
+use log::warn;
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
@@ -21,10 +22,26 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
     }
 
     if let Some(secs) = timeout {
+        let qdbus_executable: String = {
+            let find_res: Result<String, Error> = {
+                let output=Command::new("sh").arg("-c").arg("echo $PATH | tr ':' '\\n' | xargs -I {} find {} -maxdepth 1 -executable -regex '.*/qdbus[0-9]*$'").output()?;
+                let output_str = String::from_utf8(output.stdout)?;
+                let re: Vec<&str> = output_str.split('\n').collect();
+                Ok(re.first().unwrap().to_string())
+            };
+            match find_res {
+                Ok(str) => str,
+                Err(e) => {
+                    warn!("Failed to get qdbus executable: {}, use default 'dbus'", e);
+                    "qdbus".to_string()
+                }
+            }
+        };
         Command::new("sh")
             .arg("-c")
             .arg(
-               format!( "sleep {} && qdbus org.kde.klipper /klipper org.kde.klipper.klipper.clearClipboardHistory",secs),
+
+                format!( "sleep {} && {} org.kde.klipper /klipper org.kde.klipper.klipper.clearClipboardHistory",secs,qdbus_executable),
             )
             .spawn()?;
     }
