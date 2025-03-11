@@ -7,7 +7,7 @@ use pars_core::git::add_and_commit;
 use pars_core::git::commit::{CommitType, GitCommit};
 use pars_core::operation::copy_or_rename::copy_rename_io;
 
-use crate::constants::{ParsExitCode, SECRET_POSTFIX};
+use crate::constants::{ParsExitCode, SECRET_EXTENSION};
 use crate::util::unwrap_root_path;
 
 pub fn cmd_mv(
@@ -24,7 +24,7 @@ pub fn cmd_mv(
         &root,
         old_path,
         new_path,
-        SECRET_POSTFIX,
+        SECRET_EXTENSION,
         force,
         &mut BufReader::new(std::io::stdin()),
         &mut std::io::stdout(),

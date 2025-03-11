@@ -8,11 +8,14 @@
       "name": "Debug cli",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
-      "args": [],
+      "program": "${workspaceFolder}/target/debug/pars",
+      "args": [
+        "mv",
+        "www.touchgal.co",
+        "www.touchgal.io"
+      ],
       "cwd": "${workspaceFolder}",
       "preLaunchTask": "cargo build",
-      "stopAtEntry": false,
       "runInTerminal": true,
       "sourceLanguages": [
         "rust"
@@ -25,7 +28,10 @@
         }
       ],
       "miDebuggerPath": "/usr/bin/lldb",
-      "env": {},
+      "env": {
+        "RUST_BACKTRACE": "1",
+        "PARS_LOG_LEVEL": "debug"
+      },
       "externalConsole": false
     },
     {
@@ -35,8 +41,8 @@
       "program": "${workspaceFolder}/core/target/debug/${workspaceFolderBasename}",
       "args": [],
       "cwd": "${workspaceFolder}/core",
+      "cwd": "${workspaceFolder}/core",
       "preLaunchTask": "cargo build",
-      "stopAtEntry": false,
       "runInTerminal": true,
       "sourceLanguages": [
         "rust"

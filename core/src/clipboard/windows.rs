@@ -46,12 +46,12 @@ mod tests {
         let res = copy_to_clip_board(content, Some(TIMEOUT));
         assert!(res.is_ok());
 
-        let cmd = Command::new("pwsh").arg("-Command").arg("Get-Clipboard").output().unwrap();
+        let cmd = Command::new("powershell").arg("-Command").arg("Get-Clipboard").output().unwrap();
         assert_eq!(cmd.stdout, b"Hello, pars\r\n");
         assert_eq!(cmd.status.success(), true);
 
         std::thread::sleep(std::time::Duration::from_secs(1 + TIMEOUT as u64));
-        let cmd = Command::new("pwsh").arg("-Command").arg("Get-Clipboard").output().unwrap();
-        assert_eq!(cmd.stdout, b"\r\n");
+        let cmd = Command::new("powershell").arg("-Command").arg("Get-Clipboard").output().unwrap();
+        assert_eq!(cmd.stdout, b"");
     }
 }

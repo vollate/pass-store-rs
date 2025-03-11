@@ -1,10 +1,11 @@
 use std::io::{BufRead, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{fs, path};
 
 use anyhow::Result;
+use log::debug;
 
-use crate::util::fs_util::{better_rename, copy_dir_recursive, path_attack_check};
+use crate::util::fs_util::{better_rename, copy_dir_recursive, path_attack_check, path_to_str};
 use crate::{IOErr, IOErrType};
 
 // Currently, we do not support cross repo rename/copy
@@ -62,7 +63,7 @@ where
     // assume to is a directory
     if to.exists() {
         return if to.is_dir() {
-            let sub_file = to.join(file_name).with_extension(extension);
+            let sub_file = to.join(file_name);
             if sub_file.exists()
                 && !handle_overwrite_delete(&sub_file, force, stdin, stdout, stderr)?
             {
@@ -75,11 +76,12 @@ where
             }
             Ok(())
         } else {
-            Err(IOErr::new(IOErrType::InvalidFileType, to).into())
+            Err(IOErr::new(IOErrType::PathNotExist, to).into())
         };
     }
 
     // assume to is a file, append extension to it
+    //FIXME: don't use with_extension, it may break file name
     let to = to.with_extension(extension);
     if to.exists() {
         if to.is_file() {
@@ -87,7 +89,7 @@ where
                 return Ok(());
             }
         } else {
-            return Err(IOErr::new(IOErrType::InvalidFileType, &to).into());
+            return Err(IOErr::new(IOErrType::PathNotExist, &to).into());
         }
     }
     if copy {
@@ -139,6 +141,10 @@ where
         } else {
             return Err(IOErr::new(IOErrType::InvalidFileType, to).into());
         }
+    } else if copy {
+        copy_dir_recursive(from, to)?;
+    } else {
+        better_rename(from, to)?;
     }
     Ok(())
 }
@@ -160,18 +166,18 @@ where
     E: Write,
 {
     let mut from_path = root.join(from);
+    let to_path = root.join(to);
     path_attack_check(root, &from_path)?;
+    path_attack_check(root, &to_path)?;
 
     if !from_path.exists() {
-        let try_path = from_path.with_extension(file_extension);
+        let try_path = PathBuf::from(format!("{}.{}", path_to_str(&from_path)?, file_extension));
         if !try_path.exists() {
             return Err(IOErr::new(IOErrType::PathNotExist, &from_path).into());
         }
         from_path = try_path;
     }
-
-    let to_path = root.join(to);
-    path_attack_check(root, &to_path)?;
+    debug!("copy_rename_io: from_path: {}, to_path: {}", from_path.display(), to_path.display());
 
     let to_is_dir = to.ends_with(path::MAIN_SEPARATOR);
     if to_is_dir && (!to_path.exists() || !to_path.is_dir()) {

@@ -16,7 +16,7 @@ pub fn default_config_path() -> String {
 }
 
 pub const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Info;
-pub const SECRET_POSTFIX: &str = "gpg";
+pub const SECRET_EXTENSION: &str = "gpg";
 pub const DEFAULT_PASS_LENGTH: usize = 20;
 
 #[repr(i32)]

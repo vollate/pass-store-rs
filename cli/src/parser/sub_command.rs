@@ -2,6 +2,7 @@ use clap::Subcommand;
 
 #[derive(Subcommand)]
 pub enum SubCommands {
+    #[clap(about = "Initialize a new password store or reinitialize an existing one/sub-folder")]
     Init {
         #[arg(short = 'p', long = "path", value_name = "sub-folder")]
         path: Option<String>,
@@ -10,10 +11,12 @@ pub enum SubCommands {
         gpg_ids: Vec<String>,
     },
 
+    #[clap(about = "Search for a string in all files, regex is supported")]
     Grep {
         search_string: String,
     },
 
+    #[clap(about = "Find a password by name")]
     #[command(alias = "search")]
     Find {
         #[arg(required = true)]
