@@ -1,16 +1,37 @@
 use std::path::Path;
 
 use anyhow::Result;
-use colored::Colorize;
+use colored::{Color, Colorize};
 use regex::Regex;
 use secrecy::ExposeSecret;
 use walkdir::WalkDir;
 
+use crate::config::PrintConfig;
 use crate::pgp::PGPClient;
 use crate::util::fs_util::path_to_str;
+use crate::util::tree::string_to_color_opt;
 
-pub fn grep(client: &PGPClient, root: &Path, search_str: &str) -> Result<Vec<String>> {
-    //TODO: Add print config support
+#[derive(Default)]
+pub struct GrepPrintConfig {
+    pub grep_pass_color: Option<Color>,
+    pub grep_match_color: Option<Color>,
+}
+
+impl<CFG: AsRef<PrintConfig>> From<CFG> for GrepPrintConfig {
+    fn from(config: CFG) -> Self {
+        Self {
+            grep_pass_color: string_to_color_opt(&config.as_ref().grep_pass_color),
+            grep_match_color: string_to_color_opt(&config.as_ref().grep_match_color),
+        }
+    }
+}
+
+pub fn grep(
+    client: &PGPClient,
+    root: &Path,
+    search_str: &str,
+    print_cfg: &GrepPrintConfig,
+) -> Result<Vec<String>> {
     let mut results = Vec::new();
     let search_regex = Regex::new(&regex::escape(search_str))?;
 
@@ -22,22 +43,37 @@ pub fn grep(client: &PGPClient, root: &Path, search_str: &str) -> Result<Vec<Str
 
             let decrypted = client.decrypt_stdin(root, path_to_str(entry.path())?)?;
 
-            let matching_lines: Vec<String> = decrypted
-                .expose_secret()
-                .lines()
-                .filter(|line| line.contains(search_str))
-                .map(|line| {
-                    search_regex
-                        .replace_all(line, |caps: &regex::Captures| {
-                            caps[0].bright_red().to_string()
-                        })
-                        .to_string()
-                })
-                .collect();
+            let matching_lines: Vec<String> = if let Some(color) = print_cfg.grep_match_color {
+                decrypted
+                    .expose_secret()
+                    .lines()
+                    .filter(|line| line.contains(search_str))
+                    .map(|line| {
+                        search_regex
+                            .replace_all(line, |caps: &regex::Captures| {
+                                caps[0].color(color).to_string()
+                            })
+                            .to_string()
+                    })
+                    .collect()
+            } else {
+                decrypted
+                    .expose_secret()
+                    .lines()
+                    .filter(|line| line.contains(search_str))
+                    .map(|line| line.to_string())
+                    .collect()
+            };
 
-            if relative_path_str.contains(search_str) || !matching_lines.is_empty() {
-                results
-                    .push(format!("{}:", &relative_path_str[..relative_path_str.len() - 4].cyan()));
+            if !matching_lines.is_empty() {
+                if let Some(color) = print_cfg.grep_pass_color {
+                    results.push(format!(
+                        "{}:",
+                        &relative_path_str[..relative_path_str.len() - 4].color(color)
+                    ));
+                } else {
+                    results.push(format!("{}:", &relative_path_str[..relative_path_str.len() - 4]));
+                }
                 results.extend(matching_lines);
             }
         }
@@ -48,7 +84,7 @@ pub fn grep(client: &PGPClient, root: &Path, search_str: &str) -> Result<Vec<Str
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::path::{self, PathBuf};
 
     use pretty_assertions::assert_eq;
     use serial_test::serial;
@@ -64,8 +100,8 @@ mod tests {
         let email = get_test_email();
         let (_tmp_dir, root) = gen_unique_temp_dir();
 
-        let file1_content = "test password\nfoo bar\nsecret content\nnullptr";
-        let file2_content = "another password\ntest line\nmore content";
+        let file1_content = "INF\n2112112";
+        let file2_content = "Overlord\nNAN";
 
         let structure: &[(Option<&str>, &[&str])] =
             &[(Some("dir1"), &[][..]), (Some("dir2"), &[][..])];
@@ -75,12 +111,8 @@ mod tests {
         let test_client = PGPClient::new(executable.clone(), &vec![&email]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
 
-        test_client
-            .encrypt(file1_content, root.join("dir1/test_pass.gpg").to_str().unwrap())
-            .unwrap();
-        test_client
-            .encrypt(file2_content, root.join("dir2/normal_file.gpg").to_str().unwrap())
-            .unwrap();
+        test_client.encrypt(file1_content, root.join("dir1/01.gpg").to_str().unwrap()).unwrap();
+        test_client.encrypt(file2_content, root.join("dir2/10.gpg").to_str().unwrap()).unwrap();
 
         (executable, email, test_client, _tmp_dir, root)
     }
@@ -93,8 +125,9 @@ mod tests {
 
         cleanup!(
             {
-                let results = grep(&test_client, &root, "null").unwrap();
-                assert_eq!(results, vec!["dir1/test_pass.gpg:", "nullptr"]);
+                let results =
+                    grep(&test_client, &root, "211", &GrepPrintConfig::default()).unwrap();
+                assert_eq!(results, vec![&format!("dir1{}01:", path::MAIN_SEPARATOR), "2112112"]);
             },
             {
                 clean_up_test_key(&executable, &vec![&email]).unwrap();
@@ -110,8 +143,12 @@ mod tests {
 
         cleanup!(
             {
-                let results = grep(&test_client, &root, "secret").unwrap();
-                assert_eq!(results, vec!["dir1/test_pass.gpg:", "secret content"]);
+                let results =
+                    grep(&test_client, &root, "Overlord", &GrepPrintConfig::default()).unwrap();
+                assert_eq!(results, vec![&format!("dir2{}10:", path::MAIN_SEPARATOR), "Overlord"]);
+
+                let results = grep(&test_client, &root, "01", &GrepPrintConfig::default()).unwrap();
+                assert_eq!(results, Vec::<String>::new());
             },
             {
                 clean_up_test_key(&executable, &vec![&email]).unwrap();
@@ -127,7 +164,8 @@ mod tests {
 
         cleanup!(
             {
-                let results = grep(&test_client, &root, "nonexistent").unwrap();
+                let results =
+                    grep(&test_client, &root, "nonexistent", &GrepPrintConfig::default()).unwrap();
                 assert!(results.is_empty());
             },
             {

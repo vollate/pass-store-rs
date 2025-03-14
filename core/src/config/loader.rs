@@ -4,19 +4,18 @@ use std::path::Path;
 
 use config::{Config as ConfigLoader, File};
 
-use super::{ParsConfig, ParsConfigSerializable};
+use super::ParsConfig;
 use crate::util::fs_util::path_to_str;
 
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<ParsConfig, Box<dyn Error>> {
     let file_path = path_to_str(path.as_ref())?;
     let cfg_loader =
         ConfigLoader::builder().add_source(File::with_name(file_path).required(false)).build()?;
-    Ok(cfg_loader.try_deserialize::<ParsConfigSerializable>()?.into())
+    Ok(cfg_loader.try_deserialize::<ParsConfig>()?)
 }
 
 pub fn save_config<P: AsRef<Path>>(config: &ParsConfig, path: P) -> Result<(), Box<dyn Error>> {
-    let serializable_data: ParsConfigSerializable = config.clone().into();
-    let toml_str = toml::to_string_pretty(&serializable_data)?;
+    let toml_str = toml::to_string_pretty(config)?;
     fs::write(path, toml_str)?;
     Ok(())
 }

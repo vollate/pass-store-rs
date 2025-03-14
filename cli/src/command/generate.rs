@@ -12,7 +12,7 @@ use pars_core::util::fs_util::get_dir_gpg_id_content;
 use secrecy::zeroize::Zeroize;
 use secrecy::ExposeSecret;
 
-use crate::constants::{ParsExitCode, DEFAULT_PASS_LENGTH};
+use crate::constants::{ParsExitCode, DEFAULT_PASS_LENGTH, SECRET_EXTENSION};
 use crate::util::unwrap_root_path;
 
 pub fn cmd_generate(
@@ -41,6 +41,7 @@ pub fn cmd_generate(
         in_place,
         force,
         pass_length: pass_length.unwrap_or(DEFAULT_PASS_LENGTH),
+        extension: SECRET_EXTENSION.to_string(),
     };
 
     let mut res = generate_io(

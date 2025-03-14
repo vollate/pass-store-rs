@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 use pars_core::config::ParsConfig;
-use pars_core::operation::grep::grep;
+use pars_core::operation::grep::{grep, GrepPrintConfig};
 use pars_core::pgp::PGPClient;
 use pars_core::util::fs_util::get_dir_gpg_id_content;
 
@@ -20,8 +20,14 @@ pub fn cmd_grep(
         &key_fprs.iter().map(|s| s.as_str()).collect(),
     )
     .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
-    let res =
-        grep(&pgp_client, &root, search_string).map_err(|e| (ParsExitCode::Error.into(), e))?;
+
+    let res = grep(
+        &pgp_client,
+        &root,
+        search_string,
+        &Into::<GrepPrintConfig>::into(&config.print_config),
+    )
+    .map_err(|e| (ParsExitCode::Error.into(), e))?;
     res.iter().for_each(|s| println!("{}", s));
     Ok(())
 }

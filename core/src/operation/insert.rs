@@ -1,4 +1,4 @@
-use std::fs;
+use std::fs::{self, create_dir_all};
 use std::io::{BufRead, Read, Write};
 use std::path::Path;
 
@@ -9,31 +9,42 @@ use crate::pgp::PGPClient;
 use crate::util::fs_util::{
     backup_encrypted_file, path_attack_check, path_to_str, restore_backup_file,
 };
+use crate::{IOErr, IOErrType};
 
 pub struct PasswdInsertConfig {
     pub echo: bool,
     pub multiline: bool,
     pub force: bool,
+    pub extension: String,
 }
 
 pub fn insert_io<I, O, E>(
     client: &PGPClient,
     root: &Path,
     pass_name: &str,
-    config: &PasswdInsertConfig,
-    stdin: &mut I,
-    stdout: &mut O,
-    _stderr: &mut E,
+    insert_cfg: &PasswdInsertConfig,
+    in_s: &mut I,
+    out_s: &mut O,
+    _err_s: &mut E,
 ) -> Result<()>
 where
     I: Read + BufRead,
     O: Write,
     E: Write,
 {
-    let pass_path = root.join(pass_name);
-
+    let pass_path = root.join(format!("{}.{}", pass_name, insert_cfg.extension));
     path_attack_check(root, &pass_path)?;
-    if pass_path.exists() && !config.force {
+
+    // Handle the case parent folder not exist
+    if let Some(parent) = pass_path.parent() {
+        if !parent.exists() {
+            create_dir_all(parent)?;
+        }
+    } else {
+        return Err(anyhow!(IOErr::new(IOErrType::InvalidPath, &pass_path)));
+    }
+
+    if pass_path.exists() && !insert_cfg.force {
         return Err(anyhow!(format!(
             "An entry already exists for {}. Use -f to force overwrite.",
             pass_name
@@ -44,21 +55,21 @@ where
         fs::create_dir_all(parent)?;
     }
 
-    write!(stdout, "Enter password: ")?;
-    stdout.flush()?;
+    write!(out_s, "Enter password: ")?;
+    out_s.flush()?;
 
-    let password = if config.multiline {
+    let password = if insert_cfg.multiline {
         let mut buffer = String::new();
-        stdin.read_to_string(&mut buffer)?;
+        in_s.read_to_string(&mut buffer)?;
         SecretString::new(buffer.into())
     } else {
         let mut buffer = String::new();
-        stdin.read_line(&mut buffer)?;
+        in_s.read_line(&mut buffer)?;
         SecretString::new(buffer.trim().to_string().into())
     };
 
-    if config.echo {
-        writeln!(stdout, "{}", password.expose_secret())?;
+    if insert_cfg.echo {
+        writeln!(out_s, "{}", password.expose_secret())?;
     }
 
     if pass_path.exists() {
@@ -75,7 +86,7 @@ where
     } else {
         client.encrypt(password.expose_secret(), path_to_str(&pass_path)?)?;
     }
-    writeln!(stdout, "Password encrypted and saved.")?;
+    writeln!(out_s, "Password encrypted and saved.")?;
     Ok(())
 }
 
@@ -125,12 +136,17 @@ mod tests {
                     stdin_w.write_all(b"password\n").unwrap();
                 });
 
-                let config = PasswdInsertConfig { echo: false, multiline: false, force: false };
+                let config = PasswdInsertConfig {
+                    echo: false,
+                    multiline: false,
+                    force: false,
+                    extension: "gpg".to_string(),
+                };
 
                 insert_io(
                     &test_client,
                     &root,
-                    "test1.gpg",
+                    "test1",
                     &config,
                     &mut BufReader::new(&mut stdin),
                     &mut stdout,
@@ -164,12 +180,17 @@ mod tests {
                     stdin_w.write_all(b"line1\nline2\nline3").unwrap();
                 });
 
-                let config = PasswdInsertConfig { echo: false, multiline: true, force: false };
+                let config = PasswdInsertConfig {
+                    echo: false,
+                    multiline: true,
+                    force: false,
+                    extension: "gpg".to_string(),
+                };
 
                 insert_io(
                     &test_client,
                     &root,
-                    "test2.gpg",
+                    "test2",
                     &config,
                     &mut BufReader::new(&mut stdin),
                     &mut stdout,
@@ -208,12 +229,17 @@ mod tests {
                     stdin_w.write_all(b"new_password\n").unwrap();
                 });
 
-                let config = PasswdInsertConfig { echo: false, multiline: false, force: true };
+                let config = PasswdInsertConfig {
+                    echo: false,
+                    multiline: false,
+                    force: true,
+                    extension: "gpg".to_string(),
+                };
 
                 insert_io(
                     &test_client,
                     &root,
-                    "test3.gpg",
+                    "test3",
                     &config,
                     &mut BufReader::new(&mut stdin),
                     &mut stdout,
@@ -242,12 +268,17 @@ mod tests {
                 let mut stdout = Vec::new();
                 let mut stderr = Vec::new();
 
-                let config = PasswdInsertConfig { echo: false, multiline: false, force: false };
+                let config = PasswdInsertConfig {
+                    echo: false,
+                    multiline: false,
+                    force: false,
+                    extension: "gpg".to_string(),
+                };
 
                 let result = insert_io(
                     &test_client,
                     &root,
-                    "../outside.gpg",
+                    "../outside",
                     &config,
                     &mut BufReader::new(&mut stdin),
                     &mut stdout,

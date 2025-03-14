@@ -42,7 +42,7 @@ foreach ($dir in $TARGET_DIRS) {
         exit 1
     }
     Write-Host "Running cargo test in $dir..."
-    sudo cargo test -- --include-ignored
+    cargo test -- --include-ignored
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to run cargo test in $dir"
         cd ..

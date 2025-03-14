@@ -6,7 +6,7 @@ use pars_core::config::ParsConfig;
 use pars_core::operation::ls_or_show::{ls_io, LsOrShow};
 use pars_core::pgp::PGPClient;
 use pars_core::util::fs_util::get_dir_gpg_id_content;
-use pars_core::util::tree::{FilterType, TreeConfig};
+use pars_core::util::tree::{FilterType, TreeConfig, TreePrintConfig};
 use secrecy::zeroize::Zeroize;
 use secrecy::{ExposeSecret, SecretString};
 
@@ -38,7 +38,7 @@ pub fn cmd_ls(
     )
     .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
-    let res = ls_io(&pgp_client, &tree_cfg, &config.print_config.clone().into())
+    let res = ls_io(&pgp_client, &tree_cfg, &Into::<TreePrintConfig>::into(&config.print_config))
         .map_err(|e| (ParsExitCode::Error.into(), e))?;
     match res {
         LsOrShow::DirTree(tree) => {

@@ -41,16 +41,25 @@ where
     }
     Ok(true)
 }
-
+/// Copy or rename a file or directory, ask for confirmation if the target already exists(unless force)
+/// # Arguments
+/// * `copy` - Whether to copy or rename
+/// * `from` - The path of the file or directory to copy or rename
+/// * `to` - The path to copy or rename to
+/// * `extension` - The extension to append to the file name if the target is a file
+/// * `force` - Whether to overwrite the target if it already exists
+/// * `in_s` - The input stream
+/// * `out_s` - The output stream
+/// * `err_s` - The error stream
 fn copy_rename_file<I, O, E>(
     copy: bool,
     from: &Path,
     to: &Path,
     extension: &str,
     force: bool,
-    stdin: &mut I,
-    stdout: &mut O,
-    stderr: &mut E,
+    in_s: &mut I,
+    out_s: &mut O,
+    err_s: &mut E,
 ) -> Result<()>
 where
     I: Read + BufRead,
@@ -64,8 +73,7 @@ where
     if to.exists() {
         return if to.is_dir() {
             let sub_file = to.join(file_name);
-            if sub_file.exists()
-                && !handle_overwrite_delete(&sub_file, force, stdin, stdout, stderr)?
+            if sub_file.exists() && !handle_overwrite_delete(&sub_file, force, in_s, out_s, err_s)?
             {
                 return Ok(());
             }
@@ -81,11 +89,10 @@ where
     }
 
     // assume to is a file, append extension to it
-    //FIXME: don't use with_extension, it may break file name
-    let to = to.with_extension(extension);
+    let to = PathBuf::from(format!("{}.{}", path_to_str(to)?, extension));
     if to.exists() {
         if to.is_file() {
-            if !handle_overwrite_delete(&to, force, stdin, stdout, stderr)? {
+            if !handle_overwrite_delete(&to, force, in_s, out_s, err_s)? {
                 return Ok(());
             }
         } else {
@@ -100,14 +107,23 @@ where
     Ok(())
 }
 
+/// Copy or rename a directory
+/// # Arguments
+/// * `copy` - Whether to copy or rename
+/// * `from` - The path of the directory to copy or rename
+/// * `to` - The path to copy or rename to
+/// * `force` - Whether to overwrite the target if it already exists
+/// * `in_s` - The input stream
+/// * `out_s` - The output stream
+/// * `err_s` - The error stream
 fn copy_rename_dir<I, O, E>(
     copy: bool,
     from: &Path,
     to: &Path,
     force: bool,
-    stdin: &mut I,
-    stdout: &mut O,
-    stderr: &mut E,
+    in_s: &mut I,
+    out_s: &mut O,
+    err_s: &mut E,
 ) -> Result<()>
 where
     I: Read + BufRead,
@@ -120,8 +136,7 @@ where
     if to.exists() {
         if to.is_dir() {
             let sub_dir = to.join(file_name);
-            if sub_dir.exists() && !handle_overwrite_delete(&sub_dir, force, stdin, stdout, stderr)?
-            {
+            if sub_dir.exists() && !handle_overwrite_delete(&sub_dir, force, in_s, out_s, err_s)? {
                 return Ok(());
             }
             if copy {
@@ -130,7 +145,7 @@ where
                 better_rename(from, sub_dir)?;
             }
         } else if to.is_file() {
-            if !handle_overwrite_delete(to, force, stdin, stdout, stderr)? {
+            if !handle_overwrite_delete(to, force, in_s, out_s, err_s)? {
                 return Ok(());
             }
             if copy {

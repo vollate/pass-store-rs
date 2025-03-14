@@ -122,8 +122,8 @@ mod tests {
         let structure: &[(Option<&str>, &[&str])] = &[(Some("dir"), &[][..])];
         create_dir_structure(&root, structure);
 
-        let file1_content = "Sending in an eagle";
-        let file2_content = "Requesting orbital";
+        let file1_content = "Sending in an eagle\nYou must edit this to pass the test";
+        let file2_content = "Requesting orbital\nDo not edit this to pass the test";
         cleanup!(
             {
                 key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
@@ -139,14 +139,16 @@ mod tests {
                         path_to_str(&root.join("dir").join("file2.gpg")).unwrap(),
                     )
                     .unwrap();
-                edit(&test_client, &root, "file1", "gpg", "vim").unwrap();
-                edit(&test_client, &root, "dir/file2", "gpg", "vim").unwrap();
+                let res1 = edit(&test_client, &root, "file1", "gpg", "vim").unwrap();
+                let res2 = edit(&test_client, &root, "dir/file2", "gpg", "vim").unwrap();
+                assert!(res1);
+                assert!(!res2);
 
                 let file1_new_content = test_client.decrypt_stdin(&root, output).unwrap();
                 let file2_new_content = test_client.decrypt_stdin(&root, "dir/file2.gpg").unwrap();
 
                 assert_ne!(file1_new_content.expose_secret(), file1_content);
-                assert_ne!(file2_new_content.expose_secret(), file2_content);
+                assert_eq!(file2_new_content.expose_secret(), file2_content);
             },
             {
                 clean_up_test_key(executable, &vec![email]).unwrap();

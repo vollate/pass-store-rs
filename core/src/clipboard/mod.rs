@@ -1,25 +1,10 @@
 #[allow(dead_code)]
 #[cfg(target_os = "macos")]
 mod mac;
-
 #[cfg(all(unix, not(target_os = "macos")))]
-mod unix {
-    #[cfg(any(
-        target_os = "linux",
-        target_os = "freebsd",
-        target_os = "openbsd",
-        target_os = "netbsd"
-    ))]
-    pub mod wayland;
-
-    #[cfg(any(
-        target_os = "linux",
-        target_os = "freebsd",
-        target_os = "openbsd",
-        target_os = "netbsd"
-    ))]
-    pub mod xorg;
-}
+pub mod wayland;
+#[cfg(all(unix, not(target_os = "macos")))]
+pub mod xorg;
 
 #[cfg(target_os = "windows")]
 mod windows;

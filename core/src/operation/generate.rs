@@ -16,6 +16,7 @@ pub struct PasswdGenerateConfig {
     pub in_place: bool,
     pub force: bool,
     pub pass_length: usize,
+    pub extension: String,
 }
 
 fn prompt_overwrite<R: Read + BufRead, W: Write>(
@@ -33,48 +34,48 @@ pub fn generate_io<I, O, E>(
     client: &PGPClient,
     root: &Path,
     pass_name: &str,
-    config: &PasswdGenerateConfig,
-    stdin: &mut I,
-    stdout: &mut O,
-    stderr: &mut E,
+    gen_cfg: &PasswdGenerateConfig,
+    in_s: &mut I,
+    out_s: &mut O,
+    err_s: &mut E,
 ) -> Result<SecretString>
 where
     I: Read + BufRead,
     O: Write,
     E: Write,
 {
-    let pass_path = root.join(pass_name);
+    let pass_path = root.join(format!("{}.{}", pass_name, gen_cfg.extension));
 
     path_attack_check(root, &pass_path)?;
 
-    if config.in_place && config.force {
+    if gen_cfg.in_place && gen_cfg.force {
         let err_msg = "Cannot use both [--in-place] and [--force]";
-        writeln!(stderr, "{}", err_msg)?;
+        writeln!(err_s, "{}", err_msg)?;
         return Err(anyhow!(err_msg));
     }
 
     if pass_path.exists()
-        && !config.force
-        && !config.in_place
-        && !prompt_overwrite(stdin, stderr, pass_name)?
+        && !gen_cfg.force
+        && !gen_cfg.in_place
+        && !prompt_overwrite(in_s, err_s, pass_name)?
     {
-        writeln!(stdout, "Operation cancelled.")?;
+        writeln!(out_s, "Operation cancelled.")?;
         return Ok(SecretString::new("".to_string().into()));
     }
 
     let pg = PasswordGenerator::new()
-        .length(config.pass_length)
+        .length(gen_cfg.pass_length)
         .numbers(true)
         .lowercase_letters(true)
         .uppercase_letters(true)
-        .symbols(!config.no_symbols)
+        .symbols(!gen_cfg.no_symbols)
         .spaces(false)
         .exclude_similar_characters(true)
         .strict(true);
 
     let password = SecretString::new(pg.generate_one().map_err(|e| anyhow!(e))?.into());
 
-    if config.in_place && pass_path.exists() {
+    if gen_cfg.in_place && pass_path.exists() {
         let existing = client.decrypt_stdin(root, path_to_str(&pass_path)?)?;
         let mut content = existing.expose_secret().lines().collect::<Vec<_>>();
 
@@ -113,7 +114,7 @@ where
         }
     }
 
-    writeln!(stdout, "Generated password for {} saved", pass_name)?;
+    writeln!(out_s, "Generated password for {} saved", pass_name)?;
 
     Ok(password)
 }
@@ -162,12 +163,13 @@ mod tests {
                     in_place: false,
                     force: false,
                     pass_length: 16,
+                    extension: "gpg".to_string(),
                 };
 
                 let password = generate_io(
                     &test_client,
                     &root,
-                    "test1.gpg",
+                    "test1",
                     &config,
                     &mut stdin,
                     &mut stdout,
@@ -190,7 +192,7 @@ mod tests {
                 let password = generate_io(
                     &test_client,
                     &root,
-                    "test1.gpg",
+                    "test1",
                     &config,
                     &mut stdin,
                     &mut stdout,
@@ -210,7 +212,7 @@ mod tests {
                 let password = generate_io(
                     &test_client,
                     &root,
-                    "test1.gpg",
+                    "test1",
                     &config,
                     &mut stdin,
                     &mut stdout,
@@ -255,12 +257,13 @@ mod tests {
                     in_place: true,
                     force: false,
                     pass_length: 12,
+                    extension: "gpg".to_string(),
                 };
 
                 let password = generate_io(
                     &test_client,
                     &root,
-                    "test2.gpg",
+                    "test2",
                     &config,
                     &mut stdin,
                     &mut stdout,
@@ -306,12 +309,13 @@ mod tests {
                     in_place: false,
                     force: true,
                     pass_length: 8,
+                    extension: "gpg".to_string(),
                 };
 
                 let password = generate_io(
                     &test_client,
                     &root,
-                    "test3.gpg",
+                    "test3",
                     &config,
                     &mut stdin,
                     &mut stdout,
@@ -350,12 +354,13 @@ mod tests {
                     in_place: false,
                     force: false,
                     pass_length: 10,
+                    extension: "gpg".to_string(),
                 };
 
                 let password = generate_io(
                     &test_client,
                     &root,
-                    "test4.gpg",
+                    "test4",
                     &config,
                     &mut stdin,
                     &mut stdout,
@@ -392,12 +397,13 @@ mod tests {
                     in_place: false,
                     force: false,
                     pass_length: 16,
+                    extension: "gpg".to_string(),
                 };
 
                 let result = generate_io(
                     &test_client,
                     &root,
-                    "../outside.gpg",
+                    "../outside",
                     &config,
                     &mut stdin,
                     &mut stdout,
@@ -433,12 +439,13 @@ mod tests {
                     in_place: true,
                     force: true,
                     pass_length: 16,
+                    extension: "gpg".to_string(),
                 };
 
                 let result = generate_io(
                     &test_client,
                     &root,
-                    "test5.gpg",
+                    "test5",
                     &config,
                     &mut stdin,
                     &mut stdout,

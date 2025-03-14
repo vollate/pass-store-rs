@@ -37,13 +37,12 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
                 }
             }
         };
-        Command::new("sh")
+        let _=  Command::new("sh")
             .arg("-c")
             .arg(
-
                 format!( "sleep {} && {} org.kde.klipper /klipper org.kde.klipper.klipper.clearClipboardHistory",secs,qdbus_executable),
             )
-            .spawn()?;
+            .spawn();
     }
     Ok(())
 }

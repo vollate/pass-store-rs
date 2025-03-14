@@ -15,7 +15,8 @@ use crate::util::{to_relative_path, to_relative_path_opt};
     name = "pars",
     about = "Stores, retrieves, generates, and synchronizes passwords securely",
     version = env!("CARGO_PKG_VERSION"),
-    author = "Vollate <uint44t@gmail.com>"
+    author = "Vollate <uint44t@gmail.com>",
+    //TODO: add setting for color and executable
 )]
 pub struct CliParser {
     #[command(subcommand)]

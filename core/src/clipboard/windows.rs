@@ -4,10 +4,12 @@ use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
+const POWERSHELL_ARGS: [&str; 2] = ["-NoProfile", "-Command"];
+
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
     let mut cmd = Command::new("powershell");
     let mut child = cmd
-        .arg("-Command")
+        .args(POWERSHELL_ARGS)
         .arg("Set-Clipboard")
         .arg(format!("\"{}\"", secret.expose_secret()))
         .spawn()?;
@@ -15,19 +17,19 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
 
     let exit_status = child.wait()?;
     if !exit_status.success() {
-        return Err(anyhow!(format!("wl-copy exit failed: {}", exit_status)));
+        return Err(anyhow!(format!("Windows Set-Clipboard exit failed: {}", exit_status)));
     }
 
     if let Some(secs) = timeout {
         let cmd =
             format!("Start-Sleep -Seconds {} ; [Windows.ApplicationModel.DataTransfer.Clipboard, Windows, ContentType = WindowsRuntime]::ClearHistory()", secs);
-        Command::new("powershell")
-            .arg("-Command")
+        let _ = Command::new("powershell")
+            .args(POWERSHELL_ARGS)
             .arg(&cmd)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .spawn()?;
+            .spawn();
     }
     Ok(())
 }

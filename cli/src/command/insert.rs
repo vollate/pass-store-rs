@@ -9,7 +9,7 @@ use pars_core::operation::insert::{insert_io, PasswdInsertConfig};
 use pars_core::pgp::PGPClient;
 use pars_core::util::fs_util::get_dir_gpg_id_content;
 
-use crate::constants::ParsExitCode;
+use crate::constants::{ParsExitCode, SECRET_EXTENSION};
 use crate::util::unwrap_root_path;
 
 pub fn cmd_insert(
@@ -31,7 +31,8 @@ pub fn cmd_insert(
     )
     .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
-    let insert_cfg = PasswdInsertConfig { echo, multiline, force };
+    let insert_cfg =
+        PasswdInsertConfig { echo, multiline, force, extension: SECRET_EXTENSION.to_string() };
     insert_io(
         &pgp_client,
         &root,

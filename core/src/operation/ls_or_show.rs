@@ -7,7 +7,7 @@ use crate::pgp::PGPClient;
 use crate::util::fs_util::path_to_str;
 use crate::util::str;
 use crate::util::str::remove_lines_postfix;
-use crate::util::tree::{DirTree, PrintConfig, TreeConfig};
+use crate::util::tree::{DirTree, TreeConfig, TreePrintConfig};
 use crate::{IOErr, IOErrType};
 
 pub enum LsOrShow {
@@ -17,7 +17,7 @@ pub enum LsOrShow {
 pub fn ls_io(
     client: &PGPClient,
     tree_cfg: &TreeConfig,
-    print_cfg: &PrintConfig,
+    print_cfg: &TreePrintConfig,
 ) -> Result<LsOrShow> {
     let mut full_path = tree_cfg.root.join(tree_cfg.target);
 
@@ -57,7 +57,7 @@ pub fn ls_io(
     }
 }
 
-pub fn ls_dir(tree_cfg: &TreeConfig, print_cfg: &PrintConfig) -> Result<String> {
+pub fn ls_dir(tree_cfg: &TreeConfig, print_cfg: &TreePrintConfig) -> Result<String> {
     let mut full_path = tree_cfg.root.join(tree_cfg.target);
 
     while full_path.is_symlink() {
@@ -117,7 +117,7 @@ mod tests {
                     filter_type: FilterType::Disable,
                     filters: Vec::new(),
                 };
-                let print_cfg = PrintConfig {
+                let print_cfg = TreePrintConfig {
                     dir_color: None,
                     file_color: None,
                     symbol_color: None,
