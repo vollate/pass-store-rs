@@ -36,13 +36,19 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
 
 #[cfg(test)]
 mod tests {
+    use std::thread;
+    use std::time::Duration;
+
     use pretty_assertions::assert_eq;
+    use serial_test::serial;
 
     use super::*;
 
     #[test]
-    #[ignore = "Clipboard test is not stable in CI environment"]
+    #[serial]
     fn windows_clipboard_test() {
+        thread::sleep(Duration::from_secs(3));
+
         const TIMEOUT: usize = 1;
         let content = SecretString::new("Hello, pars".into());
         let res = copy_to_clip_board(content, Some(TIMEOUT));
@@ -52,7 +58,7 @@ mod tests {
         assert_eq!(cmd.stdout, b"Hello, pars\r\n");
         assert_eq!(cmd.status.success(), true);
 
-        std::thread::sleep(std::time::Duration::from_secs(1 + TIMEOUT as u64));
+        thread::sleep(Duration::from_secs(3 + TIMEOUT as u64));
         let cmd = Command::new("powershell").arg("-Command").arg("Get-Clipboard").output().unwrap();
         assert_eq!(cmd.stdout, b"");
     }

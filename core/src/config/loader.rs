@@ -2,16 +2,12 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-use config::{Config as ConfigLoader, File};
-
 use super::ParsConfig;
-use crate::util::fs_util::path_to_str;
 
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<ParsConfig, Box<dyn Error>> {
-    let file_path = path_to_str(path.as_ref())?;
-    let cfg_loader =
-        ConfigLoader::builder().add_source(File::with_name(file_path).required(false)).build()?;
-    Ok(cfg_loader.try_deserialize::<ParsConfig>()?)
+    let content = fs::read_to_string(path)?;
+    let config: ParsConfig = toml::from_str(&content)?;
+    Ok(config)
 }
 
 pub fn save_config<P: AsRef<Path>>(config: &ParsConfig, path: P) -> Result<(), Box<dyn Error>> {

@@ -41,7 +41,7 @@ where
             create_dir_all(parent)?;
         }
     } else {
-        return Err(anyhow!(IOErr::new(IOErrType::InvalidPath, &pass_path)));
+        return Err(IOErr::new(IOErrType::InvalidPath, &pass_path).into());
     }
 
     if pass_path.exists() && !insert_cfg.force {

@@ -15,23 +15,6 @@ use crate::{IOErr, IOErrType};
 
 const BACKUP_EXTENSION: &str = "parsbak";
 
-pub fn get_new_line() -> &'static str {
-    #[cfg(target_os = "macos")]
-    {
-        "\r"
-    }
-
-    #[cfg(unix)]
-    {
-        "\n"
-    }
-
-    #[cfg(windows)]
-    {
-        "\r\n"
-    }
-}
-
 pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
         for path in env::split_paths(&paths) {
@@ -42,7 +25,6 @@ pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
             }
         }
     }
-
     None
 }
 
@@ -84,11 +66,13 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
         if to_check.is_dir() {
             let key_file = to_check.join(".gpg-id");
             debug!("Check {:?} for .gpg-id file", key_file);
+
             if key_file.exists() && key_file.is_file() {
                 if let Ok(key) = fs::read_to_string(key_file) {
-                    debug!("Found key: {:?}", key);
+                    debug!("Found key(s): {:?}", key);
+
                     return Ok(key
-                        .split(get_new_line())
+                        .lines()
                         .map(|line| line.trim())
                         .filter(|line| !line.is_empty())
                         .map(|line| line.to_string())

@@ -73,8 +73,8 @@ impl PGPClient {
     ) -> Result<SecretString> {
         //TODO: match each version
         let prefix = vec![
-            "--batch",         // this is required after 2.0
-            "--pinentry-mode", //this is required after 2.1
+            "--batch",         // this is required after gnupg 2.0
+            "--pinentry-mode", //this is required after gnupg 2.1
             "loopback",
             "--decrypt",
             "--passphrase-fd",

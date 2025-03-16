@@ -24,7 +24,7 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
     if let Some(secs) = timeout {
         let qdbus_executable: String = {
             let find_res: Result<String, Error> = {
-                let output=Command::new("sh").arg("-c").arg("echo $PATH | tr ':' '\\n' | xargs -I {} find {} -maxdepth 1 -executable -regex '.*/qdbus[0-9]*$'").output()?;
+                let output=Command::new("sh").arg("-c").arg(r#"echo $PATH | tr ':' '\n' | xargs -I {} find {} -maxdepth 1 -executable -regex '.*/qdbus[0-9]*$'"#).output()?;
                 let output_str = String::from_utf8(output.stdout)?;
                 let re: Vec<&str> = output_str.split('\n').collect();
                 Ok(re.first().unwrap().to_string())
