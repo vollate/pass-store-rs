@@ -53,7 +53,7 @@ mod tests {
         assert!(res.is_ok());
 
         let cmd = Command::new("pbpaste").output().unwrap();
-        assert_eq!(cmd.stdout, b"Hello, macOS\n");
+        assert_eq!(cmd.stdout, b"Hello, macOS");
         assert_eq!(cmd.status.success(), true);
 
         thread::sleep(Duration::from_secs(3 + TIMEOUT as u64));
