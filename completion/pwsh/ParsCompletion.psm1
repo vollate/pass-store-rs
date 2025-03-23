@@ -22,6 +22,9 @@ function Get-PasswordStoreFiles {
         $_.FullName.Substring($storePath.Length + 1) -replace '\\', '/' -replace '\.gpg$', ''
     }
 
+    # Filter out .gpg-id files
+    $relativePaths = $relativePaths | Where-Object { $_ -ne ".gpg-id" -and (-not $_.EndsWith("/.gpg-id")) }
+
     # If a prefix is provided, filter matching paths
     if ($prefix) {
         $relativePaths = $relativePaths | Where-Object { $_ -like "$prefix*" }

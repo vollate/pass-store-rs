@@ -29,7 +29,6 @@ pub struct PrintConfig {
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PathConfig {
     pub default_repo: String,
-    pub repos: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -108,7 +107,6 @@ impl Default for PathConfig {
                     }
                 }
             },
-            repos: Vec::default(),
         }
     }
 }

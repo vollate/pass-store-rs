@@ -15,6 +15,7 @@ use std::env;
 use anyhow::{anyhow, Result};
 use secrecy::SecretString;
 
+#[allow(unused_imports)]
 use crate::constants::default_constants::{
     CLIP_TIME, WAYLAND_COPY_EXECUTABLE, X11_COPY_EXECUTABLE,
 };
@@ -66,7 +67,7 @@ pub fn get_clip_time() -> Option<usize> {
 
 fn check_executable(executable: &str) -> Result<()> {
     if find_executable_in_path(executable).is_none() {
-        return Err(anyhow!("Cannot find {} in PATH", executable));
+        return Err(anyhow!("Cannot find '{}' in PATH", executable));
     }
     Ok(())
 }

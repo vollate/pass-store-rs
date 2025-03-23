@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub(crate) mod default_constants {
     pub const CLIP_TIME: usize = 45;
     pub const PGP_EXECUTABLE: &str = "gpg2";
