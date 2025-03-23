@@ -6,8 +6,10 @@ use log::warn;
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
+use crate::constants::default_constants::WAYLAND_COPY_EXECUTABLE;
+
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
-    let mut cmd = Command::new("wl-copy");
+    let mut cmd = Command::new(WAYLAND_COPY_EXECUTABLE);
     cmd.arg("-n");
 
     let mut child = cmd.stdin(std::process::Stdio::piped()).spawn()?;

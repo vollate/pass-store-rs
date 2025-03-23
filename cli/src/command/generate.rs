@@ -56,7 +56,7 @@ pub fn cmd_generate(
     .map_err(|e| (ParsExitCode::Error.into(), e))?;
 
     if !clip {
-        println!("The generated password for {} is:\n{}", pass_name, res.expose_secret());
+        println!("The generated password for '{}' is:\n{}", pass_name, res.expose_secret());
         res.zeroize();
     } else {
         copy_to_clipboard(res, get_clip_time())

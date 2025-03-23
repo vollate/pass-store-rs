@@ -158,10 +158,10 @@ function ParsCompletion {
         }
     }
 
-    # Main command list (unchanged)
+    # Main command list
     $mainCommands = @("init", "grep", "find", "ls", "show", "insert", "edit", "generate", "rm", "mv", "cp", "git")
     
-    # Alias mapping (unchanged)
+    # Alias mapping
     $commandAliases = @{
         "search" = "find"
         "list"   = "ls"

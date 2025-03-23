@@ -5,8 +5,10 @@ use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
+use crate::constants::default_constants::X11_COPY_EXECUTABLE;
+
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
-    let mut child = Command::new("xclip")
+    let mut child = Command::new(X11_COPY_EXECUTABLE)
         .arg("-selection")
         .arg("clipboard")
         .stdin(std::process::Stdio::piped())
@@ -47,7 +49,7 @@ mod tests {
         assert_eq!(cmd.stdout, b"Hello, pars");
         assert_eq!(cmd.status.success(), true);
 
-        //TODO: cleanup gnome clipboard
+        //TODO: cleanup gnome clipboard(maybe useless, gnome do not support clipboard officially)
         std::thread::sleep(std::time::Duration::from_secs(1 + TIMEOUT as u64));
         let cmd =
             Command::new("xclip").arg("-o").arg("-selection").arg("clipboard").output().unwrap();

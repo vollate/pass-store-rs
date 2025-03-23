@@ -6,12 +6,14 @@
 
 - Add changes to git staged area and commit after operation(for `init`, `generate`, `rm`, `cp`, `mv`, `edit`).
 - Command `show` now support qr code generation and display.
-- Powershell and bash completion support.
+- Powershell, bash and zsh completion support.
+- Homepage readme doc.
 
 ### Changed
 
 - Remove bundle pgp and bundle git support. (Nologer scheduled for bundle support).
-- Change show logic, only clip or generate qr code for the first line of the file if no line number is provided. (Original behavior is to show the whole file content).
+- Change `show` logic, only clip or generate qr code for the first line of the file if no line number is provided. (Original behavior is to show the whole file content).
+- Change `insert` logic, now it will ask user to re-enter the password if the "--mutiline" flag is not provided.
 
 ### Fixed
 
@@ -24,7 +26,7 @@
 
 ### Added
 
-- Pass basic operations:
+- Implement pass basic operations:
   - init
   - generate
   - show

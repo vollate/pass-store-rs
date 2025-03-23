@@ -114,7 +114,7 @@ where
         }
     }
 
-    writeln!(out_s, "Generated password for {} saved", pass_name)?;
+    writeln!(out_s, "Generated password for '{}' saved", pass_name)?;
 
     Ok(password)
 }

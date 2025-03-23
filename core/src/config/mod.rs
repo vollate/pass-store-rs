@@ -3,6 +3,8 @@ use std::{env, path};
 
 use serde::{Deserialize, Serialize};
 
+use crate::constants::default_constants::{EDITOR, GIT_EXECUTABLE, PGP_EXECUTABLE};
+
 #[derive(Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
 #[serde(default)]
 pub struct ParsConfig {
@@ -72,18 +74,9 @@ impl PrintConfig {
 impl Default for ExecutableConfig {
     fn default() -> Self {
         Self {
-            pgp_executable: "gpg".into(),
-            editor_executable: {
-                #[cfg(unix)]
-                {
-                    "vim".into()
-                }
-                #[cfg(windows)]
-                {
-                    "notepad".into()
-                }
-            },
-            git_executable: "git".into(),
+            pgp_executable: PGP_EXECUTABLE.into(),
+            editor_executable: EDITOR.into(),
+            git_executable: GIT_EXECUTABLE.into(),
         }
     }
 }

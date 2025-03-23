@@ -33,7 +33,7 @@ pub fn cmd_insert(
 
     let insert_cfg =
         PasswdInsertConfig { echo, multiline, force, extension: SECRET_EXTENSION.to_string() };
-    insert_io(
+    if !insert_io(
         &pgp_client,
         &root,
         pass_name,
@@ -42,7 +42,11 @@ pub fn cmd_insert(
         &mut std::io::stdout(),
         &mut std::io::stderr(),
     )
-    .map_err(|e| (ParsExitCode::Error.into(), e))?;
+    .map_err(|e| (ParsExitCode::Error.into(), e))?
+    {
+        // Failed to insert, cancel git commit
+        return Ok(());
+    }
 
     let commit = GitCommit::new(&root, CommitType::Insert(pass_name.to_string()));
     debug!("cmd_insert: commit {}", commit);

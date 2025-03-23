@@ -2,8 +2,9 @@ use std::fs::{self, create_dir_all};
 use std::io::{BufRead, Read, Write};
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use secrecy::{ExposeSecret, SecretString};
+use zeroize::Zeroize;
 
 use crate::pgp::PGPClient;
 use crate::util::fs_util::{
@@ -26,7 +27,7 @@ pub fn insert_io<I, O, E>(
     in_s: &mut I,
     out_s: &mut O,
     _err_s: &mut E,
-) -> Result<()>
+) -> Result<bool>
 where
     I: Read + BufRead,
     O: Write,
@@ -45,17 +46,17 @@ where
     }
 
     if pass_path.exists() && !insert_cfg.force {
-        return Err(anyhow!(format!(
-            "An entry already exists for {}. Use -f to force overwrite.",
-            pass_name
-        )));
+        writeln!(out_s, "An entry already exists for '{}'. Use -f to force overwrite.", pass_name)?;
+        return Ok(false);
     }
 
     if let Some(parent) = pass_path.parent() {
-        fs::create_dir_all(parent)?;
+        if !parent.exists() {
+            create_dir_all(parent)?;
+        }
     }
 
-    write!(out_s, "Enter password: ")?;
+    write!(out_s, "Enter password for '{}': ", pass_name)?;
     out_s.flush()?;
 
     let password = if insert_cfg.multiline {
@@ -65,6 +66,15 @@ where
     } else {
         let mut buffer = String::new();
         in_s.read_line(&mut buffer)?;
+        write!(out_s, "Confirm password for '{}': ", pass_name)?;
+        out_s.flush()?;
+        let mut confirm_buffer = String::new();
+        in_s.read_line(&mut confirm_buffer)?;
+        if buffer != confirm_buffer {
+            writeln!(out_s, "Passwords do not match.")?;
+            return Ok(false);
+        }
+        confirm_buffer.zeroize();
         SecretString::new(buffer.trim().to_string().into())
     };
 
@@ -87,7 +97,7 @@ where
         client.encrypt(password.expose_secret(), path_to_str(&pass_path)?)?;
     }
     writeln!(out_s, "Password encrypted and saved.")?;
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -134,6 +144,8 @@ mod tests {
                 thread::spawn(move || {
                     sleep(Duration::from_millis(100));
                     stdin_w.write_all(b"password\n").unwrap();
+                    sleep(Duration::from_millis(100));
+                    stdin_w.write_all(b"password\n").unwrap();
                 });
 
                 let config = PasswdInsertConfig {
@@ -143,7 +155,7 @@ mod tests {
                     extension: "gpg".to_string(),
                 };
 
-                insert_io(
+                let res = insert_io(
                     &test_client,
                     &root,
                     "test1",
@@ -153,9 +165,54 @@ mod tests {
                     &mut stderr,
                 )
                 .unwrap();
+                assert_eq!(res, true);
 
                 let decrypted = test_client.decrypt_stdin(&root, "test1.gpg").unwrap();
                 assert_eq!(decrypted.expose_secret(), "password");
+            },
+            {
+                clean_up_test_key(&executable, &vec![&email]).unwrap();
+            }
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn wrong_insert() {
+        let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
+
+        cleanup!(
+            {
+                let (mut stdin, mut stdin_w) = pipe().unwrap();
+                let mut stdout = Vec::new();
+                let mut stderr = Vec::new();
+
+                thread::spawn(move || {
+                    sleep(Duration::from_millis(100));
+                    stdin_w.write_all(b"password\n").unwrap();
+                    sleep(Duration::from_millis(100));
+                    stdin_w.write_all(b"pd\n").unwrap();
+                });
+
+                let config = PasswdInsertConfig {
+                    echo: false,
+                    multiline: false,
+                    force: false,
+                    extension: "gpg".to_string(),
+                };
+
+                let res = insert_io(
+                    &test_client,
+                    &root,
+                    "test1",
+                    &config,
+                    &mut BufReader::new(&mut stdin),
+                    &mut stdout,
+                    &mut stderr,
+                )
+                .unwrap();
+                assert_eq!(res, false);
+                assert_eq!(Path::new("test1.pgp").exists(), false);
             },
             {
                 clean_up_test_key(&executable, &vec![&email]).unwrap();
@@ -184,10 +241,10 @@ mod tests {
                     echo: false,
                     multiline: true,
                     force: false,
-                    extension: "gpg".to_string(),
+                    extension: "gpg".into(),
                 };
 
-                insert_io(
+                let res = insert_io(
                     &test_client,
                     &root,
                     "test2",
@@ -197,6 +254,7 @@ mod tests {
                     &mut stderr,
                 )
                 .unwrap();
+                assert_eq!(res, true);
 
                 let decrypted = test_client.decrypt_stdin(&root, "test2.gpg").unwrap();
                 assert_eq!(decrypted.expose_secret(), "line1\nline2\nline3");
@@ -227,16 +285,18 @@ mod tests {
                 thread::spawn(move || {
                     sleep(Duration::from_millis(100));
                     stdin_w.write_all(b"new_password\n").unwrap();
+                    sleep(Duration::from_millis(100));
+                    stdin_w.write_all(b"new_password\n").unwrap();
                 });
 
-                let config = PasswdInsertConfig {
+                let mut config = PasswdInsertConfig {
                     echo: false,
                     multiline: false,
-                    force: true,
+                    force: false,
                     extension: "gpg".to_string(),
                 };
 
-                insert_io(
+                let res = insert_io(
                     &test_client,
                     &root,
                     "test3",
@@ -246,6 +306,22 @@ mod tests {
                     &mut stderr,
                 )
                 .unwrap();
+                // This insert should fail because the force option isn't set.
+                assert_eq!(res, false);
+
+                config.force = true;
+                let res = insert_io(
+                    &test_client,
+                    &root,
+                    "test3",
+                    &config,
+                    &mut BufReader::new(&mut stdin),
+                    &mut stdout,
+                    &mut stderr,
+                )
+                .unwrap();
+                // This time insert should succeed.
+                assert_eq!(res, true);
 
                 let decrypted = test_client.decrypt_stdin(&root, "test3.gpg").unwrap();
                 assert_eq!(decrypted.expose_secret(), "new_password");

@@ -1,6 +1,6 @@
 pub mod clipboard;
 pub mod config;
-pub(crate) mod constants;
+pub mod constants;
 pub mod git;
 pub mod operation;
 pub mod pgp;
@@ -22,6 +22,7 @@ enum IOErrType {
     ExpectDir,
     PathNotInRepo,
 }
+
 #[derive(Debug)]
 struct IOErr {
     err_type: IOErrType,
