@@ -1,4 +1,5 @@
 use std::fs::DirEntry;
+use std::io::{BufRead, Read, Write};
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 #[cfg(windows)]
@@ -10,10 +11,11 @@ use anyhow::{anyhow, Result};
 use clean_path::Clean;
 use fs_extra::dir::{self, CopyOptions};
 use log::debug;
+use secrecy::{ExposeSecret, SecretBox};
 
+use crate::constants::default_constants::BACKUP_EXTENSION;
+use crate::pgp::PGPClient;
 use crate::{IOErr, IOErrType};
-
-const BACKUP_EXTENSION: &str = "parsbak";
 
 pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
@@ -204,7 +206,7 @@ pub fn filename_to_str(path: &Path) -> Result<&str> {
         .ok_or_else(|| IOErr::new(IOErrType::InvalidName, path))?)
 }
 
-pub fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool> {
+pub fn is_sub_path_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool> {
     let child_clean = child.as_ref().clean();
     let parent_clean = parent.as_ref().clean();
     Ok(child_clean.starts_with(&parent_clean))
@@ -219,9 +221,43 @@ pub fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<()> {
 }
 
 pub fn path_attack_check(root: &Path, child: &Path) -> Result<()> {
-    if !is_subpath_of(root, child)? {
+    if !is_sub_path_of(root, child)? {
         Err(IOErr::new(IOErrType::PathNotInRepo, child).into())
     } else {
+        Ok(())
+    }
+}
+
+pub fn prompt_overwrite<R: Read + BufRead, W: Write>(
+    in_s: &mut R,
+    err_s: &mut W,
+    pass_name: &str,
+) -> Result<bool> {
+    write!(err_s, "An entry already exists for {}. Overwrite? [y/N]: ", pass_name)?;
+    let mut input = String::new();
+    in_s.read_line(&mut input)?;
+    Ok(input.trim().eq_ignore_ascii_case("y"))
+}
+
+pub fn create_or_overwrite(
+    client: &PGPClient,
+    pass_path: &Path,
+    password: &SecretBox<str>,
+) -> Result<()> {
+    if pass_path.exists() {
+        let backup = backup_encrypted_file(pass_path)?;
+        match client.encrypt(password.expose_secret(), path_to_str(pass_path)?) {
+            Ok(_) => {
+                fs::remove_file(&backup)?;
+                Ok(())
+            }
+            Err(e) => {
+                restore_backup_file(&backup)?;
+                Err(e)
+            }
+        }
+    } else {
+        client.encrypt(password.expose_secret(), path_to_str(pass_path)?)?;
         Ok(())
     }
 }

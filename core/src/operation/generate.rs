@@ -7,8 +7,9 @@ use passwords::PasswordGenerator;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::pgp::PGPClient;
+use crate::util::fs_util;
 use crate::util::fs_util::{
-    backup_encrypted_file, path_attack_check, path_to_str, restore_backup_file,
+    backup_encrypted_file, create_or_overwrite, path_attack_check, path_to_str, restore_backup_file,
 };
 
 pub struct PasswdGenerateConfig {
@@ -17,17 +18,6 @@ pub struct PasswdGenerateConfig {
     pub force: bool,
     pub pass_length: usize,
     pub extension: String,
-}
-
-fn prompt_overwrite<R: Read + BufRead, W: Write>(
-    stdin: &mut R,
-    stderr: &mut W,
-    pass_name: &str,
-) -> Result<bool> {
-    write!(stderr, "An entry already exists for {}. Overwrite? [y/N]: ", pass_name)?;
-    let mut input = String::new();
-    stdin.read_line(&mut input)?;
-    Ok(input.trim().eq_ignore_ascii_case("y"))
 }
 
 pub fn generate_io<I, O, E>(
@@ -57,7 +47,7 @@ where
     if pass_path.exists()
         && !gen_cfg.force
         && !gen_cfg.in_place
-        && !prompt_overwrite(in_s, err_s, pass_name)?
+        && !fs_util::prompt_overwrite(in_s, err_s, pass_name)?
     {
         writeln!(out_s, "Operation cancelled.")?;
         return Ok(SecretString::new("".to_string().into()));
@@ -98,20 +88,7 @@ where
             fs::create_dir_all(parent)?;
         }
 
-        if pass_path.exists() {
-            let backup = backup_encrypted_file(&pass_path)?;
-            match client.encrypt(password.expose_secret(), path_to_str(&pass_path)?) {
-                Ok(_) => {
-                    fs::remove_file(&backup)?;
-                }
-                Err(e) => {
-                    restore_backup_file(&backup)?;
-                    return Err(e);
-                }
-            }
-        } else {
-            client.encrypt(password.expose_secret(), path_to_str(&pass_path)?)?;
-        }
+        create_or_overwrite(client, &pass_path, &password)?;
     }
 
     writeln!(out_s, "Generated password for '{}' saved", pass_name)?;

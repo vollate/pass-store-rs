@@ -16,6 +16,8 @@ pub(crate) mod default_constants {
 
     pub const WAYLAND_COPY_EXECUTABLE: &str = "wl-copy";
     pub const X11_COPY_EXECUTABLE: &str = "xclip";
+
+    pub const BACKUP_EXTENSION: &str = "parsbak";
 }
 
 pub mod env_variables {
