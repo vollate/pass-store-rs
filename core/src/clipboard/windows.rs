@@ -1,19 +1,24 @@
 use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, Result};
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine as _;
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
 const POWERSHELL_ARGS: [&str; 2] = ["-NoProfile", "-Command"];
 
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
+    let encoded = STANDARD.encode(secret.expose_secret().as_bytes());
+    secret.zeroize();
     let mut cmd = Command::new("powershell");
     let mut child = cmd
         .args(POWERSHELL_ARGS)
-        .arg("Set-Clipboard")
-        .arg(format!("\"{}\"", secret.expose_secret()))
+        .arg(format!(
+            "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{}')) | Set-Clipboard",
+            encoded
+        ))
         .spawn()?;
-    secret.zeroize();
 
     let exit_status = child.wait()?;
     if !exit_status.success() {
@@ -40,12 +45,10 @@ mod tests {
     use std::time::Duration;
 
     use pretty_assertions::assert_eq;
-    use serial_test::serial;
 
     use super::*;
 
     #[test]
-    #[serial]
     fn windows_clipboard_test() {
         thread::sleep(Duration::from_secs(3));
 
