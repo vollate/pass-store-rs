@@ -31,13 +31,10 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
                 let re: Vec<&str> = output_str.split('\n').collect();
                 Ok(re.first().unwrap().to_string())
             };
-            match find_res {
-                Ok(str) => str,
-                Err(e) => {
-                    warn!("Failed to get qdbus executable: {}, use default 'dbus'", e);
-                    "qdbus".to_string()
-                }
-            }
+            find_res.unwrap_or_else(|e| {
+                warn!("Failed to get qdbus executable: {}, use default 'dbus'", e);
+                "qdbus".to_string()
+            })
         };
         let _=  Command::new("sh")
             .arg("-c")

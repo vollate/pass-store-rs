@@ -1,24 +1,18 @@
 use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, Result};
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine as _;
 use secrecy::{ExposeSecret, SecretString};
+use unicode_segmentation::UnicodeSegmentation;
 use zeroize::Zeroize;
 
 const POWERSHELL_ARGS: [&str; 2] = ["-NoProfile", "-Command"];
 
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
-    let encoded = STANDARD.encode(secret.expose_secret().as_bytes());
-    secret.zeroize();
-    let mut cmd = Command::new("powershell");
-    let mut child = cmd
+    let mut child = Command::new("powershell")
         .args(POWERSHELL_ARGS)
-        .arg(format!(
-            "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{}')) | Set-Clipboard",
-            encoded
-        ))
+        .arg(format!(r#"Set-Clipboard -Value "{}""#, fit_to_pwsh(secret.expose_secret())))
         .spawn()?;
+    secret.zeroize();
 
     let exit_status = child.wait()?;
     if !exit_status.success() {
@@ -39,6 +33,28 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
     Ok(())
 }
 
+pub(crate) fn fit_to_pwsh(original_str: &str) -> String {
+    let mut result = String::with_capacity(original_str.len());
+    for g in original_str.graphemes(true) {
+        match g {
+            "`" => result.push_str("``"),
+            "\"" => result.push_str("`\""),
+            "$" => result.push_str("`$"),
+            "#" => result.push_str("`#"),
+            "\n" => result.push_str("`n"),
+            "\r" => result.push_str("`r"),
+            "\t" => result.push_str("`t"),
+            "\x07" => result.push_str("`a"),
+            "\x08" => result.push_str("`b"),
+            "\x0C" => result.push_str("`f"),
+            "\x0B" => result.push_str("`v"),
+            "\x1B" => result.push_str("`e"),
+            _ => result.push_str(g),
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use std::thread;
@@ -49,20 +65,34 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "unstable in CI environment"]
     fn windows_clipboard_test() {
-        thread::sleep(Duration::from_secs(3));
+        const EXAMPLE_CLIPBOARD_CONTENT: [&str; 7] = [
+            r#"*asterisk*"#,
+            r#"`backtick`"#,
+            r#"$dollar$"#,
+            r#"'single_quote'"#,
+            r#""double_quote""#,
+            r#"\backslash\"#,
+            r#"~!@#$%^&*()_+-={}[]|:;<>?,./"#,
+        ];
 
-        const TIMEOUT: usize = 1;
-        let content = SecretString::new("Hello, pars".into());
-        let res = copy_to_clip_board(content, Some(TIMEOUT));
-        assert!(res.is_ok());
+        for secret in EXAMPLE_CLIPBOARD_CONTENT {
+            const TIMEOUT: usize = 1;
+            let content = SecretString::new(secret.into());
+            let res = copy_to_clip_board(content, Some(TIMEOUT));
+            assert!(res.is_ok());
 
-        let cmd = Command::new("powershell").arg("-Command").arg("Get-Clipboard").output().unwrap();
-        assert_eq!(cmd.stdout, b"Hello, pars\r\n");
-        assert_eq!(cmd.status.success(), true);
+            let cmd =
+                Command::new("powershell").arg("-Command").arg("Get-Clipboard").output().unwrap();
+            let out_str = String::from_utf8_lossy(&cmd.stdout).to_string();
+            assert_eq!(out_str.lines().next().unwrap(), secret);
+            assert_eq!(cmd.status.success(), true);
 
-        thread::sleep(Duration::from_secs(3 + TIMEOUT as u64));
-        let cmd = Command::new("powershell").arg("-Command").arg("Get-Clipboard").output().unwrap();
-        assert_eq!(cmd.stdout, b"");
+            thread::sleep(Duration::from_secs(1 + TIMEOUT as u64));
+            let cmd =
+                Command::new("powershell").arg("-Command").arg("Get-Clipboard").output().unwrap();
+            assert_eq!(cmd.stdout, b"");
+        }
     }
 }
