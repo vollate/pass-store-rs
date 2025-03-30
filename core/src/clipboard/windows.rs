@@ -2,15 +2,16 @@ use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
-use unicode_segmentation::UnicodeSegmentation;
 use zeroize::Zeroize;
+
+use crate::util::str::fit_to_powershell;
 
 const POWERSHELL_ARGS: [&str; 2] = ["-NoProfile", "-Command"];
 
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
     let mut child = Command::new("powershell")
         .args(POWERSHELL_ARGS)
-        .arg(format!(r#"Set-Clipboard -Value "{}""#, fit_to_pwsh(secret.expose_secret())))
+        .arg(format!(r#"Set-Clipboard -Value "{}""#, fit_to_powershell(secret.expose_secret())))
         .spawn()?;
     secret.zeroize();
 
@@ -31,28 +32,6 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
             .spawn();
     }
     Ok(())
-}
-
-pub(crate) fn fit_to_pwsh(original_str: &str) -> String {
-    let mut result = String::with_capacity(original_str.len());
-    for g in original_str.graphemes(true) {
-        match g {
-            "`" => result.push_str("``"),
-            "\"" => result.push_str("`\""),
-            "$" => result.push_str("`$"),
-            "#" => result.push_str("`#"),
-            "\n" => result.push_str("`n"),
-            "\r" => result.push_str("`r"),
-            "\t" => result.push_str("`t"),
-            "\x07" => result.push_str("`a"),
-            "\x08" => result.push_str("`b"),
-            "\x0C" => result.push_str("`f"),
-            "\x0B" => result.push_str("`v"),
-            "\x1B" => result.push_str("`e"),
-            _ => result.push_str(g),
-        }
-    }
-    result
 }
 
 #[cfg(test)]

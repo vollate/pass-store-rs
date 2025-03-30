@@ -6,6 +6,7 @@ use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
 use crate::constants::default_constants::X11_COPY_EXECUTABLE;
+use crate::util::str::fit_to_unix;
 
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
     let mut child = Command::new(X11_COPY_EXECUTABLE)
@@ -15,7 +16,7 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
         .spawn()?;
 
     let child_stdin = child.stdin.as_mut().ok_or(anyhow!("Cannot get stdin for 'xclip'"))?;
-    child_stdin.write_all(secret.expose_secret().as_bytes())?;
+    child_stdin.write_all(fit_to_unix(secret.expose_secret()).as_bytes())?;
     secret.zeroize();
 
     let exit_status = child.wait()?;

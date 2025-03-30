@@ -4,12 +4,14 @@ use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
+use crate::util::str::fit_to_unix;
+
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
     let mut child = Command::new("pbcopy").stdin(Stdio::piped()).spawn()?;
 
     if let Some(stdin) = child.stdin.as_mut() {
         use std::io::Write;
-        stdin.write_all(secret.expose_secret().as_bytes())?;
+        stdin.write_all(fit_to_unix(secret.expose_secret()).as_bytes())?;
     }
     secret.zeroize();
 
