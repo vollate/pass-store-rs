@@ -7,8 +7,6 @@ use pars_core::config::ParsConfig;
 use pars_core::git::add_and_commit;
 use pars_core::git::commit::{CommitType, GitCommit};
 use pars_core::operation::generate::{generate_io, PasswdGenerateConfig};
-use pars_core::pgp::PGPClient;
-use pars_core::util::fs_util::get_dir_gpg_id_content;
 use secrecy::zeroize::Zeroize;
 use secrecy::ExposeSecret;
 
@@ -26,15 +24,6 @@ pub fn cmd_generate(
     pass_length: Option<usize>,
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
-    let target_path = root.join(pass_name);
-
-    let key_fprs =
-        get_dir_gpg_id_content(&root, &target_path).map_err(|e| (ParsExitCode::Error.into(), e))?;
-    let pgp_client = PGPClient::new(
-        config.executable_config.pgp_executable.clone(),
-        &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-    )
-    .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
     let gen_cfg = PasswdGenerateConfig {
         no_symbols,
@@ -42,10 +31,10 @@ pub fn cmd_generate(
         force,
         pass_length: pass_length.unwrap_or(DEFAULT_PASS_LENGTH),
         extension: SECRET_EXTENSION.to_string(),
+        pgp_executable: config.executable_config.pgp_executable.clone(),
     };
 
     let mut res = generate_io(
-        &pgp_client,
         &root,
         pass_name,
         &gen_cfg,

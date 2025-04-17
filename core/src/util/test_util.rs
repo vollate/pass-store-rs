@@ -95,6 +95,14 @@ pub(crate) fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&s
     }
 }
 
+pub(crate) fn write_gpg_id(path: &Path, gpg_id: &[&str]) {
+    use std::io::Write;
+    let mut file = fs::File::create(path.join(".gpg-id")).unwrap();
+    for id in gpg_id {
+        writeln!(file, "{}", id).unwrap();
+    }
+}
+
 macro_rules! log_test {
     ($($arg:tt)*) => {
         #[cfg(test)]

@@ -9,7 +9,8 @@ use secrecy::{ExposeSecret, SecretString};
 use crate::pgp::PGPClient;
 use crate::util::fs_util;
 use crate::util::fs_util::{
-    backup_encrypted_file, create_or_overwrite, path_attack_check, path_to_str, restore_backup_file,
+    backup_encrypted_file, create_or_overwrite, get_dir_gpg_id_content, path_attack_check,
+    path_to_str, restore_backup_file,
 };
 
 pub struct PasswdGenerateConfig {
@@ -18,10 +19,10 @@ pub struct PasswdGenerateConfig {
     pub force: bool,
     pub pass_length: usize,
     pub extension: String,
+    pub pgp_executable: String,
 }
 
 pub fn generate_io<I, O, E>(
-    client: &PGPClient,
     root: &Path,
     pass_name: &str,
     gen_cfg: &PasswdGenerateConfig,
@@ -65,6 +66,13 @@ where
 
     let password = SecretString::new(pg.generate_one().map_err(|e| anyhow!(e))?.into());
 
+    // Get the appropriate key fingerprints for this path
+    let key_fprs = get_dir_gpg_id_content(root, &pass_path)?;
+    let client = PGPClient::new(
+        &gen_cfg.pgp_executable,
+        &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+    )?;
+
     if gen_cfg.in_place && pass_path.exists() {
         let existing = client.decrypt_stdin(root, path_to_str(&pass_path)?)?;
         let mut content = existing.expose_secret().lines().collect::<Vec<_>>();
@@ -88,7 +96,7 @@ where
             fs::create_dir_all(parent)?;
         }
 
-        create_or_overwrite(client, &pass_path, &password)?;
+        create_or_overwrite(&client, &pass_path, &password)?;
     }
 
     writeln!(out_s, "Generated password for '{}' saved", pass_name)?;
@@ -111,10 +119,11 @@ mod tests {
     use crate::util::defer::cleanup;
     use crate::util::test_util::*;
 
-    fn setup_test_client() -> PGPClient {
+    fn setup_test_client(root: &Path) -> PGPClient {
         key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
         let test_client = PGPClient::new(get_test_executable(), &vec![&get_test_email()]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+        write_gpg_id(root, &test_client.get_key_fprs());
         test_client
     }
 
@@ -128,12 +137,11 @@ mod tests {
 
         cleanup!(
             {
-                let test_client = setup_test_client();
                 let (stdin, stdin_w) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
-
                 let mut stderr = stderr().lock();
+                let test_client = setup_test_client(&root);
 
                 let mut config = PasswdGenerateConfig {
                     no_symbols: false,
@@ -141,18 +149,12 @@ mod tests {
                     force: false,
                     pass_length: 16,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
-                let password = generate_io(
-                    &test_client,
-                    &root,
-                    "test1",
-                    &config,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let password =
+                    generate_io(&root, "test1", &config, &mut stdin, &mut stdout, &mut stderr)
+                        .unwrap();
 
                 assert_eq!(password.expose_secret().len(), 16);
                 assert!(root.join("test1.gpg").exists());
@@ -166,16 +168,9 @@ mod tests {
                     stdin.write_all(b"n").unwrap();
                 });
                 let original_passwd = password;
-                let password = generate_io(
-                    &test_client,
-                    &root,
-                    "test1",
-                    &config,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let password =
+                    generate_io(&root, "test1", &config, &mut stdin, &mut stdout, &mut stderr)
+                        .unwrap();
                 let secret = test_client.decrypt_stdin(&root, "test1.gpg").unwrap();
                 assert_eq!(password.expose_secret(), "");
                 assert_eq!(secret.expose_secret(), original_passwd.expose_secret());
@@ -186,16 +181,9 @@ mod tests {
                     let mut stdin = stdin_w;
                     stdin.write_all(b"y").unwrap();
                 });
-                let password = generate_io(
-                    &test_client,
-                    &root,
-                    "test1",
-                    &config,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let password =
+                    generate_io(&root, "test1", &config, &mut stdin, &mut stdout, &mut stderr)
+                        .unwrap();
                 let secret = test_client.decrypt_stdin(&root, "test1.gpg").unwrap();
                 assert_eq!(secret.expose_secret(), password.expose_secret());
                 assert_eq!(password.expose_secret().len(), 114);
@@ -216,12 +204,12 @@ mod tests {
 
         cleanup!(
             {
-                let test_client = setup_test_client();
                 let (stdin, _) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
                 let mut stderr = stderr().lock();
 
+                let test_client = setup_test_client(&root);
                 test_client
                     .encrypt(
                         "existing\npassword\nfor super earth",
@@ -235,18 +223,12 @@ mod tests {
                     force: false,
                     pass_length: 12,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
-                let password = generate_io(
-                    &test_client,
-                    &root,
-                    "test2",
-                    &config,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let password =
+                    generate_io(&root, "test2", &config, &mut stdin, &mut stdout, &mut stderr)
+                        .unwrap();
 
                 let content = test_client.decrypt_stdin(&root, "test2.gpg").unwrap();
                 let lines: Vec<&str> = content.expose_secret().lines().collect();
@@ -271,12 +253,12 @@ mod tests {
 
         cleanup!(
             {
-                let test_client = setup_test_client();
                 let (stdin, _) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
                 let mut stderr = stderr().lock();
 
+                let test_client = setup_test_client(&root);
                 test_client
                     .encrypt("old_password", path_to_str(&root.join("test3.gpg")).unwrap())
                     .unwrap();
@@ -287,18 +269,12 @@ mod tests {
                     force: true,
                     pass_length: 8,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
-                let password = generate_io(
-                    &test_client,
-                    &root,
-                    "test3",
-                    &config,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let password =
+                    generate_io(&root, "test3", &config, &mut stdin, &mut stdout, &mut stderr)
+                        .unwrap();
 
                 assert_eq!(password.expose_secret().len(), 8);
                 let content = test_client.decrypt_stdin(&root, "test3.gpg").unwrap();
@@ -320,11 +296,11 @@ mod tests {
 
         cleanup!(
             {
-                let test_client = setup_test_client();
                 let (stdin, _) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
                 let mut stderr = stderr().lock();
+                let test_client = setup_test_client(&root);
 
                 let config = PasswdGenerateConfig {
                     no_symbols: true,
@@ -332,20 +308,15 @@ mod tests {
                     force: false,
                     pass_length: 10,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
-                let password = generate_io(
-                    &test_client,
-                    &root,
-                    "test4",
-                    &config,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
-
+                let password =
+                    generate_io(&root, "test4", &config, &mut stdin, &mut stdout, &mut stderr)
+                        .unwrap();
                 assert!(!password.expose_secret().contains(|c: char| !c.is_alphanumeric()));
+                let content = test_client.decrypt_stdin(&root, "test4.gpg").unwrap();
+                assert_eq!(content.expose_secret(), password.expose_secret());
             },
             {
                 clean_up_test_key(&executable, &vec![&email]).unwrap();
@@ -363,7 +334,6 @@ mod tests {
 
         cleanup!(
             {
-                let test_client = setup_test_client();
                 let (stdin, _) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
@@ -375,17 +345,11 @@ mod tests {
                     force: false,
                     pass_length: 16,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
-                let result = generate_io(
-                    &test_client,
-                    &root,
-                    "../outside",
-                    &config,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                );
+                let result =
+                    generate_io(&root, "../outside", &config, &mut stdin, &mut stdout, &mut stderr);
 
                 assert!(result.is_err());
             },
@@ -405,7 +369,6 @@ mod tests {
 
         cleanup!(
             {
-                let test_client = setup_test_client();
                 let (stdin, _) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = stdout().lock();
@@ -417,17 +380,11 @@ mod tests {
                     force: true,
                     pass_length: 16,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
-                let result = generate_io(
-                    &test_client,
-                    &root,
-                    "test5",
-                    &config,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                );
+                let result =
+                    generate_io(&root, "test5", &config, &mut stdin, &mut stdout, &mut stderr);
 
                 assert!(result.is_err());
             },

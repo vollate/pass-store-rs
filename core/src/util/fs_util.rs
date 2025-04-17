@@ -261,3 +261,17 @@ pub fn create_or_overwrite(
         Ok(())
     }
 }
+
+pub fn default_config_path() -> String {
+    let path = get_home_dir().join(".config/pars/config.toml");
+
+    match path_to_str(&path) {
+        Ok(path) => path.into(),
+        Err(_) => {
+            eprintln!(
+                "Error getting default config path, use '~/.config/pars/config.toml' instead"
+            );
+            "~/.config/pars/config.toml".into()
+        }
+    }
+}

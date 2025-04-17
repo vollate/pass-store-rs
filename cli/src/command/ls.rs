@@ -4,8 +4,6 @@ use log::debug;
 use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
 use pars_core::config::ParsConfig;
 use pars_core::operation::ls_or_show::{ls_io, LsOrShow};
-use pars_core::pgp::PGPClient;
-use pars_core::util::fs_util::get_dir_gpg_id_content;
 use pars_core::util::tree::{FilterType, TreeConfig, TreePrintConfig};
 use secrecy::zeroize::Zeroize;
 use secrecy::{ExposeSecret, SecretString};
@@ -30,16 +28,15 @@ pub fn cmd_ls(
         filter_type: FilterType::Disable,
         filters: Vec::new(),
     };
-    let key_fprs = get_dir_gpg_id_content(&root, &target_path)
-        .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
-    let pgp_client = PGPClient::new(
-        config.executable_config.pgp_executable.clone(),
-        &key_fprs.iter().map(|s| s.as_str()).collect(),
-    )
-    .map_err(|e| (ParsExitCode::PGPError.into(), e))?;
 
-    let res = ls_io(&pgp_client, &tree_cfg, &Into::<TreePrintConfig>::into(&config.print_config))
-        .map_err(|e| (ParsExitCode::Error.into(), e))?;
+    // Pass the pgp_executable to ls_io instead of a PGPClient instance
+    let res = ls_io(
+        &config.executable_config.pgp_executable,
+        &tree_cfg,
+        &Into::<TreePrintConfig>::into(&config.print_config),
+    )
+    .map_err(|e| (ParsExitCode::Error.into(), e))?;
+
     match res {
         LsOrShow::DirTree(tree) => {
             println!("{}", tree);

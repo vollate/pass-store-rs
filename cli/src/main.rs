@@ -12,10 +12,9 @@ use log::debug;
 use pars_core::config::loader::load_config;
 use pars_core::config::ParsConfig;
 use pars_core::constants::env_variables::{CONFIG_PATH_ENV, LOG_LEVEL_VAR};
+use pars_core::util::fs_util::default_config_path;
 use pars_core::util::log::{init_logger, set_log_level};
 use parser::CliParser;
-
-use crate::constants::default_config_path;
 
 fn main() {
     init_logger();

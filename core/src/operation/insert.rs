@@ -7,7 +7,9 @@ use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
 use crate::pgp::PGPClient;
-use crate::util::fs_util::{create_or_overwrite, path_attack_check, prompt_overwrite};
+use crate::util::fs_util::{
+    create_or_overwrite, get_dir_gpg_id_content, path_attack_check, prompt_overwrite,
+};
 use crate::{IOErr, IOErrType};
 
 pub struct PasswdInsertConfig {
@@ -15,10 +17,10 @@ pub struct PasswdInsertConfig {
     pub multiline: bool,
     pub force: bool,
     pub extension: String,
+    pub pgp_executable: String,
 }
 
 pub fn insert_io<I, O, E>(
-    client: &PGPClient,
     root: &Path,
     pass_name: &str,
     insert_cfg: &PasswdInsertConfig,
@@ -79,7 +81,14 @@ where
         writeln!(out_s, "{}", password.expose_secret())?;
     }
 
-    create_or_overwrite(client, &pass_path, &password)?;
+    // Get the appropriate key fingerprints for this path
+    let key_fprs = get_dir_gpg_id_content(root, &pass_path)?;
+    let client = PGPClient::new(
+        &insert_cfg.pgp_executable,
+        &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+    )?;
+
+    create_or_overwrite(&client, &pass_path, &password)?;
     writeln!(out_s, "Password encrypted and saved.")?;
     Ok(true)
 }
@@ -109,6 +118,7 @@ mod tests {
         key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
         let test_client = PGPClient::new(executable.clone(), &vec![&email]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
+        write_gpg_id(&root, &test_client.get_key_fprs());
 
         (executable, email, test_client, tmp_dir, root)
     }
@@ -137,10 +147,10 @@ mod tests {
                     multiline: false,
                     force: false,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
                 let res = insert_io(
-                    &test_client,
                     &root,
                     "test1",
                     &config,
@@ -163,7 +173,7 @@ mod tests {
     #[test]
     #[serial]
     fn wrong_insert() {
-        let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
+        let (executable, email, _test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
             {
@@ -183,10 +193,10 @@ mod tests {
                     multiline: false,
                     force: false,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
                 let res = insert_io(
-                    &test_client,
                     &root,
                     "test1",
                     &config,
@@ -226,10 +236,10 @@ mod tests {
                     multiline: true,
                     force: false,
                     extension: "gpg".into(),
+                    pgp_executable: executable.clone(),
                 };
 
                 let res = insert_io(
-                    &test_client,
                     &root,
                     "test2",
                     &config,
@@ -276,10 +286,10 @@ mod tests {
                     multiline: false,
                     force: false,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
                 let res = insert_io(
-                    &test_client,
                     &root,
                     "test3",
                     &config,
@@ -300,7 +310,6 @@ mod tests {
                 });
                 config.force = true;
                 let res = insert_io(
-                    &test_client,
                     &root,
                     "test3",
                     &config,
@@ -324,7 +333,6 @@ mod tests {
                     stdin_w.write_all(b"new_password\n").unwrap();
                 });
                 let res = insert_io(
-                    &test_client,
                     &root,
                     "test3",
                     &config,
@@ -348,7 +356,7 @@ mod tests {
     #[serial]
     #[ignore = "need run interactively"]
     fn invalid_path() {
-        let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
+        let (executable, email, _test_client, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
             {
@@ -361,10 +369,10 @@ mod tests {
                     multiline: false,
                     force: false,
                     extension: "gpg".to_string(),
+                    pgp_executable: executable.clone(),
                 };
 
                 let result = insert_io(
-                    &test_client,
                     &root,
                     "../outside",
                     &config,

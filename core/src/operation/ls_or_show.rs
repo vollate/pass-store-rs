@@ -4,7 +4,7 @@ use log::debug;
 use secrecy::SecretString;
 
 use crate::pgp::PGPClient;
-use crate::util::fs_util::path_to_str;
+use crate::util::fs_util::{get_dir_gpg_id_content, path_to_str};
 use crate::util::str;
 use crate::util::str::remove_lines_postfix;
 use crate::util::tree::{DirTree, TreeConfig, TreePrintConfig};
@@ -14,8 +14,9 @@ pub enum LsOrShow {
     Password(SecretString),
     DirTree(String),
 }
+
 pub fn ls_io(
-    client: &PGPClient,
+    pgp_executable: &str,
     tree_cfg: &TreeConfig,
     print_cfg: &TreePrintConfig,
 ) -> Result<LsOrShow> {
@@ -47,6 +48,13 @@ pub fn ls_io(
 
     if full_path.is_file() {
         debug!("ls_io: '{}' is file", tree_cfg.target);
+        // Get the appropriate key fingerprints for this file's path
+        let key_fprs = get_dir_gpg_id_content(tree_cfg.root, &full_path)?;
+        let client = PGPClient::new(
+            pgp_executable,
+            &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+        )?;
+
         let data = client.decrypt_stdin(tree_cfg.root, path_to_str(&full_path)?)?;
         Ok(LsOrShow::Password(data))
     } else if !full_path.exists() {

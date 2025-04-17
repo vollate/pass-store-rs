@@ -15,7 +15,12 @@ use crate::{IOErr, IOErrType};
 
 const FPR_FILENAME: &str = ".gpg-id";
 
-pub fn init(client: &PGPClient, root_path: &PathBuf, target_path: &str) -> Result<()> {
+pub struct InitConfig {
+    pub pgp_executable: String,
+    pub key_fprs: Vec<String>,
+}
+
+pub fn init(config: &InitConfig, root_path: &PathBuf, target_path: &str) -> Result<()> {
     if !root_path.exists() {
         fs::create_dir_all(root_path)?;
     }
@@ -27,10 +32,10 @@ pub fn init(client: &PGPClient, root_path: &PathBuf, target_path: &str) -> Resul
 
     let gpg_id_path = target_path.join(FPR_FILENAME);
 
-    let mut new_fprs = client.get_key_fprs();
+    let mut new_fprs = config.key_fprs.clone();
     let first_init = !root_path.join(".gpg-id").exists();
     if !gpg_id_path.exists() {
-        let file =
+        let mut file =
             OpenOptions::new().write(true).create(true).truncate(false).open(&gpg_id_path)?;
         let content = new_fprs.iter().enumerate().fold(String::new(), |mut acc, (i, line)| {
             if i == new_fprs.len() - 1 {
@@ -41,24 +46,33 @@ pub fn init(client: &PGPClient, root_path: &PathBuf, target_path: &str) -> Resul
             }
             acc
         });
-        write!(&file, "{}", content)?;
+        write!(&mut file, "{}", content)?;
     }
 
     if first_init {
         return Ok(());
     }
 
+    // Try to read old fingerprints from the directory
     let mut old_fprs = get_dir_gpg_id_content(root_path, &target_path)?;
     old_fprs.sort();
     let cmp_old: Vec<&str> = old_fprs.iter().map(|str| str.as_str()).collect();
     new_fprs.sort();
-    if cmp_old == new_fprs {
-        println!("New finger print are the same as the old one, no need to update.");
+
+    let cmp_new: Vec<&str> = new_fprs.iter().map(|s| s.as_str()).collect();
+    if cmp_old == cmp_new {
+        println!("New fingerprints are the same as the old ones, no need to update.");
         return Ok(());
     }
 
     debug!("Old fpr <{:?}>, replace with <{:?}>", old_fprs, new_fprs);
-    let old_client = PGPClient::new(client.get_executable(), &cmp_old)?;
+
+    // Create old client using old fingerprints
+    let old_client = PGPClient::new(&config.pgp_executable, &cmp_old)?;
+
+    // Create new client using new fingerprints
+    let new_client = PGPClient::new(&config.pgp_executable, &cmp_new)?;
+
     process_files_recursively(&target_path, &|entry| {
         let filename = entry.file_name();
         let filepath = entry.path();
@@ -68,7 +82,7 @@ pub fn init(client: &PGPClient, root_path: &PathBuf, target_path: &str) -> Resul
         if filename != FPR_FILENAME {
             let content = old_client.decrypt_stdin(root_path, path_to_str(&filepath)?)?;
             let backup_path = backup_encrypted_file(&filepath)?;
-            client.encrypt(content.expose_secret(), path_to_str(&filepath)?)?;
+            new_client.encrypt(content.expose_secret(), path_to_str(&filepath)?)?;
             fs::remove_file(backup_path)?;
             return Ok(());
         }

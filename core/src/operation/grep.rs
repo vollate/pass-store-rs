@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 
 use crate::config::PrintConfig;
 use crate::pgp::PGPClient;
-use crate::util::fs_util::path_to_str;
+use crate::util::fs_util::{get_dir_gpg_id_content, path_to_str};
 use crate::util::tree::string_to_color_opt;
 
 #[derive(Default)]
@@ -27,7 +27,7 @@ impl<CFG: AsRef<PrintConfig>> From<CFG> for GrepPrintConfig {
 }
 
 pub fn grep(
-    client: &PGPClient,
+    pgp_executable: &str,
     root: &Path,
     search_str: &str,
     print_cfg: &GrepPrintConfig,
@@ -40,6 +40,13 @@ pub fn grep(
         if entry.file_type().is_file() && entry.path().extension().unwrap_or_default() == "gpg" {
             let relative_path = entry.path().strip_prefix(root)?;
             let relative_path_str = path_to_str(relative_path)?;
+
+            // Get the appropriate key fingerprints for this file's path
+            let key_fprs = get_dir_gpg_id_content(root, entry.path())?;
+            let client = PGPClient::new(
+                pgp_executable,
+                &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            )?;
 
             let decrypted = client.decrypt_stdin(root, path_to_str(entry.path())?)?;
 
@@ -95,7 +102,7 @@ mod tests {
     use crate::util::defer::cleanup;
     use crate::util::test_util::*;
 
-    fn setup_test_environment() -> (String, String, PGPClient, TempDir, PathBuf) {
+    fn setup_test_environment() -> (String, String, TempDir, PathBuf) {
         let executable = get_test_executable();
         let email = get_test_email();
         let (_tmp_dir, root) = gen_unique_temp_dir();
@@ -113,20 +120,19 @@ mod tests {
 
         test_client.encrypt(file1_content, root.join("dir1/01.gpg").to_str().unwrap()).unwrap();
         test_client.encrypt(file2_content, root.join("dir2/10.gpg").to_str().unwrap()).unwrap();
-
-        (executable, email, test_client, _tmp_dir, root)
+        write_gpg_id(&root, &test_client.get_key_fprs());
+        (executable, email, _tmp_dir, root)
     }
 
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
     fn grep_content_match() {
-        let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
+        let (executable, email, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
             {
-                let results =
-                    grep(&test_client, &root, "211", &GrepPrintConfig::default()).unwrap();
+                let results = grep(&executable, &root, "211", &GrepPrintConfig::default()).unwrap();
                 assert_eq!(results, vec![&format!("dir1{}01:", path::MAIN_SEPARATOR), "2112112"]);
             },
             {
@@ -139,15 +145,15 @@ mod tests {
     #[serial]
     #[ignore = "need run interactively"]
     fn grep_filename_match() {
-        let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
+        let (executable, email, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
             {
                 let results =
-                    grep(&test_client, &root, "Overlord", &GrepPrintConfig::default()).unwrap();
+                    grep(&executable, &root, "Overlord", &GrepPrintConfig::default()).unwrap();
                 assert_eq!(results, vec![&format!("dir2{}10:", path::MAIN_SEPARATOR), "Overlord"]);
 
-                let results = grep(&test_client, &root, "01", &GrepPrintConfig::default()).unwrap();
+                let results = grep(&executable, &root, "01", &GrepPrintConfig::default()).unwrap();
                 assert_eq!(results, Vec::<String>::new());
             },
             {
@@ -160,12 +166,12 @@ mod tests {
     #[serial]
     #[ignore = "need run interactively"]
     fn grep_no_matches() {
-        let (executable, email, test_client, _tmp_dir, root) = setup_test_environment();
+        let (executable, email, _tmp_dir, root) = setup_test_environment();
 
         cleanup!(
             {
                 let results =
-                    grep(&test_client, &root, "nonexistent", &GrepPrintConfig::default()).unwrap();
+                    grep(&executable, &root, "nonexistent", &GrepPrintConfig::default()).unwrap();
                 assert!(results.is_empty());
             },
             {
