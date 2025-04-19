@@ -67,10 +67,10 @@ where
     let password = SecretString::new(pg.generate_one().map_err(|e| anyhow!(e))?.into());
 
     // Get the appropriate key fingerprints for this path
-    let key_fprs = get_dir_gpg_id_content(root, &pass_path)?;
+    let keys_fpr = get_dir_gpg_id_content(root, &pass_path)?;
     let client = PGPClient::new(
         &gen_cfg.pgp_executable,
-        &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+        &keys_fpr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
     )?;
 
     if gen_cfg.in_place && pass_path.exists() {
@@ -123,7 +123,7 @@ mod tests {
         key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
         let test_client = PGPClient::new(get_test_executable(), &vec![&get_test_email()]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
-        write_gpg_id(root, &test_client.get_key_fprs());
+        write_gpg_id(root, &test_client.get_keys_fpr());
         test_client
     }
 

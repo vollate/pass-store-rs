@@ -92,7 +92,7 @@ impl PGPClient {
         &self.executable
     }
 
-    pub fn get_key_fprs(&self) -> Vec<&str> {
+    pub fn get_keys_fpr(&self) -> Vec<&str> {
         get_keys_field!(self, key_fpr)
     }
 

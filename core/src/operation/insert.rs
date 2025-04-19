@@ -82,10 +82,10 @@ where
     }
 
     // Get the appropriate key fingerprints for this path
-    let key_fprs = get_dir_gpg_id_content(root, &pass_path)?;
+    let keys_fpr = get_dir_gpg_id_content(root, &pass_path)?;
     let client = PGPClient::new(
         &insert_cfg.pgp_executable,
-        &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+        &keys_fpr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
     )?;
 
     create_or_overwrite(&client, &pass_path, &password)?;
@@ -118,7 +118,7 @@ mod tests {
         key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
         let test_client = PGPClient::new(executable.clone(), &vec![&email]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
-        write_gpg_id(&root, &test_client.get_key_fprs());
+        write_gpg_id(&root, &test_client.get_keys_fpr());
 
         (executable, email, test_client, tmp_dir, root)
     }

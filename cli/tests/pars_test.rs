@@ -12,4 +12,13 @@ mod tests {
             .success()
             .stdout(predicate::str::contains("Usage:"));
     }
+
+    #[test]
+    fn cmd_insert_test() {
+        let cmd = Command::cargo_bin("pars").unwrap();
+        let args = ["insert", "test1/foo"];
+    }
+
+    #[test]
+    fn cmd_rm_test() {}
 }

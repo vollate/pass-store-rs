@@ -49,10 +49,10 @@ pub fn ls_io(
     if full_path.is_file() {
         debug!("ls_io: '{}' is file", tree_cfg.target);
         // Get the appropriate key fingerprints for this file's path
-        let key_fprs = get_dir_gpg_id_content(tree_cfg.root, &full_path)?;
+        let keys_fpr = get_dir_gpg_id_content(tree_cfg.root, &full_path)?;
         let client = PGPClient::new(
             pgp_executable,
-            &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            &keys_fpr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
         )?;
 
         let data = client.decrypt_stdin(tree_cfg.root, path_to_str(&full_path)?)?;

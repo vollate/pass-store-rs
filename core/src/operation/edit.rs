@@ -33,10 +33,10 @@ pub fn edit(
     }
 
     // Get the appropriate key fingerprints for this path
-    let key_fprs = get_dir_gpg_id_content(root, &target_path)?;
+    let keys_fpr = get_dir_gpg_id_content(root, &target_path)?;
     let client = PGPClient::new(
         pgp_executable,
-        &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+        &keys_fpr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
     )?;
 
     let tmp_dir: PathBuf = {
@@ -147,7 +147,7 @@ mod tests {
                         path_to_str(&root.join("dir").join("file2.gpg")).unwrap(),
                     )
                     .unwrap();
-                write_gpg_id(&root, &test_client.get_key_fprs());
+                write_gpg_id(&root, &test_client.get_keys_fpr());
                 let res1 = edit(&root, "file1", "gpg", "vim", executable).unwrap();
                 let res2 = edit(&root, "dir/file2", "gpg", "vim", executable).unwrap();
                 assert!(res1);

@@ -1,3 +1,5 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path::Path;
 
 use anyhow::Result;
@@ -33,6 +35,7 @@ pub fn grep(
     print_cfg: &GrepPrintConfig,
 ) -> Result<Vec<String>> {
     let mut results = Vec::new();
+    let mut cache: Vec<(u64, Vec<String>, PGPClient)> = Vec::new();
     let search_regex = Regex::new(&regex::escape(search_str))?;
 
     for entry in WalkDir::new(root) {
@@ -41,36 +44,44 @@ pub fn grep(
             let relative_path = entry.path().strip_prefix(root)?;
             let relative_path_str = path_to_str(relative_path)?;
 
-            // Get the appropriate key fingerprints for this file's path
-            let key_fprs = get_dir_gpg_id_content(root, entry.path())?;
-            let client = PGPClient::new(
-                pgp_executable,
-                &key_fprs.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-            )?;
+            let mut keys_fpr = get_dir_gpg_id_content(root, entry.path())?;
+            keys_fpr.sort();
+
+            let mut hasher = DefaultHasher::new();
+            keys_fpr.hash(&mut hasher);
+            let key_hash = hasher.finish();
+
+            let client: &mut PGPClient = if let Some((_, _, client)) = cache
+                .iter_mut()
+                .find(|(h, cached_keys, _)| *h == key_hash && *cached_keys == keys_fpr)
+            {
+                client
+            } else {
+                let new_client = PGPClient::new(
+                    pgp_executable,
+                    &keys_fpr.iter().map(String::as_str).collect::<Vec<_>>(),
+                )?;
+                cache.push((key_hash, keys_fpr.clone(), new_client));
+                &mut cache.last_mut().unwrap().2
+            };
 
             let decrypted = client.decrypt_stdin(root, path_to_str(entry.path())?)?;
-
-            let matching_lines: Vec<String> = if let Some(color) = print_cfg.grep_match_color {
-                decrypted
-                    .expose_secret()
-                    .lines()
-                    .filter(|line| line.contains(search_str))
-                    .map(|line| {
+            let matching_lines: Vec<String> = decrypted
+                .expose_secret()
+                .lines()
+                .filter(|line| line.contains(search_str))
+                .map(|line| {
+                    if let Some(color) = print_cfg.grep_match_color {
                         search_regex
                             .replace_all(line, |caps: &regex::Captures| {
                                 caps[0].color(color).to_string()
                             })
                             .to_string()
-                    })
-                    .collect()
-            } else {
-                decrypted
-                    .expose_secret()
-                    .lines()
-                    .filter(|line| line.contains(search_str))
-                    .map(|line| line.to_string())
-                    .collect()
-            };
+                    } else {
+                        line.to_string()
+                    }
+                })
+                .collect();
 
             if !matching_lines.is_empty() {
                 if let Some(color) = print_cfg.grep_pass_color {
@@ -120,7 +131,7 @@ mod tests {
 
         test_client.encrypt(file1_content, root.join("dir1/01.gpg").to_str().unwrap()).unwrap();
         test_client.encrypt(file2_content, root.join("dir2/10.gpg").to_str().unwrap()).unwrap();
-        write_gpg_id(&root, &test_client.get_key_fprs());
+        write_gpg_id(&root, &test_client.get_keys_fpr());
         (executable, email, _tmp_dir, root)
     }
 

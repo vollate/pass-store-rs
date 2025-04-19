@@ -10,7 +10,7 @@ use zeroize::Zeroize;
 use super::{PGPClient, PGPErr};
 impl PGPClient {
     pub fn encrypt(&self, plaintext: &str, output_path: &str) -> Result<()> {
-        let fprs = self.get_key_fprs();
+        let fprs = self.get_keys_fpr();
         let prefix = vec!["--batch", "--encrypt"];
         let mut args = Vec::with_capacity(prefix.len() + fprs.len() * 2 + 2);
         args.extend(prefix);

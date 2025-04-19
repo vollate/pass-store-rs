@@ -35,7 +35,7 @@ pub fn cmd_init(
     // Create InitConfig for the init function
     let init_config = InitConfig {
         pgp_executable: config.executable_config.pgp_executable.clone(),
-        key_fprs: pgp_ids.to_vec(),
+        keys_fpr: pgp_ids.to_vec(),
     };
 
     init(&init_config, &root, path.unwrap_or_default())
@@ -48,7 +48,7 @@ pub fn cmd_init(
 
     let commit = GitCommit::new(
         &root,
-        CommitType::Init(pgp_client.get_key_fprs().iter().map(|f| f.to_string()).collect()),
+        CommitType::Init(pgp_client.get_keys_fpr().iter().map(|f| f.to_string()).collect()),
     );
     debug!("cmd_init: commit {}", commit);
     add_and_commit(

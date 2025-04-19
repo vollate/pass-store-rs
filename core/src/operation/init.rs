@@ -17,7 +17,7 @@ const FPR_FILENAME: &str = ".gpg-id";
 
 pub struct InitConfig {
     pub pgp_executable: String,
-    pub key_fprs: Vec<String>,
+    pub keys_fpr: Vec<String>,
 }
 
 pub fn init(config: &InitConfig, root_path: &PathBuf, target_path: &str) -> Result<()> {
@@ -32,7 +32,7 @@ pub fn init(config: &InitConfig, root_path: &PathBuf, target_path: &str) -> Resu
 
     let gpg_id_path = target_path.join(FPR_FILENAME);
 
-    let mut new_fprs = config.key_fprs.clone();
+    let mut new_fprs = config.keys_fpr.clone();
     let first_init = !root_path.join(".gpg-id").exists();
     if !gpg_id_path.exists() {
         let mut file =

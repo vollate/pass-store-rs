@@ -41,6 +41,7 @@ where
     }
     Ok(true)
 }
+
 /// Copy or rename a file or directory, ask for confirmation if the target already exists(unless force)
 /// # Arguments
 /// * `copy` - Whether to copy or rename
@@ -502,4 +503,8 @@ mod tests {
             {}
         );
     }
+
+    #[test]
+    #[ignore = "Need to run interactively"]
+    fn re_encrypt_case_test() {}
 }
