@@ -212,32 +212,31 @@ where
     }
 
     // Check if we're dealing with GPG-encrypted files and need to re-encrypt
-    let needs_reencryption = if from_path.is_file()
-        && from_path.extension().is_some_and(|ext| ext == file_extension)
-    {
-        let from_dir = from_path.parent().unwrap_or(root);
-        let to_dir = if to_path.exists() && to_path.is_dir() {
-            &to_path
-        } else {
-            to_path.parent().unwrap_or(root)
-        };
+    let needs_reencryption =
+        if from_path.is_file() && from_path.extension().is_some_and(|ext| ext == file_extension) {
+            let from_dir = from_path.parent().unwrap_or(root);
+            let to_dir = if to_path.exists() && to_path.is_dir() {
+                &to_path
+            } else {
+                to_path.parent().unwrap_or(root)
+            };
 
-        // Compare GPG keys between source and destination directories
-        match (get_dir_gpg_id_content(root, from_dir), get_dir_gpg_id_content(root, to_dir)) {
-            (Ok(from_keys), Ok(to_keys)) => {
-                let mut from_keys_sorted = from_keys.clone();
-                let mut to_keys_sorted = to_keys.clone();
-                from_keys_sorted.sort();
-                to_keys_sorted.sort();
+            // Compare GPG keys between source and destination directories
+            match (get_dir_gpg_id_content(root, from_dir), get_dir_gpg_id_content(root, to_dir)) {
+                (Ok(from_keys), Ok(to_keys)) => {
+                    let mut from_keys_sorted = from_keys.clone();
+                    let mut to_keys_sorted = to_keys.clone();
+                    from_keys_sorted.sort();
+                    to_keys_sorted.sort();
 
-                // If keys are different, we need to re-encrypt
-                from_keys_sorted != to_keys_sorted
+                    // If keys are different, we need to re-encrypt
+                    from_keys_sorted != to_keys_sorted
+                }
+                _ => false, // If we can't get keys, default to not re-encrypting
             }
-            _ => false, // If we can't get keys, default to not re-encrypting
-        }
-    } else {
-        false
-    };
+        } else {
+            false
+        };
 
     if needs_reencryption {
         debug!("Different GPG IDs detected, re-encryption required");
@@ -351,6 +350,8 @@ mod tests {
     };
 
     #[test]
+    #[serial]
+    #[ignore = "need run interactively"]
     fn rename_test() {
         // Original structure:
         // root
@@ -458,6 +459,8 @@ mod tests {
     }
 
     #[test]
+    #[serial]
+    #[ignore = "need run interactively"]
     fn copy_test() {
         // Original structure:
         // root
@@ -570,6 +573,8 @@ mod tests {
     }
 
     #[test]
+    #[serial]
+    #[ignore = "need run interactively"]
     // Try to access parent directory, should be blocked
     fn path_attack_protection_test() {
         // Simple structure:
@@ -628,6 +633,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[ignore = "need run interactively"]
     fn re_encrypt_case_test() {
         // Set up directory structure:
         // root

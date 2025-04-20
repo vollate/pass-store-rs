@@ -12,7 +12,7 @@ if [ $? -ne 0 ]; then
     echo "cargo fix failed"
     exit $?
 fi
-cargo fmt
+cargo fmt --all
 if [ $? -ne 0 ]; then
     echo "cargo fmt failed"
     exit $?

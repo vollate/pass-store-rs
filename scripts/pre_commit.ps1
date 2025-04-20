@@ -20,7 +20,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Formatting code..."
-cargo fmt
+cargo fmt --all
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to format code"
     exit 1
