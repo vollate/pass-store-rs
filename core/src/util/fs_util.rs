@@ -1,4 +1,3 @@
-use std::fs::DirEntry;
 use std::io::{BufRead, Read, Write};
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
@@ -106,25 +105,6 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
         }
     }
     Err(anyhow!(format!("Cannot find '.gpg-id' for {:?}", cur_dir)))
-}
-
-pub(crate) fn process_files_recursively<F>(path: &PathBuf, process: &F) -> Result<()>
-where
-    F: Fn(&DirEntry) -> Result<()>,
-{
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_dir() {
-                process_files_recursively(&path.to_path_buf(), process)?;
-            } else {
-                process(&entry)?;
-            }
-        }
-    }
-    Ok(())
 }
 
 pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf> {

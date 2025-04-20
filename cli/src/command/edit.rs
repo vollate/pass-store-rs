@@ -1,7 +1,7 @@
 use std::env;
 
 use anyhow::Error;
-use pars_core::config::ParsConfig;
+use pars_core::config::cli::ParsConfig;
 use pars_core::git::{add_and_commit, commit};
 use pars_core::operation::edit::edit;
 

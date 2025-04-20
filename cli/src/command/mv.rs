@@ -2,7 +2,7 @@ use std::io::BufReader;
 
 use anyhow::{Error, Result};
 use log::debug;
-use pars_core::config::ParsConfig;
+use pars_core::config::cli::ParsConfig;
 use pars_core::git::add_and_commit;
 use pars_core::git::commit::{CommitType, GitCommit};
 use pars_core::operation::copy_or_rename::copy_rename_io;

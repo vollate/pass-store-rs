@@ -1,5 +1,5 @@
 use anyhow::{Error, Result};
-use pars_core::config::ParsConfig;
+use pars_core::config::cli::ParsConfig;
 use pars_core::operation::find::find_term;
 use pars_core::util::tree::{FilterType, TreeConfig};
 

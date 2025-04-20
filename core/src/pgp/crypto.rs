@@ -138,7 +138,7 @@ mod tests {
         cleanup!(
             {
                 key_gen_batch(executable, &gpg_key_gen_example_batch()).unwrap();
-                let test_client = PGPClient::new(executable, &vec![email]).unwrap();
+                let test_client = PGPClient::new(executable, &[email]).unwrap();
                 test_client.encrypt(plaintext, output_dest).unwrap();
 
                 if !Path::new(output_dest).exists() {
@@ -147,7 +147,7 @@ mod tests {
             },
             {
                 let _ = fs::remove_file(output_dest);
-                clean_up_test_key(executable, &vec![email]).unwrap();
+                clean_up_test_key(executable, &[email]).unwrap();
             }
         );
     }
@@ -197,7 +197,7 @@ mod tests {
             {
                 key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
                 let test_client =
-                    PGPClient::new(get_test_executable(), &vec![&get_test_email()]).unwrap();
+                    PGPClient::new(get_test_executable(), &[&get_test_email()]).unwrap();
                 test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
                 test_client.encrypt(plaintext, output_dest).unwrap();
                 let decrypted = test_client
@@ -207,7 +207,7 @@ mod tests {
             },
             {
                 fs::remove_file(output_dest).unwrap();
-                clean_up_test_key(&get_test_executable(), &vec![&get_test_email()]).unwrap();
+                clean_up_test_key(&get_test_executable(), &[&get_test_email()]).unwrap();
             }
         )
     }

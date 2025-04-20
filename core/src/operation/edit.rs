@@ -135,7 +135,7 @@ mod tests {
         cleanup!(
             {
                 key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
-                let test_client = PGPClient::new(executable, &vec![email]).unwrap();
+                let test_client = PGPClient::new(executable, &[email]).unwrap();
                 test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
                 let new_dir = root.join("file1.gpg");
                 let output = path_to_str(&new_dir).unwrap();
@@ -160,7 +160,7 @@ mod tests {
                 assert_eq!(file2_new_content.expose_secret(), file2_content);
             },
             {
-                clean_up_test_key(executable, &vec![email]).unwrap();
+                clean_up_test_key(executable, &[email]).unwrap();
             }
         );
     }

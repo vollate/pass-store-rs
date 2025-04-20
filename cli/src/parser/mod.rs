@@ -4,7 +4,7 @@ use std::env;
 
 use anyhow::{Error, Result};
 use clap::Parser;
-use pars_core::config::ParsConfig;
+use pars_core::config::cli::ParsConfig;
 use sub_command::SubCommands;
 
 use crate::command;

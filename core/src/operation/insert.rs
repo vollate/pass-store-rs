@@ -83,10 +83,7 @@ where
 
     // Get the appropriate key fingerprints for this path
     let keys_fpr = get_dir_gpg_id_content(root, &pass_path)?;
-    let client = PGPClient::new(
-        &insert_cfg.pgp_executable,
-        &keys_fpr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-    )?;
+    let client = PGPClient::new(&insert_cfg.pgp_executable, &keys_fpr)?;
 
     create_or_overwrite(&client, &pass_path, &password)?;
     writeln!(out_s, "Password encrypted and saved.")?;
@@ -116,7 +113,7 @@ mod tests {
         let (tmp_dir, root) = gen_unique_temp_dir();
 
         key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
-        let test_client = PGPClient::new(executable.clone(), &vec![&email]).unwrap();
+        let test_client = PGPClient::new(executable.clone(), &[&email]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         write_gpg_id(&root, &test_client.get_keys_fpr());
 
@@ -165,7 +162,7 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "password");
             },
             {
-                clean_up_test_key(&executable, &vec![&email]).unwrap();
+                clean_up_test_key(&executable, &[&email]).unwrap();
             }
         );
     }
@@ -209,7 +206,7 @@ mod tests {
                 assert_eq!(Path::new("test1.pgp").exists(), false);
             },
             {
-                clean_up_test_key(&executable, &vec![&email]).unwrap();
+                clean_up_test_key(&executable, &[&email]).unwrap();
             }
         );
     }
@@ -254,7 +251,7 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "line1\nline2\nline3");
             },
             {
-                clean_up_test_key(&executable, &vec![&email]).unwrap();
+                clean_up_test_key(&executable, &[&email]).unwrap();
             }
         );
     }
@@ -347,7 +344,7 @@ mod tests {
                 assert_eq!(decrypted.expose_secret(), "new_password");
             },
             {
-                clean_up_test_key(&executable, &vec![&email]).unwrap();
+                clean_up_test_key(&executable, &[&email]).unwrap();
             }
         );
     }
@@ -384,7 +381,7 @@ mod tests {
                 assert!(result.is_err());
             },
             {
-                clean_up_test_key(&executable, &vec![&email]).unwrap();
+                clean_up_test_key(&executable, &[&email]).unwrap();
             }
         );
     }

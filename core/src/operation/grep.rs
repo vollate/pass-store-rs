@@ -9,7 +9,7 @@ use regex::Regex;
 use secrecy::ExposeSecret;
 use walkdir::WalkDir;
 
-use crate::config::PrintConfig;
+use crate::config::cli::PrintConfig;
 use crate::pgp::PGPClient;
 use crate::util::fs_util::{get_dir_gpg_id_content, path_to_str};
 use crate::util::tree::string_to_color_opt;
@@ -207,7 +207,7 @@ mod tests {
         create_dir_structure(&root, structure);
 
         key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
-        let test_client = PGPClient::new(executable.clone(), &vec![&email]).unwrap();
+        let test_client = PGPClient::new(executable.clone(), &[&email]).unwrap();
         test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
 
         test_client.encrypt(file1_content, root.join("dir1/01.gpg").to_str().unwrap()).unwrap();
@@ -228,7 +228,7 @@ mod tests {
                 assert_eq!(results, vec![&format!("dir1{}01:", path::MAIN_SEPARATOR), "2112112"]);
             },
             {
-                clean_up_test_key(&executable, &vec![&email]).unwrap();
+                clean_up_test_key(&executable, &[&email]).unwrap();
             }
         );
     }
@@ -249,7 +249,7 @@ mod tests {
                 assert_eq!(results, Vec::<String>::new());
             },
             {
-                clean_up_test_key(&executable, &vec![&email]).unwrap();
+                clean_up_test_key(&executable, &[&email]).unwrap();
             }
         );
     }
@@ -267,7 +267,7 @@ mod tests {
                 assert!(results.is_empty());
             },
             {
-                clean_up_test_key(&executable, &vec![&email]).unwrap();
+                clean_up_test_key(&executable, &[&email]).unwrap();
             }
         );
     }

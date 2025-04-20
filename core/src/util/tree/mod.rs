@@ -31,7 +31,7 @@ pub struct TreePrintConfig {
     pub tree_color: Option<Color>,
 }
 
-impl<CFG: AsRef<config::PrintConfig>> From<CFG> for TreePrintConfig {
+impl<CFG: AsRef<config::cli::PrintConfig>> From<CFG> for TreePrintConfig {
     fn from(config: CFG) -> Self {
         Self {
             dir_color: string_to_color_opt(&config.as_ref().dir_color),

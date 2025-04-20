@@ -2,7 +2,7 @@ use anyhow::{anyhow, Error, Result};
 use fast_qr::{self, QRBuilder};
 use log::debug;
 use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
-use pars_core::config::ParsConfig;
+use pars_core::config::cli::ParsConfig;
 use pars_core::operation::ls_or_show::{ls_io, LsOrShow};
 use pars_core::util::tree::{FilterType, TreeConfig, TreePrintConfig};
 use secrecy::zeroize::Zeroize;

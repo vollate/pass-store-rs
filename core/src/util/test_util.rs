@@ -23,7 +23,7 @@ pub fn get_test_password() -> String {
 
 pub fn clean_up_test_key(
     executable: &str,
-    emails: &Vec<&str>,
+    emails: &[impl AsRef<str>],
 ) -> Result<(), Box<dyn std::error::Error>> {
     for email in emails {
         while let Ok((fingerprint, _, _)) = get_pgp_key_info(executable, email) {

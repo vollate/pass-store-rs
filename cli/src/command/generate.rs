@@ -3,7 +3,7 @@ use std::io::BufReader;
 use anyhow::Error;
 use log::debug;
 use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
-use pars_core::config::ParsConfig;
+use pars_core::config::cli::ParsConfig;
 use pars_core::git::add_and_commit;
 use pars_core::git::commit::{CommitType, GitCommit};
 use pars_core::operation::generate::{generate_io, PasswdGenerateConfig};
@@ -47,10 +47,8 @@ pub fn cmd_generate(
     if !clip {
         println!("The generated password for '{}' is:\n{}", pass_name, res.expose_secret());
         res.zeroize();
-    } else {
-        if let Err(e) = copy_to_clipboard(res, get_clip_time()) {
-            eprintln!("Failed to copy to clipboard: {}", e);
-        }
+    } else if let Err(e) = copy_to_clipboard(res, get_clip_time()) {
+        eprintln!("Failed to copy to clipboard: {}", e);
     }
 
     let commit = GitCommit::new(&root, CommitType::Generate(pass_name.to_string()));
