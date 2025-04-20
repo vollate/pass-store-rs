@@ -29,6 +29,7 @@ pub struct PrintConfig {
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PathConfig {
     pub default_repo: String,
+    pub repos: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -82,32 +83,29 @@ impl Default for ExecutableConfig {
 
 impl Default for PathConfig {
     fn default() -> Self {
-        PathConfig {
-            default_repo: {
-                match dirs::home_dir() {
-                    Some(path) => {
-                        format!("{}{}.password-store", path.display(), path::MAIN_SEPARATOR)
-                    }
-                    None => {
-                        format!(
-                            "{}{}.password-store",
-                            env::var(
-                                #[cfg(unix)]
-                                {
-                                    "HOME"
-                                },
-                                #[cfg(windows)]
-                                {
-                                    "USERPROFILE"
-                                }
-                            )
-                            .unwrap_or("~".into()),
-                            path::MAIN_SEPARATOR
-                        )
-                    }
-                }
-            },
-        }
+        let default_path = match dirs::home_dir() {
+            Some(path) => {
+                format!("{}{}.password-store", path.display(), path::MAIN_SEPARATOR)
+            }
+            None => {
+                format!(
+                    "{}{}.password-store",
+                    env::var(
+                        #[cfg(unix)]
+                        {
+                            "HOME"
+                        },
+                        #[cfg(windows)]
+                        {
+                            "USERPROFILE"
+                        }
+                    )
+                    .unwrap_or("~".into()),
+                    path::MAIN_SEPARATOR
+                )
+            }
+        };
+        PathConfig { default_repo: default_path.clone(), repos: vec![default_path] }
     }
 }
 

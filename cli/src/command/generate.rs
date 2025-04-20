@@ -48,8 +48,9 @@ pub fn cmd_generate(
         println!("The generated password for '{}' is:\n{}", pass_name, res.expose_secret());
         res.zeroize();
     } else {
-        copy_to_clipboard(res, get_clip_time())
-            .map_err(|e| (ParsExitCode::ClipboardError.into(), e))?;
+        if let Err(e) = copy_to_clipboard(res, get_clip_time()) {
+            eprintln!("Failed to copy to clipboard: {}", e);
+        }
     }
 
     let commit = GitCommit::new(&root, CommitType::Generate(pass_name.to_string()));

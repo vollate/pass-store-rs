@@ -1,4 +1,3 @@
-#[allow(dead_code)]
 pub mod copy_or_rename;
 pub mod edit;
 pub mod find;

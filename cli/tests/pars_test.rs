@@ -15,8 +15,8 @@ mod tests {
 
     #[test]
     fn cmd_insert_test() {
-        let cmd = Command::cargo_bin("pars").unwrap();
-        let args = ["insert", "test1/foo"];
+        let _cmd = Command::cargo_bin("pars").unwrap();
+        let _args = ["insert", "test1/foo"];
     }
 
     #[test]

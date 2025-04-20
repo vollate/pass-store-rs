@@ -1,5 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
@@ -26,6 +27,86 @@ impl<CFG: AsRef<PrintConfig>> From<CFG> for GrepPrintConfig {
             grep_match_color: string_to_color_opt(&config.as_ref().grep_match_color),
         }
     }
+}
+
+pub fn grep_stream<O>(
+    pgp_executable: &str,
+    root: &Path,
+    search_str: &str,
+    print_cfg: &GrepPrintConfig,
+    out_stream: &mut O,
+) -> Result<()>
+where
+    O: Write,
+{
+    let mut cache: Vec<(u64, Vec<String>, PGPClient)> = Vec::new();
+    let search_regex = Regex::new(&regex::escape(search_str))?;
+
+    for entry in WalkDir::new(root) {
+        let entry = entry?;
+        if entry.file_type().is_file() && entry.path().extension().unwrap_or_default() == "gpg" {
+            let relative_path = entry.path().strip_prefix(root)?;
+            let relative_path_str = path_to_str(relative_path)?;
+
+            let mut keys_fpr = get_dir_gpg_id_content(root, entry.path())?;
+            keys_fpr.sort();
+
+            let mut hasher = DefaultHasher::new();
+            keys_fpr.hash(&mut hasher);
+            let key_hash = hasher.finish();
+
+            let client: &mut PGPClient = if let Some((_, _, client)) = cache
+                .iter_mut()
+                .find(|(h, cached_keys, _)| *h == key_hash && *cached_keys == keys_fpr)
+            {
+                client
+            } else {
+                let new_client = PGPClient::new(
+                    pgp_executable,
+                    &keys_fpr.iter().map(String::as_str).collect::<Vec<_>>(),
+                )?;
+                cache.push((key_hash, keys_fpr.clone(), new_client));
+                &mut cache.last_mut().unwrap().2
+            };
+
+            let decrypted = client.decrypt_stdin(root, path_to_str(entry.path())?)?;
+            let mut has_matches = false;
+
+            for line in decrypted.expose_secret().lines() {
+                if line.contains(search_str) {
+                    if !has_matches {
+                        if let Some(color) = print_cfg.grep_pass_color {
+                            writeln!(
+                                out_stream,
+                                "{}:",
+                                &relative_path_str[..relative_path_str.len() - 4].color(color)
+                            )?;
+                        } else {
+                            writeln!(
+                                out_stream,
+                                "{}:",
+                                &relative_path_str[..relative_path_str.len() - 4]
+                            )?;
+                        }
+                        has_matches = true;
+                    }
+
+                    let output_line = if let Some(color) = print_cfg.grep_match_color {
+                        search_regex
+                            .replace_all(line, |caps: &regex::Captures| {
+                                caps[0].color(color).to_string()
+                            })
+                            .to_string()
+                    } else {
+                        line.to_string()
+                    };
+                    writeln!(out_stream, "{}", output_line)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 pub fn grep(
