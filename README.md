@@ -1,19 +1,11 @@
 # Pars
 
+**Documentation isn't complete yet, currently you can only clone and build this project from source.**
 
-<!-- vim-markdown-toc GFM -->
-
-- [Usage](#usage)
-- [Dependencies](#dependencies)
-- [Installation](#installation)
-  - [Package Manager](#package-manager)
-    - [Arch Linux](#arch-linux)
-    - [MacOS](#macos)
-    - [Windows](#windows)
-
-<!-- vim-markdown-toc -->
+>We are struggling to finish the documentation and supporting package managers and other platforms. If you want to help, please open an issue or PR.
 
 `pars` is a cross platform [zx2c4-pass](https://www.passwordstore.org/) compatibility cli tool for managing password store.
+
 ## Usage
 
 `pars` is fully compatible with `pass` and the commands are the same. Here are some examples:
@@ -35,7 +27,6 @@ pars show <path/to/password> # -c for copy to clipboard/ -q to show password's q
 pars edit <path/to/password>
 ```
 
-
 ## Dependencies
 
 To use `pars` you need to make sure your system has the following dependencies installed:
@@ -51,13 +42,15 @@ For more information on how to install these dependencies, please refer to the [
 
 #### Arch Linux
 
-You can install `pars` from the AUR using your favorite AUR helper. For example, with `yay` 
+You can install `pars` from the AUR using your favorite AUR helper. For example, with `yay`
 
-```sh
+```shell
 yay -S pars
 ```
+
 or `paru`:
-```sh
+
+```shell
 paru -S pars
 ```
 
@@ -65,7 +58,7 @@ paru -S pars
 
 You can install `pars` from the [homebrew](https://brew.sh/) using the following command:
 
-```sh
+```shell
 brew tap pars
 brew install pars
 ```
@@ -75,9 +68,16 @@ brew install pars
 
 You can install `pars` from the [scoop](https://scoop.sh/) using the following command:
 
-```sh
+```shell
 scoop add bucket
 scoop install pars
 ```
-<!--todo-->
+
+#### Cargo (Rust)
+
+You can install pars from Cargo by using the following command:
+
+```shell
+cargo install pars-cli
+```
 

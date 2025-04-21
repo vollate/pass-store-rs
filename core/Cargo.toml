@@ -2,7 +2,8 @@
 name = "pars-core"
 version = "0.2.0"
 edition = "2021"
-description = "Pars core library, include the main features of pars"
+license = "GPL-3.0-or-later"
+description = "Pars(a zx2c4-pass compatible passwords manager) core library"
 authors = ["Vollate <uint44t@gmail.com>"]
 
 

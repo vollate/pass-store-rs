@@ -586,7 +586,7 @@ dependencies = [
  "clap",
  "fast_qr",
  "log",
- "pars-core",
+ "pars-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "predicates",
  "secrecy",
 ]
@@ -613,6 +613,35 @@ dependencies = [
  "secrecy",
  "serde",
  "serial_test",
+ "tempfile",
+ "toml",
+ "unicode-segmentation",
+ "walkdir",
+ "zeroize",
+]
+
+[[package]]
+name = "pars-core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa5f1a7826b3d33dd1b9e845b87f800065c4af4f2a2d5b3c050d5e68b5f4431e"
+dependencies = [
+ "anyhow",
+ "bumpalo",
+ "chrono",
+ "clean-path",
+ "colored",
+ "dirs",
+ "fs_extra",
+ "lazy_static",
+ "log",
+ "os_pipe",
+ "parking_lot",
+ "passwords",
+ "rand 0.9.1",
+ "regex",
+ "secrecy",
+ "serde",
  "tempfile",
  "toml",
  "unicode-segmentation",
