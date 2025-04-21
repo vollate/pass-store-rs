@@ -13,8 +13,7 @@
 
 <!-- vim-markdown-toc -->
 
-`pars` is a cross platform [zx2c4-pass](https://www.passwordstore.org/) compatility cli tool for managing password store.
-
+`pars` is a cross platform [zx2c4-pass](https://www.passwordstore.org/) compatibility cli tool for managing password store.
 ## Usage
 
 `pars` is fully compatible with `pass` and the commands are the same. Here are some examples:
