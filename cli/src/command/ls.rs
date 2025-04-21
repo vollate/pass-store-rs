@@ -62,7 +62,11 @@ fn handle_qr_code(
     qrcode: Option<usize>,
     passwd: secrecy::SecretBox<str>,
 ) -> Result<(), (i32, Error)> {
-    if let Some(line_num) = qrcode {
+    if let Some(mut line_num) = qrcode {
+        if 0 == line_num {
+            line_num = 1;
+        }
+
         if let Some(line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
             let mut qr_code =
                 to_qr_code(line_content.into()).map_err(|e| (ParsExitCode::Error.into(), e))?;
@@ -79,7 +83,11 @@ fn handle_qr_code(
 }
 
 fn handle_clip(clip: Option<usize>, passwd: &secrecy::SecretBox<str>) -> Result<(), (i32, Error)> {
-    if let Some(line_num) = clip {
+    if let Some(mut line_num) = clip {
+        if 0 == line_num {
+            line_num = 1;
+        }
+
         if let Some(line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
             copy_to_clipboard(line_content.into(), get_clip_time())
                 .map_err(|e| (ParsExitCode::Error.into(), e))?;
