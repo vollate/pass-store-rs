@@ -280,9 +280,9 @@ dependencies = [
 
 [[package]]
 name = "fast_qr"
-version = "0.12.7"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16e326670ab63ef13c7699301dbb3441573ba3288e83c3bb9efaacc91a33fd01"
+checksum = "ceb2b7f37970ac8e75a69a1c450336f9fc5b7101d4e8acba3da5140bc8d2cae3"
 
 [[package]]
 name = "fastrand"

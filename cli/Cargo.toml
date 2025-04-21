@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.97"
 clap = { version = "4.5.28", features = ["derive"] }
-fast_qr = "0.12.7"
+fast_qr = "0.13.0"
 log = "0.4.26"
 pars-core = { path = "../core" }
 secrecy = "0.10.3"
