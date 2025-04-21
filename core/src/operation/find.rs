@@ -5,12 +5,12 @@ use bumpalo::Bump;
 use regex::Regex;
 
 use crate::util::str::remove_lines_postfix;
-use crate::util::tree::{DirTree, FilterType, PrintConfig, TreeConfig};
+use crate::util::tree::{DirTree, FilterType, TreeConfig, TreePrintConfig};
 
 pub fn find_term(
     terms: &Vec<&str>,
     tree_cfg: &TreeConfig,
-    print_cfg: &PrintConfig,
+    print_cfg: &TreePrintConfig,
 ) -> Result<String> {
     let mut config = tree_cfg.clone();
     config.filter_type = FilterType::Include;
@@ -208,7 +208,7 @@ mod tests {
                     filter_type: FilterType::Include,
                     filters: Vec::new(),
                 };
-                let print_cfg = PrintConfig {
+                let print_cfg = TreePrintConfig {
                     dir_color: None,
                     file_color: None,
                     symbol_color: None,

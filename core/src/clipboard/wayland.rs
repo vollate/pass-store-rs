@@ -1,18 +1,22 @@
 use std::io::Write;
 use std::process::Command;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
+use log::warn;
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
+use crate::constants::default_constants::WAYLAND_COPY_EXECUTABLE;
+use crate::util::str::fit_to_unix;
+
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
-    let mut cmd = Command::new("wl-copy");
+    let mut cmd = Command::new(WAYLAND_COPY_EXECUTABLE);
     cmd.arg("-n");
 
     let mut child = cmd.stdin(std::process::Stdio::piped()).spawn()?;
 
     let child_stdin = child.stdin.as_mut().ok_or(anyhow!("Cannot get stdin for 'wl-copy'"))?;
-    child_stdin.write_all(secret.expose_secret().as_bytes())?;
+    child_stdin.write_all(fit_to_unix(secret.expose_secret()).as_bytes())?;
     secret.zeroize();
 
     let exit_status = child.wait()?;
@@ -21,12 +25,24 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
     }
 
     if let Some(secs) = timeout {
-        Command::new("sh")
+        let qdbus_executable: String = {
+            let find_res: Result<String, Error> = {
+                let output=Command::new("sh").arg("-c").arg(r#"echo $PATH | tr ':' '\n' | xargs -I {} find {} -maxdepth 1 -executable -regex '.*/qdbus[0-9]*$'"#).output()?;
+                let output_str = String::from_utf8(output.stdout)?;
+                let re: Vec<&str> = output_str.split('\n').collect();
+                Ok(re.first().unwrap().to_string())
+            };
+            find_res.unwrap_or_else(|e| {
+                warn!("Failed to get qdbus executable: {}, use default 'dbus'", e);
+                "qdbus".to_string()
+            })
+        };
+        let _=  Command::new("sh")
             .arg("-c")
             .arg(
-               format!( "sleep {} && qdbus org.kde.klipper /klipper org.kde.klipper.klipper.clearClipboardHistory",secs),
+                format!( "sleep {} && {} org.kde.klipper /klipper org.kde.klipper.klipper.clearClipboardHistory",secs,qdbus_executable),
             )
-            .spawn()?;
+            .spawn();
     }
     Ok(())
 }

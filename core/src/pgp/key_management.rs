@@ -93,8 +93,8 @@ mod tests {
     fn pgp_key_gen_batch() {
         let executable = get_test_executable();
         key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
-        let pgp_client = PGPClient::new(executable, &vec![&get_test_email()]).unwrap();
-        clean_up_test_key(pgp_client.get_executable(), &vec![&get_test_email()]).unwrap();
+        let pgp_client = PGPClient::new(executable, &[&get_test_email()]).unwrap();
+        clean_up_test_key(pgp_client.get_executable(), &[&get_test_email()]).unwrap();
     }
 
     #[test]
@@ -103,8 +103,8 @@ mod tests {
         let executable = get_test_executable();
         let email = get_test_email();
         key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
-        let pgp_client = PGPClient::new(executable, &vec![&email]).unwrap();
+        let pgp_client = PGPClient::new(executable, &[&email]).unwrap();
         pgp_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
-        clean_up_test_key(pgp_client.get_executable(), &vec![&email]).unwrap();
+        clean_up_test_key(pgp_client.get_executable(), &[&email]).unwrap();
     }
 }

@@ -10,19 +10,34 @@ use zeroize::Zeroize;
 use crate::pgp::PGPClient;
 use crate::util::defer::Defer;
 use crate::util::fs_util::{
-    backup_encrypted_file, path_attack_check, path_to_str, restore_backup_file,
+    backup_encrypted_file, get_dir_gpg_id_content, path_attack_check, path_to_str,
+    restore_backup_file,
 };
 use crate::util::rand::rand_alphabet_string;
 use crate::{IOErr, IOErrType};
 
-pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Result<()> {
-    let target_path = root.join(target);
+pub fn edit(
+    root: &Path,
+    target: &str,
+    extension: &str,
+    editor: &str,
+    pgp_executable: &str,
+) -> Result<bool> {
+    let target_path = root.join(format!("{}.{}", target, extension));
     path_attack_check(root, &target_path)?;
+
     if !target_path.exists() {
         return Err(IOErr::new(IOErrType::PathNotExist, &target_path).into());
     } else if !target_path.is_file() {
         return Err(IOErr::new(IOErrType::ExpectFile, &target_path).into());
     }
+
+    // Get the appropriate key fingerprints for this path
+    let keys_fpr = get_dir_gpg_id_content(root, &target_path)?;
+    let client = PGPClient::new(
+        pgp_executable,
+        &keys_fpr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+    )?;
 
     let tmp_dir: PathBuf = {
         let temp_base = {
@@ -65,7 +80,7 @@ pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Resu
         let mut old_content = client.decrypt_stdin(root, path_to_str(&target_path)?)?;
         if old_content.expose_secret() == new_content {
             println!("Password unchanged");
-            return Ok(());
+            return Ok(false);
         }
         old_content.zeroize();
 
@@ -80,7 +95,7 @@ pub fn edit(client: &PGPClient, root: &Path, target: &str, editor: &str) -> Resu
             }
         }
         println!("Edit password for {} in repo {} using {}.", target, root.display(), editor);
-        Ok(())
+        Ok(true)
     } else {
         Err(anyhow!("Failed to edit file"))
     }
@@ -96,7 +111,7 @@ mod tests {
     use crate::util::defer::cleanup;
     use crate::util::test_util::{
         clean_up_test_key, create_dir_structure, gen_unique_temp_dir, get_test_email,
-        get_test_executable, gpg_key_edit_example_batch, gpg_key_gen_example_batch,
+        get_test_executable, gpg_key_edit_example_batch, gpg_key_gen_example_batch, write_gpg_id,
     };
 
     #[test]
@@ -115,12 +130,12 @@ mod tests {
         let structure: &[(Option<&str>, &[&str])] = &[(Some("dir"), &[][..])];
         create_dir_structure(&root, structure);
 
-        let file1_content = "Sending in an eagle";
-        let file2_content = "Requesting orbital";
+        let file1_content = "Sending in an eagle\n\n!!! You must edit this to pass the test !!!";
+        let file2_content = "Requesting orbital\n\n!!! Do not edit this to pass the test !!!";
         cleanup!(
             {
                 key_gen_batch(&get_test_executable(), &gpg_key_gen_example_batch()).unwrap();
-                let test_client = PGPClient::new(executable, &vec![email]).unwrap();
+                let test_client = PGPClient::new(executable, &[email]).unwrap();
                 test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
                 let new_dir = root.join("file1.gpg");
                 let output = path_to_str(&new_dir).unwrap();
@@ -132,17 +147,20 @@ mod tests {
                         path_to_str(&root.join("dir").join("file2.gpg")).unwrap(),
                     )
                     .unwrap();
-                edit(&test_client, &root, "file1.gpg", "vim").unwrap();
-                edit(&test_client, &root, "dir/file2.gpg", "vim").unwrap();
+                write_gpg_id(&root, &test_client.get_keys_fpr());
+                let res1 = edit(&root, "file1", "gpg", "vim", executable).unwrap();
+                let res2 = edit(&root, "dir/file2", "gpg", "vim", executable).unwrap();
+                assert!(res1);
+                assert!(!res2);
 
                 let file1_new_content = test_client.decrypt_stdin(&root, output).unwrap();
                 let file2_new_content = test_client.decrypt_stdin(&root, "dir/file2.gpg").unwrap();
 
                 assert_ne!(file1_new_content.expose_secret(), file1_content);
-                assert_ne!(file2_new_content.expose_secret(), file2_content);
+                assert_eq!(file2_new_content.expose_secret(), file2_content);
             },
             {
-                clean_up_test_key(executable, &vec![email]).unwrap();
+                clean_up_test_key(executable, &[email]).unwrap();
             }
         );
     }

@@ -4,10 +4,10 @@ use anyhow::Result;
 use colored::Colorize;
 use log::debug;
 
-use super::{DirTree, NodeType, PrintConfig};
+use super::{DirTree, NodeType, TreePrintConfig};
 
 impl DirTree<'_> {
-    pub fn print_tree(&self, config: &PrintConfig) -> Result<String> {
+    pub fn print_tree(&self, config: &TreePrintConfig) -> Result<String> {
         debug!("Start to print tree:\n{:?}", self.map);
         let mut tree_builder = String::new(); //TODO(Vollate): we should use other structure for building string(huge dir case)
         let mut node_stack = VecDeque::<(usize, usize)>::new();
@@ -116,8 +116,12 @@ mod tests {
 
     #[test]
     fn tree_normal_case() {
-        let no_color_print =
-            PrintConfig { dir_color: None, file_color: None, symbol_color: None, tree_color: None };
+        let no_color_print = TreePrintConfig {
+            dir_color: None,
+            file_color: None,
+            symbol_color: None,
+            tree_color: None,
+        };
         // Create directory structure as below:
         // ├── dir1
         // │   ├── file1
@@ -169,8 +173,12 @@ mod tests {
 
     #[test]
     fn test_filtered_case() {
-        let no_color_print =
-            PrintConfig { dir_color: None, file_color: None, symbol_color: None, tree_color: None };
+        let no_color_print = TreePrintConfig {
+            dir_color: None,
+            file_color: None,
+            symbol_color: None,
+            tree_color: None,
+        };
         // Create directory structure as below:
         // ├── dir1
         // │   └── file1
@@ -248,8 +256,12 @@ mod tests {
 
     #[test]
     fn test_symbolic_link() {
-        let no_color_print =
-            PrintConfig { dir_color: None, file_color: None, symbol_color: None, tree_color: None };
+        let no_color_print = TreePrintConfig {
+            dir_color: None,
+            file_color: None,
+            symbol_color: None,
+            tree_color: None,
+        };
         // Create directory structure as below:
         // root1
         // ├── dir1
@@ -360,8 +372,12 @@ mod tests {
 
     #[test]
     fn test_recursive_detection() {
-        let no_color_print =
-            PrintConfig { dir_color: None, file_color: None, symbol_color: None, tree_color: None };
+        let no_color_print = TreePrintConfig {
+            dir_color: None,
+            file_color: None,
+            symbol_color: None,
+            tree_color: None,
+        };
 
         // Test direct recursion
         {

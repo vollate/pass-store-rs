@@ -7,9 +7,18 @@ mod tests {
     fn cmd_init_test() {
         let mut cmd = Command::cargo_bin("pars").unwrap();
         cmd.arg("--help")
-            .env("PASS_CONFIG_PATH", "tests/test-config.toml")
+            .env("PARS_CONFIG_PATH", "tests/test-config.toml")
             .assert()
             .success()
             .stdout(predicate::str::contains("Usage:"));
     }
+
+    #[test]
+    fn cmd_insert_test() {
+        let _cmd = Command::cargo_bin("pars").unwrap();
+        let _args = ["insert", "test1/foo"];
+    }
+
+    #[test]
+    fn cmd_rm_test() {}
 }

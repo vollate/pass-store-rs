@@ -1,22 +1,7 @@
 use log::LevelFilter;
-use pars_core::util::fs_util::{get_home_dir, path_to_str};
-
-pub fn default_config_path() -> String {
-    let path = get_home_dir().join(".config/pars/config.toml");
-
-    match path_to_str(&path) {
-        Ok(path) => path.into(),
-        Err(_) => {
-            eprintln!(
-                "Error getting default config path, use '~/.config/pars/config.toml' instead"
-            );
-            "~/.config/pars/config.toml".into()
-        }
-    }
-}
 
 pub const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Info;
-pub const SECRET_POSTFIX: &str = "gpg";
+pub const SECRET_EXTENSION: &str = "gpg";
 pub const DEFAULT_PASS_LENGTH: usize = 20;
 
 #[repr(i32)]
@@ -62,7 +47,6 @@ impl From<ParsExitCode> for i32 {
 #[cfg(target_os = "windows")]
 impl From<ParsExitCode> for i32 {
     #[allow(unreachable_patterns)]
-
     fn from(val: ParsExitCode) -> Self {
         match val {
             ParsExitCode::Success => 0,

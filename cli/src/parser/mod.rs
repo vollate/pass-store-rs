@@ -1,8 +1,10 @@
 pub(crate) mod sub_command;
 
+use std::env;
+
 use anyhow::{Error, Result};
 use clap::Parser;
-use pars_core::config::ParsConfig;
+use pars_core::config::cli::ParsConfig;
 use sub_command::SubCommands;
 
 use crate::command;
@@ -12,8 +14,9 @@ use crate::util::{to_relative_path, to_relative_path_opt};
 #[command(
     name = "pars",
     about = "Stores, retrieves, generates, and synchronizes passwords securely",
-    version = "0.1.0",
-    author = "Vollate <uint44t@gmail.com>"
+    version = env!("CARGO_PKG_VERSION"),
+    author = "Vollate <uint44t@gmail.com>",
+    //TODO: add setting for color and executable
 )]
 pub struct CliParser {
     #[command(subcommand)]
@@ -42,7 +45,17 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
         Some(SubCommands::Find { names }) => {
             command::find::cmd_find(&config, cli_args.base_dir.as_deref(), &names)?;
         }
-        Some(SubCommands::Ls { clip, qrcode, pass_name }) => {
+        Some(SubCommands::Ls { sub_folder }) => {
+            let sub_folder = to_relative_path_opt(sub_folder);
+            command::ls::cmd_ls(
+                &config,
+                cli_args.base_dir.as_deref(),
+                None,
+                None,
+                sub_folder.as_deref(),
+            )?;
+        }
+        Some(SubCommands::Show { clip, qrcode, pass_name }) => {
             let pass_name = to_relative_path_opt(pass_name);
             command::ls::cmd_ls(
                 &config,

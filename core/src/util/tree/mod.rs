@@ -24,23 +24,24 @@ pub struct TreeConfig<'a> {
     pub filters: Vec<Regex>,
 }
 
-pub struct PrintConfig {
+pub struct TreePrintConfig {
     pub dir_color: Option<Color>,
     pub file_color: Option<Color>,
     pub symbol_color: Option<Color>,
     pub tree_color: Option<Color>,
 }
 
-impl From<config::PrintConfig> for PrintConfig {
-    fn from(config: config::PrintConfig) -> Self {
+impl<CFG: AsRef<config::cli::PrintConfig>> From<CFG> for TreePrintConfig {
+    fn from(config: CFG) -> Self {
         Self {
-            dir_color: string_to_color_opt(&config.dir_color),
-            file_color: string_to_color_opt(&config.file_color),
-            symbol_color: string_to_color_opt(&config.symbol_color),
-            tree_color: string_to_color_opt(&config.tree_color),
+            dir_color: string_to_color_opt(&config.as_ref().dir_color),
+            file_color: string_to_color_opt(&config.as_ref().file_color),
+            symbol_color: string_to_color_opt(&config.as_ref().symbol_color),
+            tree_color: string_to_color_opt(&config.as_ref().tree_color),
         }
     }
 }
+
 #[derive(Debug)]
 pub enum NodeType {
     File,

@@ -23,7 +23,7 @@ pub fn get_test_password() -> String {
 
 pub fn clean_up_test_key(
     executable: &str,
-    emails: &Vec<&str>,
+    emails: &[impl AsRef<str>],
 ) -> Result<(), Box<dyn std::error::Error>> {
     for email in emails {
         while let Ok((fingerprint, _, _)) = get_pgp_key_info(executable, email) {
@@ -92,6 +92,14 @@ pub(crate) fn create_dir_structure(base: &Path, structure: &[(Option<&str>, &[&s
         for file in *files {
             fs::File::create(dir_path.join(file)).unwrap();
         }
+    }
+}
+
+pub(crate) fn write_gpg_id(path: &Path, gpg_id: &[&str]) {
+    use std::io::Write;
+    let mut file = fs::File::create(path.join(".gpg-id")).unwrap();
+    for id in gpg_id {
+        writeln!(file, "{}", id).unwrap();
     }
 }
 

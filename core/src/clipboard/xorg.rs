@@ -5,15 +5,18 @@ use anyhow::{anyhow, Result};
 use secrecy::{ExposeSecret, SecretString};
 use zeroize::Zeroize;
 
+use crate::constants::default_constants::X11_COPY_EXECUTABLE;
+use crate::util::str::fit_to_unix;
+
 pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
-    let mut child = Command::new("xclip")
+    let mut child = Command::new(X11_COPY_EXECUTABLE)
         .arg("-selection")
         .arg("clipboard")
         .stdin(std::process::Stdio::piped())
         .spawn()?;
 
     let child_stdin = child.stdin.as_mut().ok_or(anyhow!("Cannot get stdin for 'xclip'"))?;
-    child_stdin.write_all(secret.expose_secret().as_bytes())?;
+    child_stdin.write_all(fit_to_unix(secret.expose_secret()).as_bytes())?;
     secret.zeroize();
 
     let exit_status = child.wait()?;
@@ -23,7 +26,7 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize
 
     if let Some(secs) = timeout {
         let cmd = format!("sleep {} && echo -n '' | xclip -selection clipboard", secs);
-        Command::new("sh").arg("-c").arg(cmd).spawn()?;
+        let _ = Command::new("sh").arg("-c").arg(cmd).spawn();
     }
 
     Ok(())
@@ -47,7 +50,7 @@ mod tests {
         assert_eq!(cmd.stdout, b"Hello, pars");
         assert_eq!(cmd.status.success(), true);
 
-        //TODO: cleanup gnome clipboard
+        //TODO: cleanup gnome clipboard(maybe useless, gnome do not support clipboard officially)
         std::thread::sleep(std::time::Duration::from_secs(1 + TIMEOUT as u64));
         let cmd =
             Command::new("xclip").arg("-o").arg("-selection").arg("clipboard").output().unwrap();

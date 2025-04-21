@@ -4,20 +4,21 @@ use log::debug;
 use secrecy::SecretString;
 
 use crate::pgp::PGPClient;
-use crate::util::fs_util::path_to_str;
+use crate::util::fs_util::{get_dir_gpg_id_content, path_to_str};
 use crate::util::str;
 use crate::util::str::remove_lines_postfix;
-use crate::util::tree::{DirTree, PrintConfig, TreeConfig};
+use crate::util::tree::{DirTree, TreeConfig, TreePrintConfig};
 use crate::{IOErr, IOErrType};
 
 pub enum LsOrShow {
     Password(SecretString),
     DirTree(String),
 }
+
 pub fn ls_io(
-    client: &PGPClient,
+    pgp_executable: &str,
     tree_cfg: &TreeConfig,
-    print_cfg: &PrintConfig,
+    print_cfg: &TreePrintConfig,
 ) -> Result<LsOrShow> {
     let mut full_path = tree_cfg.root.join(tree_cfg.target);
 
@@ -47,6 +48,13 @@ pub fn ls_io(
 
     if full_path.is_file() {
         debug!("ls_io: '{}' is file", tree_cfg.target);
+        // Get the appropriate key fingerprints for this file's path
+        let keys_fpr = get_dir_gpg_id_content(tree_cfg.root, &full_path)?;
+        let client = PGPClient::new(
+            pgp_executable,
+            &keys_fpr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+        )?;
+
         let data = client.decrypt_stdin(tree_cfg.root, path_to_str(&full_path)?)?;
         Ok(LsOrShow::Password(data))
     } else if !full_path.exists() {
@@ -57,7 +65,7 @@ pub fn ls_io(
     }
 }
 
-pub fn ls_dir(tree_cfg: &TreeConfig, print_cfg: &PrintConfig) -> Result<String> {
+pub fn ls_dir(tree_cfg: &TreeConfig, print_cfg: &TreePrintConfig) -> Result<String> {
     let mut full_path = tree_cfg.root.join(tree_cfg.target);
 
     while full_path.is_symlink() {
@@ -117,7 +125,7 @@ mod tests {
                     filter_type: FilterType::Disable,
                     filters: Vec::new(),
                 };
-                let print_cfg = PrintConfig {
+                let print_cfg = TreePrintConfig {
                     dir_color: None,
                     file_color: None,
                     symbol_color: None,

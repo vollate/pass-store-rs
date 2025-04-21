@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use pars_core::config::ParsConfig;
+use pars_core::config::cli::ParsConfig;
 
 pub(crate) fn unwrap_root_path(root: Option<&str>, config: &ParsConfig) -> PathBuf {
     match root {

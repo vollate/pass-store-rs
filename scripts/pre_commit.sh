@@ -12,7 +12,7 @@ if [ $? -ne 0 ]; then
     echo "cargo fix failed"
     exit $?
 fi
-cargo fmt
+cargo fmt --all
 if [ $? -ne 0 ]; then
     echo "cargo fmt failed"
     exit $?
@@ -24,11 +24,13 @@ for dir in "${TARGET_DIRS[@]}"; do
     cargo clippy --fix --allow-dirty
     if [ $? -ne 0 ]; then
         echo "cargo clippy failed in $dir"
+        cd ..
         exit $?
     fi
-    cargo test
+    cargo test -- --include-ignored
     if [ $? -ne 0 ]; then
         echo "cargo test failed in $dir"
+        cd ..
         exit $?
     fi
     cd ..

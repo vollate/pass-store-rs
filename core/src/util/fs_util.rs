@@ -1,4 +1,4 @@
-use std::fs::DirEntry;
+use std::io::{BufRead, Read, Write};
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 #[cfg(windows)]
@@ -10,27 +10,11 @@ use anyhow::{anyhow, Result};
 use clean_path::Clean;
 use fs_extra::dir::{self, CopyOptions};
 use log::debug;
+use secrecy::{ExposeSecret, SecretBox};
 
+use crate::constants::default_constants::BACKUP_EXTENSION;
+use crate::pgp::PGPClient;
 use crate::{IOErr, IOErrType};
-
-const BACKUP_EXTENSION: &str = "parsbak";
-
-pub fn get_new_line() -> &'static str {
-    #[cfg(target_os = "macos")]
-    {
-        "\r"
-    }
-
-    #[cfg(unix)]
-    {
-        "\n"
-    }
-
-    #[cfg(windows)]
-    {
-        "\r\n"
-    }
-}
 
 pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
@@ -42,7 +26,6 @@ pub fn find_executable_in_path(executable: &str) -> Option<PathBuf> {
             }
         }
     }
-
     None
 }
 
@@ -84,11 +67,13 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
         if to_check.is_dir() {
             let key_file = to_check.join(".gpg-id");
             debug!("Check {:?} for .gpg-id file", key_file);
+
             if key_file.exists() && key_file.is_file() {
                 if let Ok(key) = fs::read_to_string(key_file) {
-                    debug!("Found key: {:?}", key);
+                    debug!("Found key(s): {:?}", key);
+
                     return Ok(key
-                        .split(get_new_line())
+                        .lines()
                         .map(|line| line.trim())
                         .filter(|line| !line.is_empty())
                         .map(|line| line.to_string())
@@ -120,25 +105,6 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
         }
     }
     Err(anyhow!(format!("Cannot find '.gpg-id' for {:?}", cur_dir)))
-}
-
-pub(crate) fn process_files_recursively<F>(path: &PathBuf, process: &F) -> Result<()>
-where
-    F: Fn(&DirEntry) -> Result<()>,
-{
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_dir() {
-                process_files_recursively(&path.to_path_buf(), process)?;
-            } else {
-                process(&entry)?;
-            }
-        }
-    }
-    Ok(())
 }
 
 pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf> {
@@ -220,7 +186,7 @@ pub fn filename_to_str(path: &Path) -> Result<&str> {
         .ok_or_else(|| IOErr::new(IOErrType::InvalidName, path))?)
 }
 
-pub fn is_subpath_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool> {
+pub fn is_sub_path_of<P: AsRef<Path>>(parent: P, child: P) -> Result<bool> {
     let child_clean = child.as_ref().clean();
     let parent_clean = parent.as_ref().clean();
     Ok(child_clean.starts_with(&parent_clean))
@@ -235,9 +201,57 @@ pub fn set_readonly<P: AsRef<Path>>(path: P, readonly: bool) -> Result<()> {
 }
 
 pub fn path_attack_check(root: &Path, child: &Path) -> Result<()> {
-    if !is_subpath_of(root, child)? {
+    if !is_sub_path_of(root, child)? {
         Err(IOErr::new(IOErrType::PathNotInRepo, child).into())
     } else {
         Ok(())
+    }
+}
+
+pub fn prompt_overwrite<R: Read + BufRead, W: Write>(
+    in_s: &mut R,
+    err_s: &mut W,
+    pass_name: &str,
+) -> Result<bool> {
+    write!(err_s, "An entry already exists for {}. Overwrite? [y/N]: ", pass_name)?;
+    let mut input = String::new();
+    in_s.read_line(&mut input)?;
+    Ok(input.trim().eq_ignore_ascii_case("y"))
+}
+
+pub fn create_or_overwrite(
+    client: &PGPClient,
+    pass_path: &Path,
+    password: &SecretBox<str>,
+) -> Result<()> {
+    if pass_path.exists() {
+        let backup = backup_encrypted_file(pass_path)?;
+        match client.encrypt(password.expose_secret(), path_to_str(pass_path)?) {
+            Ok(_) => {
+                fs::remove_file(&backup)?;
+                Ok(())
+            }
+            Err(e) => {
+                restore_backup_file(&backup)?;
+                Err(e)
+            }
+        }
+    } else {
+        client.encrypt(password.expose_secret(), path_to_str(pass_path)?)?;
+        Ok(())
+    }
+}
+
+pub fn default_config_path() -> String {
+    let path = get_home_dir().join(".config/pars/config.toml");
+
+    match path_to_str(&path) {
+        Ok(path) => path.into(),
+        Err(_) => {
+            eprintln!(
+                "Error getting default config path, use '~/.config/pars/config.toml' instead"
+            );
+            "~/.config/pars/config.toml".into()
+        }
     }
 }
