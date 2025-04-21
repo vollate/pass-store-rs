@@ -1,7 +1,10 @@
 [package]
 name = "pars-core"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
+description = "Pars core library, include the main features of pars"
+authors = ["Vollate <uint44t@gmail.com>"]
+
 
 [dependencies]
 chrono = "0.4.39"
@@ -26,12 +29,8 @@ anyhow = "1.0.97"
 toml = "0.8.20"
 unicode-segmentation = "1.12.0"
 
-
 [features]
 default = []
-
-
-
 
 [dev-dependencies]
 serial_test = "3.2.0"
