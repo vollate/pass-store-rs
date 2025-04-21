@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-### Addded
+### Added
 
 - Add changes to git staged area and commit after operation(for `init`, `generate`, `rm`, `cp`, `mv`, `edit`).
 - Command `show` now support qr code generation and display.
