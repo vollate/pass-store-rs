@@ -108,7 +108,7 @@ While `pars` aims for full compatibility with `pass`, a few key differences exis
 pars show -c <path/to/password>        # ❌ Cause error
 pars show -c -- <path/to/password>     # ✅ OK
 pars show -c0 <path/to/password>       # ✅ Safe, the line 0 will be regarded as the frist line
-pars show -c 0 <path/to/password>      # ✅ You can also separte them
+pars show -c 0 <path/to/password>      # ✅ You can also separate them
 pars show <path/to/password> -q        # ✅ OK
 ```
 
@@ -205,7 +205,8 @@ Then, run `"Import-Module ParsCompletion" >> $PROFILE` to enable the module.
 
 ## Contributing
 
-We welcome contributions of all kinds — from simple bug reports and typo fixes to major new features.
+We welcome contributions of all kinds — from simple bug reports and typo fixes to major new features. Open an issue or pull request on our [GitHub repository](https://github.com/vollate/pass-store-rs) to get started.
+<!-- How to format -->
 
 ## Reporting Bugs
 
