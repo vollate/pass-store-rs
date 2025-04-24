@@ -12,6 +12,7 @@ pub struct PGPKey {
     username: String,
     email: String,
 }
+
 pub struct PGPClient {
     executable: String,
     keys: Vec<PGPKey>,

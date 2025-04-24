@@ -1,0 +1,16 @@
+[print_config]
+dir_color = "cyan"
+file_color = ""
+symbol_color = "bright green"
+tree_color = ""
+grep_pass_color = "bright green"
+grep_match_color = "bright red"
+
+[path_config]
+default_repo = "/home/lambillda/.password-store"
+repos = ["/home/lambillda/.password-store"]
+
+[executable_config]
+pgp_executable = "gpg2"
+editor_executable = "vim"
+git_executable = "git"

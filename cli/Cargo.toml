@@ -1,17 +1,19 @@
 [package]
 name = "pars-cli"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "A zx2c4-pass compatible passwords manager with CLI"
 authors = ["Vollate <uint44t@gmail.com>"]
+repository = "https://github.com/vollate/pass-store-rs"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.97"
 clap = { version = "4.5.28", features = ["derive"] }
 fast_qr = "0.13.0"
 log = "0.4.26"
-pars-core = { version = "0.2.0" }
+pars-core = { version = "0.2.1" }
 secrecy = "0.10.3"
 
 [[bin]]
@@ -21,3 +23,6 @@ path = "src/main.rs"
 [dev-dependencies]
 assert_cmd = "2.0.16"
 predicates = "3.1.3"
+
+[build-dependencies]
+clap_complete = "4.5.47"

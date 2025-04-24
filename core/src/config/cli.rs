@@ -143,6 +143,18 @@ mod tests {
     }
 
     #[test]
+    fn generate_default_config_test() {
+        let default_config = ParsConfig::default();
+        let root = env!("CARGO_MANIFEST_DIR");
+        let save_path = Path::new(root).parent().unwrap().join("config").join("cli");
+        if !save_path.exists() {
+            fs::create_dir_all(&save_path).unwrap();
+        }
+        save_config(&default_config, save_path.join("pars_config.toml"))
+            .expect("Failed to save default config");
+    }
+
+    #[test]
     fn invalid_path_test() {
         let test_config = ParsConfig::default();
         let result = if cfg!(unix) {

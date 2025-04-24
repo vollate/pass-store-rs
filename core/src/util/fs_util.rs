@@ -8,6 +8,7 @@ use std::{env, fs, io};
 
 use anyhow::{anyhow, Result};
 use clean_path::Clean;
+use directories::ProjectDirs;
 use fs_extra::dir::{self, CopyOptions};
 use log::debug;
 use secrecy::{ExposeSecret, SecretBox};
@@ -243,15 +244,13 @@ pub fn create_or_overwrite(
 }
 
 pub fn default_config_path() -> String {
-    let path = get_home_dir().join(".config/pars/config.toml");
-
-    match path_to_str(&path) {
-        Ok(path) => path.into(),
-        Err(_) => {
-            eprintln!(
-                "Error getting default config path, use '~/.config/pars/config.toml' instead"
-            );
-            "~/.config/pars/config.toml".into()
-        }
+    if let Some(proj_dirs) = ProjectDirs::from("", "", "pars") {
+        let config_path = proj_dirs.config_dir().join("config.toml");
+        config_path.to_string_lossy().into_owned()
+    } else {
+        eprintln!(
+            "Error determining config directory, falling back to '~/.config/pars/config.toml'"
+        );
+        "~/.config/pars/config.toml".into()
     }
 }

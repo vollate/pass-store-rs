@@ -13,11 +13,25 @@ use crate::util::{to_relative_path, to_relative_path_opt};
 #[derive(Parser)]
 #[command(
     name = "pars",
-    about = "Stores, retrieves, generates, and synchronizes passwords securely",
     version = env!("CARGO_PKG_VERSION"),
     author = "Vollate <uint44t@gmail.com>",
-    //TODO: add setting for color and executable
+    long_about = r#"
+ _ __   __ _ _ __ ___ 
+| '_ \ / _` | '__/ __|
+| |_) | (_| | |  \__ \
+| .__/ \__,_|_|  |___/
+|_|                   
+
+A zx2c4-pass compatible password manager.
+
+------------------------------------------------------------
+Author   : Vollate <uint44t@gmail.com>
+Docs     : https://github.com/vollate/pass-store-rs/tree/main/cli
+License  : GPLv3 https://www.gnu.org/licenses/gpl-3.0.html
+------------------------------------------------------------
+"#
 )]
+
 pub struct CliParser {
     #[command(subcommand)]
     pub command: Option<SubCommands>,
