@@ -8,6 +8,7 @@ To use `pars-cli`, ensure your system has the following dependencies installed:
 
 - `gpg2`: for encryption and decryption (any program that implements the PGP standard, such as GnuPG or OpenPGP)
 - `git`: for version control
+- `xclip`(X11) or `wl-clipboard`(Wayland): for Linux DE clipboard support
 
 Refer to the [Installation](#installation) section for installation details.
 

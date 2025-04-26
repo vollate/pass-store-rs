@@ -7,8 +7,8 @@ grep_pass_color = "bright green"
 grep_match_color = "bright red"
 
 [path_config]
-default_repo = "/home/lambillda/.password-store"
-repos = ["/home/lambillda/.password-store"]
+default_repo = "<Your Home>/.password-store"
+repos = ["<Your Home>/.password-store"]
 
 [executable_config]
 pgp_executable = "gpg2"

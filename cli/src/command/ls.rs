@@ -104,7 +104,7 @@ fn handle_clip(clip: Option<usize>, passwd: &secrecy::SecretBox<str>) -> Result<
     Ok(())
 }
 
-fn to_qr_code(secret: SecretString) -> anyhow::Result<SecretString> {
+fn to_qr_code(secret: SecretString) -> Result<SecretString> {
     let qr = QRBuilder::new(secret.expose_secret()).build()?;
     Ok(qr.to_str().into())
 }

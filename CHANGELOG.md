@@ -1,6 +1,12 @@
-# Pars Changelog
+# pars-cli Changelog
 
 ## [Unreleased]
+
+### Changed
+
+- Refactor fuction to lessen arguments and improve readability.
+
+## [0.1.2] - 2025-04-25
 
 ### Added
 
@@ -37,3 +43,4 @@
   - edit
   - find
   - git
+

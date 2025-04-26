@@ -13,6 +13,17 @@ use crate::util::fs_util::{
     path_to_str, restore_backup_file,
 };
 
+pub struct IOStreams<'a, I, O, E>
+where
+    I: Read + BufRead,
+    O: Write,
+    E: Write,
+{
+    pub in_s: &'a mut I,
+    pub out_s: &'a mut O,
+    pub err_s: &'a mut E,
+}
+
 pub struct PasswdGenerateConfig {
     pub no_symbols: bool,
     pub in_place: bool,
@@ -26,9 +37,7 @@ pub fn generate_io<I, O, E>(
     root: &Path,
     pass_name: &str,
     gen_cfg: &PasswdGenerateConfig,
-    in_s: &mut I,
-    out_s: &mut O,
-    err_s: &mut E,
+    io_streams: &mut IOStreams<I, O, E>,
 ) -> Result<SecretString>
 where
     I: Read + BufRead,
@@ -41,16 +50,16 @@ where
 
     if gen_cfg.in_place && gen_cfg.force {
         let err_msg = "Cannot use both [--in-place] and [--force]";
-        writeln!(err_s, "{}", err_msg)?;
+        writeln!(io_streams.err_s, "{}", err_msg)?;
         return Err(anyhow!(err_msg));
     }
 
     if pass_path.exists()
         && !gen_cfg.force
         && !gen_cfg.in_place
-        && !fs_util::prompt_overwrite(in_s, err_s, pass_name)?
+        && !fs_util::prompt_overwrite(io_streams.in_s, io_streams.err_s, pass_name)?
     {
-        writeln!(out_s, "Operation cancelled.")?;
+        writeln!(io_streams.out_s, "Operation cancelled.")?;
         return Ok(SecretString::new("".to_string().into()));
     }
 
@@ -96,7 +105,7 @@ where
         create_or_overwrite(&client, &pass_path, &password)?;
     }
 
-    writeln!(out_s, "Generated password for '{}' saved", pass_name)?;
+    writeln!(io_streams.out_s, "Generated password for '{}' saved", pass_name)?;
 
     Ok(password)
 }
@@ -149,9 +158,10 @@ mod tests {
                     pgp_executable: executable.clone(),
                 };
 
-                let password =
-                    generate_io(&root, "test1", &config, &mut stdin, &mut stdout, &mut stderr)
-                        .unwrap();
+                let mut io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let password = generate_io(&root, "test1", &config, &mut io_streams).unwrap();
 
                 assert_eq!(password.expose_secret().len(), 16);
                 assert!(root.join("test1.gpg").exists());
@@ -165,22 +175,20 @@ mod tests {
                     stdin.write_all(b"n").unwrap();
                 });
                 let original_passwd = password;
-                let password =
-                    generate_io(&root, "test1", &config, &mut stdin, &mut stdout, &mut stderr)
-                        .unwrap();
+                let password = generate_io(&root, "test1", &config, &mut io_streams).unwrap();
                 let secret = test_client.decrypt_stdin(&root, "test1.gpg").unwrap();
                 assert_eq!(password.expose_secret(), "");
                 assert_eq!(secret.expose_secret(), original_passwd.expose_secret());
 
                 let (stdin, stdin_w) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
+                let mut io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
                 thread::spawn(move || {
                     let mut stdin = stdin_w;
                     stdin.write_all(b"y").unwrap();
                 });
-                let password =
-                    generate_io(&root, "test1", &config, &mut stdin, &mut stdout, &mut stderr)
-                        .unwrap();
+                let password = generate_io(&root, "test1", &config, &mut io_streams).unwrap();
                 let secret = test_client.decrypt_stdin(&root, "test1.gpg").unwrap();
                 assert_eq!(secret.expose_secret(), password.expose_secret());
                 assert_eq!(password.expose_secret().len(), 114);
@@ -223,9 +231,10 @@ mod tests {
                     pgp_executable: executable.clone(),
                 };
 
-                let password =
-                    generate_io(&root, "test2", &config, &mut stdin, &mut stdout, &mut stderr)
-                        .unwrap();
+                let mut io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let password = generate_io(&root, "test2", &config, &mut io_streams).unwrap();
 
                 let content = test_client.decrypt_stdin(&root, "test2.gpg").unwrap();
                 let lines: Vec<&str> = content.expose_secret().lines().collect();
@@ -269,9 +278,10 @@ mod tests {
                     pgp_executable: executable.clone(),
                 };
 
-                let password =
-                    generate_io(&root, "test3", &config, &mut stdin, &mut stdout, &mut stderr)
-                        .unwrap();
+                let mut io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let password = generate_io(&root, "test3", &config, &mut io_streams).unwrap();
 
                 assert_eq!(password.expose_secret().len(), 8);
                 let content = test_client.decrypt_stdin(&root, "test3.gpg").unwrap();
@@ -308,9 +318,11 @@ mod tests {
                     pgp_executable: executable.clone(),
                 };
 
-                let password =
-                    generate_io(&root, "test4", &config, &mut stdin, &mut stdout, &mut stderr)
-                        .unwrap();
+                let mut io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let password = generate_io(&root, "test4", &config, &mut io_streams).unwrap();
+
                 assert!(!password.expose_secret().contains(|c: char| !c.is_alphanumeric()));
                 let content = test_client.decrypt_stdin(&root, "test4.gpg").unwrap();
                 assert_eq!(content.expose_secret(), password.expose_secret());
@@ -345,8 +357,10 @@ mod tests {
                     pgp_executable: executable.clone(),
                 };
 
-                let result =
-                    generate_io(&root, "../outside", &config, &mut stdin, &mut stdout, &mut stderr);
+                let mut io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let result = generate_io(&root, "../outside", &config, &mut io_streams);
 
                 assert!(result.is_err());
             },
@@ -380,8 +394,10 @@ mod tests {
                     pgp_executable: executable.clone(),
                 };
 
-                let result =
-                    generate_io(&root, "test5", &config, &mut stdin, &mut stdout, &mut stderr);
+                let mut io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let result = generate_io(&root, "test5", &config, &mut io_streams);
 
                 assert!(result.is_err());
             },

@@ -144,7 +144,9 @@ mod tests {
 
     #[test]
     fn generate_default_config_test() {
-        let default_config = ParsConfig::default();
+        let mut default_config = ParsConfig::default();
+        default_config.path_config.default_repo = "<Your Home>/.password-store".into();
+        default_config.path_config.repos = vec!["<Your Home>/.password-store".into()];
         let root = env!("CARGO_MANIFEST_DIR");
         let save_path = Path::new(root).parent().unwrap().join("config").join("cli");
         if !save_path.exists() {

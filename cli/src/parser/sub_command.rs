@@ -23,7 +23,26 @@ pub enum SubCommands {
 
     #[clap(about = "List all passwords in the store or a sub-folder")]
     #[command(alias = "list")]
-    Ls { sub_folder: Option<String> },
+    Ls {
+        #[arg(
+            short = 'c',
+            long = "clip",
+            value_name = "line-number",
+            default_missing_value = "1",
+            num_args = 0..=1
+        )]
+        clip: Option<usize>,
+
+        #[arg(
+            short = 'q',
+            long = "qrcode",
+            value_name = "line-number",
+            default_missing_value = "1",
+            num_args = 0..=1
+        )]
+        qrcode: Option<usize>,
+        sub_folder: Option<String>,
+    },
 
     #[clap(about = "Show a password, optionally clip or qrcode it")]
     Show {
