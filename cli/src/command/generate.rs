@@ -2,7 +2,7 @@ use std::io::BufReader;
 
 use anyhow::Error;
 use log::debug;
-use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
+use pars_core::clipboard::copy_to_clipboard;
 use pars_core::config::cli::ParsConfig;
 use pars_core::git::add_and_commit;
 use pars_core::git::commit::{CommitType, GitCommit};
@@ -53,7 +53,7 @@ pub fn cmd_generate(
             res.expose_secret()
         );
         res.zeroize();
-    } else if let Err(e) = copy_to_clipboard(res, get_clip_time()) {
+    } else if let Err(e) = copy_to_clipboard(res, &config.clip_config.clip_time) {
         eprintln!("Failed to copy to clipboard: {}", e);
     }
 

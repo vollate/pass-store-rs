@@ -28,6 +28,7 @@ pub enum SubCommands {
             short = 'c',
             long = "clip",
             value_name = "line-number",
+            require_equals = true,
             default_missing_value = "1",
             num_args = 0..=1
         )]
@@ -37,6 +38,7 @@ pub enum SubCommands {
             short = 'q',
             long = "qrcode",
             value_name = "line-number",
+            require_equals = true,
             default_missing_value = "1",
             num_args = 0..=1
         )]
@@ -50,6 +52,7 @@ pub enum SubCommands {
             short = 'c',
             long = "clip",
             value_name = "line-number",
+            require_equals = true,
             default_missing_value = "1",
             num_args = 0..=1
         )]
@@ -59,6 +62,7 @@ pub enum SubCommands {
             short = 'q',
             long = "qrcode",
             value_name = "line-number",
+            require_equals = true,
             default_missing_value = "1",
             num_args = 0..=1
         )]

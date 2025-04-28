@@ -24,6 +24,35 @@ fn main() {
     process_cli(&config_path);
 }
 
+fn fix_args(raw: Vec<String>) -> Vec<String> {
+    let mut out = Vec::with_capacity(raw.len());
+    let mut iter = raw.into_iter();
+
+    if let Some(prog) = iter.next() {
+        out.push(prog);
+    }
+
+    while let Some(token) = iter.next() {
+        if token == "-c" || token == "-q" {
+            if let Some(next) = iter.next() {
+                if next.parse::<u32>().is_ok() {
+                    out.push(format!("{}={}", token, next));
+                    continue;
+                } else {
+                    out.push(token.clone());
+                    out.push(next);
+                    continue;
+                }
+            }
+            out.push(token);
+        } else {
+            out.push(token);
+        }
+    }
+
+    out
+}
+
 fn process_cli(config_path: &str) {
     let config = if PathBuf::from(&config_path).exists() {
         match load_config(config_path) {
@@ -37,7 +66,9 @@ fn process_cli(config_path: &str) {
         ParsConfig::default()
     };
 
-    let cli_args = CliParser::parse();
+    let raw_args: Vec<String> = env::args().collect();
+    let args = fix_args(raw_args);
+    let cli_args = CliParser::parse_from(args);
 
     if let Err((code, e)) = parser::handle_cli(config, cli_args) {
         eprintln!("{}", e);

@@ -18,10 +18,9 @@ pub struct CopyRenameConfig {
     pub file_extension: String,
 }
 
-// 导入 IOStreams 结构体，这个在 generate.rs 中定义
 use crate::operation::generate::IOStreams;
 
-// Currently, we do not support cross repo rename/copy
+// Cross repo rename/copy is not supported
 fn handle_overwrite_delete<I, O, E>(
     path_to_overwrite: &Path,
     force: bool,
@@ -167,6 +166,100 @@ where
     Ok(())
 }
 
+/// Re-encrypts a file with different GPG keys
+///
+/// This is used when copying or moving files between directories with different .gpg-id files
+fn reencrypt_file<I, O, E>(
+    from_path: &Path,
+    to_path: &Path,
+    root: &Path,
+    config: &CopyRenameConfig,
+    io_streams: &mut IOStreams<I, O, E>,
+) -> Result<()>
+where
+    I: Read + BufRead,
+    O: Write,
+    E: Write,
+{
+    // Get the target directory for determining GPG keys
+    let target_dir = if to_path.exists() && to_path.is_dir() {
+        to_path
+    } else {
+        match to_path.parent() {
+            Some(parent) => parent,
+            None => root,
+        }
+    };
+
+    // Get target filename
+    let target_file = if to_path.exists() && to_path.is_dir() {
+        let filename = from_path
+            .file_name()
+            .ok_or_else(|| IOErr::new(IOErrType::CannotGetFileName, from_path))?;
+        to_path.join(filename)
+    } else {
+        PathBuf::from(format!("{}.{}", path_to_str(to_path)?, config.file_extension))
+    };
+
+    // Check for overwrite
+    if target_file.exists() && !handle_overwrite_delete(&target_file, config.force, io_streams)? {
+        return Ok(());
+    }
+
+    // Set up clients for decryption and re-encryption
+    let from_dir = from_path.parent().unwrap_or(root);
+    let from_keys = get_dir_gpg_id_content(root, from_dir)?;
+    let to_keys = get_dir_gpg_id_content(root, target_dir)?;
+
+    // Create client for decryption with source keys
+    let source_client = match PGPClient::new("gpg", &from_keys) {
+        Ok(client) => client,
+        Err(e) => {
+            writeln!(io_streams.err_s, "Error creating PGP client for decryption: {}", e)?;
+            return Err(e);
+        }
+    };
+
+    // Create client for encryption with destination keys
+    let target_client = match PGPClient::new("gpg", &to_keys) {
+        Ok(client) => client,
+        Err(e) => {
+            writeln!(io_streams.err_s, "Error creating PGP client for encryption: {}", e)?;
+            return Err(e);
+        }
+    };
+
+    // Decrypt the file
+    let content = match source_client.decrypt_stdin(root, path_to_str(from_path)?) {
+        Ok(content) => content,
+        Err(e) => {
+            writeln!(io_streams.err_s, "Error decrypting file: {}", e)?;
+            return Err(e);
+        }
+    };
+
+    // Encrypt with the destination keys
+    match target_client.encrypt(content.expose_secret(), path_to_str(&target_file)?) {
+        Ok(_) => {
+            if !config.copy {
+                // If this was a move operation, delete the original file
+                if let Err(e) = fs::remove_file(from_path) {
+                    writeln!(
+                        io_streams.err_s,
+                        "Warning: Failed to delete original file after move: {}",
+                        e
+                    )?;
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            writeln!(io_streams.err_s, "Error re-encrypting file: {}", e)?;
+            Err(e)
+        }
+    }
+}
+
 pub fn copy_rename_io<I, O, E>(
     config: CopyRenameConfig,
     root: &Path,
@@ -239,82 +332,7 @@ where
 
         // If it's a file that needs re-encryption
         if from_path.is_file() {
-            // Get the target directory for determining GPG keys
-            let target_dir = if to_path.exists() && to_path.is_dir() {
-                to_path.clone()
-            } else {
-                to_path.parent().unwrap_or(root).to_path_buf()
-            };
-
-            // Get target filename
-            let target_file = if to_path.exists() && to_path.is_dir() {
-                let filename = from_path
-                    .file_name()
-                    .ok_or_else(|| IOErr::new(IOErrType::CannotGetFileName, &from_path))?;
-                to_path.join(filename)
-            } else {
-                PathBuf::from(format!("{}.{}", path_to_str(&to_path)?, config.file_extension))
-            };
-
-            // Check for overwrite
-            if target_file.exists()
-                && !handle_overwrite_delete(&target_file, config.force, &mut io_streams)?
-            {
-                return Ok(());
-            }
-
-            // Set up clients for decryption and re-encryption
-            let from_dir = from_path.parent().unwrap_or(root);
-            let from_keys = get_dir_gpg_id_content(root, from_dir)?;
-            let to_keys = get_dir_gpg_id_content(root, &target_dir)?;
-
-            // Create client for decryption with source keys
-            let source_client = match PGPClient::new("gpg", &from_keys) {
-                Ok(client) => client,
-                Err(e) => {
-                    writeln!(io_streams.err_s, "Error creating PGP client for decryption: {}", e)?;
-                    return Err(e);
-                }
-            };
-
-            // Create client for encryption with destination keys
-            let target_client = match PGPClient::new("gpg", &to_keys) {
-                Ok(client) => client,
-                Err(e) => {
-                    writeln!(io_streams.err_s, "Error creating PGP client for encryption: {}", e)?;
-                    return Err(e);
-                }
-            };
-
-            // Decrypt the file
-            let content = match source_client.decrypt_stdin(root, path_to_str(&from_path)?) {
-                Ok(content) => content,
-                Err(e) => {
-                    writeln!(io_streams.err_s, "Error decrypting file: {}", e)?;
-                    return Err(e);
-                }
-            };
-
-            // Encrypt with the destination keys
-            match target_client.encrypt(content.expose_secret(), path_to_str(&target_file)?) {
-                Ok(_) => {
-                    if !config.copy {
-                        // If this was a move operation, delete the original file
-                        if let Err(e) = fs::remove_file(&from_path) {
-                            writeln!(
-                                io_streams.err_s,
-                                "Warning: Failed to delete original file after move: {}",
-                                e
-                            )?;
-                        }
-                    }
-                    return Ok(());
-                }
-                Err(e) => {
-                    writeln!(io_streams.err_s, "Error re-encrypting file: {}", e)?;
-                    return Err(e);
-                }
-            }
+            return reencrypt_file(&from_path, &to_path, root, &config, &mut io_streams);
         }
     }
 
@@ -369,7 +387,7 @@ mod tests {
 
         cleanup!(
             {
-                let (stdin, stdin_w) = pipe().unwrap();
+                let (stdin, _stdin_w) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();
@@ -484,7 +502,7 @@ mod tests {
 
         cleanup!(
             {
-                let (stdin, stdin_w) = pipe().unwrap();
+                let (stdin, _stdin_w) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();

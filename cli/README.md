@@ -50,6 +50,7 @@ We are trying to package `pars-cli` to more package managers. If you want to hel
 <!--scoop add bucket xxxx-->
 <!--scoop install pars-cli-->
 <!--```-->
+
 ### Cargo
 
 Install `pars-cli` using Cargo:
@@ -95,40 +96,20 @@ pars find <name>
 
 # Search passwords by content
 pars grep <content>
+
+# For more commands, check the help message:
+pars --help # or -h(short help)
 ```
 
 ## Differences
 
 While `pars` aims for full compatibility with `pass`, a few key differences exist:
 
-1. **Option Placement for `-c` and `-q`**
-
-   If `-c` (clipboard) or `-q` (QR code) is used and followed directly by arguments (like a path), you must either:
-
-```sh
-pars show -c <path/to/password>        # ❌ Cause error
-pars show -c -- <path/to/password>     # ✅ OK
-pars show -c0 <path/to/password>       # ✅ Safe, the line 0 will be regarded as the frist line
-pars show -c 0 <path/to/password>      # ✅ You can also separate them
-pars show <path/to/password> -q        # ✅ OK
-```
-
-<details>
-<summary>Why <code>pars</code> and <code>pass</code> differ in argument parsing</summary>
-<div>
-<p><code>pars</code> uses the <a href="https://docs.rs/clap">Rust Clap</a> library for parsing command-line arguments. Clap is a modern, strongly typed argument parser that conforms to POSIX standards. It enforces clear separation between options and positional arguments, especially when options accept optional values or multiple values.</p>
-
-<p>In contrast, <code>pass</code> is written in Bash and parses arguments manually using shell constructs like <code>shift</code>, <code>case</code>, and <code>getopts</code>. This gives <code>pass</code> more lenient and flexible handling of ambiguous argument positions, but it also results in inconsistent behavior between versions or environments.</p>
-
-<p>Because of these fundamental differences, some <code>pass</code>-style invocations must be adjusted slightly when used with <code>pars</code>.</p>
-</div>
-</details>
-
-2. **Configuration via File**
+1. **Configuration via File**
 
    Unlike `pass`, `pars` does not rely on environment variables for configuration. All settings are managed through a dedicated config file. You can change the config file location by setting the `PARS_CONFIG_PATH` environment variable.
 
-3. **No Plugin Support (Yet)**
+2. **No Plugin Support (Yet)**
 
    Plugin support is currently not available, but may be considered in future versions.
 
@@ -207,6 +188,7 @@ Then, run `"Import-Module ParsCompletion" >> $PROFILE` to enable the module.
 ## Contributing
 
 We welcome contributions of all kinds — from simple bug reports and typo fixes to major new features. Open an issue or pull request on our [GitHub repository](https://github.com/vollate/pass-store-rs) to get started.
+
 <!-- How to format -->
 
 ## Reporting Bugs
@@ -218,4 +200,3 @@ If you encounter any issues, please report them on our [GitHub Issues page](http
 - Steps to reproduce
 - Relevant output or logs: set up the environment variable `PARS_LOG_LEVEL=Debug` to get more logs, **remember to remove any sensitive information before sharing!**
 - Crash reports: if `pars` exits abnormally, set up the environment variable `PARS_LOG_LEVEL=Debug` and `RUST_BACKTRACE=1` to get the backtrace, and share it with us. **Remember to remove any sensitive information before sharing!**
-  

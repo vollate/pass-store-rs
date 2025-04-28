@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support `getopt` like cli argument parsing.
+
 ### Changed
 
 - Refactor fuction to lessen arguments and improve readability.
@@ -43,4 +47,3 @@
   - edit
   - find
   - git
-

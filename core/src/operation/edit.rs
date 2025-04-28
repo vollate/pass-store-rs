@@ -73,7 +73,8 @@ pub fn edit(
     });
     content.zeroize();
 
-    let mut cmd = Command::new(editor).arg(path_to_str(&temp_filepath)?).spawn()?;
+    let editor_args = [path_to_str(&temp_filepath)?];
+    let mut cmd = Command::new(editor).args(&editor_args).spawn()?;
     let status = cmd.wait()?;
     if status.success() {
         let new_content = fs::read_to_string(&temp_filepath)?;
@@ -114,6 +115,34 @@ mod tests {
         get_test_executable, gpg_key_edit_example_batch, gpg_key_gen_example_batch, write_gpg_id,
     };
 
+    fn create_fake_editor(root: &Path) -> PathBuf {
+        #[cfg(unix)]
+        let fake_editor_content = r#"#!/bin/bash
+file="$1"
+sed -i '1d' "$file"
+"#;
+
+        #[cfg(windows)]
+        let fake_editor_content = r#"@echo off
+set file=%1
+powershell -Command "(Get-Content %file% | Select-Object -Skip 1) | Set-Content %file%"
+"#;
+
+        let fake_editor_path =
+            root.join(if cfg!(unix) { "fake_editor.sh" } else { "fake_editor.bat" });
+        fs::write(&fake_editor_path, fake_editor_content).expect("Failed to write fake editor");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&fake_editor_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&fake_editor_path, perms).unwrap();
+        }
+
+        fake_editor_path
+    }
+
     #[test]
     #[serial]
     #[ignore = "need run interactively"]
@@ -148,8 +177,12 @@ mod tests {
                     )
                     .unwrap();
                 write_gpg_id(&root, &test_client.get_keys_fpr());
-                let res1 = edit(&root, "file1", "gpg", "vim", executable).unwrap();
-                let res2 = edit(&root, "dir/file2", "gpg", "vim", executable).unwrap();
+
+                let fake_editor = create_fake_editor(&root);
+                let res1 =
+                    edit(&root, "file1", "gpg", path_to_str(&fake_editor).unwrap(), executable)
+                        .unwrap();
+                let res2 = edit(&root, "dir/file2", "gpg", "cat", executable).unwrap();
                 assert!(res1);
                 assert!(!res2);
 

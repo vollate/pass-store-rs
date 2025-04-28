@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Error, Result};
 use fast_qr::{self, QRBuilder};
 use log::debug;
-use pars_core::clipboard::{copy_to_clipboard, get_clip_time};
+use pars_core::clipboard::copy_to_clipboard;
 use pars_core::config::cli::ParsConfig;
 use pars_core::operation::ls_or_show::{ls_io, LsOrShow};
 use pars_core::util::tree::{FilterType, TreeConfig, TreePrintConfig};
@@ -49,7 +49,7 @@ pub fn cmd_ls(
                 return Ok(());
             }
 
-            handle_clip(clip, &passwd)?;
+            handle_clip(clip, &passwd, config)?;
 
             handle_qr_code(qrcode, passwd)?;
 
@@ -82,14 +82,18 @@ fn handle_qr_code(
     Ok(())
 }
 
-fn handle_clip(clip: Option<usize>, passwd: &secrecy::SecretBox<str>) -> Result<(), (i32, Error)> {
+fn handle_clip(
+    clip: Option<usize>,
+    passwd: &secrecy::SecretBox<str>,
+    config: &ParsConfig,
+) -> Result<(), (i32, Error)> {
     if let Some(mut line_num) = clip {
         if 0 == line_num {
             line_num = 1;
         }
 
         if let Some(line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
-            copy_to_clipboard(line_content.into(), get_clip_time())
+            copy_to_clipboard(line_content.into(), &config.clip_config.clip_time)
                 .map_err(|e| (ParsExitCode::Error.into(), e))?;
         } else {
             return Err((

@@ -17,6 +17,8 @@ pub struct ParsConfig {
     pub path_config: PathConfig,
     #[serde(default = "ExecutableConfig::default")]
     pub executable_config: ExecutableConfig,
+    #[serde(default = "ClipConfig::default")]
+    pub clip_config: ClipConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
@@ -40,6 +42,11 @@ pub struct ExecutableConfig {
     pub pgp_executable: String,
     pub editor_executable: String,
     pub git_executable: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct ClipConfig {
+    pub clip_time: Option<usize>,
 }
 
 impl Default for PrintConfig {
@@ -109,6 +116,12 @@ impl Default for PathConfig {
             }
         };
         PathConfig { default_repo: default_path.clone(), repos: vec![default_path] }
+    }
+}
+
+impl Default for ClipConfig {
+    fn default() -> Self {
+        ClipConfig { clip_time: Some(45) }
     }
 }
 
