@@ -74,7 +74,7 @@ pub fn edit(
     content.zeroize();
 
     let editor_args = [path_to_str(&temp_filepath)?];
-    let mut cmd = Command::new(editor).args(&editor_args).spawn()?;
+    let mut cmd = Command::new(editor).args(editor_args).spawn()?;
     let status = cmd.wait()?;
     if status.success() {
         let new_content = fs::read_to_string(&temp_filepath)?;

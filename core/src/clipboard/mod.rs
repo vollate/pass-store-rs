@@ -9,8 +9,6 @@ pub mod xorg;
 #[cfg(target_os = "windows")]
 mod windows;
 
-use std::env;
-
 #[allow(unused_imports)]
 use anyhow::{anyhow, Result};
 use secrecy::SecretString;
@@ -30,6 +28,7 @@ pub fn copy_to_clipboard(content: SecretString, sec_to_clear: &Option<usize>) ->
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
+        use std::env;
         if env::var("WAYLAND_DISPLAY").is_ok() {
             check_executable(WAYLAND_COPY_EXECUTABLE)?;
             wayland::copy_to_clip_board(content.clone(), sec_to_clear)?;

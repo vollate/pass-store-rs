@@ -6,7 +6,7 @@ use zeroize::Zeroize;
 
 use crate::util::str::fit_to_unix;
 
-pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
+pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: &Option<usize>) -> Result<()> {
     let mut child = Command::new("pbcopy").stdin(Stdio::piped()).spawn()?;
 
     if let Some(stdin) = child.stdin.as_mut() {
@@ -51,7 +51,7 @@ mod tests {
 
         const TIMEOUT: usize = 1;
         let content = SecretString::new("Hello, macOS".into());
-        let res = copy_to_clip_board(content, Some(TIMEOUT));
+        let res = copy_to_clip_board(content, &Some(TIMEOUT));
         assert!(res.is_ok());
 
         let cmd = Command::new("pbpaste").output().unwrap();

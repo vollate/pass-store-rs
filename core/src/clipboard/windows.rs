@@ -8,7 +8,7 @@ use crate::util::str::fit_to_powershell;
 
 const POWERSHELL_ARGS: [&str; 2] = ["-NoProfile", "-Command"];
 
-pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
+pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: &Option<usize>) -> Result<()> {
     let mut child = Command::new("powershell")
         .args(POWERSHELL_ARGS)
         .arg(format!(r#"Set-Clipboard -Value "{}""#, fit_to_powershell(secret.expose_secret())))
@@ -59,7 +59,7 @@ mod tests {
         for secret in EXAMPLE_CLIPBOARD_CONTENT {
             const TIMEOUT: usize = 1;
             let content = SecretString::new(secret.into());
-            let res = copy_to_clip_board(content, Some(TIMEOUT));
+            let res = copy_to_clip_board(content, &Some(TIMEOUT));
             assert!(res.is_ok());
 
             let cmd =
