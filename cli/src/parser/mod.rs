@@ -16,9 +16,21 @@ use crate::util::{to_relative_path, to_relative_path_opt};
     about = "pars - A zx2c4-pass compatible passwords manager",
     version = env!("CARGO_PKG_VERSION"),
     author = "Vollate <uint44t@gmail.com>",
-    long_about = "",
-    after_help = "License: GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>"
+    long_about = r#"
+ _ __   __ _ _ __ ___ 
+| '_ \ / _` | '__/ __|
+| |_) | (_| | |  \__ \
+| .__/ \__,_|_|  |___/
+|_|                   
+A zx2c4-pass compatible password manager.
+------------------------------------------------------------
+Author   : Vollate <uint44t@gmail.com>
+Docs     : https://github.com/vollate/pass-store-rs/tree/main/cli
+License  : GPLv3 https://www.gnu.org/licenses/gpl-3.0.html
+------------------------------------------------------------
+"#
 )]
+
 pub struct CliParser {
     #[command(subcommand)]
     pub command: Option<SubCommands>,
