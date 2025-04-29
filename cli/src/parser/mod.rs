@@ -13,6 +13,7 @@ use crate::util::{to_relative_path, to_relative_path_opt};
 #[derive(Parser)]
 #[command(
     name = "pars",
+    about = "pars - A zx2c4-pass compatible passwords manager",
     version = env!("CARGO_PKG_VERSION"),
     author = "Vollate <uint44t@gmail.com>",
     long_about = r#"
@@ -21,9 +22,7 @@ use crate::util::{to_relative_path, to_relative_path_opt};
 | |_) | (_| | |  \__ \
 | .__/ \__,_|_|  |___/
 |_|                   
-
 A zx2c4-pass compatible password manager.
-
 ------------------------------------------------------------
 Author   : Vollate <uint44t@gmail.com>
 Docs     : https://github.com/vollate/pass-store-rs/tree/main/cli
@@ -59,13 +58,13 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
         Some(SubCommands::Find { names }) => {
             command::find::cmd_find(&config, cli_args.base_dir.as_deref(), &names)?;
         }
-        Some(SubCommands::Ls { sub_folder }) => {
+        Some(SubCommands::Ls { clip, qrcode, sub_folder }) => {
             let sub_folder = to_relative_path_opt(sub_folder);
             command::ls::cmd_ls(
                 &config,
                 cli_args.base_dir.as_deref(),
-                None,
-                None,
+                clip,
+                qrcode,
                 sub_folder.as_deref(),
             )?;
         }
@@ -103,16 +102,16 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             pass_length,
         }) => {
             let pass_name = to_relative_path(pass_name);
-            command::generate::cmd_generate(
-                &config,
-                cli_args.base_dir.as_deref(),
+            let cmd_config = command::generate::GenerateCommandConfig {
+                base_dir: cli_args.base_dir.as_deref(),
                 no_symbols,
                 clip,
                 in_place,
                 force,
-                &pass_name,
+                pass_name: &pass_name,
                 pass_length,
-            )?;
+            };
+            command::generate::cmd_generate(&config, cmd_config)?;
         }
         Some(SubCommands::Rm { recursive, force, pass_name }) => {
             let pass_name = to_relative_path(pass_name);

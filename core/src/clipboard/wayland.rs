@@ -9,7 +9,7 @@ use zeroize::Zeroize;
 use crate::constants::default_constants::WAYLAND_COPY_EXECUTABLE;
 use crate::util::str::fit_to_unix;
 
-pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
+pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: &Option<usize>) -> Result<()> {
     let mut cmd = Command::new(WAYLAND_COPY_EXECUTABLE);
     cmd.arg("-n");
 
@@ -57,7 +57,7 @@ mod tests {
     fn wayland_clipboard_test() {
         const TIMEOUT: usize = 1;
         let content = SecretString::new("Hello, pars".into());
-        let res = copy_to_clip_board(content, Some(TIMEOUT));
+        let res = copy_to_clip_board(content, &Some(TIMEOUT));
         assert!(res.is_ok());
 
         let cmd = Command::new("wl-paste").output().unwrap();

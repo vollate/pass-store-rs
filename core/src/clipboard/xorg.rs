@@ -8,7 +8,7 @@ use zeroize::Zeroize;
 use crate::constants::default_constants::X11_COPY_EXECUTABLE;
 use crate::util::str::fit_to_unix;
 
-pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: Option<usize>) -> Result<()> {
+pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: &Option<usize>) -> Result<()> {
     let mut child = Command::new(X11_COPY_EXECUTABLE)
         .arg("-selection")
         .arg("clipboard")
@@ -42,7 +42,7 @@ mod tests {
     fn xorg_clipboard_test() {
         const TIMEOUT: usize = 1;
         let content = SecretString::new("Hello, pars".into());
-        let res = copy_to_clip_board(content, Some(TIMEOUT));
+        let res = copy_to_clip_board(content, &Some(TIMEOUT));
         assert!(res.is_ok());
 
         let cmd =

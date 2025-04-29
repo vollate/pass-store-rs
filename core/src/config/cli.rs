@@ -17,6 +17,8 @@ pub struct ParsConfig {
     pub path_config: PathConfig,
     #[serde(default = "ExecutableConfig::default")]
     pub executable_config: ExecutableConfig,
+    #[serde(default = "ClipConfig::default")]
+    pub clip_config: ClipConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
@@ -40,6 +42,11 @@ pub struct ExecutableConfig {
     pub pgp_executable: String,
     pub editor_executable: String,
     pub git_executable: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct ClipConfig {
+    pub clip_time: Option<usize>,
 }
 
 impl Default for PrintConfig {
@@ -112,6 +119,12 @@ impl Default for PathConfig {
     }
 }
 
+impl Default for ClipConfig {
+    fn default() -> Self {
+        ClipConfig { clip_time: Some(45) }
+    }
+}
+
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<ParsConfig, Box<dyn Error>> {
     let content = fs::read_to_string(path)?;
     let config: ParsConfig = toml::from_str(&content)?;
@@ -144,7 +157,9 @@ mod tests {
 
     #[test]
     fn generate_default_config_test() {
-        let default_config = ParsConfig::default();
+        let mut default_config = ParsConfig::default();
+        default_config.path_config.default_repo = "<Your Home>/.password-store".into();
+        default_config.path_config.repos = vec!["<Your Home>/.password-store".into()];
         let root = env!("CARGO_MANIFEST_DIR");
         let save_path = Path::new(root).parent().unwrap().join("config").join("cli");
         if !save_path.exists() {

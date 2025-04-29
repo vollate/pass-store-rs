@@ -1,6 +1,16 @@
-# Pars Changelog
+# pars-cli Changelog
 
 ## [Unreleased]
+
+### Added
+
+- Support `getopt` like cli argument parsing.
+
+### Changed
+
+- Refactor fuction to lessen arguments and improve readability.
+
+## [0.1.2] - 2025-04-25
 
 ### Added
 
