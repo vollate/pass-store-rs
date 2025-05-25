@@ -43,7 +43,7 @@ pub fn cmd_insert(
     }
 
     let commit = GitCommit::new(&root, CommitType::Insert(pass_name.to_string()));
-    debug!("cmd_insert: commit {}", commit);
+    debug!("cmd_insert: commit {commit}");
     add_and_commit(
         &config.executable_config.git_executable,
         &root,

@@ -100,7 +100,7 @@ where
                     } else {
                         line.to_string()
                     };
-                    writeln!(out_stream, "{}", output_line)?;
+                    writeln!(out_stream, "{output_line}")?;
                 }
             }
         }

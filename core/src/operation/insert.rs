@@ -55,7 +55,7 @@ where
         }
     }
 
-    write!(out_s, "Enter password for '{}': ", pass_name)?;
+    write!(out_s, "Enter password for '{pass_name}': ")?;
     out_s.flush()?;
 
     let password = if insert_cfg.multiline {
@@ -65,7 +65,7 @@ where
     } else {
         let mut buffer = String::new();
         in_s.read_line(&mut buffer)?;
-        write!(out_s, "Confirm password for '{}': ", pass_name)?;
+        write!(out_s, "Confirm password for '{pass_name}': ")?;
         out_s.flush()?;
         let mut confirm_buffer = String::new();
         in_s.read_line(&mut confirm_buffer)?;

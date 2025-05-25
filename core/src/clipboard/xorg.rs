@@ -25,7 +25,7 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: &Option<usiz
     }
 
     if let Some(secs) = timeout {
-        let cmd = format!("sleep {} && echo -n '' | xclip -selection clipboard", secs);
+        let cmd = format!("sleep {secs} && echo -n '' | xclip -selection clipboard");
         let _ = Command::new("sh").arg("-c").arg(cmd).spawn();
     }
 

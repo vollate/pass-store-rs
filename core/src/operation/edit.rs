@@ -23,7 +23,7 @@ pub fn edit(
     editor: &str,
     pgp_executable: &str,
 ) -> Result<bool> {
-    let target_path = root.join(format!("{}.{}", target, extension));
+    let target_path = root.join(format!("{target}.{extension}"));
     path_attack_check(root, &target_path)?;
 
     if !target_path.exists() {
@@ -55,7 +55,7 @@ pub fn edit(
                 env::temp_dir()
             }
         };
-        TempDir::new_in(temp_base)?.into_path()
+        TempDir::new_in(temp_base)?.keep()
     };
 
     let temp_filename = target_path.with_extension("txt");
@@ -168,7 +168,7 @@ powershell -Command "(Get-Content %file% | Select-Object -Skip 1) | Set-Content 
                 test_client.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
                 let new_dir = root.join("file1.gpg");
                 let output = path_to_str(&new_dir).unwrap();
-                println!("{}", output);
+                println!("{output}");
                 test_client.encrypt(file1_content, output).unwrap();
                 test_client
                     .encrypt(

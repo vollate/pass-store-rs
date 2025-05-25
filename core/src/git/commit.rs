@@ -27,16 +27,16 @@ impl<'a> GitCommit<'a> {
                 let mut msg =
                     format!("Init password with {}", keys.first().unwrap_or(&"".to_string()));
                 for key in keys[1..].iter() {
-                    msg.push_str(&format!(", {}", key));
+                    msg.push_str(&format!(", {key}"));
                 }
                 msg
             }
-            CommitType::Insert(path) => format!("Insert password {}", path),
-            CommitType::Generate(path) => format!("Generate password {}", path),
-            CommitType::Update(path) => format!("Update password {}", path),
-            CommitType::Delete(path) => format!("Delete password {}", path),
-            CommitType::Copy((src, dst)) => format!("Copy {} to {}", src, dst),
-            CommitType::Rename((src, dst)) => format!("Rename {} to {}", src, dst),
+            CommitType::Insert(path) => format!("Insert password {path}"),
+            CommitType::Generate(path) => format!("Generate password {path}"),
+            CommitType::Update(path) => format!("Update password {path}"),
+            CommitType::Delete(path) => format!("Delete password {path}"),
+            CommitType::Copy((src, dst)) => format!("Copy {src} to {dst}"),
+            CommitType::Rename((src, dst)) => format!("Rename {src} to {dst}"),
         }
     }
 }

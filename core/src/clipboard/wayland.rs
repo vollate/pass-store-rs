@@ -33,14 +33,14 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: &Option<usiz
                 Ok(re.first().unwrap().to_string())
             };
             find_res.unwrap_or_else(|e| {
-                warn!("Failed to get qdbus executable: {}, use default 'dbus'", e);
+                warn!("Failed to get qdbus executable: {e}, use default 'dbus'");
                 "qdbus".to_string()
             })
         };
         let _=  Command::new("sh")
             .arg("-c")
             .arg(
-                format!( "sleep {} && {} org.kde.klipper /klipper org.kde.klipper.klipper.clearClipboardHistory",secs,qdbus_executable),
+                format!( "sleep {secs} && {qdbus_executable} org.kde.klipper /klipper org.kde.klipper.klipper.clearClipboardHistory"),
             )
             .spawn();
     }

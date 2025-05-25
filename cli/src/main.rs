@@ -48,7 +48,7 @@ fn fix_args(raw: Vec<String>) -> Vec<String> {
                 out.push(token);
             } else if rest.parse::<u32>().is_ok() {
                 // rewrite `-cNUM` to `-c=NUM`
-                out.push(format!("{}={}", flag, rest));
+                out.push(format!("{flag}={rest}"));
             } else {
                 // not a numeric suffix, leave as-is
                 out.push(token);
@@ -68,7 +68,7 @@ fn fix_args(raw: Vec<String>) -> Vec<String> {
                 if let Some(next) = iter.next() {
                     if next.parse::<u32>().is_ok() {
                         // numeric: rewrite
-                        out.push(format!("{}={}", token, next));
+                        out.push(format!("{token}={next}"));
                     } else {
                         // non-numeric: keep flag and push as positional
                         out.push(token.clone());
@@ -94,7 +94,7 @@ fn process_cli(config_path: &str) {
         match load_config(config_path) {
             Ok(config) => config,
             Err(e) => {
-                eprintln!("Failed to load config file '{}': {}", config_path, e);
+                eprintln!("Failed to load config file '{config_path}': {e}");
                 std::process::exit(ParsExitCode::Error.into());
             }
         }
@@ -107,8 +107,8 @@ fn process_cli(config_path: &str) {
     let cli_args = CliParser::parse_from(args);
 
     if let Err((code, e)) = parser::handle_cli(config, cli_args) {
-        eprintln!("{}", e);
-        debug!("Error: {:?}", e);
+        eprintln!("{e}");
+        debug!("Error: {e:?}");
         std::process::exit(code);
     }
 }

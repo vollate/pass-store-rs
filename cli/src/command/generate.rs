@@ -54,11 +54,11 @@ pub fn cmd_generate(
         );
         res.zeroize();
     } else if let Err(e) = copy_to_clipboard(res, &config.clip_config.clip_time) {
-        eprintln!("Failed to copy to clipboard: {}", e);
+        eprintln!("Failed to copy to clipboard: {e}");
     }
 
     let commit = GitCommit::new(&root, CommitType::Generate(cmd_config.pass_name.to_string()));
-    debug!("cmd_generate: commit {}", commit);
+    debug!("cmd_generate: commit {commit}");
     add_and_commit(
         &config.executable_config.git_executable,
         &root,

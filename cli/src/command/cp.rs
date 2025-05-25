@@ -33,7 +33,7 @@ pub fn cmd_cp(
 
     let commit =
         GitCommit::new(&root, CommitType::Copy((old_path.to_string(), new_path.to_string())));
-    debug!("cmd_cp: commit {}", commit);
+    debug!("cmd_cp: commit {commit}");
     add_and_commit(
         &config.executable_config.git_executable,
         &root,

@@ -33,7 +33,7 @@ pub fn cmd_mv(
 
     let commit =
         GitCommit::new(&root, CommitType::Rename((old_path.to_string(), new_path.to_string())));
-    debug!("cmd_mv: commit {}", commit);
+    debug!("cmd_mv: commit {commit}");
     add_and_commit(
         &config.executable_config.git_executable,
         &root,

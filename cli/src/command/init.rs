@@ -46,7 +46,7 @@ pub fn cmd_init(
         &root,
         CommitType::Init(pgp_client.get_keys_fpr().iter().map(|f| f.to_string()).collect()),
     );
-    debug!("cmd_init: commit {}", commit);
+    debug!("cmd_init: commit {commit}");
     add_and_commit(
         &config.executable_config.git_executable,
         &root,

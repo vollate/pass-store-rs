@@ -30,7 +30,7 @@ fn write_new_fpr_file(path: &Path, fprs: &[impl AsRef<str>]) -> Result<()> {
         }
         acc
     });
-    write!(&mut file, "{}", content)?;
+    write!(&mut file, "{content}")?;
     Ok(())
 }
 
@@ -73,7 +73,7 @@ pub fn init(config: &InitConfig, root: &Path, target_path: Option<&str>) -> Resu
         return Ok(());
     }
 
-    debug!("Old fpr <{:?}>, replace with <{:?}>", old_fprs, new_fprs);
+    debug!("Old fpr <{old_fprs:?}>, replace with <{new_fprs:?}>");
 
     // Create old client using old fingerprints
     let old_client = PGPClient::new(&config.pgp_executable, &old_fprs)?;

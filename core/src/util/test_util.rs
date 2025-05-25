@@ -99,7 +99,7 @@ pub(crate) fn write_gpg_id(path: &Path, gpg_id: &[&str]) {
     use std::io::Write;
     let mut file = fs::File::create(path.join(".gpg-id")).unwrap();
     for id in gpg_id {
-        writeln!(file, "{}", id).unwrap();
+        writeln!(file, "{id}").unwrap();
     }
 }
 

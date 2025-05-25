@@ -50,7 +50,7 @@ where
 
     if gen_cfg.in_place && gen_cfg.force {
         let err_msg = "Cannot use both [--in-place] and [--force]";
-        writeln!(io_streams.err_s, "{}", err_msg)?;
+        writeln!(io_streams.err_s, "{err_msg}")?;
         return Err(anyhow!(err_msg));
     }
 
@@ -105,7 +105,7 @@ where
         create_or_overwrite(&client, &pass_path, &password)?;
     }
 
-    writeln!(io_streams.out_s, "Generated password for '{}' saved", pass_name)?;
+    writeln!(io_streams.out_s, "Generated password for '{pass_name}' saved")?;
 
     Ok(password)
 }

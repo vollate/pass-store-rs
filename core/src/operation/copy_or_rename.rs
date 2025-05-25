@@ -215,7 +215,7 @@ where
     let source_client = match PGPClient::new("gpg", &from_keys) {
         Ok(client) => client,
         Err(e) => {
-            writeln!(io_streams.err_s, "Error creating PGP client for decryption: {}", e)?;
+            writeln!(io_streams.err_s, "Error creating PGP client for decryption: {e}")?;
             return Err(e);
         }
     };
@@ -224,7 +224,7 @@ where
     let target_client = match PGPClient::new("gpg", &to_keys) {
         Ok(client) => client,
         Err(e) => {
-            writeln!(io_streams.err_s, "Error creating PGP client for encryption: {}", e)?;
+            writeln!(io_streams.err_s, "Error creating PGP client for encryption: {e}")?;
             return Err(e);
         }
     };
@@ -233,7 +233,7 @@ where
     let content = match source_client.decrypt_stdin(root, path_to_str(from_path)?) {
         Ok(content) => content,
         Err(e) => {
-            writeln!(io_streams.err_s, "Error decrypting file: {}", e)?;
+            writeln!(io_streams.err_s, "Error decrypting file: {e}")?;
             return Err(e);
         }
     };
@@ -246,15 +246,14 @@ where
                 if let Err(e) = fs::remove_file(from_path) {
                     writeln!(
                         io_streams.err_s,
-                        "Warning: Failed to delete original file after move: {}",
-                        e
+                        "Warning: Failed to delete original file after move: {e}"
                     )?;
                 }
             }
             Ok(())
         }
         Err(e) => {
-            writeln!(io_streams.err_s, "Error re-encrypting file: {}", e)?;
+            writeln!(io_streams.err_s, "Error re-encrypting file: {e}")?;
             Err(e)
         }
     }
@@ -689,7 +688,7 @@ mod tests {
 
         // Create a second key for the subdirectory
         // We create a new email by appending a suffix to make it unique
-        let email2 = format!("sub-{}", email1);
+        let email2 = format!("sub-{email1}");
         let second_key_batch = format!(
             r#"%echo Generating a second key
 Key-Type: RSA
@@ -697,13 +696,12 @@ Key-Length: 2048
 Subkey-Type: RSA
 Subkey-Length: 2048
 Name-Real: Test User Sub
-Name-Email: {}
+Name-Email: {email2}
 Expire-Date: 0
 Passphrase: password
 %commit
 %echo Key generation complete
-"#,
-            email2
+"#
         );
 
         key_gen_batch(&executable, &second_key_batch).unwrap();

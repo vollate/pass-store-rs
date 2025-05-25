@@ -20,7 +20,7 @@ pub fn cmd_ls(
 ) -> Result<(), (i32, Error)> {
     let root = unwrap_root_path(base_dir, config);
     let target_path = root.join(target.unwrap_or_default());
-    debug!("cmd_ls: root {:?}, target_path {:?}", root, target_path);
+    debug!("cmd_ls: root {root:?}, target_path {target_path:?}");
 
     let tree_cfg = TreeConfig {
         root: &root,
@@ -39,7 +39,7 @@ pub fn cmd_ls(
 
     match res {
         LsOrShow::DirTree(tree) => {
-            println!("{}", tree);
+            println!("{tree}");
             Ok(())
         }
         LsOrShow::Password(mut passwd) => {
