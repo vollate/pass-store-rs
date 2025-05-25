@@ -13,7 +13,9 @@ anyhow = "1.0.97"
 clap = { version = "4.5.28", features = ["derive"] }
 fast_qr = "0.13.0"
 log = "0.4.26"
+nucleo-matcher = "0.3.1"
 pars-core = { version = "^0.2" }
+ratatui = "0.29.0"
 secrecy = "0.10.3"
 
 [[bin]]

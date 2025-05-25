@@ -53,7 +53,7 @@ pub fn cmd_generate(
             res.expose_secret()
         );
         res.zeroize();
-    } else if let Err(e) = copy_to_clipboard(res, &config.clip_config.clip_time) {
+    } else if let Err(e) = copy_to_clipboard(res, &config.feature_config.clip_time) {
         eprintln!("Failed to copy to clipboard: {e}");
     }
 

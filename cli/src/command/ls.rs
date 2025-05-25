@@ -93,7 +93,7 @@ fn handle_clip(
         }
 
         if let Some(line_content) = passwd.expose_secret().split('\n').nth(line_num - 1) {
-            copy_to_clipboard(line_content.into(), &config.clip_config.clip_time)
+            copy_to_clipboard(line_content.into(), &config.feature_config.clip_time)
                 .map_err(|e| (ParsExitCode::Error.into(), e))?;
         } else {
             return Err((
