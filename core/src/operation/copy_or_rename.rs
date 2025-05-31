@@ -12,13 +12,19 @@ use crate::util::fs_util::{
 };
 use crate::{IOErr, IOErrType};
 
-// Currently, we do not support cross repo rename/copy
+pub struct CopyRenameConfig {
+    pub copy: bool,
+    pub force: bool,
+    pub file_extension: String,
+}
+
+use crate::operation::generate::IOStreams;
+
+// Cross repo rename/copy is not supported
 fn handle_overwrite_delete<I, O, E>(
     path_to_overwrite: &Path,
     force: bool,
-    stdin: &mut I,
-    stdout: &mut O,
-    _stderr: &mut E,
+    io_streams: &mut IOStreams<I, O, E>,
 ) -> Result<bool>
 where
     I: Read + BufRead,
@@ -26,15 +32,15 @@ where
     E: Write,
 {
     if !force {
-        stdout.write_fmt(format_args!(
+        io_streams.out_s.write_fmt(format_args!(
             "File {} already exists, overwrite? [y/N]: ",
             path_to_overwrite.to_string_lossy()
         ))?;
-        stdout.flush()?;
+        io_streams.out_s.flush()?;
         let mut input = String::new();
-        stdin.read_line(&mut input)?;
+        io_streams.in_s.read_line(&mut input)?;
         if !input.trim().to_lowercase().starts_with('y') {
-            stdout.write_all("Canceled\n".as_bytes())?;
+            io_streams.out_s.write_all("Canceled\n".as_bytes())?;
             return Ok(false);
         }
     }
@@ -53,18 +59,14 @@ where
 /// * `to` - The path to copy or rename to
 /// * `extension` - The extension to append to the file name if the target is a file
 /// * `force` - Whether to overwrite the target if it already exists
-/// * `in_s` - The input stream
-/// * `out_s` - The output stream
-/// * `err_s` - The error stream
+/// * `io_streams` - The I/O streams for input, output, and error
 fn copy_rename_file<I, O, E>(
     copy: bool,
     from: &Path,
     to: &Path,
     extension: &str,
     force: bool,
-    in_s: &mut I,
-    out_s: &mut O,
-    err_s: &mut E,
+    io_streams: &mut IOStreams<I, O, E>,
 ) -> Result<()>
 where
     I: Read + BufRead,
@@ -78,8 +80,7 @@ where
     if to.exists() {
         return if to.is_dir() {
             let sub_file = to.join(file_name);
-            if sub_file.exists() && !handle_overwrite_delete(&sub_file, force, in_s, out_s, err_s)?
-            {
+            if sub_file.exists() && !handle_overwrite_delete(&sub_file, force, io_streams)? {
                 return Ok(());
             }
             if copy {
@@ -97,7 +98,7 @@ where
     let to = PathBuf::from(format!("{}.{}", path_to_str(to)?, extension));
     if to.exists() {
         if to.is_file() {
-            if !handle_overwrite_delete(&to, force, in_s, out_s, err_s)? {
+            if !handle_overwrite_delete(&to, force, io_streams)? {
                 return Ok(());
             }
         } else {
@@ -118,17 +119,13 @@ where
 /// * `from` - The path of the directory to copy or rename
 /// * `to` - The path to copy or rename to
 /// * `force` - Whether to overwrite the target if it already exists
-/// * `in_s` - The input stream
-/// * `out_s` - The output stream
-/// * `err_s` - The error stream
+/// * `io_streams` - The I/O streams for input, output, and error
 fn copy_rename_dir<I, O, E>(
     copy: bool,
     from: &Path,
     to: &Path,
     force: bool,
-    in_s: &mut I,
-    out_s: &mut O,
-    err_s: &mut E,
+    io_streams: &mut IOStreams<I, O, E>,
 ) -> Result<()>
 where
     I: Read + BufRead,
@@ -141,7 +138,7 @@ where
     if to.exists() {
         if to.is_dir() {
             let sub_dir = to.join(file_name);
-            if sub_dir.exists() && !handle_overwrite_delete(&sub_dir, force, in_s, out_s, err_s)? {
+            if sub_dir.exists() && !handle_overwrite_delete(&sub_dir, force, io_streams)? {
                 return Ok(());
             }
             if copy {
@@ -150,7 +147,7 @@ where
                 better_rename(from, sub_dir)?;
             }
         } else if to.is_file() {
-            if !handle_overwrite_delete(to, force, in_s, out_s, err_s)? {
+            if !handle_overwrite_delete(to, force, io_streams)? {
                 return Ok(());
             }
             if copy {
@@ -169,16 +166,105 @@ where
     Ok(())
 }
 
+/// Re-encrypts a file with different GPG keys
+///
+/// This is used when copying or moving files between directories with different .gpg-id files
+fn reencrypt_file<I, O, E>(
+    from_path: &Path,
+    to_path: &Path,
+    root: &Path,
+    config: &CopyRenameConfig,
+    io_streams: &mut IOStreams<I, O, E>,
+) -> Result<()>
+where
+    I: Read + BufRead,
+    O: Write,
+    E: Write,
+{
+    // Get the target directory for determining GPG keys
+    let target_dir = if to_path.exists() && to_path.is_dir() {
+        to_path
+    } else {
+        match to_path.parent() {
+            Some(parent) => parent,
+            None => root,
+        }
+    };
+
+    // Get target filename
+    let target_file = if to_path.exists() && to_path.is_dir() {
+        let filename = from_path
+            .file_name()
+            .ok_or_else(|| IOErr::new(IOErrType::CannotGetFileName, from_path))?;
+        to_path.join(filename)
+    } else {
+        PathBuf::from(format!("{}.{}", path_to_str(to_path)?, config.file_extension))
+    };
+
+    // Check for overwrite
+    if target_file.exists() && !handle_overwrite_delete(&target_file, config.force, io_streams)? {
+        return Ok(());
+    }
+
+    // Set up clients for decryption and re-encryption
+    let from_dir = from_path.parent().unwrap_or(root);
+    let from_keys = get_dir_gpg_id_content(root, from_dir)?;
+    let to_keys = get_dir_gpg_id_content(root, target_dir)?;
+
+    // Create client for decryption with source keys
+    let source_client = match PGPClient::new("gpg", &from_keys) {
+        Ok(client) => client,
+        Err(e) => {
+            writeln!(io_streams.err_s, "Error creating PGP client for decryption: {e}")?;
+            return Err(e);
+        }
+    };
+
+    // Create client for encryption with destination keys
+    let target_client = match PGPClient::new("gpg", &to_keys) {
+        Ok(client) => client,
+        Err(e) => {
+            writeln!(io_streams.err_s, "Error creating PGP client for encryption: {e}")?;
+            return Err(e);
+        }
+    };
+
+    // Decrypt the file
+    let content = match source_client.decrypt_stdin(root, path_to_str(from_path)?) {
+        Ok(content) => content,
+        Err(e) => {
+            writeln!(io_streams.err_s, "Error decrypting file: {e}")?;
+            return Err(e);
+        }
+    };
+
+    // Encrypt with the destination keys
+    match target_client.encrypt(content.expose_secret(), path_to_str(&target_file)?) {
+        Ok(_) => {
+            if !config.copy {
+                // If this was a move operation, delete the original file
+                if let Err(e) = fs::remove_file(from_path) {
+                    writeln!(
+                        io_streams.err_s,
+                        "Warning: Failed to delete original file after move: {e}"
+                    )?;
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            writeln!(io_streams.err_s, "Error re-encrypting file: {e}")?;
+            Err(e)
+        }
+    }
+}
+
 pub fn copy_rename_io<I, O, E>(
-    copy: bool,
+    config: CopyRenameConfig,
     root: &Path,
     from: &str,
     to: &str,
-    file_extension: &str,
-    force: bool,
-    stdin: &mut I,
-    stdout: &mut O,
-    stderr: &mut E,
+    mut io_streams: IOStreams<I, O, E>,
 ) -> Result<()>
 where
     I: Read + BufRead,
@@ -191,7 +277,8 @@ where
     path_attack_check(root, &to_path)?;
 
     if !from_path.exists() {
-        let try_path = PathBuf::from(format!("{}.{}", path_to_str(&from_path)?, file_extension));
+        let try_path =
+            PathBuf::from(format!("{}.{}", path_to_str(&from_path)?, config.file_extension));
         if !try_path.exists() {
             return Err(IOErr::new(IOErrType::PathNotExist, &from_path).into());
         }
@@ -202,9 +289,9 @@ where
     let to_is_dir = to.ends_with(path::MAIN_SEPARATOR);
     if to_is_dir && (!to_path.exists() || !to_path.is_dir()) {
         writeln!(
-            stderr,
+            io_streams.err_s,
             "Cannot {} '{}' to '{}': No such directory",
-            if copy { "copy" } else { "rename" },
+            if config.copy { "copy" } else { "rename" },
             from,
             to
         )?;
@@ -212,121 +299,54 @@ where
     }
 
     // Check if we're dealing with GPG-encrypted files and need to re-encrypt
-    let needs_reencryption =
-        if from_path.is_file() && from_path.extension().is_some_and(|ext| ext == file_extension) {
-            let from_dir = from_path.parent().unwrap_or(root);
-            let to_dir = if to_path.exists() && to_path.is_dir() {
-                &to_path
-            } else {
-                to_path.parent().unwrap_or(root)
-            };
-
-            // Compare GPG keys between source and destination directories
-            match (get_dir_gpg_id_content(root, from_dir), get_dir_gpg_id_content(root, to_dir)) {
-                (Ok(from_keys), Ok(to_keys)) => {
-                    let mut from_keys_sorted = from_keys.clone();
-                    let mut to_keys_sorted = to_keys.clone();
-                    from_keys_sorted.sort();
-                    to_keys_sorted.sort();
-
-                    // If keys are different, we need to re-encrypt
-                    from_keys_sorted != to_keys_sorted
-                }
-                _ => false, // If we can't get keys, default to not re-encrypting
-            }
+    let needs_reencryption = if from_path.is_file()
+        && from_path.extension().is_some_and(|ext| ext.to_string_lossy() == config.file_extension)
+    {
+        let from_dir = from_path.parent().unwrap_or(root);
+        let to_dir = if to_path.exists() && to_path.is_dir() {
+            &to_path
         } else {
-            false
+            to_path.parent().unwrap_or(root)
         };
+
+        // Compare GPG keys between source and destination directories
+        match (get_dir_gpg_id_content(root, from_dir), get_dir_gpg_id_content(root, to_dir)) {
+            (Ok(from_keys), Ok(to_keys)) => {
+                let mut from_keys_sorted = from_keys.clone();
+                let mut to_keys_sorted = to_keys.clone();
+                from_keys_sorted.sort();
+                to_keys_sorted.sort();
+
+                // If keys are different, we need to re-encrypt
+                from_keys_sorted != to_keys_sorted
+            }
+            _ => false, // If we can't get keys, default to not re-encrypting
+        }
+    } else {
+        false
+    };
 
     if needs_reencryption {
         debug!("Different GPG IDs detected, re-encryption required");
 
         // If it's a file that needs re-encryption
         if from_path.is_file() {
-            // Get the target directory for determining GPG keys
-            let target_dir = if to_path.exists() && to_path.is_dir() {
-                to_path.clone()
-            } else {
-                to_path.parent().unwrap_or(root).to_path_buf()
-            };
-
-            // Get target filename
-            let target_file = if to_path.exists() && to_path.is_dir() {
-                let filename = from_path
-                    .file_name()
-                    .ok_or_else(|| IOErr::new(IOErrType::CannotGetFileName, &from_path))?;
-                to_path.join(filename)
-            } else {
-                PathBuf::from(format!("{}.{}", path_to_str(&to_path)?, file_extension))
-            };
-
-            // Check for overwrite
-            if target_file.exists()
-                && !handle_overwrite_delete(&target_file, force, stdin, stdout, stderr)?
-            {
-                return Ok(());
-            }
-
-            // Set up clients for decryption and re-encryption
-            let from_dir = from_path.parent().unwrap_or(root);
-            let from_keys = get_dir_gpg_id_content(root, from_dir)?;
-            let to_keys = get_dir_gpg_id_content(root, &target_dir)?;
-
-            // Create client for decryption with source keys
-            let source_client = match PGPClient::new("gpg", &from_keys) {
-                Ok(client) => client,
-                Err(e) => {
-                    writeln!(stderr, "Error creating PGP client for decryption: {}", e)?;
-                    return Err(e);
-                }
-            };
-
-            // Create client for encryption with destination keys
-            let target_client = match PGPClient::new("gpg", &to_keys) {
-                Ok(client) => client,
-                Err(e) => {
-                    writeln!(stderr, "Error creating PGP client for encryption: {}", e)?;
-                    return Err(e);
-                }
-            };
-
-            // Decrypt the file
-            let content = match source_client.decrypt_stdin(root, path_to_str(&from_path)?) {
-                Ok(content) => content,
-                Err(e) => {
-                    writeln!(stderr, "Error decrypting file: {}", e)?;
-                    return Err(e);
-                }
-            };
-
-            // Encrypt with the destination keys
-            match target_client.encrypt(content.expose_secret(), path_to_str(&target_file)?) {
-                Ok(_) => {
-                    if !copy {
-                        // If this was a move operation, delete the original file
-                        if let Err(e) = fs::remove_file(&from_path) {
-                            writeln!(
-                                stderr,
-                                "Warning: Failed to delete original file after move: {}",
-                                e
-                            )?;
-                        }
-                    }
-                    return Ok(());
-                }
-                Err(e) => {
-                    writeln!(stderr, "Error re-encrypting file: {}", e)?;
-                    return Err(e);
-                }
-            }
+            return reencrypt_file(&from_path, &to_path, root, &config, &mut io_streams);
         }
     }
 
     // Default behavior for cases not needing re-encryption
     if from_path.is_file() {
-        copy_rename_file(copy, &from_path, &to_path, file_extension, force, stdin, stdout, stderr)
+        copy_rename_file(
+            config.copy,
+            &from_path,
+            &to_path,
+            &config.file_extension,
+            config.force,
+            &mut io_streams,
+        )
     } else if from_path.is_dir() {
-        copy_rename_dir(copy, &from_path, &to_path, force, stdin, stdout, stderr)
+        copy_rename_dir(config.copy, &from_path, &to_path, config.force, &mut io_streams)
     } else {
         Err(IOErr::new(IOErrType::InvalidFileType, &from_path).into())
     }
@@ -366,91 +386,97 @@ mod tests {
 
         cleanup!(
             {
-                let (stdin, mut stdin_w) = pipe().unwrap();
+                let (stdin, _stdin_w) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();
 
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let rename_config = CopyRenameConfig {
+                    copy: false,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
                 // Rename a.gpg to c.gpg
-                copy_rename_io(
-                    false,
-                    &root,
-                    "a",
-                    "c",
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                copy_rename_io(rename_config, &root, "a", "c", io_streams).unwrap();
                 assert_eq!(false, root.join("a.gpg").exists());
                 assert_eq!(true, root.join("c.gpg").exists());
 
                 // Rename b.gpg to c.gpg, without force, input "n" interactively
+                let (stdin, mut stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
                 thread::spawn(move || {
                     sleep(std::time::Duration::from_millis(100));
                     stdin_w.write_all(b"n\n").unwrap();
                 });
-                copy_rename_io(
-                    false,
-                    &root,
-                    "b",
-                    "c",
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+
+                let rename_config = CopyRenameConfig {
+                    copy: false,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
+                copy_rename_io(rename_config, &root, "b", "c", io_streams).unwrap();
                 assert_eq!(true, root.join("b.gpg").exists());
 
                 // Rename b.gpg to c.gpg, with force
-                copy_rename_io(
-                    false,
-                    &root,
-                    "b",
-                    "c",
-                    "gpg",
-                    true,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let rename_config = CopyRenameConfig {
+                    copy: false,
+                    force: true,
+                    file_extension: "gpg".to_string(),
+                };
+
+                copy_rename_io(rename_config, &root, "b", "c", io_streams).unwrap();
                 assert_eq!(false, root.join("b.gpg").exists());
                 assert_eq!(true, root.join("c.gpg").exists());
 
                 // Now, try to rename file into a dir(end with path separator)
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let rename_config = CopyRenameConfig {
+                    copy: false,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
                 copy_rename_io(
-                    false,
+                    rename_config,
                     &root,
                     "c",
                     &format!("d_dir{}", path::MAIN_SEPARATOR_STR),
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
+                    io_streams,
                 )
                 .unwrap();
                 assert_eq!(false, root.join("c.gpg").exists());
                 assert_eq!(true, root.join("d_dir").join("c.gpg").exists());
 
                 // Try to rename d_dir to e_dir, should be e_dir/d_dir
-                copy_rename_io(
-                    false,
-                    &root,
-                    "d_dir",
-                    "e_dir",
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let rename_config = CopyRenameConfig {
+                    copy: false,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
+                copy_rename_io(rename_config, &root, "d_dir", "e_dir", io_streams).unwrap();
                 assert_eq!(false, root.join("d_dir").exists());
                 assert_eq!(true, root.join("e_dir").join("d_dir").exists());
             },
@@ -475,7 +501,7 @@ mod tests {
 
         cleanup!(
             {
-                let (stdin, mut stdin_w) = pipe().unwrap();
+                let (stdin, _stdin_w) = pipe().unwrap();
                 let mut stdin = BufReader::new(stdin);
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();
@@ -483,88 +509,92 @@ mod tests {
                 // Copy a.gpg to c.gpg
                 fs::write(root.join("a.gpg"), "foo_a").unwrap();
                 assert_eq!(false, root.join("c.gpg").exists());
-                copy_rename_io(
-                    true,
-                    &root,
-                    "a",
-                    "c",
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let copy_config = CopyRenameConfig {
+                    copy: true,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
+                copy_rename_io(copy_config, &root, "a", "c", io_streams).unwrap();
                 assert_eq!(true, root.join("a.gpg").exists());
                 assert_eq!(true, root.join("c.gpg").exists());
                 assert_eq!("foo_a", fs::read_to_string(root.join("c.gpg")).unwrap());
 
                 // Copy b.gpg to c.gpg, without force, input "n" interactively
+                let (stdin, mut stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
                 fs::write(root.join("b.gpg"), "foo_b").unwrap();
                 thread::spawn(move || {
                     sleep(std::time::Duration::from_millis(100));
                     stdin_w.write_all(b"n\n").unwrap();
                 });
 
-                copy_rename_io(
-                    true,
-                    &root,
-                    "b",
-                    "c",
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let copy_config = CopyRenameConfig {
+                    copy: true,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
+                copy_rename_io(copy_config, &root, "b", "c", io_streams).unwrap();
                 assert_ne!("foo_b", fs::read_to_string(root.join("c.gpg")).unwrap());
 
                 // Copy b.gpg to c.gpg, with force, overwrite the content of c.gpg
-                copy_rename_io(
-                    true,
-                    &root,
-                    "b",
-                    "c",
-                    "gpg",
-                    true,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let copy_config =
+                    CopyRenameConfig { copy: true, force: true, file_extension: "gpg".to_string() };
+
+                copy_rename_io(copy_config, &root, "b", "c", io_streams).unwrap();
                 assert_eq!("foo_b", fs::read_to_string(root.join("c.gpg")).unwrap());
 
                 // Now, try to copy file into a dir(end with path separator)
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
                 fs::write(root.join("c.gpg"), "foo_c").unwrap();
+
+                let copy_config = CopyRenameConfig {
+                    copy: true,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
                 copy_rename_io(
-                    true,
+                    copy_config,
                     &root,
                     "c",
                     &format!("d_dir{}", path::MAIN_SEPARATOR_STR),
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
+                    io_streams,
                 )
                 .unwrap();
                 assert_eq!(true, root.join("c.gpg").exists());
                 assert_eq!("foo_c", fs::read_to_string(root.join("c.gpg")).unwrap());
 
                 // Try to copy d_dir to e_dir, should be e_dir/d_dir
-                copy_rename_io(
-                    true,
-                    &root,
-                    "d_dir",
-                    "e_dir",
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
-                )
-                .unwrap();
+                let (stdin, _) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let copy_config = CopyRenameConfig {
+                    copy: true,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
+                copy_rename_io(copy_config, &root, "d_dir", "e_dir", io_streams).unwrap();
                 assert_eq!(true, root.join("d_dir").exists());
                 assert_eq!(true, root.join("e_dir").join("d_dir").exists());
             },
@@ -589,16 +619,20 @@ mod tests {
                 let mut stdin = io::stdin().lock();
                 let mut stdout = io::stdout().lock();
                 let mut stderr = io::stderr().lock();
+
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
                 if copy_rename_io(
-                    false,
+                    CopyRenameConfig {
+                        copy: false,
+                        force: true,
+                        file_extension: "gpg".to_string(),
+                    },
                     &root,
                     "../../a",
                     "c",
-                    "gpg",
-                    true,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
+                    io_streams,
                 )
                 .is_ok()
                 {
@@ -608,16 +642,15 @@ mod tests {
                     );
                 }
 
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
                 if copy_rename_io(
-                    true,
+                    CopyRenameConfig { copy: true, force: true, file_extension: "gpg".to_string() },
                     &root,
                     "a",
                     "../../c",
-                    "gpg",
-                    true,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
+                    io_streams,
                 )
                 .is_ok()
                 {
@@ -655,7 +688,7 @@ mod tests {
 
         // Create a second key for the subdirectory
         // We create a new email by appending a suffix to make it unique
-        let email2 = format!("sub-{}", email1);
+        let email2 = format!("sub-{email1}");
         let second_key_batch = format!(
             r#"%echo Generating a second key
 Key-Type: RSA
@@ -663,13 +696,12 @@ Key-Length: 2048
 Subkey-Type: RSA
 Subkey-Length: 2048
 Name-Real: Test User Sub
-Name-Email: {}
+Name-Email: {email2}
 Expire-Date: 0
 Passphrase: password
 %commit
 %echo Key generation complete
-"#,
-            email2
+"#
         );
 
         key_gen_batch(&executable, &second_key_batch).unwrap();
@@ -693,17 +725,20 @@ Passphrase: password
                 let test_content = "This is a secret message";
                 client1.encrypt(test_content, root.join("file1.gpg").to_str().unwrap()).unwrap();
 
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
                 // Copy the file to the subdirectory
                 copy_rename_io(
-                    true,
+                    CopyRenameConfig {
+                        copy: true,
+                        force: false,
+                        file_extension: "gpg".to_string(),
+                    },
                     &root,
                     "file1",
                     "subdir/file1",
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
+                    io_streams,
                 )
                 .unwrap();
 
@@ -720,17 +755,20 @@ Passphrase: password
                 let test_content2 = "Another secret message for moving";
                 client1.encrypt(test_content2, root.join("file2.gpg").to_str().unwrap()).unwrap();
 
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
                 // Move the file to the subdirectory
                 copy_rename_io(
-                    false, // false = move instead of copy
+                    CopyRenameConfig {
+                        copy: false, // false = move instead of copy
+                        force: false,
+                        file_extension: "gpg".to_string(),
+                    },
                     &root,
                     "file2",
                     "subdir/file2",
-                    "gpg",
-                    false,
-                    &mut stdin,
-                    &mut stdout,
-                    &mut stderr,
+                    io_streams,
                 )
                 .unwrap();
 

@@ -36,7 +36,7 @@ pub fn init_logger() {
 
 pub fn set_log_level(level: LevelFilter) {
     *LOG_LEVEL.write() = level;
-    debug!("Log level set to {:?}!", level);
+    debug!("Log level set to {level:?}!");
 }
 
 pub fn init_debug_logger() {

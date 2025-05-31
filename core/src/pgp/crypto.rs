@@ -33,7 +33,7 @@ impl PGPClient {
 
         let status = child.wait()?;
         if status.success() {
-            debug!("File encrypted successfully: {}", output_path);
+            debug!("File encrypted successfully: {output_path}");
             Ok(())
         } else {
             let mut buffer = String::new();

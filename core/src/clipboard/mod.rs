@@ -9,8 +9,6 @@ pub mod xorg;
 #[cfg(target_os = "windows")]
 mod windows;
 
-use std::env;
-
 #[allow(unused_imports)]
 use anyhow::{anyhow, Result};
 use secrecy::SecretString;
@@ -19,10 +17,9 @@ use secrecy::SecretString;
 use crate::constants::default_constants::{
     CLIP_TIME, WAYLAND_COPY_EXECUTABLE, X11_COPY_EXECUTABLE,
 };
-use crate::constants::env_variables::CLIP_TIME_ENV;
 use crate::util::fs_util::find_executable_in_path;
 
-pub fn copy_to_clipboard(content: SecretString, sec_to_clear: Option<usize>) -> Result<()> {
+pub fn copy_to_clipboard(content: SecretString, sec_to_clear: &Option<usize>) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         check_executable("pbcopy")?;
@@ -31,6 +28,7 @@ pub fn copy_to_clipboard(content: SecretString, sec_to_clear: Option<usize>) -> 
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
+        use std::env;
         if env::var("WAYLAND_DISPLAY").is_ok() {
             check_executable(WAYLAND_COPY_EXECUTABLE)?;
             wayland::copy_to_clip_board(content.clone(), sec_to_clear)?;
@@ -51,18 +49,6 @@ pub fn copy_to_clipboard(content: SecretString, sec_to_clear: Option<usize>) -> 
     }
 
     Ok(())
-}
-
-pub fn get_clip_time() -> Option<usize> {
-    let time = match env::var(CLIP_TIME_ENV) {
-        Ok(val) => val.parse::<usize>().unwrap_or(CLIP_TIME),
-        Err(_) => CLIP_TIME,
-    };
-    if 0 == time {
-        None
-    } else {
-        Some(time)
-    }
 }
 
 fn check_executable(executable: &str) -> Result<()> {

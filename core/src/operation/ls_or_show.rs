@@ -33,7 +33,7 @@ pub fn ls_io(
         let result = tree.print_tree(print_cfg)?;
         let result = remove_lines_postfix(&result, ".gpg");
         let tree = if tree_cfg.target.is_empty() {
-            format!("Password Store\n{}", result)
+            format!("Password Store\n{result}")
         } else {
             format!("{}\n{}", tree_cfg.target, result)
         };
@@ -41,7 +41,7 @@ pub fn ls_io(
     }
 
     if let Some(filename) = full_path.file_name().and_then(|n| n.to_str()) {
-        full_path.set_file_name(format!("{}.gpg", filename));
+        full_path.set_file_name(format!("{filename}.gpg"));
     } else {
         return Err(IOErr::new(IOErrType::InvalidName, &full_path).into());
     }
@@ -60,7 +60,7 @@ pub fn ls_io(
     } else if !full_path.exists() {
         Err(IOErr::new(IOErrType::PathNotExist, &full_path).into())
     } else {
-        debug!("ls_io: {:?} is neither file or dir", full_path);
+        debug!("ls_io: {full_path:?} is neither file or dir");
         Err(IOErr::new(IOErrType::InvalidFileType, &full_path).into())
     }
 }
@@ -78,7 +78,7 @@ pub fn ls_dir(tree_cfg: &TreeConfig, print_cfg: &TreePrintConfig) -> Result<Stri
         let result = tree.print_tree(print_cfg)?;
         let result = str::remove_lines_postfix(&result, ".gpg");
         if tree_cfg.target.is_empty() {
-            Ok(format!("Password Store\n{}", result))
+            Ok(format!("Password Store\n{result}"))
         } else {
             Ok(format!("{}\n{}", tree_cfg.target, result))
         }

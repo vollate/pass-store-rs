@@ -58,7 +58,7 @@ impl DirTree<'_> {
                         format!("{} -> {}", child.name, child.symlink_target.as_ref().unwrap())
                     };
                     if child.is_recursive {
-                        line = format!("{} [recursive, not followed]\n", line);
+                        line = format!("{line} [recursive, not followed]\n");
                     } else {
                         line.push('\n');
                     }

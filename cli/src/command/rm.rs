@@ -31,7 +31,7 @@ pub fn cmd_rm(
     .map_err(|e| (ParsExitCode::Error.into(), e))?;
 
     let commit = GitCommit::new(&root, CommitType::Delete(pass_name.to_string()));
-    debug!("cmd_rm: commit {}", commit);
+    debug!("cmd_rm: commit {commit}");
     add_and_commit(
         &config.executable_config.git_executable,
         &root,
