@@ -67,11 +67,11 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
     while to_check != root {
         if to_check.is_dir() {
             let key_file = to_check.join(".gpg-id");
-            debug!("Check {:?} for .gpg-id file", key_file);
+            debug!("Check {key_file:?} for .gpg-id file");
 
             if key_file.exists() && key_file.is_file() {
                 if let Ok(key) = fs::read_to_string(key_file) {
-                    debug!("Found key(s): {:?}", key);
+                    debug!("Found key(s): {key:?}");
 
                     return Ok(key
                         .lines()
@@ -92,10 +92,10 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
 
     if root.is_dir() {
         let key_file = root.join(".gpg-id");
-        debug!("Checking root {:?} for .gpg-id file", root);
+        debug!("Checking root {root:?} for .gpg-id file");
         if key_file.exists() && key_file.is_file() {
             if let Ok(key) = fs::read_to_string(key_file) {
-                debug!("Found key: {:?}", key);
+                debug!("Found key: {key:?}");
                 return Ok(key
                     .split('\n')
                     .map(|line| line.trim())
@@ -214,7 +214,7 @@ pub fn prompt_overwrite<R: Read + BufRead, W: Write>(
     err_s: &mut W,
     pass_name: &str,
 ) -> Result<bool> {
-    write!(err_s, "An entry already exists for {}. Overwrite? [y/N]: ", pass_name)?;
+    write!(err_s, "An entry already exists for {pass_name}. Overwrite? [y/N]: ")?;
     let mut input = String::new();
     in_s.read_line(&mut input)?;
     Ok(input.trim().eq_ignore_ascii_case("y"))

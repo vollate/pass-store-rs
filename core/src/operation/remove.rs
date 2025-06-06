@@ -47,15 +47,15 @@ where
     path_attack_check(root, &dist_path)?;
 
     if !dist_path.exists() || !dist_path.is_dir() {
-        debug!("Try to delete dir {:?}, which not exist", dist_path);
-        dist_path = root.join(format!("{}.gpg", dist));
+        debug!("Try to delete dir {dist_path:?}, which not exist");
+        dist_path = root.join(format!("{dist}.gpg"));
         if !dist_path.exists() || !dist_path.is_file() {
             if force {
                 writeln!(stdout, "Noting to remove")?;
                 return Ok(());
             }
-            debug!("Try to delete file {:?}, which not exist", dist_path);
-            writeln!(stderr, "Cannot remove '{}': No such file or directory", dist)?;
+            debug!("Try to delete file {dist_path:?}, which not exist");
+            writeln!(stderr, "Cannot remove '{dist}': No such file or directory")?;
             return Err(IOErr::new(IOErrType::PathNotExist, &dist_path).into());
         }
     }
@@ -66,7 +66,7 @@ where
             dist,
             root.display()
         );
-        write!(stdout, "{}", confirm_msg)?;
+        write!(stdout, "{confirm_msg}")?;
         stdout.flush()?;
         let mut input = String::new();
         stdin.read_line(&mut input)?;
@@ -77,18 +77,18 @@ where
 
     if dist_path.is_file() {
         fs::remove_file(&dist_path)?;
-        writeln!(stderr, "Removed '{}'", dist)?;
+        writeln!(stderr, "Removed '{dist}'")?;
     } else if dist_path.is_dir() {
         if recursive {
             remove_dir_recursive(&dist_path, stdout)?;
         } else {
-            let err_msg = format!("Cannot remove '{}': Is a directory.", dist);
-            writeln!(stderr, "{}", err_msg)?;
+            let err_msg = format!("Cannot remove '{dist}': Is a directory.");
+            writeln!(stderr, "{err_msg}")?;
             return Err(IOErr::new(IOErrType::ExpectFile, &dist_path).into());
         }
     } else {
-        let err_msg = format!("Cannot remove '{}': Not a file or directory.", dist);
-        writeln!(stderr, "{}", err_msg)?;
+        let err_msg = format!("Cannot remove '{dist}': Not a file or directory.");
+        writeln!(stderr, "{err_msg}")?;
         return Err(IOErr::new(IOErrType::InvalidFileType, &dist_path).into());
     }
 

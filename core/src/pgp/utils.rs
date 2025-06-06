@@ -19,7 +19,7 @@ pub(crate) fn get_pgp_key_info<S: AsRef<str>, T: AsRef<str>>(
     }
 
     let info = String::from_utf8(output.stdout)?;
-    debug!("fingerprint output: {}", info);
+    debug!("fingerprint output: {info}");
 
     let mut fpr = String::new();
 

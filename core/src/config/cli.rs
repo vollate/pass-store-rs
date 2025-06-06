@@ -4,6 +4,7 @@ use std::path::Path;
 #[allow(dead_code)]
 use std::{env, path};
 
+use log::warn;
 use serde::{Deserialize, Serialize};
 
 use crate::constants::default_constants::{EDITOR, GIT_EXECUTABLE, PGP_EXECUTABLE};
@@ -17,6 +18,8 @@ pub struct ParsConfig {
     pub path_config: PathConfig,
     #[serde(default = "ExecutableConfig::default")]
     pub executable_config: ExecutableConfig,
+    #[serde(default = "FeatureConfig::default")]
+    pub feature_config: FeatureConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
@@ -40,6 +43,12 @@ pub struct ExecutableConfig {
     pub pgp_executable: String,
     pub editor_executable: String,
     pub git_executable: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct FeatureConfig {
+    pub clip_time: Option<usize>,
+    pub fuzzy_search: bool,
 }
 
 impl Default for PrintConfig {
@@ -112,6 +121,12 @@ impl Default for PathConfig {
     }
 }
 
+impl Default for FeatureConfig {
+    fn default() -> Self {
+        FeatureConfig { clip_time: Some(45), fuzzy_search: true }
+    }
+}
+
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<ParsConfig, Box<dyn Error>> {
     let content = fs::read_to_string(path)?;
     let config: ParsConfig = toml::from_str(&content)?;
@@ -122,6 +137,47 @@ pub fn save_config<P: AsRef<Path>>(config: &ParsConfig, path: P) -> Result<(), B
     let toml_str = toml::to_string_pretty(config)?;
     fs::write(path, toml_str)?;
     Ok(())
+}
+
+pub fn handle_env_config(config: ParsConfig) -> ParsConfig {
+    use env_var_handler::*;
+
+    let mut new_conf = config;
+    let config = &mut new_conf;
+
+    handle_clip_time(config);
+    handle_fuzzy(config);
+
+    new_conf
+}
+
+mod env_var_handler {
+    use super::*;
+
+    pub(super) fn handle_clip_time(config: &mut ParsConfig) {
+        if let Ok(sec_str) = env::var("PARS_CLIP_TIME") {
+            match sec_str.parse::<usize>() {
+                Ok(sec) => {
+                    config.feature_config.clip_time = {
+                        if sec == 0 {
+                            None
+                        } else {
+                            Some(sec)
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Parse env variable 'PARS_CLIP_TIME' met error {e}");
+                }
+            }
+        }
+    }
+
+    pub(super) fn handle_fuzzy(config: &mut ParsConfig) {
+        if env::var("PARS_NO_FUZZY").is_ok() {
+            config.feature_config.fuzzy_search = false;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -144,7 +200,9 @@ mod tests {
 
     #[test]
     fn generate_default_config_test() {
-        let default_config = ParsConfig::default();
+        let mut default_config = ParsConfig::default();
+        default_config.path_config.default_repo = "<Your Home>/.password-store".into();
+        default_config.path_config.repos = vec!["<Your Home>/.password-store".into()];
         let root = env!("CARGO_MANIFEST_DIR");
         let save_path = Path::new(root).parent().unwrap().join("config").join("cli");
         if !save_path.exists() {
