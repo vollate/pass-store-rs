@@ -22,7 +22,7 @@ pub(crate) fn copy_to_clip_board(mut secret: SecretString, timeout: &Option<usiz
 
     if let Some(secs) = timeout {
         let cmd =
-            format!("Start-Sleep -Seconds {} ; [Windows.ApplicationModel.DataTransfer.Clipboard, Windows, ContentType = WindowsRuntime]::ClearHistory()", secs);
+            format!("Start-Sleep -Seconds {secs} ; [Windows.ApplicationModel.DataTransfer.Clipboard, Windows, ContentType = WindowsRuntime]::ClearHistory()");
         let _ = Command::new("powershell")
             .args(POWERSHELL_ARGS)
             .arg(&cmd)

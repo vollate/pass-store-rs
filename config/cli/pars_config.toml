@@ -12,8 +12,9 @@ repos = ["<Your Home>/.password-store"]
 
 [executable_config]
 pgp_executable = "gpg2"
-editor_executable = "vim"
+editor_executable = "notepad"
 git_executable = "git"
 
-[clip_config]
+[feature_config]
 clip_time = 45
+fuzzy_search = true
