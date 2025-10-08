@@ -692,7 +692,8 @@ mod tests {
                 };
 
                 // Try to rename a.gpg to non_existent_dir/b.gpg, should fail
-                let result = copy_rename_io(rename_config, &root, "a", "non_existent_dir/b", io_streams);
+                let result =
+                    copy_rename_io(rename_config, &root, "a", "non_existent_dir/b", io_streams);
                 assert!(result.is_err(), "Should fail when parent directory doesn't exist");
 
                 // Verify original file still exists
@@ -730,7 +731,8 @@ mod tests {
                 };
 
                 // Try to copy a.gpg to non_existent_dir/b.gpg, should fail
-                let result = copy_rename_io(copy_config, &root, "a", "non_existent_dir/b", io_streams);
+                let result =
+                    copy_rename_io(copy_config, &root, "a", "non_existent_dir/b", io_streams);
                 assert!(result.is_err(), "Should fail when parent directory doesn't exist");
 
                 // Verify original file still exists

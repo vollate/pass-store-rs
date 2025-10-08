@@ -12,10 +12,7 @@ pub fn cmd_shell(
     args: &[String],
 ) -> Result<(), (i32, Error)> {
     if args.is_empty() {
-        return Err((
-            ParsExitCode::Error.into(),
-            anyhow!("No command provided"),
-        ));
+        return Err((ParsExitCode::Error.into(), anyhow!("No command provided")));
     }
 
     let root = unwrap_root_path(base_dir, config);
