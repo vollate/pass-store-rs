@@ -42,6 +42,8 @@ pub fn better_rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(
                 fs::copy(from, to)?;
                 fs::remove_file(from)?;
             }
+        } else {
+            return Err(err.into());
         }
     }
 

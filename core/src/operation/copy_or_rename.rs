@@ -666,6 +666,84 @@ mod tests {
 
     #[test]
     #[serial]
+    fn rename_to_non_existent_parent_dir_test() {
+        // Test that renaming to a non-existent parent directory returns an error
+        // Original structure:
+        // root
+        // └── a.gpg
+        let (_tmp_dir, root) = gen_unique_temp_dir();
+        let structure: &[(Option<&str>, &[&str])] = &[(None, &["a.gpg"][..])];
+        create_dir_structure(&root, structure);
+
+        cleanup!(
+            {
+                let (stdin, _stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let mut stdout = io::stdout().lock();
+                let mut stderr = io::stderr().lock();
+
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let rename_config = CopyRenameConfig {
+                    copy: false,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
+                // Try to rename a.gpg to non_existent_dir/b.gpg, should fail
+                let result = copy_rename_io(rename_config, &root, "a", "non_existent_dir/b", io_streams);
+                assert!(result.is_err(), "Should fail when parent directory doesn't exist");
+
+                // Verify original file still exists
+                assert!(root.join("a.gpg").exists());
+            },
+            {}
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn copy_to_non_existent_parent_dir_test() {
+        // Test that copying to a non-existent parent directory returns an error
+        // Original structure:
+        // root
+        // └── a.gpg
+        let (_tmp_dir, root) = gen_unique_temp_dir();
+        let structure: &[(Option<&str>, &[&str])] = &[(None, &["a.gpg"][..])];
+        create_dir_structure(&root, structure);
+
+        cleanup!(
+            {
+                let (stdin, _stdin_w) = pipe().unwrap();
+                let mut stdin = BufReader::new(stdin);
+                let mut stdout = io::stdout().lock();
+                let mut stderr = io::stderr().lock();
+
+                let io_streams =
+                    IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
+
+                let copy_config = CopyRenameConfig {
+                    copy: true,
+                    force: false,
+                    file_extension: "gpg".to_string(),
+                };
+
+                // Try to copy a.gpg to non_existent_dir/b.gpg, should fail
+                let result = copy_rename_io(copy_config, &root, "a", "non_existent_dir/b", io_streams);
+                assert!(result.is_err(), "Should fail when parent directory doesn't exist");
+
+                // Verify original file still exists
+                assert!(root.join("a.gpg").exists());
+                // Verify target was not created
+                assert!(!root.join("non_existent_dir").exists());
+            },
+            {}
+        );
+    }
+
+    #[test]
+    #[serial]
     #[ignore = "need run interactively"]
     fn re_encrypt_case_test() {
         // Set up directory structure:

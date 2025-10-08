@@ -157,4 +157,8 @@ Optionally forcefully, selectively reencrypting."#)]
         #[arg(trailing_var_arg = true)]
         args: Vec<String>,
     },
+
+    /// Execute an external shell command in the password store directory
+    #[command(external_subcommand)]
+    External(Vec<String>),
 }
