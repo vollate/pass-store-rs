@@ -10,7 +10,7 @@ readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.97"
-clap = { version = "4.5.28", features = ["derive"] }
+clap = { version = "4.5.51", features = ["derive"] }
 fast_qr = "0.13.0"
 log = "0.4.26"
 nucleo-matcher = "0.3.1"
