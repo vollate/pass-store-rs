@@ -27,7 +27,12 @@ pub fn cmd_shell(
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
-        .map_err(|e| (ParsExitCode::Error.into(), e.into()))?
+        .map_err(|e| {
+            (
+                ParsExitCode::Error.into(),
+                anyhow!("Failed to execute external command '{command}': {e}"),
+            )
+        })?
         .wait()
         .map_err(|e| (ParsExitCode::Error.into(), e.into()))?;
 

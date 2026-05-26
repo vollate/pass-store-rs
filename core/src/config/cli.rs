@@ -49,6 +49,7 @@ pub struct ExecutableConfig {
 pub struct FeatureConfig {
     pub clip_time: Option<usize>,
     pub fuzzy_search: bool,
+    pub vim_mode: bool,
 }
 
 impl Default for PrintConfig {
@@ -123,7 +124,7 @@ impl Default for PathConfig {
 
 impl Default for FeatureConfig {
     fn default() -> Self {
-        FeatureConfig { clip_time: Some(45), fuzzy_search: true }
+        FeatureConfig { clip_time: Some(45), fuzzy_search: true, vim_mode: false }
     }
 }
 
@@ -147,6 +148,7 @@ pub fn handle_env_config(config: ParsConfig) -> ParsConfig {
 
     handle_clip_time(config);
     handle_fuzzy(config);
+    handle_vim_mode(config);
 
     new_conf
 }
@@ -176,6 +178,12 @@ mod env_var_handler {
     pub(super) fn handle_fuzzy(config: &mut ParsConfig) {
         if env::var("PARS_NO_FUZZY").is_ok() {
             config.feature_config.fuzzy_search = false;
+        }
+    }
+
+    pub(super) fn handle_vim_mode(config: &mut ParsConfig) {
+        if env::var("PARS_VIM_MODE").is_ok() {
+            config.feature_config.vim_mode = true;
         }
     }
 }

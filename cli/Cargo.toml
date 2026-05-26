@@ -11,6 +11,7 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.97"
 clap = { version = "4.5.28", features = ["derive"] }
+crossterm = "0.28"
 dirs = "6"
 fast_qr = "0.13.0"
 log = "0.4.26"

@@ -155,6 +155,8 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
             // If there are trailing arguments, treat them as external shell command
             if !cli_args.args.is_empty() {
                 command::shell::cmd_shell(&config, cli_args.base_dir.as_deref(), &cli_args.args)?;
+            } else if config.feature_config.fuzzy_search {
+                crate::fuzzy::interactive_search(&config, cli_args.base_dir.as_deref())?;
             } else {
                 command::ls::cmd_ls(&config, cli_args.base_dir.as_deref(), None, None, None)?;
             }
