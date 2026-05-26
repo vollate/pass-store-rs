@@ -1,3 +1,4 @@
+pub mod completion;
 pub mod cp;
 pub mod edit;
 pub mod find;

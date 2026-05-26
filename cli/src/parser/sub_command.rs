@@ -158,7 +158,40 @@ Optionally forcefully, selectively reencrypting."#)]
         args: Vec<String>,
     },
 
+    #[clap(about = "Generate or install shell completions")]
+    Completion {
+        #[command(subcommand)]
+        action: CompletionAction,
+    },
+
     /// Execute an external shell command in the password store directory
     #[command(external_subcommand)]
     External(Vec<String>),
+}
+
+#[derive(Clone, clap::ValueEnum)]
+pub enum ShellType {
+    Bash,
+    Zsh,
+    Fish,
+    Powershell,
+}
+
+#[derive(Subcommand)]
+pub enum CompletionAction {
+    #[clap(about = "Install shell completion for the current or specified shell")]
+    Install {
+        #[arg(short, long)]
+        shell: Option<ShellType>,
+    },
+    #[clap(about = "Uninstall shell completion for the current or specified shell")]
+    Uninstall {
+        #[arg(short, long)]
+        shell: Option<ShellType>,
+    },
+    #[clap(about = "Print shell completion script to stdout")]
+    Generate {
+        #[arg(short, long)]
+        shell: Option<ShellType>,
+    },
 }
