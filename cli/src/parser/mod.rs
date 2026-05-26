@@ -145,6 +145,9 @@ pub fn handle_cli(config: ParsConfig, cli_args: CliParser) -> Result<(), (i32, E
         Some(SubCommands::Git { args }) => {
             command::git::cmd_git(&config, cli_args.base_dir.as_deref(), &args)?;
         }
+        Some(SubCommands::Completion { action }) => {
+            command::completion::cmd_completion(action)?;
+        }
         Some(SubCommands::External(args)) => {
             command::shell::cmd_shell(&config, cli_args.base_dir.as_deref(), &args)?;
         }

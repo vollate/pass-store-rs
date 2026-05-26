@@ -11,6 +11,7 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.97"
 clap = { version = "4.5.28", features = ["derive"] }
+dirs = "6"
 fast_qr = "0.13.0"
 log = "0.4.26"
 nucleo-matcher = "0.3.1"
@@ -26,5 +27,3 @@ path = "src/main.rs"
 assert_cmd = "2.0.16"
 predicates = "3.1.3"
 
-[build-dependencies]
-clap_complete = "4.5.47"

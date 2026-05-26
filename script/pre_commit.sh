@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/bin/zsh
 TARGET_DIRS=("core" "cli")
 
 if ! [ -d '.git' ]; then

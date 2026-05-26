@@ -12,7 +12,7 @@ repos = ["<Your Home>/.password-store"]
 
 [executable_config]
 pgp_executable = "gpg2"
-editor_executable = "notepad"
+editor_executable = "vim"
 git_executable = "git"
 
 [feature_config]
