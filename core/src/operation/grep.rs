@@ -79,7 +79,7 @@ where
                             writeln!(
                                 out_stream,
                                 "{}:",
-                                &relative_path_str[..relative_path_str.len() - 4].color(color)
+                                relative_path_str[..relative_path_str.len() - 4].color(color)
                             )?;
                         } else {
                             writeln!(
@@ -168,7 +168,7 @@ pub fn grep(
                 if let Some(color) = print_cfg.grep_pass_color {
                     results.push(format!(
                         "{}:",
-                        &relative_path_str[..relative_path_str.len() - 4].color(color)
+                        relative_path_str[..relative_path_str.len() - 4].color(color)
                     ));
                 } else {
                     results.push(format!("{}:", &relative_path_str[..relative_path_str.len() - 4]));
