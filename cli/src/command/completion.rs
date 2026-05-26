@@ -48,10 +48,47 @@ fn home_dir() -> Result<PathBuf, Error> {
 
 fn generate(shell: &ShellType) {
     match shell {
-        ShellType::Bash => print!("{}", BASH_COMPLETION),
-        ShellType::Zsh => print!("{}", ZSH_COMPLETION),
-        ShellType::Fish => print!("{}", FISH_COMPLETION),
-        ShellType::Powershell => print!("{}", PWSH_COMPLETION_PSM1),
+        ShellType::Bash => {
+            print!("{}", BASH_COMPLETION);
+            eprintln!("\n# Usage: Add the following to your ~/.bashrc (or save to a file):");
+            eprintln!("#   pars completion generate --shell bash >> ~/.bashrc");
+            eprintln!("#");
+            eprintln!("# Or save to the bash-completion directory (recommended):");
+            eprintln!("#   pars completion generate --shell bash > ~/.local/share/bash-completion/completions/pars");
+            eprintln!("#");
+            eprintln!("# Alternatively, run `pars completion install` to do this automatically.");
+        }
+        ShellType::Zsh => {
+            print!("{}", ZSH_COMPLETION);
+            eprintln!("\n# Usage: Save to a directory in your $fpath:");
+            eprintln!(
+                "#   mkdir -p ~/.zfunc && pars completion generate --shell zsh > ~/.zfunc/_pars"
+            );
+            eprintln!("#");
+            eprintln!("# Then ensure your ~/.zshrc contains:");
+            eprintln!("#   fpath+=~/.zfunc");
+            eprintln!("#   autoload -Uz compinit && compinit");
+            eprintln!("#");
+            eprintln!("# Alternatively, run `pars completion install` to do this automatically.");
+        }
+        ShellType::Fish => {
+            print!("{}", FISH_COMPLETION);
+            eprintln!("\n# Usage: Save to the fish completions directory:");
+            eprintln!(
+                "#   pars completion generate --shell fish > ~/.config/fish/completions/pars.fish"
+            );
+            eprintln!("#");
+            eprintln!("# Fish will auto-load it on next shell start.");
+            eprintln!("# Alternatively, run `pars completion install` to do this automatically.");
+        }
+        ShellType::Powershell => {
+            print!("{}", PWSH_COMPLETION_PSM1);
+            eprintln!("\n# Usage: Save as a PowerShell module:");
+            eprintln!("#   Save the output to <Documents>/PowerShell/Modules/ParsCompletion/ParsCompletion.psm1");
+            eprintln!("#   Then add `Import-Module ParsCompletion` to your $PROFILE");
+            eprintln!("#");
+            eprintln!("# Alternatively, run `pars completion install` to do this automatically.");
+        }
     }
 }
 
