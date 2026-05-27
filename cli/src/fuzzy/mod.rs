@@ -73,6 +73,7 @@ impl App {
     }
 
     /// Whether the search mode is active (Insert or Normal)
+    #[allow(dead_code)]
     pub fn is_searching(&self) -> bool {
         matches!(self.mode, AppMode::Insert | AppMode::Normal)
     }
@@ -350,40 +351,23 @@ fn run_app(
                     if let Event::Key(key) = evt {
                         match key.code {
                             KeyCode::Char('1') | KeyCode::Char('c') => {
-                                if let Some(ref content) = app.decrypted_content {
-                                    let first_line =
-                                        content.lines().next().unwrap_or("").to_string();
-                                    let secret: SecretString = first_line.into();
-                                    match copy_to_clipboard(
-                                        secret,
-                                        &config.feature_config.clip_time,
-                                    ) {
-                                        Ok(_) => {
-                                            app.message = Some("Copied to clipboard!".to_string());
-                                            return Ok(());
-                                        }
-                                        Err(e) => {
-                                            app.message = Some(format!("Clipboard error: {e}"));
-                                        }
-                                    }
+                                if do_copy(app, config)? {
+                                    return Ok(());
                                 }
                             }
                             KeyCode::Char('2') | KeyCode::Char('d') => {
                                 app.mode = AppMode::Display;
                             }
                             KeyCode::Char('3') | KeyCode::Char('r') => {
-                                if let Some(ref content) = app.decrypted_content {
-                                    let first_line = content.lines().next().unwrap_or("");
-                                    match QRBuilder::new(first_line).build() {
-                                        Ok(qr) => {
-                                            app.decrypted_content = Some(qr.to_str());
-                                            app.mode = AppMode::Display;
-                                        }
-                                        Err(e) => {
-                                            app.message = Some(format!("QR error: {e}"));
-                                        }
-                                    }
-                                }
+                                do_qr(app)?;
+                            }
+                            KeyCode::Char('4') | KeyCode::Char('e') => {
+                                do_edit(app, config, &root, terminal)?;
+                                // After editing, re-decrypt to refresh
+                                re_decrypt(app, config, &root);
+                            }
+                            KeyCode::Char('5') | KeyCode::Char('g') => {
+                                do_generate(app, config, &root, terminal)?;
                             }
                             KeyCode::Esc | KeyCode::Char('b') => {
                                 app.selected_entry = None;
@@ -394,6 +378,8 @@ fn run_app(
                                 } else {
                                     app.mode = AppMode::Insert;
                                 }
+                                // Force full redraw to clear popup remnants
+                                terminal.clear().map_err(|e| (1, anyhow!("Clear error: {e}")))?;
                             }
                             KeyCode::Char('q') => return Ok(()),
                             KeyCode::Up | KeyCode::Char('k') => {
@@ -402,53 +388,25 @@ fn run_app(
                                 }
                             }
                             KeyCode::Down | KeyCode::Char('j') => {
-                                if app.action_cursor < 2 {
+                                if app.action_cursor < 4 {
                                     app.action_cursor += 1;
                                 }
                             }
-                            KeyCode::Enter => {
-                                // Execute action based on cursor position
-                                match app.action_cursor {
-                                    0 => {
-                                        // Copy to clipboard
-                                        if let Some(ref content) = app.decrypted_content {
-                                            let first_line =
-                                                content.lines().next().unwrap_or("").to_string();
-                                            let secret: SecretString = first_line.into();
-                                            match copy_to_clipboard(
-                                                secret,
-                                                &config.feature_config.clip_time,
-                                            ) {
-                                                Ok(_) => {
-                                                    app.message =
-                                                        Some("Copied to clipboard!".to_string());
-                                                    return Ok(());
-                                                }
-                                                Err(e) => {
-                                                    app.message =
-                                                        Some(format!("Clipboard error: {e}"));
-                                                }
-                                            }
-                                        }
+                            KeyCode::Enter => match app.action_cursor {
+                                0 => {
+                                    if do_copy(app, config)? {
+                                        return Ok(());
                                     }
-                                    1 => app.mode = AppMode::Display,
-                                    2 => {
-                                        if let Some(ref content) = app.decrypted_content {
-                                            let first_line = content.lines().next().unwrap_or("");
-                                            match QRBuilder::new(first_line).build() {
-                                                Ok(qr) => {
-                                                    app.decrypted_content = Some(qr.to_str());
-                                                    app.mode = AppMode::Display;
-                                                }
-                                                Err(e) => {
-                                                    app.message = Some(format!("QR error: {e}"));
-                                                }
-                                            }
-                                        }
-                                    }
-                                    _ => {}
                                 }
-                            }
+                                1 => app.mode = AppMode::Display,
+                                2 => do_qr(app)?,
+                                3 => {
+                                    do_edit(app, config, &root, terminal)?;
+                                    re_decrypt(app, config, &root);
+                                }
+                                4 => do_generate(app, config, &root, terminal)?,
+                                _ => {}
+                            },
                             _ => {}
                         }
                     }
@@ -530,6 +488,177 @@ fn handle_mouse(app: &mut App, mouse: event::MouseEvent) {
                 app.cursor += 1;
             }
         }
+        MouseEventKind::Down(event::MouseButton::Left) => {
+            // Calculate which row was clicked
+            // Layout: input block (3 rows) + results top border (1 row) = 4 rows before list items
+            let results_start_y: u16 = 4;
+            let click_y = mouse.row;
+            if click_y >= results_start_y {
+                let clicked_offset = (click_y - results_start_y) as usize;
+                let target_index = app.scroll_offset + clicked_offset;
+                if target_index < app.filtered.len() {
+                    app.cursor = target_index;
+                }
+            }
+        }
         _ => {}
+    }
+}
+
+fn do_copy(app: &mut App, config: &ParsConfig) -> Result<bool, (i32, Error)> {
+    if let Some(ref content) = app.decrypted_content {
+        let first_line = content.lines().next().unwrap_or("").to_string();
+        let secret: SecretString = first_line.into();
+        match copy_to_clipboard(secret, &config.feature_config.clip_time) {
+            Ok(_) => {
+                app.message = Some("Copied to clipboard!".to_string());
+                if config.feature_config.exit_on_copy {
+                    return Ok(true); // Signal exit
+                }
+                // Go back to search
+                app.selected_entry = None;
+                app.decrypted_content = None;
+                app.action_cursor = 0;
+                if app.vim_enabled {
+                    app.mode = AppMode::Normal;
+                } else {
+                    app.mode = AppMode::Insert;
+                }
+            }
+            Err(e) => {
+                app.message = Some(format!("Clipboard error: {e}"));
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn do_qr(app: &mut App) -> Result<(), (i32, Error)> {
+    if let Some(ref content) = app.decrypted_content {
+        let first_line = content.lines().next().unwrap_or("");
+        match QRBuilder::new(first_line).build() {
+            Ok(qr) => {
+                app.decrypted_content = Some(qr.to_str());
+                app.mode = AppMode::Display;
+            }
+            Err(e) => {
+                app.message = Some(format!("QR error: {e}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn do_edit(
+    app: &mut App,
+    config: &ParsConfig,
+    _root: &Path,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) -> Result<(), (i32, Error)> {
+    if let Some(ref entry_name) = app.selected_entry.clone() {
+        // Leave TUI temporarily to run editor
+        disable_raw_mode().ok();
+        execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture).ok();
+
+        let result = crate::command::edit::cmd_edit(config, None, entry_name);
+
+        // Restore TUI — re-enter alternate screen and raw mode
+        enable_raw_mode().ok();
+        execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture).ok();
+
+        // Force ratatui to fully redraw by resetting its internal diff buffer
+        terminal.clear().map_err(|e| (1, anyhow!("Terminal clear error: {e}")))?;
+
+        match result {
+            Ok(_) => {
+                app.message = Some("Edit complete".to_string());
+            }
+            Err((_, e)) => {
+                app.message = Some(format!("Edit error: {e}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn do_generate(
+    app: &mut App,
+    config: &ParsConfig,
+    root: &Path,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) -> Result<(), (i32, Error)> {
+    if let Some(ref entry_name) = app.selected_entry.clone() {
+        // Ask user for confirmation before regenerating
+        app.message = Some(format!("Regenerate '{}'? [y/N]", entry_name));
+
+        // Draw the confirmation prompt
+        terminal.draw(|frame| ui::draw(frame, app)).map_err(|e| (1, anyhow!("Draw error: {e}")))?;
+
+        // Wait for confirmation
+        loop {
+            if event::poll(std::time::Duration::from_millis(5000))
+                .map_err(|e| (1, anyhow!("Event poll error: {e}")))?
+            {
+                let evt = event::read().map_err(|e| (1, anyhow!("Event read error: {e}")))?;
+                if let Event::Key(key) = evt {
+                    match key.code {
+                        KeyCode::Char('y') | KeyCode::Char('Y') => {
+                            // Confirmed — regenerate
+                            let cmd_config = crate::command::generate::GenerateCommandConfig {
+                                base_dir: None,
+                                no_symbols: false,
+                                clip: false,
+                                in_place: true,
+                                force: true,
+                                pass_name: entry_name,
+                                pass_length: None,
+                            };
+                            match crate::command::generate::cmd_generate(config, cmd_config) {
+                                Ok(_) => {
+                                    app.message = Some("Password regenerated".to_string());
+                                    re_decrypt(app, config, root);
+                                }
+                                Err((_, e)) => {
+                                    app.message = Some(format!("Generate error: {e}"));
+                                }
+                            }
+                            break;
+                        }
+                        _ => {
+                            // Any other key = cancel
+                            app.message = Some("Cancelled".to_string());
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // Timeout = cancel
+                app.message = Some("Cancelled (timeout)".to_string());
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn re_decrypt(app: &mut App, config: &ParsConfig, root: &Path) {
+    if let Some(ref entry_name) = app.selected_entry {
+        let tree_cfg = TreeConfig {
+            root,
+            target: entry_name,
+            filter_type: FilterType::Disable,
+            filters: Vec::new(),
+        };
+        let print_cfg = TreePrintConfig {
+            dir_color: None,
+            file_color: None,
+            symbol_color: None,
+            tree_color: None,
+        };
+        if let Ok(LsOrShow::Password(secret)) =
+            ls_io(&config.executable_config.pgp_executable, &tree_cfg, &print_cfg)
+        {
+            app.decrypted_content = Some(secret.expose_secret().to_string());
+        }
     }
 }

@@ -50,6 +50,7 @@ pub struct FeatureConfig {
     pub clip_time: Option<usize>,
     pub fuzzy_search: bool,
     pub vim_mode: bool,
+    pub exit_on_copy: bool,
 }
 
 impl Default for PrintConfig {
@@ -124,7 +125,12 @@ impl Default for PathConfig {
 
 impl Default for FeatureConfig {
     fn default() -> Self {
-        FeatureConfig { clip_time: Some(45), fuzzy_search: true, vim_mode: false }
+        FeatureConfig {
+            clip_time: Some(45),
+            fuzzy_search: true,
+            vim_mode: false,
+            exit_on_copy: false,
+        }
     }
 }
 

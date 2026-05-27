@@ -28,6 +28,10 @@ const DISPLAY_TEXT_COLOR: Color = Color::White;
 
 /// Main entry point for rendering.
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    // Set black background for the entire frame (ensures readability on light terminals)
+    let bg_block = Block::default().style(Style::default().bg(Color::Black));
+    frame.render_widget(bg_block, frame.area());
+
     // Always draw the search background
     draw_search(frame, app);
 
@@ -243,7 +247,7 @@ fn draw_action_popup(frame: &mut Frame, app: &App) {
 
     // Popup dimensions
     let popup_width = 44u16.min(area.width.saturating_sub(4));
-    let popup_height = 9u16.min(area.height.saturating_sub(4));
+    let popup_height = 12u16.min(area.height.saturating_sub(4));
 
     // Calculate the screen row of the selected entry.
     // Layout: input block (3 rows) + results top border (1 row) = 4 rows before list items
@@ -282,19 +286,21 @@ fn draw_action_popup(frame: &mut Frame, app: &App) {
     let popup_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Double)
-        .border_style(Style::default().fg(POPUP_BORDER_COLOR))
+        .border_style(Style::default().fg(POPUP_BORDER_COLOR).bg(Color::Black))
         .title(Span::styled(title, Style::default().fg(TITLE_COLOR).add_modifier(Modifier::BOLD)))
         .title_alignment(Alignment::Center);
 
     let actions = [
-        ("[c] Copy to clipboard", 'c'),
-        ("[d] Display password", 'd'),
-        ("[r] Show as QR code", 'r'),
+        "[c] Copy to clipboard",
+        "[d] Display password",
+        "[r] Show as QR code",
+        "[e] Edit password",
+        "[g] Regenerate password",
     ];
 
     let mut lines: Vec<Line> = vec![Line::from("")];
 
-    for (i, (label, _)) in actions.iter().enumerate() {
+    for (i, label) in actions.iter().enumerate() {
         let is_active = i == app.action_cursor;
         let style = if is_active {
             Style::default().fg(Color::Black).bg(POPUP_HIGHLIGHT_COLOR).add_modifier(Modifier::BOLD)
@@ -324,7 +330,8 @@ fn draw_action_popup(frame: &mut Frame, app: &App) {
         lines.push(Line::from(Span::styled(format!("   {msg}"), Style::default().fg(color))));
     }
 
-    let paragraph = Paragraph::new(lines).block(popup_block);
+    let paragraph =
+        Paragraph::new(lines).style(Style::default().bg(Color::Black)).block(popup_block);
     frame.render_widget(paragraph, popup_area);
 }
 
