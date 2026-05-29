@@ -18,7 +18,7 @@ pub fn get_test_executable() -> String {
 }
 
 pub fn get_test_password() -> String {
-    env::var("PASS_RS_TEST_PASSWORD").unwrap_or("passwd".into())
+    env::var("PASS_RS_TEST_PASSWORD").unwrap_or("password".into())
 }
 
 pub fn clean_up_test_key(

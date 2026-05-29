@@ -1,0 +1,423 @@
+//! Main event loop and per-mode keyboard/mouse handling.
+
+use std::io;
+use std::path::Path;
+
+use anyhow::{anyhow, Error};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseEventKind};
+use nucleo_matcher::{Config, Matcher};
+use pars_core::config::cli::ParsConfig;
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
+
+use super::actions::{
+    do_copy, do_display, do_edit, do_generate_new, do_insert_new, do_qr, do_regenerate,
+};
+use super::app::{App, PendingAction};
+use super::entries::filter_entries;
+use super::{ui, AppMode};
+use crate::util::unwrap_root_path;
+
+pub fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    app: &mut App,
+    config: &ParsConfig,
+    base_dir: Option<&str>,
+) -> Result<(), (i32, Error)> {
+    let mut matcher = Matcher::new(Config::DEFAULT);
+    let root = unwrap_root_path(base_dir, config);
+
+    loop {
+        terminal.draw(|frame| ui::draw(frame, app)).map_err(|e| (1, anyhow!("Draw error: {e}")))?;
+
+        if !event::poll(std::time::Duration::from_millis(200))
+            .map_err(|e| (1, anyhow!("Event poll error: {e}")))?
+        {
+            continue;
+        }
+
+        let evt = event::read().map_err(|e| (1, anyhow!("Event read error: {e}")))?;
+
+        // Clear transient messages on most input (except in InputName / Action where they
+        // may be confirmation messages we want to keep visible).
+        if app.mode != AppMode::InputName && app.mode != AppMode::Action && app.message.is_some() {
+            app.message = None;
+        }
+
+        match app.mode {
+            AppMode::Insert => handle_insert_mode(app, evt, &mut matcher, terminal, config, &root)?,
+            AppMode::Normal => handle_normal_mode(app, evt, &mut matcher, terminal, config, &root)?,
+            AppMode::InputName => {
+                handle_input_name_mode(app, evt, &mut matcher, terminal, config, &root)?
+            }
+            AppMode::Action => handle_action_mode(app, evt, terminal, config, &root)?,
+            AppMode::Display => handle_display_mode(app, evt, terminal),
+        }
+    }
+}
+
+// ─── Mode handlers ──────────────────────────────────────────────────────────
+
+fn handle_insert_mode(
+    app: &mut App,
+    evt: Event,
+    matcher: &mut Matcher,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    _config: &ParsConfig,
+    root: &Path,
+) -> Result<(), (i32, Error)> {
+    if let Event::Key(key) = evt {
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            match key.code {
+                KeyCode::Char('c') => return Err((0, anyhow!("__exit__"))),
+                KeyCode::Char('u') => {
+                    app.query.clear();
+                    refilter(app, matcher);
+                }
+                KeyCode::Char('w') => {
+                    let trimmed = app.query.trim_end();
+                    if let Some(pos) = trimmed.rfind(|c: char| c == '/' || c == ' ') {
+                        app.query.truncate(pos);
+                    } else {
+                        app.query.clear();
+                    }
+                    refilter(app, matcher);
+                }
+                KeyCode::Char('g') => {
+                    open_name_input(app, PendingAction::Generate);
+                }
+                KeyCode::Char('n') => {
+                    open_name_input(app, PendingAction::Insert);
+                }
+                _ => {}
+            }
+        } else {
+            match key.code {
+                KeyCode::Esc => {
+                    if app.vim_enabled {
+                        app.mode = AppMode::Normal;
+                    } else {
+                        return Err((0, anyhow!("__exit__")));
+                    }
+                }
+                KeyCode::Char(c) => {
+                    app.query.push(c);
+                    refilter(app, matcher);
+                }
+                KeyCode::Backspace => {
+                    app.query.pop();
+                    refilter(app, matcher);
+                }
+                KeyCode::Up => move_cursor(app, -1),
+                KeyCode::Down => move_cursor(app, 1),
+                KeyCode::Enter => {
+                    handle_select(app, root);
+                    terminal.clear().ok();
+                }
+                _ => {}
+            }
+        }
+    } else if let Event::Mouse(mouse) = evt {
+        handle_mouse(app, mouse);
+    }
+    Ok(())
+}
+
+fn handle_normal_mode(
+    app: &mut App,
+    evt: Event,
+    matcher: &mut Matcher,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    _config: &ParsConfig,
+    root: &Path,
+) -> Result<(), (i32, Error)> {
+    if let Event::Key(key) = evt {
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            match key.code {
+                KeyCode::Char('c') => return Err((0, anyhow!("__exit__"))),
+                KeyCode::Char('d') => {
+                    let half = app.visible_height / 2;
+                    let max = app.filtered.len().saturating_sub(1);
+                    app.cursor = (app.cursor + half).min(max);
+                }
+                KeyCode::Char('u') => {
+                    let half = app.visible_height / 2;
+                    app.cursor = app.cursor.saturating_sub(half);
+                }
+                KeyCode::Char('f') => {
+                    let max = app.filtered.len().saturating_sub(1);
+                    app.cursor = (app.cursor + app.visible_height).min(max);
+                }
+                KeyCode::Char('b') => {
+                    app.cursor = app.cursor.saturating_sub(app.visible_height);
+                }
+                KeyCode::Char('g') => open_name_input(app, PendingAction::Generate),
+                KeyCode::Char('n') => open_name_input(app, PendingAction::Insert),
+                _ => {}
+            }
+            app.pending_d = false;
+        } else {
+            match key.code {
+                KeyCode::Char('q') => return Err((0, anyhow!("__exit__"))),
+                KeyCode::Char('i') => {
+                    app.mode = AppMode::Insert;
+                    app.pending_d = false;
+                }
+                KeyCode::Char('j') | KeyCode::Down => {
+                    move_cursor(app, 1);
+                    app.pending_d = false;
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    move_cursor(app, -1);
+                    app.pending_d = false;
+                }
+                KeyCode::Char('d') => {
+                    if app.pending_d {
+                        app.query.clear();
+                        refilter(app, matcher);
+                        app.pending_d = false;
+                    } else {
+                        app.pending_d = true;
+                    }
+                }
+                KeyCode::Char('D') => {
+                    app.query.clear();
+                    refilter(app, matcher);
+                    app.pending_d = false;
+                }
+                KeyCode::Char('g') => {
+                    app.cursor = 0;
+                    app.pending_d = false;
+                }
+                KeyCode::Char('G') => {
+                    if !app.filtered.is_empty() {
+                        app.cursor = app.filtered.len() - 1;
+                    }
+                    app.pending_d = false;
+                }
+                KeyCode::Enter => {
+                    app.pending_d = false;
+                    handle_select(app, root);
+                    terminal.clear().ok();
+                }
+                _ => app.pending_d = false,
+            }
+        }
+    } else if let Event::Mouse(mouse) = evt {
+        app.pending_d = false;
+        handle_mouse(app, mouse);
+    }
+    Ok(())
+}
+
+fn handle_input_name_mode(
+    app: &mut App,
+    evt: Event,
+    matcher: &mut Matcher,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    config: &ParsConfig,
+    root: &Path,
+) -> Result<(), (i32, Error)> {
+    if let Event::Key(key) = evt {
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            match key.code {
+                KeyCode::Char('c') => return Err((0, anyhow!("__exit__"))),
+                KeyCode::Char('u') => app.name_input.clear(),
+                _ => {}
+            }
+        } else {
+            match key.code {
+                KeyCode::Esc => {
+                    app.name_input.clear();
+                    app.pending_action = None;
+                    app.mode = if app.vim_enabled { AppMode::Normal } else { AppMode::Insert };
+                    terminal.clear().ok();
+                }
+                KeyCode::Char(c) => app.name_input.push(c),
+                KeyCode::Backspace => {
+                    app.name_input.pop();
+                }
+                KeyCode::Enter => {
+                    if app.name_input.trim().is_empty() {
+                        app.message = Some("Name cannot be empty".to_string());
+                    } else {
+                        let name = app.name_input.trim().to_string();
+                        let action = app.pending_action;
+                        app.name_input.clear();
+                        app.pending_action = None;
+                        app.mode = if app.vim_enabled { AppMode::Normal } else { AppMode::Insert };
+                        terminal.clear().ok();
+                        match action {
+                            Some(PendingAction::Generate) => {
+                                do_generate_new(app, config, root, terminal, matcher, &name)?;
+                            }
+                            Some(PendingAction::Insert) => {
+                                do_insert_new(app, config, root, terminal, matcher, &name)?;
+                            }
+                            None => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+fn handle_action_mode(
+    app: &mut App,
+    evt: Event,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    config: &ParsConfig,
+    root: &Path,
+) -> Result<(), (i32, Error)> {
+    let Event::Key(key) = evt else {
+        return Ok(());
+    };
+
+    match key.code {
+        KeyCode::Char('1') | KeyCode::Char('c') => {
+            if do_copy(app, config, root)? {
+                return Err((0, anyhow!("__exit__")));
+            }
+            terminal.clear().ok();
+        }
+        KeyCode::Char('2') | KeyCode::Char('d') => {
+            do_display(app, config, root)?;
+            terminal.clear().ok();
+        }
+        KeyCode::Char('3') | KeyCode::Char('r') => {
+            do_qr(app, config, root)?;
+            terminal.clear().ok();
+        }
+        KeyCode::Char('4') | KeyCode::Char('e') => {
+            do_edit(app, config, terminal)?;
+            app.decrypted_content = None;
+        }
+        KeyCode::Char('5') | KeyCode::Char('g') => {
+            do_regenerate(app, config, root, terminal)?;
+        }
+        KeyCode::Esc | KeyCode::Char('b') => {
+            app.selected_entry = None;
+            app.decrypted_content = None;
+            app.action_cursor = 0;
+            app.message = None;
+            app.mode = if app.vim_enabled { AppMode::Normal } else { AppMode::Insert };
+            terminal.clear().ok();
+        }
+        KeyCode::Char('q') => return Err((0, anyhow!("__exit__"))),
+        KeyCode::Up | KeyCode::Char('k') => {
+            if app.action_cursor > 0 {
+                app.action_cursor -= 1;
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.action_cursor < 4 {
+                app.action_cursor += 1;
+            }
+        }
+        KeyCode::Enter => match app.action_cursor {
+            0 => {
+                if do_copy(app, config, root)? {
+                    return Err((0, anyhow!("__exit__")));
+                }
+                terminal.clear().ok();
+            }
+            1 => {
+                do_display(app, config, root)?;
+                terminal.clear().ok();
+            }
+            2 => {
+                do_qr(app, config, root)?;
+                terminal.clear().ok();
+            }
+            3 => {
+                do_edit(app, config, terminal)?;
+                app.decrypted_content = None;
+            }
+            4 => do_regenerate(app, config, root, terminal)?,
+            _ => {}
+        },
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_display_mode(
+    app: &mut App,
+    evt: Event,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) {
+    if let Event::Key(_) = evt {
+        // Invalidate cache so next display reads fresh content (relevant after QR)
+        app.decrypted_content = None;
+        app.mode = AppMode::Action;
+        terminal.clear().ok();
+    }
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+fn refilter(app: &mut App, matcher: &mut Matcher) {
+    app.filtered = filter_entries(&app.query, &app.entries, matcher);
+    app.cursor = 0;
+    app.scroll_offset = 0;
+}
+
+fn move_cursor(app: &mut App, delta: i32) {
+    if delta < 0 {
+        app.cursor = app.cursor.saturating_sub((-delta) as usize);
+    } else if !app.filtered.is_empty() {
+        let max = app.filtered.len() - 1;
+        app.cursor = (app.cursor + delta as usize).min(max);
+    }
+}
+
+fn open_name_input(app: &mut App, action: PendingAction) {
+    app.pending_action = Some(action);
+    app.name_input.clear();
+    app.message = None;
+    app.mode = AppMode::InputName;
+}
+
+fn handle_select(app: &mut App, _root: &Path) {
+    if app.filtered.is_empty() {
+        return;
+    }
+    let entry_name = app.filtered[app.cursor].0.clone();
+    // Just open the action popup — DO NOT decrypt yet. Decryption happens lazily when
+    // the user picks an action that actually needs the password content.
+    app.selected_entry = Some(entry_name);
+    app.decrypted_content = None;
+    app.action_cursor = 0;
+    app.mode = AppMode::Action;
+}
+
+fn handle_mouse(app: &mut App, mouse: event::MouseEvent) {
+    match mouse.kind {
+        MouseEventKind::ScrollUp => {
+            if app.cursor > 0 {
+                app.cursor -= 1;
+            }
+        }
+        MouseEventKind::ScrollDown => {
+            if !app.filtered.is_empty() && app.cursor < app.filtered.len() - 1 {
+                app.cursor += 1;
+            }
+        }
+        MouseEventKind::Down(event::MouseButton::Left) => {
+            // Layout: input(3) + results_border(1) = 4 rows before list
+            let results_start_y: u16 = 4;
+            let click_y = mouse.row;
+            if click_y >= results_start_y {
+                let clicked_offset = (click_y - results_start_y) as usize;
+                let target_index = app.scroll_offset + clicked_offset;
+                if target_index < app.filtered.len() {
+                    app.cursor = target_index;
+                }
+            }
+        }
+        _ => {}
+    }
+}
