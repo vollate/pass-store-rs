@@ -65,8 +65,17 @@ pub fn interactive_search(config: &ParsConfig, base_dir: Option<&str>) -> Result
     let mut app = App::new(entries, vim_enabled);
     let result = events::run_app(&mut terminal, &mut app, config, base_dir);
 
+    // Clean shutdown: clear the alt screen so any leftover (display popup, errors) is
+    // wiped, then restore the previous screen and re-enable normal cursor/input.
+    let _ = terminal.clear();
     disable_raw_mode().ok();
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture).ok();
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture,
+        crossterm::cursor::Show
+    )
+    .ok();
     terminal.show_cursor().ok();
 
     // The event loop signals normal exit by returning Err with the sentinel "__exit__"

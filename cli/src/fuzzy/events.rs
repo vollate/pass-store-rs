@@ -4,7 +4,8 @@ use std::io;
 use std::path::Path;
 
 use anyhow::{anyhow, Error};
-use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseEventKind};
+use crossterm::event::{self, EnableMouseCapture, Event, KeyCode, KeyModifiers, MouseEventKind};
+use crossterm::execute;
 use nucleo_matcher::{Config, Matcher};
 use pars_core::config::cli::ParsConfig;
 use ratatui::backend::CrosstermBackend;
@@ -51,7 +52,7 @@ pub fn run_app(
                 handle_input_name_mode(app, evt, &mut matcher, terminal, config, &root)?
             }
             AppMode::Action => handle_action_mode(app, evt, terminal, config, &root)?,
-            AppMode::Display => handle_display_mode(app, evt, terminal),
+            AppMode::Display => handle_display_mode(app, evt, terminal)?,
         }
     }
 }
@@ -118,7 +119,7 @@ fn handle_insert_mode(
             }
         }
     } else if let Event::Mouse(mouse) = evt {
-        handle_mouse(app, mouse);
+        handle_mouse(app, mouse, root, terminal);
     }
     Ok(())
 }
@@ -205,7 +206,7 @@ fn handle_normal_mode(
         }
     } else if let Event::Mouse(mouse) = evt {
         app.pending_d = false;
-        handle_mouse(app, mouse);
+        handle_mouse(app, mouse, root, terminal);
     }
     Ok(())
 }
@@ -272,31 +273,76 @@ fn handle_action_mode(
     config: &ParsConfig,
     root: &Path,
 ) -> Result<(), (i32, Error)> {
+    // Mouse interactions in the action popup
+    if let Event::Mouse(mouse) = evt {
+        match mouse.kind {
+            MouseEventKind::Down(event::MouseButton::Left) => {
+                if app.action_popup_rect.contains(mouse.column, mouse.row) {
+                    // Action rows: 0..5 starting at action_popup_first_action_y
+                    let first_y = app.action_popup_first_action_y;
+                    if mouse.row >= first_y {
+                        let idx = (mouse.row - first_y) as usize;
+                        if idx < 5 {
+                            app.action_cursor = idx;
+                            // Double-click-like UX: a single click both selects AND activates.
+                            return invoke_action(app, config, root, terminal, idx);
+                        }
+                    }
+                } else {
+                    // Click outside the popup → close it (treat like Esc/back)
+                    app.selected_entry = None;
+                    app.decrypted_content = None;
+                    app.action_cursor = 0;
+                    app.message = None;
+                    app.mode = if app.vim_enabled { AppMode::Normal } else { AppMode::Insert };
+                    terminal.clear().ok();
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                if app.action_cursor > 0 {
+                    app.action_cursor -= 1;
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if app.action_cursor < 4 {
+                    app.action_cursor += 1;
+                }
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     let Event::Key(key) = evt else {
         return Ok(());
     };
 
+    // Ctrl+C always exits — handle before plain-char shortcuts so it isn't
+    // misread as the 'c' (copy) hotkey.
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        if let KeyCode::Char('c') = key.code {
+            return Err((0, anyhow!("__exit__")));
+        }
+        // Any other Ctrl-modified key in the action popup is ignored, so
+        // combos like Ctrl+D / Ctrl+R don't accidentally trigger actions.
+        return Ok(());
+    }
+
     match key.code {
         KeyCode::Char('1') | KeyCode::Char('c') => {
-            if do_copy(app, config, root)? {
-                return Err((0, anyhow!("__exit__")));
-            }
-            terminal.clear().ok();
+            return invoke_action(app, config, root, terminal, 0);
         }
         KeyCode::Char('2') | KeyCode::Char('d') => {
-            do_display(app, config, root)?;
-            terminal.clear().ok();
+            return invoke_action(app, config, root, terminal, 1);
         }
         KeyCode::Char('3') | KeyCode::Char('r') => {
-            do_qr(app, config, root)?;
-            terminal.clear().ok();
+            return invoke_action(app, config, root, terminal, 2);
         }
         KeyCode::Char('4') | KeyCode::Char('e') => {
-            do_edit(app, config, terminal)?;
-            app.decrypted_content = None;
+            return invoke_action(app, config, root, terminal, 3);
         }
         KeyCode::Char('5') | KeyCode::Char('g') => {
-            do_regenerate(app, config, root, terminal)?;
+            return invoke_action(app, config, root, terminal, 4);
         }
         KeyCode::Esc | KeyCode::Char('b') => {
             app.selected_entry = None;
@@ -317,28 +363,41 @@ fn handle_action_mode(
                 app.action_cursor += 1;
             }
         }
-        KeyCode::Enter => match app.action_cursor {
-            0 => {
-                if do_copy(app, config, root)? {
-                    return Err((0, anyhow!("__exit__")));
-                }
-                terminal.clear().ok();
+        KeyCode::Enter => {
+            return invoke_action(app, config, root, terminal, app.action_cursor);
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn invoke_action(
+    app: &mut App,
+    config: &ParsConfig,
+    root: &Path,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    idx: usize,
+) -> Result<(), (i32, Error)> {
+    match idx {
+        0 => {
+            if do_copy(app, config, root)? {
+                return Err((0, anyhow!("__exit__")));
             }
-            1 => {
-                do_display(app, config, root)?;
-                terminal.clear().ok();
-            }
-            2 => {
-                do_qr(app, config, root)?;
-                terminal.clear().ok();
-            }
-            3 => {
-                do_edit(app, config, terminal)?;
-                app.decrypted_content = None;
-            }
-            4 => do_regenerate(app, config, root, terminal)?,
-            _ => {}
-        },
+            terminal.clear().ok();
+        }
+        1 => {
+            do_display(app, config, root)?;
+            terminal.clear().ok();
+        }
+        2 => {
+            do_qr(app, config, root)?;
+            terminal.clear().ok();
+        }
+        3 => {
+            do_edit(app, config, terminal)?;
+            app.decrypted_content = None;
+        }
+        4 => do_regenerate(app, config, root, terminal)?,
         _ => {}
     }
     Ok(())
@@ -348,13 +407,30 @@ fn handle_display_mode(
     app: &mut App,
     evt: Event,
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-) {
-    if let Event::Key(_) = evt {
-        // Invalidate cache so next display reads fresh content (relevant after QR)
+) -> Result<(), (i32, Error)> {
+    // Mouse events are intentionally ignored so the user can select+copy text
+    // natively (mouse capture was disabled when entering Display mode).
+    let Event::Key(key) = evt else {
+        return Ok(());
+    };
+
+    // Only the keys advertised in the popup help line do anything; anything else
+    // is ignored to match the displayed contract.
+    if matches!(key.code, KeyCode::Char('q'))
+        || (matches!(key.code, KeyCode::Char('c')) && key.modifiers.contains(KeyModifiers::CONTROL))
+    {
+        execute!(io::stdout(), EnableMouseCapture).ok();
+        return Err((0, anyhow!("__exit__")));
+    }
+
+    if matches!(key.code, KeyCode::Esc | KeyCode::Enter) {
+        execute!(io::stdout(), EnableMouseCapture).ok();
         app.decrypted_content = None;
         app.mode = AppMode::Action;
         terminal.clear().ok();
     }
+    // Other keys: do nothing.
+    Ok(())
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -394,7 +470,12 @@ fn handle_select(app: &mut App, _root: &Path) {
     app.mode = AppMode::Action;
 }
 
-fn handle_mouse(app: &mut App, mouse: event::MouseEvent) {
+fn handle_mouse(
+    app: &mut App,
+    mouse: event::MouseEvent,
+    root: &Path,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) {
     match mouse.kind {
         MouseEventKind::ScrollUp => {
             if app.cursor > 0 {
@@ -415,6 +496,26 @@ fn handle_mouse(app: &mut App, mouse: event::MouseEvent) {
                 let target_index = app.scroll_offset + clicked_offset;
                 if target_index < app.filtered.len() {
                     app.cursor = target_index;
+
+                    // Double-click detection: same row clicked within 400ms acts as Enter.
+                    let now = std::time::Instant::now();
+                    let is_double = matches!(
+                        (app.last_click_row, app.last_click_time),
+                        (Some(r), Some(t))
+                            if r == click_y
+                                && now.duration_since(t)
+                                    < std::time::Duration::from_millis(400)
+                    );
+
+                    if is_double {
+                        app.last_click_row = None;
+                        app.last_click_time = None;
+                        handle_select(app, root);
+                        terminal.clear().ok();
+                    } else {
+                        app.last_click_row = Some(click_y);
+                        app.last_click_time = Some(now);
+                    }
                 }
             }
         }

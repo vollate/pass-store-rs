@@ -16,8 +16,8 @@ const MATCH_COLOR: Color = Color::Yellow;
 const SELECTED_BG: Color = Color::DarkGray;
 const SELECTED_FG: Color = Color::White;
 const COUNTER_COLOR: Color = Color::DarkGray;
-const HELP_COLOR: Color = Color::DarkGray;
-const POPUP_BORDER_COLOR: Color = Color::Magenta;
+const HELP_COLOR: Color = Color::Gray;
+const POPUP_BORDER_COLOR: Color = Color::LightCyan;
 const POPUP_HIGHLIGHT_COLOR: Color = Color::Green;
 const ACTION_NORMAL_COLOR: Color = Color::White;
 const MESSAGE_SUCCESS_COLOR: Color = Color::Green;
@@ -35,6 +35,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     // Always draw the main layout (search + list + help)
     draw_main(frame, app);
+
+    // Reset popup hit-test rect; it'll be set again if we draw the popup below.
+    if app.mode != AppMode::Action {
+        app.action_popup_rect = super::app::PopupRect::default();
+    }
 
     // Overlay popups
     if app.mode == AppMode::Action {
@@ -254,10 +259,24 @@ fn styled_help(s: &str) -> Span<'_> {
 }
 
 /// Render the action popup (after selecting an existing password).
-fn draw_action_popup(frame: &mut Frame, app: &App) {
+fn draw_action_popup(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
-    let popup_width = 70u16.min(area.width.saturating_sub(4));
+    // Compute popup width based on the longest line of content (flex with max).
+    let selected = app.selected_entry.as_deref().unwrap_or("?");
+    let actions = [
+        "[c] Copy to clipboard",
+        "[d] Display password",
+        "[r] Show as QR code",
+        "[e] Edit password",
+        "[g] Regenerate password",
+    ];
+    let action_max = actions.iter().map(|s| s.len()).max().unwrap_or(20);
+    // Title needs " {selected} " — 2 spaces of padding inside the border.
+    let title_width = selected.chars().count() + 2;
+    // Action lines have " ▶ " (3) + label.
+    let inner_needed = action_max.max(title_width).max(40) + 6; // padding
+    let popup_width = (inner_needed as u16).min(area.width.saturating_sub(4)).max(36);
     let popup_height = 14u16.min(area.height.saturating_sub(4));
 
     // Layout: input(3) + results_border(1) = 4 rows before list
@@ -275,6 +294,16 @@ fn draw_action_popup(frame: &mut Frame, app: &App) {
     let popup_x = (area.width.saturating_sub(popup_width)) / 2;
 
     let popup_area = Rect { x: popup_x, y: popup_y, width: popup_width, height: popup_height };
+
+    // Record area for mouse hit-testing in events.rs.
+    app.action_popup_rect = super::app::PopupRect {
+        x: popup_area.x,
+        y: popup_area.y,
+        width: popup_area.width,
+        height: popup_area.height,
+    };
+    // First action row sits at: popup_y (top border) + 1 (padding empty line) + 1 = popup_y + 2.
+    app.action_popup_first_action_y = popup_y + 2;
 
     frame.render_widget(Clear, popup_area);
 
@@ -374,19 +403,39 @@ fn draw_action_popup(frame: &mut Frame, app: &App) {
 fn draw_display_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
-    let popup_width = (area.width.saturating_sub(6)).min(80);
-    let popup_height = (area.height.saturating_sub(6)).min(area.height.saturating_sub(4));
+    let content = app.decrypted_content.as_deref().unwrap_or("");
+    let selected = app.selected_entry.as_deref().unwrap_or("?");
+    let title = format!(" {} ", selected);
 
+    // Content-aware sizing: width = longest line, height = number of lines.
+    let content_max_line_width = content.lines().map(|l| l.chars().count()).max().unwrap_or(20);
+    let content_lines = content.lines().count().max(1);
+
+    let inner_needed_w = content_max_line_width.max(title.chars().count()).max(40) + 4;
+    let inner_needed_h = content_lines + 4; // borders (2) + help (1) + padding (1)
+
+    let popup_width = (inner_needed_w as u16).min(area.width.saturating_sub(4)).max(40);
+    let popup_height = (inner_needed_h as u16).min(area.height.saturating_sub(4)).max(6);
+
+    // Position relative to the selected list row (same logic as action popup):
+    // upper half of screen → popup opens below the row,
+    // lower half → popup opens above the row.
+    let results_start_y: u16 = 4; // input(3) + results_border(1)
+    let visible_cursor = app.cursor.saturating_sub(app.scroll_offset) as u16;
+    let selected_row_y = results_start_y + visible_cursor;
+    let screen_center_y = area.height / 2;
+
+    let popup_y = if selected_row_y < screen_center_y {
+        (selected_row_y + 1).min(area.height.saturating_sub(popup_height))
+    } else {
+        selected_row_y.saturating_sub(popup_height)
+    };
+    let popup_y = popup_y.min(area.height.saturating_sub(popup_height));
     let popup_x = (area.width.saturating_sub(popup_width)) / 2;
-    let popup_y = (area.height.saturating_sub(popup_height)) / 2;
 
     let popup_area = Rect { x: popup_x, y: popup_y, width: popup_width, height: popup_height };
 
     frame.render_widget(Clear, popup_area);
-
-    let selected = app.selected_entry.as_deref().unwrap_or("?");
-    let title = format!(" {} ", selected);
-    let content = app.decrypted_content.as_deref().unwrap_or("");
 
     let inner_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -406,10 +455,15 @@ fn draw_display_popup(frame: &mut Frame, app: &App) {
         .wrap(Wrap { trim: false });
     frame.render_widget(content_paragraph, inner_chunks[0]);
 
-    let help_line = Line::from(vec![Span::styled(
-        " Press any key to go back ",
-        Style::default().fg(HELP_COLOR).bg(Color::Black),
-    )]);
+    let help_line = Line::from(vec![
+        Span::raw(" "),
+        styled_key("Esc"),
+        styled_help(" / "),
+        styled_key("Enter"),
+        styled_help(" back  "),
+        styled_key("q"),
+        styled_help(" quit"),
+    ]);
     frame.render_widget(
         Paragraph::new(help_line)
             .style(Style::default().bg(Color::Black))

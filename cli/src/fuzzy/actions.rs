@@ -125,6 +125,8 @@ pub fn do_qr(app: &mut App, config: &ParsConfig, root: &Path) -> Result<(), (i32
         match QRBuilder::new(first_line).build() {
             Ok(qr) => {
                 app.decrypted_content = Some(qr.to_str());
+                // Release mouse capture so the user can interact with the QR / text natively
+                execute!(io::stdout(), DisableMouseCapture).ok();
                 app.mode = AppMode::Display;
             }
             Err(e) => {
@@ -139,6 +141,9 @@ pub fn do_display(app: &mut App, config: &ParsConfig, root: &Path) -> Result<(),
     if !ensure_decrypted(app, config, root) {
         return Ok(());
     }
+    // Release mouse capture so the user can select+copy the displayed password
+    // using terminal-native text selection (and Ctrl+Shift+C on Linux).
+    execute!(io::stdout(), DisableMouseCapture).ok();
     app.mode = AppMode::Display;
     Ok(())
 }
