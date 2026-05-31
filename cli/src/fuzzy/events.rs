@@ -315,10 +315,9 @@ fn handle_action_mode(
                     app.action_cursor -= 1;
                 }
             }
-            MouseEventKind::ScrollDown
-                if app.action_cursor < 4 => {
-                    app.action_cursor += 1;
-                }
+            MouseEventKind::ScrollDown if app.action_cursor < 4 => {
+                app.action_cursor += 1;
+            }
             _ => {}
         }
         return Ok(());

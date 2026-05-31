@@ -12,11 +12,6 @@ if [ $? -ne 0 ]; then
     echo "cargo fix failed"
     exit $?
 fi
-cargo fmt --all
-if [ $? -ne 0 ]; then
-    echo "cargo fmt failed"
-    exit $?
-fi
 
 for dir in "${TARGET_DIRS[@]}"; do
     cd "$dir" || exit
@@ -35,5 +30,11 @@ for dir in "${TARGET_DIRS[@]}"; do
     fi
     cd ..
 done
+
+cargo fmt --all
+if [ $? -ne 0 ]; then
+    echo "cargo fmt failed"
+    exit $?
+fi
 
 git add -A
