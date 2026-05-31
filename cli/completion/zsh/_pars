@@ -1,0 +1,185 @@
+#compdef pars
+
+_pars_store_entries() {
+    local store_dir
+    # Check if -R or --repo was specified on the command line
+    local -a words_array
+    words_array=(${words[@]})
+    local i
+    for ((i=1; i < ${#words_array[@]}; i++)); do
+        if [[ "${words_array[$i]}" == "-R" || "${words_array[$i]}" == "--repo" ]]; then
+            if (( i + 1 < ${#words_array[@]} )); then
+                store_dir="${words_array[$((i+1))]}"
+            fi
+            break
+        elif [[ "${words_array[$i]}" == -R* ]]; then
+            store_dir="${words_array[$i]#-R}"
+            break
+        elif [[ "${words_array[$i]}" == --repo=* ]]; then
+            store_dir="${words_array[$i]#--repo=}"
+            break
+        fi
+    done
+
+    # Fall back to environment variable or default
+    if [[ -z "$store_dir" ]]; then
+        store_dir="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
+    fi
+
+    # Expand ~ if present
+    store_dir="${store_dir/#\~/$HOME}"
+
+    if [[ ! -d "$store_dir" ]]; then
+        return
+    fi
+
+    local -a entries
+    local -a dirs
+
+    # Find .gpg files, strip prefix and .gpg extension
+    entries=($(find "$store_dir" -name '*.gpg' -type f 2>/dev/null | \
+        sed -e "s|^${store_dir}/||" -e 's|\.gpg$||' | sort))
+
+    # Find directories (for subfolder navigation)
+    dirs=($(find "$store_dir" -type d -not -name '.*' -not -path "$store_dir" 2>/dev/null | \
+        sed -e "s|^${store_dir}/||" | sort))
+
+    local -a completions
+    completions=("${entries[@]}" "${dirs[@]}")
+
+    if (( ${#completions[@]} > 0 )); then
+        compadd -a completions
+    fi
+}
+
+_pars() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    local -a commands
+    commands=(
+        'init:Initialize a new password store'
+        'grep:Search for a string in decrypted passwords'
+        'find:Find a password file by name'
+        'search:Find a password file by name'
+        'ls:List passwords'
+        'list:List passwords'
+        'show:Show a password'
+        'insert:Insert a new password'
+        'add:Insert a new password'
+        'edit:Edit a password with $EDITOR'
+        'generate:Generate a new password'
+        'rm:Remove a password'
+        'remove:Remove a password'
+        'delete:Remove a password'
+        'mv:Move or rename a password'
+        'rename:Move or rename a password'
+        'move:Move or rename a password'
+        'cp:Copy a password'
+        'copy:Copy a password'
+        'git:Execute a git command in the password store'
+    )
+
+    _arguments -C \
+        '-R[Specify password store directory]:directory:_directories' \
+        '--repo[Specify password store directory]:directory:_directories' \
+        '-h[Show help]' \
+        '--help[Show help]' \
+        '-V[Show version]' \
+        '--version[Show version]' \
+        '1:command:->command' \
+        '*::arg:->args'
+
+    case $state in
+        command)
+            _describe 'command' commands
+            ;;
+        args)
+            local cmd="${line[1]}"
+            case $cmd in
+                init)
+                    _arguments \
+                        '-p[Initialize sub-folder]:sub-folder:_directories' \
+                        '--path[Initialize sub-folder]:sub-folder:_directories' \
+                        '*:gpg-id:'
+                    ;;
+                ls|list)
+                    _arguments \
+                        '-c[Copy to clipboard]::line number:' \
+                        '--clip[Copy to clipboard]::line number:' \
+                        '-q[Display as QR code]::line number:' \
+                        '--qrcode[Display as QR code]::line number:' \
+                        '*:entry:_pars_store_entries'
+                    ;;
+                show)
+                    _arguments \
+                        '-c[Copy to clipboard]::line number:' \
+                        '--clip[Copy to clipboard]::line number:' \
+                        '-q[Display as QR code]::line number:' \
+                        '--qrcode[Display as QR code]::line number:' \
+                        '*:entry:_pars_store_entries'
+                    ;;
+                insert|add)
+                    _arguments \
+                        '-e[Echo input]' \
+                        '--echo[Echo input]' \
+                        '-m[Multiline input]' \
+                        '--multiline[Multiline input]' \
+                        '-f[Force overwrite]' \
+                        '--force[Force overwrite]' \
+                        '*:entry:_pars_store_entries'
+                    ;;
+                edit)
+                    _arguments \
+                        '*:entry:_pars_store_entries'
+                    ;;
+                generate)
+                    _arguments \
+                        '-n[No symbols]' \
+                        '--no-symbols[No symbols]' \
+                        '-c[Copy to clipboard]' \
+                        '--clip[Copy to clipboard]' \
+                        '-i[Replace first line]' \
+                        '--in-place[Replace first line]' \
+                        '-f[Force overwrite]' \
+                        '--force[Force overwrite]' \
+                        '*:entry:_pars_store_entries'
+                    ;;
+                rm|remove|delete)
+                    _arguments \
+                        '-r[Remove recursively]' \
+                        '--recursive[Remove recursively]' \
+                        '-f[Force removal]' \
+                        '--force[Force removal]' \
+                        '*:entry:_pars_store_entries'
+                    ;;
+                mv|rename|move)
+                    _arguments \
+                        '-f[Force move]' \
+                        '--force[Force move]' \
+                        '*:entry:_pars_store_entries'
+                    ;;
+                cp|copy)
+                    _arguments \
+                        '-f[Force copy]' \
+                        '--force[Force copy]' \
+                        '*:entry:_pars_store_entries'
+                    ;;
+                grep)
+                    _arguments \
+                        '*:search string:'
+                    ;;
+                find|search)
+                    _arguments \
+                        '*:search string:'
+                    ;;
+                git)
+                    _arguments \
+                        '*:git command:'
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_pars "$@"

@@ -5,11 +5,15 @@ use anyhow::{anyhow, Error, Result};
 
 use crate::parser::sub_command::{CompletionAction, ShellType};
 
-const BASH_COMPLETION: &str = include_str!("../../../completion/bash/pars.bash");
-const ZSH_COMPLETION: &str = include_str!("../../../completion/zsh/_pars");
-const FISH_COMPLETION: &str = include_str!("../../../completion/fish/pars.fish");
-const PWSH_COMPLETION_PSM1: &str = include_str!("../../../completion/pwsh/ParsCompletion.psm1");
-const PWSH_COMPLETION_PSD1: &str = include_str!("../../../completion/pwsh/ParsCompletion.psd1");
+// Completion scripts live under `cli/completion/` (a copy of the repo-root
+// `completion/` tree) so that `cargo publish` can package them inside the
+// crate. The repo-root copy remains the source of truth for development;
+// keep the two in sync.
+const BASH_COMPLETION: &str = include_str!("../../completion/bash/pars.bash");
+const ZSH_COMPLETION: &str = include_str!("../../completion/zsh/_pars");
+const FISH_COMPLETION: &str = include_str!("../../completion/fish/pars.fish");
+const PWSH_COMPLETION_PSM1: &str = include_str!("../../completion/pwsh/ParsCompletion.psm1");
+const PWSH_COMPLETION_PSD1: &str = include_str!("../../completion/pwsh/ParsCompletion.psd1");
 
 const PARS_MARKER: &str = "# Added by pars completion";
 
