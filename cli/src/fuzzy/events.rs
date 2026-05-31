@@ -4,7 +4,9 @@ use std::io;
 use std::path::Path;
 
 use anyhow::{anyhow, Error};
-use crossterm::event::{self, EnableMouseCapture, Event, KeyCode, KeyModifiers, MouseEventKind};
+use crossterm::event::{
+    self, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind,
+};
 use crossterm::execute;
 use nucleo_matcher::{Config, Matcher};
 use pars_core::config::cli::ParsConfig;
@@ -38,6 +40,16 @@ pub fn run_app(
         }
 
         let evt = event::read().map_err(|e| (1, anyhow!("Event read error: {e}")))?;
+
+        // Windows (ConPTY) reports Press AND Release for every key; Linux/macOS only
+        // report Press by default. Drop non-Press key events so the Enter that
+        // launched `cargo run` doesn't get re-delivered as a Release-then-Press
+        // and auto-select the first entry. Mouse / Resize events pass through.
+        if let Event::Key(ref k) = evt {
+            if k.kind != KeyEventKind::Press {
+                continue;
+            }
+        }
 
         // Clear transient messages on most input (except in InputName / Action where they
         // may be confirmation messages we want to keep visible).
