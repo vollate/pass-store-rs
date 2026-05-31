@@ -33,6 +33,15 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     let bg_block = Block::default().style(Style::default().bg(Color::Black));
     frame.render_widget(bg_block, frame.area());
 
+    // Display mode replaces the main view entirely — no list rendered underneath, so
+    // terminal-native multi-line selection can't pick up surrounding password names.
+    if app.mode == AppMode::Display {
+        draw_display_view(frame, app);
+        // Reset hit-test rect (action popup is not visible).
+        app.action_popup_rect = super::app::PopupRect::default();
+        return;
+    }
+
     // Always draw the main layout (search + list + help)
     draw_main(frame, app);
 
@@ -44,9 +53,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     // Overlay popups
     if app.mode == AppMode::Action {
         draw_action_popup(frame, app);
-    }
-    if app.mode == AppMode::Display {
-        draw_display_popup(frame, app);
     }
     if app.mode == AppMode::InputName {
         draw_name_input_popup(frame, app);
@@ -399,64 +405,58 @@ fn draw_action_popup(frame: &mut Frame, app: &mut App) {
     frame.render_widget(paragraph, popup_area);
 }
 
-/// Display mode: centered popup showing decrypted content.
-fn draw_display_popup(frame: &mut Frame, app: &App) {
+/// Display mode: dedicated full-screen view for the decrypted content.
+/// No password list is rendered behind it — so multi-line terminal text selection
+/// only ever picks up the password content itself, never neighboring entry names.
+fn draw_display_view(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
     let content = app.decrypted_content.as_deref().unwrap_or("");
     let selected = app.selected_entry.as_deref().unwrap_or("?");
-    let title = format!(" {} ", selected);
 
-    // Content-aware sizing: width = longest line, height = number of lines.
-    let content_max_line_width = content.lines().map(|l| l.chars().count()).max().unwrap_or(20);
-    let content_lines = content.lines().count().max(1);
-
-    let inner_needed_w = content_max_line_width.max(title.chars().count()).max(40) + 4;
-    let inner_needed_h = content_lines + 4; // borders (2) + help (1) + padding (1)
-
-    let popup_width = (inner_needed_w as u16).min(area.width.saturating_sub(4)).max(40);
-    let popup_height = (inner_needed_h as u16).min(area.height.saturating_sub(4)).max(6);
-
-    // Position relative to the selected list row (same logic as action popup):
-    // upper half of screen → popup opens below the row,
-    // lower half → popup opens above the row.
-    let results_start_y: u16 = 4; // input(3) + results_border(1)
-    let visible_cursor = app.cursor.saturating_sub(app.scroll_offset) as u16;
-    let selected_row_y = results_start_y + visible_cursor;
-    let screen_center_y = area.height / 2;
-
-    let popup_y = if selected_row_y < screen_center_y {
-        (selected_row_y + 1).min(area.height.saturating_sub(popup_height))
-    } else {
-        selected_row_y.saturating_sub(popup_height)
-    };
-    let popup_y = popup_y.min(area.height.saturating_sub(popup_height));
-    let popup_x = (area.width.saturating_sub(popup_width)) / 2;
-
-    let popup_area = Rect { x: popup_x, y: popup_y, width: popup_width, height: popup_height };
-
-    frame.render_widget(Clear, popup_area);
-
-    let inner_chunks = Layout::default()
+    let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(1)])
-        .split(popup_area);
+        .constraints([
+            Constraint::Length(1), // header (entry name)
+            Constraint::Length(1), // separator
+            Constraint::Min(1),    // content (full width, no border)
+            Constraint::Length(1), // separator
+            Constraint::Length(1), // help
+        ])
+        .split(area);
 
-    let content_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(TITLE_COLOR).bg(Color::Black))
-        .title(Span::styled(title, Style::default().fg(TITLE_COLOR).add_modifier(Modifier::BOLD)))
-        .title_alignment(Alignment::Center);
+    // ── Header: entry name, centered, bold
+    let header = Paragraph::new(Line::from(Span::styled(
+        format!(" {} ", selected),
+        Style::default().fg(TITLE_COLOR).bg(Color::Black).add_modifier(Modifier::BOLD),
+    )))
+    .alignment(Alignment::Center)
+    .style(Style::default().bg(Color::Black));
+    frame.render_widget(header, chunks[0]);
 
+    // ── Top separator: a horizontal rule of '─' across the full width.
+    let sep_line = "─".repeat(area.width as usize);
+    let sep_style = Style::default().fg(BORDER_COLOR).bg(Color::Black);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(sep_line.clone(), sep_style))),
+        chunks[1],
+    );
+
+    // ── Content: full-width, no surrounding block. Every cell on these rows is
+    //    either password text or empty space — no border glyphs to contaminate selections.
     let content_paragraph = Paragraph::new(content)
         .style(Style::default().fg(DISPLAY_TEXT_COLOR).bg(Color::Black))
-        .block(content_block)
         .wrap(Wrap { trim: false });
-    frame.render_widget(content_paragraph, inner_chunks[0]);
+    frame.render_widget(content_paragraph, chunks[2]);
 
+    // ── Bottom separator
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(sep_line, sep_style))),
+        chunks[3],
+    );
+
+    // ── Help line
     let help_line = Line::from(vec![
-        Span::raw(" "),
         styled_key("Esc"),
         styled_help(" / "),
         styled_key("Enter"),
@@ -468,7 +468,7 @@ fn draw_display_popup(frame: &mut Frame, app: &App) {
         Paragraph::new(help_line)
             .style(Style::default().bg(Color::Black))
             .alignment(Alignment::Center),
-        inner_chunks[1],
+        chunks[4],
     );
 }
 
