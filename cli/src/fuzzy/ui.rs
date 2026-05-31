@@ -450,10 +450,7 @@ fn draw_display_view(frame: &mut Frame, app: &App) {
     frame.render_widget(content_paragraph, chunks[2]);
 
     // ── Bottom separator
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(sep_line, sep_style))),
-        chunks[3],
-    );
+    frame.render_widget(Paragraph::new(Line::from(Span::styled(sep_line, sep_style))), chunks[3]);
 
     // ── Help line
     let help_line = Line::from(vec![

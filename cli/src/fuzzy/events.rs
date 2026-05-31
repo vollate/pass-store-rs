@@ -89,7 +89,7 @@ fn handle_insert_mode(
                 }
                 KeyCode::Char('w') => {
                     let trimmed = app.query.trim_end();
-                    if let Some(pos) = trimmed.rfind(|c: char| c == '/' || c == ' ') {
+                    if let Some(pos) = trimmed.rfind(['/', ' ']) {
                         app.query.truncate(pos);
                     } else {
                         app.query.clear();
@@ -315,11 +315,10 @@ fn handle_action_mode(
                     app.action_cursor -= 1;
                 }
             }
-            MouseEventKind::ScrollDown => {
-                if app.action_cursor < 4 {
+            MouseEventKind::ScrollDown
+                if app.action_cursor < 4 => {
                     app.action_cursor += 1;
                 }
-            }
             _ => {}
         }
         return Ok(());
