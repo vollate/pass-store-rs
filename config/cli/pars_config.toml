@@ -18,3 +18,5 @@ git_executable = "git"
 [feature_config]
 clip_time = 45
 fuzzy_search = true
+vim_mode = false
+exit_on_copy = false

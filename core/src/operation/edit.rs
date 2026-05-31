@@ -116,10 +116,16 @@ mod tests {
     };
 
     fn create_fake_editor(root: &Path) -> PathBuf {
+        // NOTE: the sed invocation must work on both GNU sed (Linux) AND BSD sed (macOS).
+        // GNU sed accepts `sed -i '1d' file`, but BSD sed requires `-i` to be followed by
+        // a backup extension, so it would read '1d' as the extension and then try to use
+        // the file path as the script — producing "invalid command code f" errors.
+        // Avoid the issue entirely by using a temp file + mv, which is portable.
         #[cfg(unix)]
         let fake_editor_content = r#"#!/bin/bash
 file="$1"
-sed -i '1d' "$file"
+tmp="${file}.tmp"
+sed '1d' "$file" > "$tmp" && mv "$tmp" "$file"
 "#;
 
         #[cfg(windows)]
