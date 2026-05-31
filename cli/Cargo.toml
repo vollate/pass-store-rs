@@ -11,13 +11,13 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.97"
 clap = { version = "4.5.28", features = ["derive"] }
-crossterm = "0.28"
+crossterm = "0.29"
 dirs = "6"
 fast_qr = "0.13.0"
 log = "0.4.26"
 nucleo-matcher = "0.3.1"
 pars-core = { version = "^0.2" }
-ratatui = "0.29.0"
+ratatui = "0.30.0"
 secrecy = "0.10.3"
 
 [[bin]]
