@@ -70,7 +70,6 @@ impl From<ParsExitCode> for i32 {
 #[cfg(target_os = "macos")]
 impl From<ParsExitCode> for i32 {
     #[allow(unreachable_patterns)]
-
     fn from(val: ParsExitCode) -> Self {
         match val {
             ParsExitCode::Success => 0,
