@@ -137,6 +137,11 @@ pub struct InsertEntryResult {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EntryMutationResult {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GenerateEntryResult {
     pub entry_path: String,
     pub password: String,
@@ -222,6 +227,7 @@ pub struct GenerateEntryRequest {
 pub struct EditEntryRequest {
     pub entry: EntryRef,
     pub content: String,
+    pub pgp_executable: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -472,6 +478,66 @@ pub fn generate_entry(request: GenerateEntryRequest) -> GuiResult<GenerateEntryR
         password,
         overwrote_existing: insert_result.overwrote_existing,
     })
+}
+
+pub fn edit_entry(request: EditEntryRequest) -> GuiResult<EntryMutationResult> {
+    if !request.entry.encrypted_path().is_file() {
+        return Err(CoreError::StoreError(format!("entry does not exist: {}", request.entry.path)));
+    }
+
+    let result = insert_entry(InsertEntryRequest {
+        entry: request.entry,
+        content: request.content,
+        overwrite: true,
+        pgp_executable: request.pgp_executable,
+    })?;
+
+    Ok(EntryMutationResult { path: result.entry_path })
+}
+
+pub fn move_entry(request: MoveEntryRequest) -> GuiResult<EntryMutationResult> {
+    if request.from.root != request.to.root {
+        return Err(CoreError::ValidationError(
+            "cannot move entries across different password store roots".to_string(),
+        ));
+    }
+
+    let from_path = request.from.encrypted_path();
+    let to_path = request.to.encrypted_path();
+
+    if !from_path.is_file() {
+        return Err(CoreError::StoreError(format!("entry does not exist: {}", request.from.path)));
+    }
+
+    if to_path.exists() && !request.overwrite {
+        return Err(CoreError::ValidationError(format!(
+            "entry already exists: {}",
+            request.to.path
+        )));
+    }
+
+    if to_path.exists() && !to_path.is_file() {
+        return Err(CoreError::StoreError(format!(
+            "destination is not a password file: {}",
+            request.to.path
+        )));
+    }
+
+    if let Some(parent) = to_path.parent() {
+        fs::create_dir_all(parent)?;
+    } else {
+        return Err(CoreError::StoreError(format!(
+            "entry has no parent path: {}",
+            request.to.path
+        )));
+    }
+
+    if to_path.exists() {
+        fs::remove_file(&to_path)?;
+    }
+    fs::rename(&from_path, &to_path)?;
+
+    Ok(EntryMutationResult { path: request.to.path })
 }
 
 pub fn read_entry(request: ReadEntryRequest) -> GuiResult<EntrySecret> {

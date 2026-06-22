@@ -78,6 +78,8 @@ Goal: create a core API layer that is friendly to GUI/native callers and does no
 - [x] Add non-interactive `read_entry` GUI API that decrypts and parses entries.
 - [x] Add non-interactive `insert_entry` GUI API using explicit `overwrite` flag.
 - [x] Add non-interactive `generate_entry` GUI API using explicit `overwrite` flag.
+- [x] Add non-interactive `edit_entry` GUI API that re-encrypts confirmed content.
+- [x] Add non-interactive `move_entry` GUI API using explicit `overwrite` flag.
 - [x] Add non-interactive `delete_entry` GUI API using explicit `recursive` flag.
 - [x] Add Rust unit tests for GUI API list/read/insert/generate/delete using temp password stores:
   - [x] list
