@@ -37,7 +37,10 @@ This roadmap tracks the remaining work needed to turn the current Flutter GUI sh
 
 Goal: create a core API layer that is friendly to GUI/native callers and does not depend on terminal streams.
 
-- [ ] Audit current `core/src/operation/*` APIs and classify each as GUI-ready, CLI-shaped, or reusable with adapter.
+- [x] Audit current `core/src/operation/*` APIs and classify each as GUI-ready, CLI-shaped, or reusable with adapter.
+  - GUI-ready through `core::gui`: list/read/insert/generate/edit/move/delete entry APIs.
+  - CLI-shaped only: interactive insert/generate/edit/remove/copy/rename operations, terminal tree output, clipboard status messaging, and raw `git` execution with inherited stdio.
+  - Reusable with adapter: PGP encryption/decryption helpers, `.gpg-id` lookup, path validation, password generation, file backup/restore, and git argument validation.
 - [x] Add a `core::gui` or `core::api` module for GUI-safe request/response structs.
 - [x] Define `CoreError` with typed error categories:
   - [x] `ConfigError`
@@ -73,15 +76,17 @@ Goal: create a core API layer that is friendly to GUI/native callers and does no
   - [x] `DeleteEntryRequest`
   - [x] `BatchOperationRequest`
   - [x] `GitOperationRequest`
-- [ ] Remove interactive stdin/stdout assumptions from GUI-callable operations.
-- [ ] Replace CLI overwrite prompts with explicit request flags and typed conflicts.
+- [x] Remove interactive stdin/stdout assumptions from GUI-callable operations.
+- [x] Replace CLI overwrite prompts with explicit request flags and typed conflicts.
 - [x] Add non-interactive `read_entry` GUI API that decrypts and parses entries.
+- [x] Add non-interactive `edit_entry` GUI API that re-encrypts confirmed content.
+- [x] Add non-interactive `move_entry` GUI API using explicit `overwrite` flag.
 - [x] Add non-interactive `delete_entry` GUI API using explicit `recursive` flag.
-- [ ] Add Rust unit tests for GUI API list/read/insert/generate/delete using temp password stores:
+- [x] Add Rust unit tests for GUI API list/read/insert/generate/delete using temp password stores:
   - [x] list
   - [x] read
-  - [ ] insert
-  - [ ] generate
+  - [x] insert
+  - [x] generate
   - [x] delete
 - [x] Add Rust tests proving path traversal is rejected through GUI APIs.
 

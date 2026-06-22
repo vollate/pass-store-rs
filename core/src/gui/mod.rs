@@ -4,12 +4,13 @@ use std::fmt::{Display, Formatter};
 use std::path::{Component, Path, PathBuf};
 use std::{fs, io};
 
-use secrecy::ExposeSecret;
+use passwords::PasswordGenerator;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::pgp::PGPClient;
-use crate::util::fs_util::{get_dir_gpg_id_content, path_to_str};
+use crate::util::fs_util::{create_or_overwrite, get_dir_gpg_id_content, path_to_str};
 
 pub type GuiResult<T> = Result<T, CoreError>;
 
@@ -120,6 +121,17 @@ pub struct DeleteEntryResult {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EntryMutationResult {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GenerateEntryResult {
+    pub path: String,
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ParsedEntryField {
     pub key: String,
     pub label: String,
@@ -182,6 +194,7 @@ pub struct InsertEntryRequest {
     pub entry: EntryRef,
     pub content: String,
     pub overwrite: bool,
+    pub pgp_executable: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -190,12 +203,14 @@ pub struct GenerateEntryRequest {
     pub length: usize,
     pub no_symbols: bool,
     pub overwrite: bool,
+    pub pgp_executable: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EditEntryRequest {
     pub entry: EntryRef,
     pub content: String,
+    pub pgp_executable: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -359,6 +374,100 @@ pub fn delete_entry(request: DeleteEntryRequest) -> GuiResult<DeleteEntryResult>
     Ok(DeleteEntryResult { deleted_path: request.entry.path, deleted_type: EntryType::Directory })
 }
 
+pub fn insert_entry(request: InsertEntryRequest) -> GuiResult<EntryMutationResult> {
+    let path = request.entry.path.clone();
+    encrypt_entry_content(
+        &request.entry,
+        &request.content,
+        request.overwrite,
+        &request.pgp_executable,
+    )?;
+
+    Ok(EntryMutationResult { path })
+}
+
+pub fn generate_entry(request: GenerateEntryRequest) -> GuiResult<GenerateEntryResult> {
+    if request.length == 0 {
+        return Err(CoreError::ValidationError(
+            "generated password length must be greater than zero".to_string(),
+        ));
+    }
+
+    let generator = PasswordGenerator::new()
+        .length(request.length)
+        .numbers(true)
+        .lowercase_letters(true)
+        .uppercase_letters(true)
+        .symbols(!request.no_symbols)
+        .spaces(false)
+        .exclude_similar_characters(true)
+        .strict(true);
+    let password =
+        generator.generate_one().map_err(|err| CoreError::ValidationError(err.to_string()))?;
+    let path = request.entry.path.clone();
+
+    encrypt_entry_content(&request.entry, &password, request.overwrite, &request.pgp_executable)?;
+
+    Ok(GenerateEntryResult { path, password })
+}
+
+pub fn edit_entry(request: EditEntryRequest) -> GuiResult<EntryMutationResult> {
+    let encrypted_path = request.entry.encrypted_path();
+    if !encrypted_path.is_file() {
+        return Err(CoreError::StoreError(format!("entry does not exist: {}", request.entry.path)));
+    }
+
+    let path = request.entry.path.clone();
+    encrypt_entry_content(&request.entry, &request.content, true, &request.pgp_executable)?;
+
+    Ok(EntryMutationResult { path })
+}
+
+pub fn move_entry(request: MoveEntryRequest) -> GuiResult<EntryMutationResult> {
+    if request.from.root != request.to.root {
+        return Err(CoreError::ValidationError(
+            "cannot move entries across different password store roots".to_string(),
+        ));
+    }
+
+    let from_path = request.from.encrypted_path();
+    let to_path = request.to.encrypted_path();
+
+    if !from_path.is_file() {
+        return Err(CoreError::StoreError(format!("entry does not exist: {}", request.from.path)));
+    }
+
+    if to_path.exists() && !request.overwrite {
+        return Err(CoreError::ValidationError(format!(
+            "entry already exists: {}",
+            request.to.path
+        )));
+    }
+
+    if to_path.exists() && !to_path.is_file() {
+        return Err(CoreError::StoreError(format!(
+            "destination is not a password file: {}",
+            request.to.path
+        )));
+    }
+
+    if let Some(parent) = to_path.parent() {
+        fs::create_dir_all(parent)?;
+    } else {
+        return Err(CoreError::StoreError(format!(
+            "entry has no parent path: {}",
+            request.to.path
+        )));
+    }
+
+    if to_path.exists() {
+        fs::remove_file(&to_path)?;
+    }
+    fs::rename(&from_path, &to_path)?;
+
+    Ok(EntryMutationResult { path: request.to.path })
+}
+
 pub fn read_entry(request: ReadEntryRequest) -> GuiResult<EntrySecret> {
     let encrypted_path = request.entry.encrypted_path();
     if !encrypted_path.is_file() {
@@ -377,6 +486,41 @@ pub fn read_entry(request: ReadEntryRequest) -> GuiResult<EntrySecret> {
         .map_err(|err| CoreError::PgpError(err.to_string()))?;
 
     Ok(parse_entry_secret(plain_text.expose_secret()))
+}
+
+fn encrypt_entry_content(
+    entry: &EntryRef,
+    content: &str,
+    overwrite: bool,
+    pgp_executable: &str,
+) -> GuiResult<()> {
+    let encrypted_path = entry.encrypted_path();
+    if encrypted_path.exists() && !overwrite {
+        return Err(CoreError::ValidationError(format!("entry already exists: {}", entry.path)));
+    }
+
+    if encrypted_path.exists() && !encrypted_path.is_file() {
+        return Err(CoreError::StoreError(format!(
+            "entry path is not a password file: {}",
+            entry.path
+        )));
+    }
+
+    if let Some(parent) = encrypted_path.parent() {
+        fs::create_dir_all(parent)?;
+    } else {
+        return Err(CoreError::StoreError(format!("entry has no parent path: {}", entry.path)));
+    }
+
+    let keys = get_dir_gpg_id_content(&entry.root, &encrypted_path)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+    let key_refs = keys.iter().map(String::as_str).collect::<Vec<_>>();
+    let client = PGPClient::new(pgp_executable, &key_refs)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+    let secret = SecretString::new(content.to_string().into());
+
+    create_or_overwrite(&client, &encrypted_path, &secret)
+        .map_err(|err| CoreError::PgpError(err.to_string()))
 }
 
 pub fn parse_entry_secret(plain_text: &str) -> EntrySecret {
