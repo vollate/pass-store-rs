@@ -38,45 +38,45 @@ This roadmap tracks the remaining work needed to turn the current Flutter GUI sh
 Goal: create a core API layer that is friendly to GUI/native callers and does not depend on terminal streams.
 
 - [ ] Audit current `core/src/operation/*` APIs and classify each as GUI-ready, CLI-shaped, or reusable with adapter.
-- [ ] Add a `core::gui` or `core::api` module for GUI-safe request/response structs.
-- [ ] Define `CoreError` with typed error categories:
-  - [ ] `ConfigError`
-  - [ ] `StoreError`
-  - [ ] `PgpError`
-  - [ ] `GitError`
-  - [ ] `ClipboardError`
-  - [ ] `ValidationError`
-  - [ ] `UnsupportedPlatform`
-- [ ] Define repo/store models:
-  - [ ] `StoreId`
-  - [ ] `StoreInfo`
-  - [ ] `StoreStatus`
-  - [ ] `GitStatusSummary`
-- [ ] Define entry models:
-  - [ ] `EntryRef`
-  - [ ] `EntrySummary`
-  - [ ] `EntrySecret`
-  - [ ] `ParsedEntryFields`
-  - [ ] `RawEntryNotes`
-- [ ] Define key models:
-  - [ ] `PgpKeySummary`
-  - [ ] `SshKeySummary`
-  - [ ] `KeyImportResult`
-  - [ ] `KeyExportResult`
-- [ ] Define operation request structs:
-  - [ ] `ListEntriesRequest`
-  - [ ] `ReadEntryRequest`
-  - [ ] `InsertEntryRequest`
-  - [ ] `GenerateEntryRequest`
-  - [ ] `EditEntryRequest`
-  - [ ] `MoveEntryRequest`
-  - [ ] `DeleteEntryRequest`
-  - [ ] `BatchOperationRequest`
-  - [ ] `GitOperationRequest`
+- [x] Add a `core::gui` or `core::api` module for GUI-safe request/response structs.
+- [x] Define `CoreError` with typed error categories:
+  - [x] `ConfigError`
+  - [x] `StoreError`
+  - [x] `PgpError`
+  - [x] `GitError`
+  - [x] `ClipboardError`
+  - [x] `ValidationError`
+  - [x] `UnsupportedPlatform`
+- [x] Define repo/store models:
+  - [x] `StoreId`
+  - [x] `StoreInfo`
+  - [x] `StoreStatus`
+  - [x] `GitStatusSummary`
+- [x] Define entry models:
+  - [x] `EntryRef`
+  - [x] `EntrySummary`
+  - [x] `EntrySecret`
+  - [x] `ParsedEntryFields`
+  - [x] `RawEntryNotes`
+- [x] Define key models:
+  - [x] `PgpKeySummary`
+  - [x] `SshKeySummary`
+  - [x] `KeyImportResult`
+  - [x] `KeyExportResult`
+- [x] Define operation request structs:
+  - [x] `ListEntriesRequest`
+  - [x] `ReadEntryRequest`
+  - [x] `InsertEntryRequest`
+  - [x] `GenerateEntryRequest`
+  - [x] `EditEntryRequest`
+  - [x] `MoveEntryRequest`
+  - [x] `DeleteEntryRequest`
+  - [x] `BatchOperationRequest`
+  - [x] `GitOperationRequest`
 - [ ] Remove interactive stdin/stdout assumptions from GUI-callable operations.
 - [ ] Replace CLI overwrite prompts with explicit request flags and typed conflicts.
 - [ ] Add Rust unit tests for GUI API list/read/insert/generate/delete using temp password stores.
-- [ ] Add Rust tests proving path traversal is rejected through GUI APIs.
+- [x] Add Rust tests proving path traversal is rejected through GUI APIs.
 
 ## Milestone 2: Flutter/Rust Native Bridge
 
