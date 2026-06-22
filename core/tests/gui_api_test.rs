@@ -4,7 +4,7 @@ use std::process::{self, Command, Stdio};
 
 use pars_core::gui::{
     delete_entry, generate_entry, insert_entry, list_entries, parse_entry_secret, read_entry,
-    validate_git_args, DeleteEntryRequest, EntryRef, EntryType, GenerateEntryRequest,
+    run_git_args, validate_git_args, DeleteEntryRequest, EntryRef, EntryType, GenerateEntryRequest,
     GitOperationRequest, InsertEntryRequest, ListEntriesRequest, ReadEntryRequest,
 };
 use pars_core::pgp::key_management::key_gen_batch;
@@ -132,6 +132,45 @@ fn validate_git_args_rejects_shell_syntax() {
         let err = validate_git_args(&args).unwrap_err();
         assert!(err.to_string().contains("shell syntax is not allowed"));
     }
+}
+
+#[test]
+fn run_git_args_runs_inside_selected_store_path() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().to_path_buf();
+    Command::new("git").args(["init"]).current_dir(&root).output().unwrap();
+    Command::new("git")
+        .args(["config", "user.email", "pars@example.com"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    Command::new("git").args(["config", "user.name", "Pars"]).current_dir(&root).output().unwrap();
+
+    fs::write(root.join("marker.txt"), "demo").unwrap();
+
+    let output = run_git_args(
+        GitOperationRequest::new(root, vec!["status".to_string(), "--short".to_string()]).unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(output.command, "git status --short");
+    assert!(output.success);
+    assert_eq!(output.exit_code, Some(0));
+    assert!(output.stdout.contains("marker.txt"));
+}
+
+#[test]
+fn run_git_args_preserves_failed_command_output() {
+    let temp = tempfile::tempdir().unwrap();
+    let output = run_git_args(
+        GitOperationRequest::new(temp.path().to_path_buf(), vec!["status".to_string()]).unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(output.command, "git status");
+    assert!(!output.success);
+    assert_ne!(output.exit_code, Some(0));
+    assert!(output.stderr.contains("not a git repository"));
 }
 
 #[test]

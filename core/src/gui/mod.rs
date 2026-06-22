@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::path::{Component, Path, PathBuf};
+use std::process::Command;
 use std::{fs, io};
 
 use passwords::PasswordGenerator;
@@ -80,6 +81,15 @@ pub struct GitStatusSummary {
     pub has_remote: bool,
     pub ahead: usize,
     pub behind: usize,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GitCommandOutput {
+    pub command: String,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: Option<i32>,
+    pub success: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -272,6 +282,30 @@ pub fn validate_git_args(args: &[String]) -> GuiResult<()> {
     }
 
     Ok(())
+}
+
+pub fn run_git_args(request: GitOperationRequest) -> GuiResult<GitCommandOutput> {
+    validate_git_args(&request.args)?;
+    if !request.root.is_dir() {
+        return Err(CoreError::StoreError(format!(
+            "git working directory does not exist: {}",
+            request.root.display()
+        )));
+    }
+
+    let output = Command::new("git")
+        .args(&request.args)
+        .current_dir(&request.root)
+        .output()
+        .map_err(|err| CoreError::GitError(err.to_string()))?;
+
+    Ok(GitCommandOutput {
+        command: format!("git {}", request.args.join(" ")),
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        exit_code: output.status.code(),
+        success: output.status.success(),
+    })
 }
 
 pub fn list_entries(request: ListEntriesRequest) -> GuiResult<Vec<EntrySummary>> {

@@ -326,7 +326,8 @@ Goal: make Git settings and sync work safely.
   - [x] rejects pipes
   - [x] rejects redirection
   - [x] rejects command substitution patterns
-  - [ ] runs only in selected store path
+  - [x] runs only in selected store path
+  - [x] core returns full command, stdout, stderr, and exit status
   - [ ] displays full command before execution
   - [ ] displays stdout/stderr/exit status after execution
 - [x] Add tests proving shell syntax is rejected.
