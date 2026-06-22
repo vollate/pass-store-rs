@@ -211,6 +211,42 @@ pub struct GitOperationRequest {
     pub args: Vec<String>,
 }
 
+impl GitOperationRequest {
+    pub fn new(root: PathBuf, args: Vec<String>) -> GuiResult<Self> {
+        validate_git_args(&args)?;
+        Ok(Self { root, args })
+    }
+}
+
+pub fn validate_git_args(args: &[String]) -> GuiResult<()> {
+    if args.is_empty() {
+        return Err(CoreError::ValidationError("git args cannot be empty".to_string()));
+    }
+
+    for arg in args {
+        let trimmed = arg.trim();
+        if trimmed.is_empty() {
+            return Err(CoreError::ValidationError(
+                "git args cannot contain empty values".to_string(),
+            ));
+        }
+
+        if trimmed == "git" {
+            return Err(CoreError::ValidationError(
+                "enter only args after git, for example: status".to_string(),
+            ));
+        }
+
+        if contains_shell_syntax(trimmed) {
+            return Err(CoreError::ValidationError(format!(
+                "shell syntax is not allowed in git args: {trimmed}"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 pub fn list_entries(request: ListEntriesRequest) -> GuiResult<Vec<EntrySummary>> {
     let root = request.root;
     if !root.is_dir() {
@@ -340,6 +376,18 @@ fn normalize_entry_path(path: &str) -> GuiResult<String> {
     }
 
     Ok(parts.join("/"))
+}
+
+fn contains_shell_syntax(arg: &str) -> bool {
+    arg.contains("$(")
+        || arg.contains(';')
+        || arg.contains('|')
+        || arg.contains('&')
+        || arg.contains('>')
+        || arg.contains('<')
+        || arg.contains('`')
+        || arg.contains('\n')
+        || arg.contains('\r')
 }
 
 fn is_hidden_store_file(path: &Path) -> bool {

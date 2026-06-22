@@ -312,15 +312,15 @@ Goal: make Git settings and sync work safely.
 - [ ] Implement re-clone/re-pull store recovery flow.
 - [ ] Implement delete local repo with strong confirmation.
 - [ ] Implement advanced Git args runner:
-  - [ ] only accepts args after `git`
-  - [ ] rejects shell separators
-  - [ ] rejects pipes
-  - [ ] rejects redirection
-  - [ ] rejects command substitution patterns
+  - [x] only accepts args after `git`
+  - [x] rejects shell separators
+  - [x] rejects pipes
+  - [x] rejects redirection
+  - [x] rejects command substitution patterns
   - [ ] runs only in selected store path
   - [ ] displays full command before execution
   - [ ] displays stdout/stderr/exit status after execution
-- [ ] Add tests proving shell syntax is rejected.
+- [x] Add tests proving shell syntax is rejected.
 - [ ] Add tests for failed Git command output rendering.
 
 ## Milestone 10: Onboarding Completion
