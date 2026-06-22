@@ -4,8 +4,12 @@ use std::fmt::{Display, Formatter};
 use std::path::{Component, Path, PathBuf};
 use std::{fs, io};
 
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
+
+use crate::pgp::PGPClient;
+use crate::util::fs_util::{get_dir_gpg_id_content, path_to_str};
 
 pub type GuiResult<T> = Result<T, CoreError>;
 
@@ -170,6 +174,7 @@ pub struct ListEntriesRequest {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReadEntryRequest {
     pub entry: EntryRef,
+    pub pgp_executable: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -352,6 +357,26 @@ pub fn delete_entry(request: DeleteEntryRequest) -> GuiResult<DeleteEntryResult>
 
     fs::remove_dir_all(&directory_path)?;
     Ok(DeleteEntryResult { deleted_path: request.entry.path, deleted_type: EntryType::Directory })
+}
+
+pub fn read_entry(request: ReadEntryRequest) -> GuiResult<EntrySecret> {
+    let encrypted_path = request.entry.encrypted_path();
+    if !encrypted_path.is_file() {
+        return Err(CoreError::StoreError(format!("entry does not exist: {}", request.entry.path)));
+    }
+
+    let keys = get_dir_gpg_id_content(&request.entry.root, &encrypted_path)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+    let key_refs = keys.iter().map(String::as_str).collect::<Vec<_>>();
+    let client = PGPClient::new(&request.pgp_executable, &key_refs)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+    let encrypted_path =
+        path_to_str(&encrypted_path).map_err(|err| CoreError::StoreError(err.to_string()))?;
+    let plain_text = client
+        .decrypt_stdin(&request.entry.root, encrypted_path)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+
+    Ok(parse_entry_secret(plain_text.expose_secret()))
 }
 
 pub fn parse_entry_secret(plain_text: &str) -> EntrySecret {

@@ -1,16 +1,58 @@
 use std::fs;
 use std::path::PathBuf;
+use std::process::{self, Command, Stdio};
 
 use pars_core::gui::{
-    delete_entry, list_entries, parse_entry_secret, validate_git_args, DeleteEntryRequest,
-    EntryRef, EntryType, GitOperationRequest, ListEntriesRequest,
+    delete_entry, list_entries, parse_entry_secret, read_entry, validate_git_args,
+    DeleteEntryRequest, EntryRef, EntryType, GitOperationRequest, ListEntriesRequest,
+    ReadEntryRequest,
 };
+use pars_core::pgp::key_management::key_gen_batch;
+use pars_core::pgp::PGPClient;
+use serial_test::serial;
 
 fn create_file(path: PathBuf) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).unwrap();
     }
     fs::write(path, "").unwrap();
+}
+
+struct TestKey {
+    executable: String,
+    email: String,
+}
+
+impl Drop for TestKey {
+    fn drop(&mut self) {
+        let _ = Command::new(&self.executable)
+            .args(["--batch", "--yes", "--delete-secret-and-public-keys", &self.email])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+fn test_pgp_executable() -> String {
+    std::env::var("PASS_RS_TEST_EXECUTABLE").unwrap_or("gpg".into())
+}
+
+fn test_key_batch(email: &str) -> String {
+    format!(
+        r#"%echo Generating a GUI test key
+Key-Type: RSA
+Key-Length: 2048
+Subkey-Type: RSA
+Subkey-Length: 2048
+Name-Real: Pars GUI Test
+Name-Email: {email}
+Expire-Date: 0
+%no-protection
+%commit
+%echo Key generation complete
+"#
+    )
 }
 
 #[test]
@@ -139,4 +181,36 @@ fn delete_entry_removes_directory_when_recursive_is_explicit() {
     assert_eq!(result.deleted_path, "work");
     assert_eq!(result.deleted_type, EntryType::Directory);
     assert!(!root.join("work").exists());
+}
+
+#[test]
+#[serial]
+fn read_entry_decrypts_password_file_and_parses_content() {
+    let executable = test_pgp_executable();
+    let email = format!("pars-gui-read-{}@rs.pass", process::id());
+    let _key = TestKey { executable: executable.clone(), email: email.clone() };
+    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().to_path_buf();
+    fs::write(root.join(".gpg-id"), format!("{email}\n")).unwrap();
+
+    let client = PGPClient::new(&executable, &[&email]).unwrap();
+    client
+        .encrypt(
+            "hunter2\nusername: alice\nurl: https://example.com\nkeep this raw",
+            root.join("github.gpg").to_str().unwrap(),
+        )
+        .unwrap();
+
+    let secret = read_entry(ReadEntryRequest {
+        entry: EntryRef::new(root, "github").unwrap(),
+        pgp_executable: executable,
+    })
+    .unwrap();
+
+    assert_eq!(secret.password, "hunter2");
+    assert_eq!(secret.field_value("username"), Some("alice"));
+    assert_eq!(secret.field_value("url"), Some("https://example.com"));
+    assert_eq!(secret.raw_notes, "keep this raw");
 }
