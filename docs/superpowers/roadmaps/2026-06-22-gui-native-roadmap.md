@@ -76,11 +76,12 @@ Goal: create a core API layer that is friendly to GUI/native callers and does no
 - [ ] Remove interactive stdin/stdout assumptions from GUI-callable operations.
 - [ ] Replace CLI overwrite prompts with explicit request flags and typed conflicts.
 - [x] Add non-interactive `read_entry` GUI API that decrypts and parses entries.
+- [x] Add non-interactive `insert_entry` GUI API using explicit `overwrite` flag.
 - [x] Add non-interactive `delete_entry` GUI API using explicit `recursive` flag.
 - [ ] Add Rust unit tests for GUI API list/read/insert/generate/delete using temp password stores:
   - [x] list
   - [x] read
-  - [ ] insert
+  - [x] insert
   - [ ] generate
   - [x] delete
 - [x] Add Rust tests proving path traversal is rejected through GUI APIs.

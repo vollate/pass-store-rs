@@ -4,12 +4,12 @@ use std::fmt::{Display, Formatter};
 use std::path::{Component, Path, PathBuf};
 use std::{fs, io};
 
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::pgp::PGPClient;
-use crate::util::fs_util::{get_dir_gpg_id_content, path_to_str};
+use crate::util::fs_util::{create_or_overwrite, get_dir_gpg_id_content, path_to_str};
 
 pub type GuiResult<T> = Result<T, CoreError>;
 
@@ -120,6 +120,12 @@ pub struct DeleteEntryResult {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct InsertEntryResult {
+    pub entry_path: String,
+    pub overwrote_existing: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ParsedEntryField {
     pub key: String,
     pub label: String,
@@ -182,6 +188,7 @@ pub struct InsertEntryRequest {
     pub entry: EntryRef,
     pub content: String,
     pub overwrite: bool,
+    pub pgp_executable: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -357,6 +364,38 @@ pub fn delete_entry(request: DeleteEntryRequest) -> GuiResult<DeleteEntryResult>
 
     fs::remove_dir_all(&directory_path)?;
     Ok(DeleteEntryResult { deleted_path: request.entry.path, deleted_type: EntryType::Directory })
+}
+
+pub fn insert_entry(request: InsertEntryRequest) -> GuiResult<InsertEntryResult> {
+    let encrypted_path = request.entry.encrypted_path();
+    let overwrote_existing = encrypted_path.exists();
+
+    if overwrote_existing && !request.overwrite {
+        return Err(CoreError::ValidationError(format!(
+            "entry already exists: {}",
+            request.entry.path
+        )));
+    }
+
+    if let Some(parent) = encrypted_path.parent() {
+        fs::create_dir_all(parent)?;
+    } else {
+        return Err(CoreError::StoreError(format!(
+            "entry path has no parent directory: {}",
+            request.entry.path
+        )));
+    }
+
+    let keys = get_dir_gpg_id_content(&request.entry.root, &encrypted_path)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+    let key_refs = keys.iter().map(String::as_str).collect::<Vec<_>>();
+    let client = PGPClient::new(&request.pgp_executable, &key_refs)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+    let content = SecretString::new(request.content.into());
+    create_or_overwrite(&client, &encrypted_path, &content)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+
+    Ok(InsertEntryResult { entry_path: request.entry.path, overwrote_existing })
 }
 
 pub fn read_entry(request: ReadEntryRequest) -> GuiResult<EntrySecret> {

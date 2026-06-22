@@ -3,12 +3,13 @@ use std::path::PathBuf;
 use std::process::{self, Command, Stdio};
 
 use pars_core::gui::{
-    delete_entry, list_entries, parse_entry_secret, read_entry, validate_git_args,
-    DeleteEntryRequest, EntryRef, EntryType, GitOperationRequest, ListEntriesRequest,
-    ReadEntryRequest,
+    delete_entry, insert_entry, list_entries, parse_entry_secret, read_entry, validate_git_args,
+    DeleteEntryRequest, EntryRef, EntryType, GitOperationRequest, InsertEntryRequest,
+    ListEntriesRequest, ReadEntryRequest,
 };
 use pars_core::pgp::key_management::key_gen_batch;
 use pars_core::pgp::PGPClient;
+use secrecy::ExposeSecret;
 use serial_test::serial;
 
 fn create_file(path: PathBuf) {
@@ -213,4 +214,77 @@ fn read_entry_decrypts_password_file_and_parses_content() {
     assert_eq!(secret.field_value("username"), Some("alice"));
     assert_eq!(secret.field_value("url"), Some("https://example.com"));
     assert_eq!(secret.raw_notes, "keep this raw");
+}
+
+#[test]
+#[serial]
+fn insert_entry_encrypts_content_and_creates_parent_directories() {
+    let executable = test_pgp_executable();
+    let email = format!("pars-gui-insert-{}@rs.pass", process::id());
+    let _key = TestKey { executable: executable.clone(), email: email.clone() };
+    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().to_path_buf();
+    fs::write(root.join(".gpg-id"), format!("{email}\n")).unwrap();
+
+    let result = insert_entry(InsertEntryRequest {
+        entry: EntryRef::new(root.clone(), "work/dev/github").unwrap(),
+        content: "hunter2\nusername: alice".to_string(),
+        overwrite: false,
+        pgp_executable: executable.clone(),
+    })
+    .unwrap();
+
+    assert_eq!(result.entry_path, "work/dev/github");
+    assert!(!result.overwrote_existing);
+    assert!(root.join("work/dev/github.gpg").is_file());
+
+    let client = PGPClient::new(&executable, &[&email]).unwrap();
+    let decrypted =
+        client.decrypt_stdin(&root, root.join("work/dev/github.gpg").to_str().unwrap()).unwrap();
+    assert_eq!(decrypted.expose_secret(), "hunter2\nusername: alice");
+}
+
+#[test]
+#[serial]
+fn insert_entry_requires_explicit_overwrite_for_existing_passwords() {
+    let executable = test_pgp_executable();
+    let email = format!("pars-gui-overwrite-{}@rs.pass", process::id());
+    let _key = TestKey { executable: executable.clone(), email: email.clone() };
+    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().to_path_buf();
+    fs::write(root.join(".gpg-id"), format!("{email}\n")).unwrap();
+
+    insert_entry(InsertEntryRequest {
+        entry: EntryRef::new(root.clone(), "github").unwrap(),
+        content: "old".to_string(),
+        overwrite: false,
+        pgp_executable: executable.clone(),
+    })
+    .unwrap();
+
+    let err = insert_entry(InsertEntryRequest {
+        entry: EntryRef::new(root.clone(), "github").unwrap(),
+        content: "new".to_string(),
+        overwrite: false,
+        pgp_executable: executable.clone(),
+    })
+    .unwrap_err();
+    assert!(err.to_string().contains("already exists"));
+
+    let result = insert_entry(InsertEntryRequest {
+        entry: EntryRef::new(root.clone(), "github").unwrap(),
+        content: "new".to_string(),
+        overwrite: true,
+        pgp_executable: executable.clone(),
+    })
+    .unwrap();
+    assert!(result.overwrote_existing);
+
+    let client = PGPClient::new(&executable, &[&email]).unwrap();
+    let decrypted = client.decrypt_stdin(&root, root.join("github.gpg").to_str().unwrap()).unwrap();
+    assert_eq!(decrypted.expose_secret(), "new");
 }
