@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::path::{Component, Path, PathBuf};
 use std::{fs, io};
 
+use passwords::PasswordGenerator;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
@@ -126,6 +127,13 @@ pub struct InsertEntryResult {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GenerateEntryResult {
+    pub entry_path: String,
+    pub password: String,
+    pub overwrote_existing: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ParsedEntryField {
     pub key: String,
     pub label: String,
@@ -197,6 +205,7 @@ pub struct GenerateEntryRequest {
     pub length: usize,
     pub no_symbols: bool,
     pub overwrite: bool,
+    pub pgp_executable: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -396,6 +405,39 @@ pub fn insert_entry(request: InsertEntryRequest) -> GuiResult<InsertEntryResult>
         .map_err(|err| CoreError::PgpError(err.to_string()))?;
 
     Ok(InsertEntryResult { entry_path: request.entry.path, overwrote_existing })
+}
+
+pub fn generate_entry(request: GenerateEntryRequest) -> GuiResult<GenerateEntryResult> {
+    if request.length == 0 {
+        return Err(CoreError::ValidationError(
+            "password length must be greater than 0".to_string(),
+        ));
+    }
+
+    let generator = PasswordGenerator::new()
+        .length(request.length)
+        .numbers(true)
+        .lowercase_letters(true)
+        .uppercase_letters(true)
+        .symbols(!request.no_symbols)
+        .spaces(false)
+        .exclude_similar_characters(true)
+        .strict(true);
+    let password =
+        generator.generate_one().map_err(|err| CoreError::ValidationError(err.to_string()))?;
+
+    let insert_result = insert_entry(InsertEntryRequest {
+        entry: request.entry,
+        content: password.clone(),
+        overwrite: request.overwrite,
+        pgp_executable: request.pgp_executable,
+    })?;
+
+    Ok(GenerateEntryResult {
+        entry_path: insert_result.entry_path,
+        password,
+        overwrote_existing: insert_result.overwrote_existing,
+    })
 }
 
 pub fn read_entry(request: ReadEntryRequest) -> GuiResult<EntrySecret> {
