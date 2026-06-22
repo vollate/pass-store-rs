@@ -2,8 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use pars_core::gui::{
-    list_entries, parse_entry_secret, validate_git_args, EntryRef, EntryType, GitOperationRequest,
-    ListEntriesRequest,
+    delete_entry, list_entries, parse_entry_secret, validate_git_args, DeleteEntryRequest,
+    EntryRef, EntryType, GitOperationRequest, ListEntriesRequest,
 };
 
 fn create_file(path: PathBuf) {
@@ -89,4 +89,54 @@ fn validate_git_args_rejects_shell_syntax() {
         let err = validate_git_args(&args).unwrap_err();
         assert!(err.to_string().contains("shell syntax is not allowed"));
     }
+}
+
+#[test]
+fn delete_entry_removes_password_file_without_prompting() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().to_path_buf();
+    create_file(root.join("work/github.gpg"));
+
+    let result = delete_entry(DeleteEntryRequest {
+        entry: EntryRef::new(root.clone(), "work/github").unwrap(),
+        recursive: false,
+    })
+    .unwrap();
+
+    assert_eq!(result.deleted_path, "work/github");
+    assert_eq!(result.deleted_type, EntryType::Password);
+    assert!(!root.join("work/github.gpg").exists());
+}
+
+#[test]
+fn delete_entry_requires_recursive_for_directories() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().to_path_buf();
+    create_file(root.join("work/github.gpg"));
+
+    let err = delete_entry(DeleteEntryRequest {
+        entry: EntryRef::new(root.clone(), "work").unwrap(),
+        recursive: false,
+    })
+    .unwrap_err();
+
+    assert!(err.to_string().contains("recursive=true"));
+    assert!(root.join("work/github.gpg").exists());
+}
+
+#[test]
+fn delete_entry_removes_directory_when_recursive_is_explicit() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().to_path_buf();
+    create_file(root.join("work/dev/github.gpg"));
+
+    let result = delete_entry(DeleteEntryRequest {
+        entry: EntryRef::new(root.clone(), "work").unwrap(),
+        recursive: true,
+    })
+    .unwrap();
+
+    assert_eq!(result.deleted_path, "work");
+    assert_eq!(result.deleted_type, EntryType::Directory);
+    assert!(!root.join("work").exists());
 }

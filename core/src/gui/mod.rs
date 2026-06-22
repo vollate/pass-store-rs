@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::io;
 use std::path::{Component, Path, PathBuf};
+use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
@@ -107,6 +107,12 @@ pub struct EntrySummary {
     pub parent_path: Option<String>,
     pub entry_type: EntryType,
     pub child_count: usize,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DeleteEntryResult {
+    pub deleted_path: String,
+    pub deleted_type: EntryType,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -305,6 +311,47 @@ pub fn list_entries(request: ListEntriesRequest) -> GuiResult<Vec<EntrySummary>>
             EntrySummary { path, name, parent_path, entry_type, child_count }
         })
         .collect())
+}
+
+pub fn delete_entry(request: DeleteEntryRequest) -> GuiResult<DeleteEntryResult> {
+    let encrypted_path = request.entry.encrypted_path();
+    if encrypted_path.is_file() {
+        fs::remove_file(&encrypted_path)?;
+        return Ok(DeleteEntryResult {
+            deleted_path: request.entry.path,
+            deleted_type: EntryType::Password,
+        });
+    }
+
+    let directory_path = request.entry.root.join(&request.entry.path);
+    if !directory_path.exists() {
+        return Err(CoreError::StoreError(format!("entry does not exist: {}", request.entry.path)));
+    }
+
+    let metadata = fs::symlink_metadata(&directory_path)?;
+    if metadata.file_type().is_symlink() {
+        return Err(CoreError::ValidationError(format!(
+            "refusing to delete symlink entry: {}",
+            request.entry.path
+        )));
+    }
+
+    if !metadata.is_dir() {
+        return Err(CoreError::StoreError(format!(
+            "entry is neither password file nor directory: {}",
+            request.entry.path
+        )));
+    }
+
+    if !request.recursive {
+        return Err(CoreError::ValidationError(format!(
+            "directory deletion requires recursive=true: {}",
+            request.entry.path
+        )));
+    }
+
+    fs::remove_dir_all(&directory_path)?;
+    Ok(DeleteEntryResult { deleted_path: request.entry.path, deleted_type: EntryType::Directory })
 }
 
 pub fn parse_entry_secret(plain_text: &str) -> EntrySecret {

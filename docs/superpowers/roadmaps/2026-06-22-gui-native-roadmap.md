@@ -75,7 +75,13 @@ Goal: create a core API layer that is friendly to GUI/native callers and does no
   - [x] `GitOperationRequest`
 - [ ] Remove interactive stdin/stdout assumptions from GUI-callable operations.
 - [ ] Replace CLI overwrite prompts with explicit request flags and typed conflicts.
-- [ ] Add Rust unit tests for GUI API list/read/insert/generate/delete using temp password stores.
+- [x] Add non-interactive `delete_entry` GUI API using explicit `recursive` flag.
+- [ ] Add Rust unit tests for GUI API list/read/insert/generate/delete using temp password stores:
+  - [x] list
+  - [ ] read
+  - [ ] insert
+  - [ ] generate
+  - [x] delete
 - [x] Add Rust tests proving path traversal is rejected through GUI APIs.
 
 ## Milestone 2: Flutter/Rust Native Bridge
