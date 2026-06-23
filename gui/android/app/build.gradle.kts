@@ -47,7 +47,7 @@ androidComponents {
         val rustProfile = if (variant.buildType == "release") "release" else "debug"
         val buildParsBridge = tasks.register<Exec>("buildParsBridge$capitalizedVariantName") {
             workingDir = project.rootDir.parentFile.parentFile
-            commandLine("bash", "gui/bridge/build_android.sh")
+            commandLine("bash", "gui/bridge/build_unix.sh", "android")
             environment("PARS_ANDROID_PROFILE", rustProfile)
             environment(
                 "PARS_ANDROID_OUTPUT_DIR",

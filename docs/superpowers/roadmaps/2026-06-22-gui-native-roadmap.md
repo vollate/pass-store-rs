@@ -109,6 +109,7 @@ Goal: connect Flutter to Rust core directly.
   - [x] macOS
   - [x] Windows
   - [x] Linux
+  - [x] Consolidated scripts to one Unix-like build entrypoint and one Windows entrypoint.
 - [x] Expose async Rust functions to Dart:
   - [x] `load_config`
   - [x] `save_config`
@@ -229,16 +230,16 @@ Goal: make PGP and SSH keys real, not just settings UI.
 
 Goal: protect local app access and optional PGP passphrase caching.
 
-- [ ] Implement 9-dot gesture capture widget.
-- [ ] Implement gesture confirmation flow.
+- [x] Implement 9-dot gesture capture widget.
+- [x] Implement gesture confirmation flow.
 - [ ] Store gesture verifier securely.
-- [ ] Implement app lock state.
-- [ ] Implement lock on app resume option.
-- [ ] Implement auto-lock timeout.
+- [x] Implement app lock state.
+- [x] Implement lock on app resume option.
+- [x] Implement auto-lock timeout.
 - [ ] Add biometric unlock support:
   - [ ] Android
   - [ ] iOS
-  - [ ] desktop fallback or disabled state
+  - [x] desktop fallback or disabled state
 - [ ] Add KMS/Keychain storage for PGP passphrase:
   - [ ] Android Keystore
   - [ ] iOS Keychain/Secure Enclave where available
@@ -260,7 +261,7 @@ Goal: protect local app access and optional PGP passphrase caching.
   - [ ] session expires
   - [ ] detail sheet closes
   - [ ] app goes background if configured
-- [ ] Add widget and unit tests for lock/session state transitions.
+- [x] Add widget and unit tests for lock/session state transitions.
 
 ## Milestone 7: Vault Real Data
 

@@ -3,25 +3,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/app/pars_gui_app.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
+import 'package:pars_gui/services/fake_pars_repository.dart';
 import 'package:pars_gui/services/git_repository.dart';
 import 'package:pars_gui/services/key_repository.dart';
+import 'package:pars_gui/services/security_repository.dart';
 import 'package:pars_gui/services/settings_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/services/vault_repository.dart';
+import 'package:pars_gui/widgets/gesture_lock_input.dart';
 
 void main() {
   testWidgets('shows onboarding before entering the vault', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
 
     expect(find.text('Set gesture lock'), findsOneWidget);
-    expect(find.text('Continue'), findsOneWidget);
+    expect(find.text('Draw at least 4 dots.'), findsOneWidget);
   });
 
   testWidgets('enters the mobile shell after onboarding', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
 
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
+    await _completeGestureSetup(tester);
 
     expect(find.text('Vault'), findsWidgets);
     expect(find.text('Manage'), findsOneWidget);
@@ -30,8 +32,7 @@ void main() {
 
   testWidgets('vault searches entries and opens detail sheet', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
+    await _completeGestureSetup(tester);
 
     expect(find.text('GitHub'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'stripe');
@@ -50,8 +51,7 @@ void main() {
 
   testWidgets('manage tab exposes batch management workflows', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
+    await _completeGestureSetup(tester);
 
     await tester.tap(find.text('Manage'));
     await tester.pumpAndSettle();
@@ -66,8 +66,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(ParsGuiApp.fake());
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
+    await _completeGestureSetup(tester);
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
@@ -94,15 +93,15 @@ void main() {
     const repository = _InjectedRepository();
 
     await tester.pumpWidget(
-      const ParsGuiApp(
+      ParsGuiApp(
         vaultRepository: repository,
         settingsRepository: repository,
         keyRepository: repository,
         gitRepository: repository,
+        securityRepository: InMemorySecurityRepository(),
       ),
     );
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
+    await _completeGestureSetup(tester);
 
     expect(find.text('Example Store'), findsWidgets);
     expect(find.text('Injected Entry'), findsOneWidget);
@@ -114,6 +113,96 @@ void main() {
 
     expect(find.text('Injected User <injected@example.com>'), findsOneWidget);
   });
+
+  testWidgets('locks and unlocks an existing app session', (tester) async {
+    final securityRepository = InMemorySecurityRepository.withPattern(
+      const <int>[0, 1, 2, 5],
+      autoLockTimeout: const Duration(seconds: 1),
+      lastUnlockedAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+
+    expect(find.text('Vault'), findsWidgets);
+
+    await tester.pump(const Duration(milliseconds: 1100));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock Pars'), findsOneWidget);
+
+    await _drawGesture(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vault'), findsWidgets);
+  });
+
+  testWidgets('settings updates local unlock controls', (tester) async {
+    final securityRepository = InMemorySecurityRepository.withPattern(
+      const <int>[0, 1, 2, 5],
+      lastUnlockedAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Require unlock on app resume'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('5 min'));
+    await tester.pumpAndSettle();
+
+    expect(securityRepository.lockOnResume, isTrue);
+    expect(securityRepository.autoLockTimeout, const Duration(minutes: 5));
+  });
+}
+
+Future<void> _completeGestureSetup(WidgetTester tester) async {
+  await _drawGesture(tester);
+  await tester.pumpAndSettle();
+  expect(find.text('Gesture captured. Confirm it once more.'), findsOneWidget);
+  await _drawGesture(tester);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _drawGesture(WidgetTester tester) async {
+  final box = tester.renderObject<RenderBox>(find.byType(GestureLockInput));
+  final topLeft = box.localToGlobal(Offset.zero);
+  final cell = box.size.width / 3;
+  Offset dot(int index) =>
+      topLeft +
+      Offset(cell * (index % 3) + cell / 2, cell * (index ~/ 3) + cell / 2);
+
+  final gesture = await tester.createGesture();
+  await gesture.down(dot(0));
+  await tester.pump();
+  await gesture.moveTo(dot(0) + Offset(cell / 4, 0));
+  await tester.pump();
+  await gesture.moveTo(dot(1));
+  await tester.pump();
+  await gesture.moveTo(dot(2));
+  await tester.pump();
+  await gesture.moveTo(dot(5));
+  await tester.pump();
+  await gesture.up();
 }
 
 class _InjectedRepository

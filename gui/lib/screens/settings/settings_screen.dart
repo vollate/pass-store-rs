@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/key_record.dart';
 import '../../services/git_repository.dart';
 import '../../services/key_repository.dart';
+import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
 
@@ -12,11 +13,15 @@ class SettingsScreen extends StatelessWidget {
     required this.settingsRepository,
     required this.keyRepository,
     required this.gitRepository,
+    required this.securityRepository,
+    this.onSecuritySettingsChanged,
   });
 
   final SettingsRepository settingsRepository;
   final KeyRepository keyRepository;
   final GitRepository gitRepository;
+  final SecurityRepository securityRepository;
+  final VoidCallback? onSecuritySettingsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -40,13 +45,12 @@ class SettingsScreen extends StatelessWidget {
                 children: <Widget>[
                   _SettingsTile(
                     title: 'Gesture lock and biometrics',
-                    subtitle: 'Gesture fallback, biometric quick unlock',
+                    subtitle:
+                        securityRepository.lockOnResume
+                            ? 'Lock on app resume'
+                            : 'Gesture unlock configured',
                     icon: Icons.pattern,
-                    onTap:
-                        () => _showTextSheet(
-                          context,
-                          'Gesture lock and biometrics',
-                        ),
+                    onTap: () => _showSecuritySheet(context),
                   ),
                   _SettingsTile(
                     title: 'PGP session timeout',
@@ -140,6 +144,97 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
     );
+  }
+
+  void _showSecuritySheet(BuildContext context) {
+    final timeoutOptions = <Duration>[
+      const Duration(minutes: 1),
+      const Duration(minutes: 5),
+      const Duration(minutes: 15),
+      const Duration(hours: 1),
+    ];
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setSheetState) => SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Gesture lock and biometrics',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 12),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Require unlock on app resume'),
+                          subtitle: const Text(
+                            'Gesture unlock is used as fallback',
+                          ),
+                          value: securityRepository.lockOnResume,
+                          onChanged: (value) async {
+                            await securityRepository.setLockOnResume(value);
+                            onSecuritySettingsChanged?.call();
+                            setSheetState(() {});
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Auto-lock timeout',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            for (final timeout in timeoutOptions)
+                              ChoiceChip(
+                                label: Text(_timeoutLabel(timeout)),
+                                selected:
+                                    securityRepository.autoLockTimeout ==
+                                    timeout,
+                                onSelected: (_) async {
+                                  await securityRepository.setAutoLockTimeout(
+                                    timeout,
+                                  );
+                                  onSecuritySettingsChanged?.call();
+                                  setSheetState(() {});
+                                },
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.fingerprint_outlined),
+                          title: const Text('Biometric unlock'),
+                          subtitle: const Text(
+                            'Unavailable until platform integration',
+                          ),
+                          trailing: const Icon(Icons.lock_outline),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ),
+    );
+  }
+
+  String _timeoutLabel(Duration timeout) {
+    if (timeout.inMinutes < 60) {
+      return '${timeout.inMinutes} min';
+    }
+    return '${timeout.inHours} hour';
   }
 
   void _showKeys(BuildContext context, KeyRecordType type) {
@@ -351,7 +446,9 @@ class SettingsScreen extends StatelessWidget {
       builder:
           (context) => AlertDialog(
             title: Text(
-              type == KeyRecordType.pgp ? 'Import PGP key file' : 'Import SSH key file',
+              type == KeyRecordType.pgp
+                  ? 'Import PGP key file'
+                  : 'Import SSH key file',
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,

@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
+import '../../widgets/gesture_lock_input.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({
     super.key,
     required this.onComplete,
+    required this.securityRepository,
     this.settingsRepository,
   });
 
   final VoidCallback onComplete;
+  final SecurityRepository securityRepository;
   final SettingsRepository? settingsRepository;
 
   @override
@@ -45,44 +49,138 @@ class OnboardingScreen extends StatelessWidget {
                           repository: settingsRepository!,
                           lifecycle: lifecycle!,
                         )
-                        : Center(
-                          child: SizedBox(
-                            width: 190,
-                            height: 190,
-                            child: GridView.count(
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisCount: 3,
-                              mainAxisSpacing: 24,
-                              crossAxisSpacing: 24,
-                              children: List<Widget>.generate(
-                                9,
-                                (index) => DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                      width: 2,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                        : _GestureSetup(
+                          securityRepository: securityRepository,
+                          onComplete: onComplete,
                         ),
               ),
-              FilledButton(
-                onPressed: onComplete,
-                child: const SizedBox(
-                  width: double.infinity,
-                  child: Center(child: Text('Continue')),
+              if (needsStoreSetup)
+                FilledButton(
+                  onPressed: onComplete,
+                  child: const SizedBox(
+                    width: double.infinity,
+                    child: Center(child: Text('Continue')),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+class _GestureSetup extends StatefulWidget {
+  const _GestureSetup({
+    required this.securityRepository,
+    required this.onComplete,
+  });
+
+  final SecurityRepository securityRepository;
+  final VoidCallback onComplete;
+
+  @override
+  State<_GestureSetup> createState() => _GestureSetupState();
+}
+
+class _GestureSetupState extends State<_GestureSetup> {
+  List<int>? _initialPattern;
+  String? _message;
+  bool _isSaving = false;
+
+  bool get _isConfirming => _initialPattern != null;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        Expanded(
+          child: Center(
+            child: GestureLockInput(
+              enabled: !_isSaving,
+              onCompleted: (pattern) => _handlePattern(context, pattern),
+            ),
+          ),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          child: Text(
+            _message ??
+                (_isConfirming
+                    ? 'Draw the same gesture again.'
+                    : 'Draw at least 4 dots.'),
+            key: ValueKey<String>(_message ?? 'default-$_isConfirming'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color:
+                  _message == null
+                      ? Theme.of(context).colorScheme.onSurfaceVariant
+                      : Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton(
+          onPressed:
+              _initialPattern == null || _isSaving
+                  ? null
+                  : () => setState(() {
+                    _initialPattern = null;
+                    _message = 'Start again with a new gesture.';
+                  }),
+          child: const SizedBox(
+            width: double.infinity,
+            child: Center(child: Text('Reset gesture')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handlePattern(BuildContext context, List<int> pattern) async {
+    if (pattern.length < 4) {
+      setState(() => _message = 'Use at least 4 dots.');
+      return;
+    }
+    final first = _initialPattern;
+    if (first == null) {
+      setState(() {
+        _initialPattern = pattern;
+        _message = 'Gesture captured. Confirm it once more.';
+      });
+      return;
+    }
+    if (!_samePattern(first, pattern)) {
+      setState(() {
+        _initialPattern = null;
+        _message = 'Gestures did not match. Start again.';
+      });
+      return;
+    }
+    setState(() {
+      _isSaving = true;
+      _message = 'Gesture confirmed.';
+    });
+    await widget.securityRepository.saveGestureVerifier(
+      GestureVerifier.fromPattern(pattern),
+    );
+    await widget.securityRepository.markUnlocked(DateTime.now());
+    if (context.mounted) {
+      widget.onComplete();
+    }
+  }
+
+  bool _samePattern(List<int> left, List<int> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    for (var i = 0; i < left.length; i += 1) {
+      if (left[i] != right[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 

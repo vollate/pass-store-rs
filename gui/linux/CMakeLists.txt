@@ -57,6 +57,28 @@ pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+# Build and stage a Rust bridge copy for direct CMake target builds. The
+# install step below also copies it directly into the final app bundle after
+# Flutter clears the bundle directory.
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+  set(PARS_BRIDGE_PROFILE "debug")
+else()
+  set(PARS_BRIDGE_PROFILE "release")
+endif()
+
+set(PARS_BRIDGE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/../bridge/build_unix.sh")
+set(PARS_BRIDGE_NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/linux")
+
+add_custom_target(pars_bridge_linux
+  COMMAND ${CMAKE_COMMAND} -E env
+    "PARS_BRIDGE_PROFILE=${PARS_BRIDGE_PROFILE}"
+    "PARS_LINUX_OUTPUT_DIR=${PARS_BRIDGE_NATIVE_ASSETS_DIR}"
+    "${PARS_BRIDGE_SCRIPT}" linux
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.."
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} pars_bridge_linux)
+
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
 
@@ -90,6 +112,20 @@ install(CODE "
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+
+install(CODE "
+  execute_process(
+    COMMAND \"${CMAKE_COMMAND}\" -E env
+      \"PARS_BRIDGE_PROFILE=${PARS_BRIDGE_PROFILE}\"
+      \"PARS_LINUX_OUTPUT_DIR=${INSTALL_BUNDLE_LIB_DIR}\"
+      \"${PARS_BRIDGE_SCRIPT}\" linux
+    WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}/../..\"
+    RESULT_VARIABLE PARS_BRIDGE_RESULT
+  )
+  if(NOT PARS_BRIDGE_RESULT EQUAL 0)
+    message(FATAL_ERROR \"Failed to build and bundle libpars_bridge.so\")
+  endif()
+  " COMPONENT Runtime)
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)

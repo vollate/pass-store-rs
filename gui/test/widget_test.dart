@@ -6,5 +6,6 @@ void main() {
     await tester.pumpWidget(ParsGuiApp.fake());
 
     expect(find.text('Set gesture lock'), findsOneWidget);
+    expect(find.text('Draw at least 4 dots.'), findsOneWidget);
   });
 }
