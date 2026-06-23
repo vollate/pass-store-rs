@@ -32,6 +32,33 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDir(layout.buildDirectory.dir("rustJniLibs"))
+        }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val capitalizedVariantName =
+            variant.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        val rustProfile = if (variant.buildType == "release") "release" else "debug"
+        val buildParsBridge = tasks.register<Exec>("buildParsBridge$capitalizedVariantName") {
+            workingDir = project.rootDir.parentFile.parentFile
+            commandLine("bash", "gui/bridge/build_android.sh")
+            environment("PARS_ANDROID_PROFILE", rustProfile)
+            environment(
+                "PARS_ANDROID_OUTPUT_DIR",
+                layout.buildDirectory.dir("rustJniLibs").get().asFile.absolutePath,
+            )
+        }
+
+        tasks.matching { it.name == "merge${capitalizedVariantName}NativeLibs" }.configureEach {
+            dependsOn(buildParsBridge)
+        }
+    }
 }
 
 kotlin {
