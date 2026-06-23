@@ -5,7 +5,19 @@ use std::process::Command;
 use pars_core::config::cli::{
     load_config as load_core_config, save_config as save_core_config, ParsConfig,
 };
-use pars_core::gui::{self, CoreError, EntryRef, GitOperationRequest, StoreId, StoreInfo};
+use pars_core::gui::{
+    self, CoreError, EntryRef, GitOperationRequest, KeyExportResult, PgpKeySummary, SshKeySummary,
+    StoreId, StoreInfo,
+};
+use pars_core::key_management::{
+    add_pgp_key_to_gpg_id as add_pgp_key_to_gpg_id_core, detect_imported_key_material,
+    export_ssh_private_key as export_ssh_private_key_core,
+    export_ssh_public_key as export_ssh_public_key_core, generate_ssh_ed25519_key,
+    import_ssh_private_key_text as import_ssh_private_key_text_core, list_ssh_keys,
+    ImportedKeyKind, PrivateKeyConfirmation,
+};
+use pars_core::pgp::backend::{KeyGenerationRequest, PgpBackend, SystemGpgBackend};
+use secrecy::SecretString;
 
 pub const SUPPORTED_METHODS: &[&str] = &[
     "load_config",
@@ -31,6 +43,21 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "clone_store",
     "remove_store",
     "delete_local_store",
+    "list_keys",
+    "detect_imported_key",
+    "generate_pgp_key",
+    "import_pgp_public_key",
+    "import_pgp_private_key_file",
+    "import_pgp_private_key_text",
+    "export_pgp_public_key",
+    "export_pgp_private_key",
+    "add_pgp_key_to_gpg_id",
+    "generate_ssh_key",
+    "import_ssh_private_key_file",
+    "import_ssh_private_key_text",
+    "export_ssh_public_key",
+    "export_ssh_private_key",
+    "open_github_ssh_settings",
 ];
 
 #[derive(Debug, Clone)]
@@ -115,6 +142,36 @@ pub struct MutationResponse {
 #[derive(Debug, Clone)]
 pub struct DeleteEntryResponse {
     pub result: Option<DeleteEntryResultDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ListKeysResponse {
+    pub keys: Vec<KeyRecordDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct KeyMutationResponse {
+    pub key: Option<KeyRecordDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct KeyDetectionResponse {
+    pub kind: Option<String>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct KeyExportResponse {
+    pub export: Option<KeyExportDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct OpenExternalUrlResponse {
+    pub url: Option<String>,
     pub error: Option<BridgeFailure>,
 }
 
@@ -300,6 +357,68 @@ pub struct DeleteLocalStoreRequest {
 }
 
 #[derive(Debug, Clone)]
+pub struct ListKeysRequest {
+    pub config_path: String,
+    pub pgp_executable: Option<String>,
+    pub ssh_dir: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GeneratePgpKeyRequest {
+    pub config_path: String,
+    pub pgp_executable: Option<String>,
+    pub name: String,
+    pub email: String,
+    pub passphrase: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportKeyTextRequest {
+    pub config_path: String,
+    pub ssh_dir: Option<String>,
+    pub name: Option<String>,
+    pub armored_text: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportKeyFileRequest {
+    pub config_path: String,
+    pub ssh_dir: Option<String>,
+    pub name: Option<String>,
+    pub path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExportPgpKeyRequest {
+    pub config_path: String,
+    pub pgp_executable: Option<String>,
+    pub fingerprint: String,
+    pub confirmation: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AddPgpKeyToGpgIdRequest {
+    pub root: String,
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct GenerateSshKeyRequest {
+    pub ssh_dir: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExportSshKeyRequest {
+    pub ssh_dir: String,
+    pub name: String,
+    pub confirmation: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct OpenGithubSshSettingsRequest {}
+
+#[derive(Debug, Clone)]
 pub struct AppStateDto {
     pub config_path: String,
     pub config_exists: bool,
@@ -391,6 +510,20 @@ pub struct GitCommandOutputDto {
 pub struct CopyEntryPasswordResult {
     pub path: String,
     pub password: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct KeyRecordDto {
+    pub key_type: String,
+    pub name: String,
+    pub fingerprint: String,
+    pub source: String,
+    pub has_private_key: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct KeyExportDto {
+    pub armored_text: String,
 }
 
 pub async fn load_config(request: LoadConfigRequest) -> ConfigResponse {
@@ -587,6 +720,182 @@ pub async fn delete_local_store(request: DeleteLocalStoreRequest) -> UnitRespons
     UnitResponse { error: delete_local_store_inner(request).err() }
 }
 
+pub async fn list_keys(request: ListKeysRequest) -> ListKeysResponse {
+    match list_keys_inner(request) {
+        Ok(keys) => ListKeysResponse { keys, error: None },
+        Err(error) => ListKeysResponse { keys: Vec::new(), error: Some(error) },
+    }
+}
+
+pub async fn detect_imported_key(request: ImportKeyTextRequest) -> KeyDetectionResponse {
+    match detect_imported_key_material(&request.armored_text) {
+        Ok(kind) => KeyDetectionResponse { kind: Some(imported_key_kind(kind)), error: None },
+        Err(error) => KeyDetectionResponse { kind: None, error: Some(BridgeFailure::from(error)) },
+    }
+}
+
+pub async fn generate_pgp_key(request: GeneratePgpKeyRequest) -> KeyMutationResponse {
+    match pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+        backend
+            .generate_key(KeyGenerationRequest {
+                name: request.name,
+                email: request.email,
+                passphrase: request.passphrase.map(SecretString::from),
+            })
+            .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+    }) {
+        Ok(result) => KeyMutationResponse {
+            key: Some(KeyRecordDto {
+                key_type: "pgp".to_string(),
+                name: result.fingerprint.clone(),
+                fingerprint: result.fingerprint,
+                source: "Generated on device".to_string(),
+                has_private_key: result.imported_private_key,
+            }),
+            error: None,
+        },
+        Err(error) => KeyMutationResponse { key: None, error: Some(error) },
+    }
+}
+
+pub async fn import_pgp_public_key(request: ImportKeyTextRequest) -> KeyMutationResponse {
+    import_pgp_key_text(request, false)
+}
+
+pub async fn import_pgp_private_key_text(request: ImportKeyTextRequest) -> KeyMutationResponse {
+    import_pgp_key_text(request, true)
+}
+
+pub async fn import_pgp_private_key_file(request: ImportKeyFileRequest) -> KeyMutationResponse {
+    match fs::read_to_string(&request.path).map_err(|error| {
+        BridgeFailure::from(CoreError::StoreError(format!(
+            "failed to read key file {}: {error}",
+            request.path
+        )))
+    }) {
+        Ok(armored_text) => import_pgp_key_text(
+            ImportKeyTextRequest {
+                config_path: request.config_path,
+                ssh_dir: request.ssh_dir,
+                name: request.name,
+                armored_text,
+            },
+            true,
+        ),
+        Err(error) => KeyMutationResponse { key: None, error: Some(error) },
+    }
+}
+
+pub async fn export_pgp_public_key(request: ExportPgpKeyRequest) -> KeyExportResponse {
+    match pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+        backend
+            .export_public_key(&request.fingerprint)
+            .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+    }) {
+        Ok(export) => KeyExportResponse { export: Some(export.into()), error: None },
+        Err(error) => KeyExportResponse { export: None, error: Some(error) },
+    }
+}
+
+pub async fn export_pgp_private_key(request: ExportPgpKeyRequest) -> KeyExportResponse {
+    let expected = format!("EXPORT PRIVATE KEY {}", request.fingerprint);
+    if request.confirmation.as_deref() != Some(expected.as_str()) {
+        return KeyExportResponse {
+            export: None,
+            error: Some(BridgeFailure::from(CoreError::ValidationError(format!(
+                "private key export requires confirmation phrase: {expected}"
+            )))),
+        };
+    }
+
+    match pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+        backend
+            .export_private_key(&request.fingerprint, None)
+            .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+    }) {
+        Ok(export) => KeyExportResponse { export: Some(export.into()), error: None },
+        Err(error) => KeyExportResponse { export: None, error: Some(error) },
+    }
+}
+
+pub async fn add_pgp_key_to_gpg_id(request: AddPgpKeyToGpgIdRequest) -> UnitResponse {
+    UnitResponse {
+        error: add_pgp_key_to_gpg_id_core(Path::new(&request.root), &request.fingerprint)
+            .err()
+            .map(BridgeFailure::from),
+    }
+}
+
+pub async fn generate_ssh_key(request: GenerateSshKeyRequest) -> KeyMutationResponse {
+    match generate_ssh_ed25519_key(Path::new(&request.ssh_dir), &request.name) {
+        Ok(key) => KeyMutationResponse { key: Some(key.into()), error: None },
+        Err(error) => KeyMutationResponse { key: None, error: Some(BridgeFailure::from(error)) },
+    }
+}
+
+pub async fn import_ssh_private_key_text(request: ImportKeyTextRequest) -> KeyMutationResponse {
+    let Some(name) = request.name else {
+        return KeyMutationResponse {
+            key: None,
+            error: Some(BridgeFailure::from(CoreError::ValidationError(
+                "SSH private key import requires a key name".to_string(),
+            ))),
+        };
+    };
+    let ssh_dir = request.ssh_dir.map(PathBuf::from).unwrap_or_else(default_ssh_dir);
+    match import_ssh_private_key_text_core(&ssh_dir, &name, &request.armored_text) {
+        Ok(key) => KeyMutationResponse { key: Some(key.into()), error: None },
+        Err(error) => KeyMutationResponse { key: None, error: Some(BridgeFailure::from(error)) },
+    }
+}
+
+pub async fn import_ssh_private_key_file(request: ImportKeyFileRequest) -> KeyMutationResponse {
+    match fs::read_to_string(&request.path).map_err(|error| {
+        BridgeFailure::from(CoreError::StoreError(format!(
+            "failed to read key file {}: {error}",
+            request.path
+        )))
+    }) {
+        Ok(armored_text) => {
+            import_ssh_private_key_text(ImportKeyTextRequest {
+                config_path: request.config_path,
+                ssh_dir: request.ssh_dir,
+                name: request.name,
+                armored_text,
+            })
+            .await
+        }
+        Err(error) => KeyMutationResponse { key: None, error: Some(error) },
+    }
+}
+
+pub async fn export_ssh_public_key(request: ExportSshKeyRequest) -> KeyExportResponse {
+    match export_ssh_public_key_core(Path::new(&request.ssh_dir), &request.name) {
+        Ok(export) => KeyExportResponse { export: Some(export.into()), error: None },
+        Err(error) => KeyExportResponse { export: None, error: Some(BridgeFailure::from(error)) },
+    }
+}
+
+pub async fn export_ssh_private_key(request: ExportSshKeyRequest) -> KeyExportResponse {
+    let confirmation = PrivateKeyConfirmation::new(
+        &request.name,
+        request.confirmation.clone().unwrap_or_default(),
+    );
+    match export_ssh_private_key_core(Path::new(&request.ssh_dir), &request.name, confirmation) {
+        Ok(export) => KeyExportResponse { export: Some(export.into()), error: None },
+        Err(error) => KeyExportResponse { export: None, error: Some(BridgeFailure::from(error)) },
+    }
+}
+
+pub async fn open_github_ssh_settings(
+    _request: OpenGithubSshSettingsRequest,
+) -> OpenExternalUrlResponse {
+    OpenExternalUrlResponse {
+        url: Some("https://github.com/settings/keys".to_string()),
+        error: None,
+    }
+}
+
 fn list_stores_inner(request: ListStoresRequest) -> Result<Vec<StoreInfoDto>, BridgeFailure> {
     let config = match request.config_path {
         Some(path) => load_core_config(path)
@@ -612,6 +921,101 @@ fn list_stores_inner(request: ListStoresRequest) -> Result<Vec<StoreInfoDto>, Br
         })
         .map(StoreInfoDto::from)
         .collect())
+}
+
+fn list_keys_inner(request: ListKeysRequest) -> Result<Vec<KeyRecordDto>, BridgeFailure> {
+    let mut keys = Vec::new();
+    if let Ok(backend) = pgp_backend(&request.config_path, request.pgp_executable.as_deref()) {
+        if let Ok(pgp_keys) = backend.list_keys() {
+            keys.extend(pgp_keys.into_iter().map(KeyRecordDto::from));
+        }
+    }
+
+    let ssh_dir = request.ssh_dir.map(PathBuf::from).unwrap_or_else(default_ssh_dir);
+    keys.extend(
+        list_ssh_keys(&ssh_dir).map_err(BridgeFailure::from)?.into_iter().map(KeyRecordDto::from),
+    );
+    Ok(keys)
+}
+
+fn import_pgp_key_text(request: ImportKeyTextRequest, private_key: bool) -> KeyMutationResponse {
+    let detected = detect_imported_key_material(&request.armored_text);
+    let expected_kind =
+        if private_key { ImportedKeyKind::PgpPrivate } else { ImportedKeyKind::PgpPublic };
+    match detected {
+        Ok(kind) if kind == expected_kind => {}
+        Ok(_) => {
+            return KeyMutationResponse {
+                key: None,
+                error: Some(BridgeFailure::from(CoreError::ValidationError(
+                    "pasted key type does not match the requested PGP import".to_string(),
+                ))),
+            };
+        }
+        Err(error) => {
+            return KeyMutationResponse { key: None, error: Some(BridgeFailure::from(error)) }
+        }
+    }
+
+    match pgp_backend(&request.config_path, None).and_then(|backend| {
+        if private_key {
+            backend
+                .import_private_key(&SecretString::from(request.armored_text))
+                .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+        } else {
+            backend
+                .import_public_key(&request.armored_text)
+                .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+        }
+    }) {
+        Ok(result) => KeyMutationResponse {
+            key: Some(KeyRecordDto {
+                key_type: "pgp".to_string(),
+                name: request.name.unwrap_or_else(|| result.fingerprint.clone()),
+                fingerprint: result.fingerprint,
+                source: if private_key { "Imported private key" } else { "Imported public key" }
+                    .to_string(),
+                has_private_key: result.imported_private_key,
+            }),
+            error: None,
+        },
+        Err(error) => KeyMutationResponse { key: None, error: Some(error) },
+    }
+}
+
+fn pgp_backend(
+    config_path: &str,
+    pgp_executable: Option<&str>,
+) -> Result<SystemGpgBackend, BridgeFailure> {
+    let mut config = if Path::new(config_path).is_file() {
+        load_core_config(config_path)
+            .map_err(|error| CoreError::ConfigError(error.to_string()))
+            .map_err(BridgeFailure::from)?
+    } else {
+        ParsConfig::default()
+    };
+    if let Some(executable) = pgp_executable {
+        config.pgp_config.system_gpg_path = Some(executable.to_string());
+    }
+    SystemGpgBackend::from_config(&config.pgp_config)
+        .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+}
+
+fn imported_key_kind(kind: ImportedKeyKind) -> String {
+    match kind {
+        ImportedKeyKind::PgpPublic => "pgp_public",
+        ImportedKeyKind::PgpPrivate => "pgp_private",
+        ImportedKeyKind::SshPrivate => "ssh_private",
+    }
+    .to_string()
+}
+
+fn default_ssh_dir() -> PathBuf {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .map(|home| home.join(".ssh"))
+        .unwrap_or_else(|| PathBuf::from(".ssh"))
 }
 
 fn inspect_app_state_inner(request: InspectAppStateRequest) -> Result<AppStateDto, BridgeFailure> {
@@ -1032,5 +1436,35 @@ impl From<gui::GitCommandOutput> for GitCommandOutputDto {
             exit_code: value.exit_code,
             success: value.success,
         }
+    }
+}
+
+impl From<PgpKeySummary> for KeyRecordDto {
+    fn from(value: PgpKeySummary) -> Self {
+        Self {
+            key_type: "pgp".to_string(),
+            name: value.identity,
+            fingerprint: value.fingerprint,
+            source: "GnuPG keyring".to_string(),
+            has_private_key: value.has_private_key,
+        }
+    }
+}
+
+impl From<SshKeySummary> for KeyRecordDto {
+    fn from(value: SshKeySummary) -> Self {
+        Self {
+            key_type: "ssh".to_string(),
+            name: value.name,
+            fingerprint: value.fingerprint,
+            source: "SSH key directory".to_string(),
+            has_private_key: value.has_private_key,
+        }
+    }
+}
+
+impl From<KeyExportResult> for KeyExportDto {
+    fn from(value: KeyExportResult) -> Self {
+        Self { armored_text: value.armored_text }
     }
 }

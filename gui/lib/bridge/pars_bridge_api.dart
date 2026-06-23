@@ -82,6 +82,64 @@ abstract interface class ParsBridgeApi {
   Future<frb.UnitResponse> deleteLocalStore({
     required frb.DeleteLocalStoreRequest request,
   });
+
+  Future<frb.ListKeysResponse> listKeys({required frb.ListKeysRequest request});
+
+  Future<frb.KeyDetectionResponse> detectImportedKey({
+    required frb.ImportKeyTextRequest request,
+  });
+
+  Future<frb.KeyMutationResponse> generatePgpKey({
+    required frb.GeneratePgpKeyRequest request,
+  });
+
+  Future<frb.KeyMutationResponse> importPgpPublicKey({
+    required frb.ImportKeyTextRequest request,
+  });
+
+  Future<frb.KeyMutationResponse> importPgpPrivateKeyFile({
+    required frb.ImportKeyFileRequest request,
+  });
+
+  Future<frb.KeyMutationResponse> importPgpPrivateKeyText({
+    required frb.ImportKeyTextRequest request,
+  });
+
+  Future<frb.KeyExportResponse> exportPgpPublicKey({
+    required frb.ExportPgpKeyRequest request,
+  });
+
+  Future<frb.KeyExportResponse> exportPgpPrivateKey({
+    required frb.ExportPgpKeyRequest request,
+  });
+
+  Future<frb.UnitResponse> addPgpKeyToGpgId({
+    required frb.AddPgpKeyToGpgIdRequest request,
+  });
+
+  Future<frb.KeyMutationResponse> generateSshKey({
+    required frb.GenerateSshKeyRequest request,
+  });
+
+  Future<frb.KeyMutationResponse> importSshPrivateKeyFile({
+    required frb.ImportKeyFileRequest request,
+  });
+
+  Future<frb.KeyMutationResponse> importSshPrivateKeyText({
+    required frb.ImportKeyTextRequest request,
+  });
+
+  Future<frb.KeyExportResponse> exportSshPublicKey({
+    required frb.ExportSshKeyRequest request,
+  });
+
+  Future<frb.KeyExportResponse> exportSshPrivateKey({
+    required frb.ExportSshKeyRequest request,
+  });
+
+  Future<frb.OpenExternalUrlResponse> openGithubSshSettings({
+    required frb.OpenGithubSshSettingsRequest request,
+  });
 }
 
 final class FrbParsBridgeApi implements ParsBridgeApi {
@@ -198,4 +256,79 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   Future<frb.UnitResponse> deleteLocalStore({
     required frb.DeleteLocalStoreRequest request,
   }) => frb.deleteLocalStore(request: request);
+
+  @override
+  Future<frb.ListKeysResponse> listKeys({
+    required frb.ListKeysRequest request,
+  }) => frb.listKeys(request: request);
+
+  @override
+  Future<frb.KeyDetectionResponse> detectImportedKey({
+    required frb.ImportKeyTextRequest request,
+  }) => frb.detectImportedKey(request: request);
+
+  @override
+  Future<frb.KeyMutationResponse> generatePgpKey({
+    required frb.GeneratePgpKeyRequest request,
+  }) => frb.generatePgpKey(request: request);
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPublicKey({
+    required frb.ImportKeyTextRequest request,
+  }) => frb.importPgpPublicKey(request: request);
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPrivateKeyFile({
+    required frb.ImportKeyFileRequest request,
+  }) => frb.importPgpPrivateKeyFile(request: request);
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPrivateKeyText({
+    required frb.ImportKeyTextRequest request,
+  }) => frb.importPgpPrivateKeyText(request: request);
+
+  @override
+  Future<frb.KeyExportResponse> exportPgpPublicKey({
+    required frb.ExportPgpKeyRequest request,
+  }) => frb.exportPgpPublicKey(request: request);
+
+  @override
+  Future<frb.KeyExportResponse> exportPgpPrivateKey({
+    required frb.ExportPgpKeyRequest request,
+  }) => frb.exportPgpPrivateKey(request: request);
+
+  @override
+  Future<frb.UnitResponse> addPgpKeyToGpgId({
+    required frb.AddPgpKeyToGpgIdRequest request,
+  }) => frb.addPgpKeyToGpgId(request: request);
+
+  @override
+  Future<frb.KeyMutationResponse> generateSshKey({
+    required frb.GenerateSshKeyRequest request,
+  }) => frb.generateSshKey(request: request);
+
+  @override
+  Future<frb.KeyMutationResponse> importSshPrivateKeyFile({
+    required frb.ImportKeyFileRequest request,
+  }) => frb.importSshPrivateKeyFile(request: request);
+
+  @override
+  Future<frb.KeyMutationResponse> importSshPrivateKeyText({
+    required frb.ImportKeyTextRequest request,
+  }) => frb.importSshPrivateKeyText(request: request);
+
+  @override
+  Future<frb.KeyExportResponse> exportSshPublicKey({
+    required frb.ExportSshKeyRequest request,
+  }) => frb.exportSshPublicKey(request: request);
+
+  @override
+  Future<frb.KeyExportResponse> exportSshPrivateKey({
+    required frb.ExportSshKeyRequest request,
+  }) => frb.exportSshPrivateKey(request: request);
+
+  @override
+  Future<frb.OpenExternalUrlResponse> openGithubSshSettings({
+    required frb.OpenGithubSshSettingsRequest request,
+  }) => frb.openGithubSshSettings(request: request);
 }

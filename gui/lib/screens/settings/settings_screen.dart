@@ -180,27 +180,343 @@ class SettingsScreen extends StatelessWidget {
                       runSpacing: 8,
                       children: <Widget>[
                         FilledButton(
-                          onPressed: () {},
+                          onPressed: () => _showCreateKeyForm(context, type),
                           child: const Text('Create'),
                         ),
                         OutlinedButton(
-                          onPressed: () {},
+                          onPressed: () => _showImportKeyForm(context, type),
                           child: const Text('Import'),
                         ),
                         OutlinedButton(
-                          onPressed: () {},
+                          onPressed:
+                              () => _showImportKeyFileForm(context, type),
+                          child: const Text('Import file'),
+                        ),
+                        OutlinedButton(
+                          onPressed:
+                              keys.isEmpty
+                                  ? null
+                                  : () => _exportPublicKey(context, keys.first),
                           child: const Text('Export public'),
                         ),
                         OutlinedButton(
-                          onPressed: () {},
+                          onPressed:
+                              keys.isEmpty
+                                  ? null
+                                  : () => _showPrivateExportForm(
+                                    context,
+                                    keys.first,
+                                  ),
                           child: const Text('Export private'),
                         ),
+                        if (type == KeyRecordType.pgp && keys.isNotEmpty)
+                          OutlinedButton(
+                            onPressed:
+                                () => _addPgpKeyToStore(context, keys.first),
+                            child: const Text('Add to .gpg-id'),
+                          ),
+                        if (type == KeyRecordType.ssh)
+                          OutlinedButton(
+                            onPressed: () => _showGithubSettingsUrl(context),
+                            child: const Text('GitHub settings'),
+                          ),
                       ],
                     ),
                   ],
                 ),
               ),
             ),
+          ),
+    );
+  }
+
+  void _showCreateKeyForm(BuildContext context, KeyRecordType type) {
+    final name = TextEditingController();
+    final email = TextEditingController();
+    final passphrase = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              type == KeyRecordType.pgp ? 'Create PGP key' : 'Create SSH key',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
+                if (type == KeyRecordType.pgp)
+                  TextField(
+                    controller: email,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
+                if (type == KeyRecordType.pgp)
+                  TextField(
+                    controller: passphrase,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: 'Passphrase'),
+                  ),
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed:
+                    () => _runKeyAction(
+                      context,
+                      () =>
+                          type == KeyRecordType.pgp
+                              ? keyRepository.generatePgpKey(
+                                name: name.text,
+                                email: email.text,
+                                passphrase:
+                                    passphrase.text.trim().isEmpty
+                                        ? null
+                                        : passphrase.text,
+                              )
+                              : keyRepository.generateSshKey(name.text),
+                    ),
+                child: const Text('Create'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showImportKeyForm(BuildContext context, KeyRecordType type) {
+    final name = TextEditingController();
+    final keyText = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              type == KeyRecordType.pgp ? 'Import PGP key' : 'Import SSH key',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (type == KeyRecordType.ssh)
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                  ),
+                TextField(
+                  controller: keyText,
+                  minLines: 4,
+                  maxLines: 8,
+                  decoration: const InputDecoration(labelText: 'Key text'),
+                ),
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed:
+                    () => _runKeyAction(context, () {
+                      if (type == KeyRecordType.ssh) {
+                        return keyRepository.importSshPrivateKeyText(
+                          name: name.text,
+                          privateKey: keyText.text,
+                        );
+                      }
+                      if (keyText.text.contains('PGP PRIVATE KEY BLOCK')) {
+                        return keyRepository.importPgpPrivateKeyText(
+                          keyText.text,
+                        );
+                      }
+                      return keyRepository.importPgpPublicKeyText(keyText.text);
+                    }),
+                child: const Text('Import'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showImportKeyFileForm(BuildContext context, KeyRecordType type) {
+    final name = TextEditingController();
+    final path = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              type == KeyRecordType.pgp ? 'Import PGP key file' : 'Import SSH key file',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (type == KeyRecordType.ssh)
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                  ),
+                TextField(
+                  controller: path,
+                  decoration: const InputDecoration(labelText: 'Path'),
+                ),
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed:
+                    () => _runKeyAction(
+                      context,
+                      () =>
+                          type == KeyRecordType.pgp
+                              ? keyRepository.importPgpPrivateKeyFile(path.text)
+                              : keyRepository.importSshPrivateKeyFile(
+                                name: name.text,
+                                path: path.text,
+                              ),
+                    ),
+                child: const Text('Import'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showPrivateExportForm(BuildContext context, KeyRecord key) {
+    final confirmation = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Export private key'),
+            content: TextField(
+              controller: confirmation,
+              decoration: const InputDecoration(labelText: 'Confirmation'),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed:
+                    () => _showExportedText(
+                      context,
+                      () =>
+                          key.type == KeyRecordType.pgp
+                              ? keyRepository.exportPgpPrivateKey(
+                                fingerprint: key.fingerprint,
+                                confirmation: confirmation.text,
+                              )
+                              : keyRepository.exportSshPrivateKey(
+                                name: key.name,
+                                confirmation: confirmation.text,
+                              ),
+                    ),
+                child: const Text('Export'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _runKeyAction(
+    BuildContext context,
+    Future<KeyRecord> Function() action,
+  ) async {
+    try {
+      final key = await action();
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(key.name)));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  void _exportPublicKey(BuildContext context, KeyRecord key) {
+    _showExportedText(
+      context,
+      () =>
+          key.type == KeyRecordType.pgp
+              ? keyRepository.exportPgpPublicKey(key.fingerprint)
+              : keyRepository.exportSshPublicKey(key.name),
+    );
+  }
+
+  Future<void> _showExportedText(
+    BuildContext context,
+    Future<String> Function() action,
+  ) async {
+    try {
+      final text = await action();
+      if (!context.mounted) return;
+      showDialog<void>(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Exported key'),
+              content: SelectableText(text),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  Future<void> _addPgpKeyToStore(BuildContext context, KeyRecord key) async {
+    try {
+      await keyRepository.addPgpKeyToSelectedStore(key.fingerprint);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(key.fingerprint)));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  Future<void> _showGithubSettingsUrl(BuildContext context) async {
+    final url = await keyRepository.githubSshSettingsUri();
+    if (!context.mounted) return;
+    showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('GitHub SSH settings'),
+            content: SelectableText(url.toString()),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
           ),
     );
   }

@@ -3,6 +3,7 @@ pub mod config;
 pub mod constants;
 pub mod git;
 pub mod gui;
+pub mod key_management;
 pub mod operation;
 pub mod pgp;
 pub mod util;

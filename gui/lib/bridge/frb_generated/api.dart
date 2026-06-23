@@ -6,8 +6,8 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_store_to_config`, `clone_store_inner`, `create_local_store_inner`, `delete_local_store_inner`, `entry_ref`, `git_remote_exists`, `import_local_store_inner`, `inspect_app_state_inner`, `inspect_store`, `list_stores_inner`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `onboarding_state`, `pgp_key_missing`, `read_entry_inner`, `remove_store_inner`, `run_git_command_response`, `run_git`, `save_config_for_mutation`, `select_store_inner`, `simple`, `store_failure`, `store_name`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `add_store_to_config`, `clone_store_inner`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `entry_ref`, `git_remote_exists`, `import_local_store_inner`, `import_pgp_key_text`, `imported_key_kind`, `inspect_app_state_inner`, `inspect_store`, `list_keys_inner`, `list_stores_inner`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `onboarding_state`, `pgp_backend`, `pgp_key_missing`, `read_entry_inner`, `remove_store_inner`, `run_git_command_response`, `run_git`, `save_config_for_mutation`, `select_store_inner`, `simple`, `store_failure`, `store_name`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 
 Future<ConfigResponse> loadConfig({required LoadConfigRequest request}) =>
     RustLib.instance.api.crateApiLoadConfig(request: request);
@@ -86,6 +86,86 @@ Future<UnitResponse> removeStore({required RemoveStoreRequest request}) =>
 Future<UnitResponse> deleteLocalStore({
   required DeleteLocalStoreRequest request,
 }) => RustLib.instance.api.crateApiDeleteLocalStore(request: request);
+
+Future<ListKeysResponse> listKeys({required ListKeysRequest request}) =>
+    RustLib.instance.api.crateApiListKeys(request: request);
+
+Future<KeyDetectionResponse> detectImportedKey({
+  required ImportKeyTextRequest request,
+}) => RustLib.instance.api.crateApiDetectImportedKey(request: request);
+
+Future<KeyMutationResponse> generatePgpKey({
+  required GeneratePgpKeyRequest request,
+}) => RustLib.instance.api.crateApiGeneratePgpKey(request: request);
+
+Future<KeyMutationResponse> importPgpPublicKey({
+  required ImportKeyTextRequest request,
+}) => RustLib.instance.api.crateApiImportPgpPublicKey(request: request);
+
+Future<KeyMutationResponse> importPgpPrivateKeyText({
+  required ImportKeyTextRequest request,
+}) => RustLib.instance.api.crateApiImportPgpPrivateKeyText(request: request);
+
+Future<KeyMutationResponse> importPgpPrivateKeyFile({
+  required ImportKeyFileRequest request,
+}) => RustLib.instance.api.crateApiImportPgpPrivateKeyFile(request: request);
+
+Future<KeyExportResponse> exportPgpPublicKey({
+  required ExportPgpKeyRequest request,
+}) => RustLib.instance.api.crateApiExportPgpPublicKey(request: request);
+
+Future<KeyExportResponse> exportPgpPrivateKey({
+  required ExportPgpKeyRequest request,
+}) => RustLib.instance.api.crateApiExportPgpPrivateKey(request: request);
+
+Future<UnitResponse> addPgpKeyToGpgId({
+  required AddPgpKeyToGpgIdRequest request,
+}) => RustLib.instance.api.crateApiAddPgpKeyToGpgId(request: request);
+
+Future<KeyMutationResponse> generateSshKey({
+  required GenerateSshKeyRequest request,
+}) => RustLib.instance.api.crateApiGenerateSshKey(request: request);
+
+Future<KeyMutationResponse> importSshPrivateKeyText({
+  required ImportKeyTextRequest request,
+}) => RustLib.instance.api.crateApiImportSshPrivateKeyText(request: request);
+
+Future<KeyMutationResponse> importSshPrivateKeyFile({
+  required ImportKeyFileRequest request,
+}) => RustLib.instance.api.crateApiImportSshPrivateKeyFile(request: request);
+
+Future<KeyExportResponse> exportSshPublicKey({
+  required ExportSshKeyRequest request,
+}) => RustLib.instance.api.crateApiExportSshPublicKey(request: request);
+
+Future<KeyExportResponse> exportSshPrivateKey({
+  required ExportSshKeyRequest request,
+}) => RustLib.instance.api.crateApiExportSshPrivateKey(request: request);
+
+Future<OpenExternalUrlResponse> openGithubSshSettings({
+  required OpenGithubSshSettingsRequest request,
+}) => RustLib.instance.api.crateApiOpenGithubSshSettings(request: request);
+
+class AddPgpKeyToGpgIdRequest {
+  final String root;
+  final String fingerprint;
+
+  const AddPgpKeyToGpgIdRequest({
+    required this.root,
+    required this.fingerprint,
+  });
+
+  @override
+  int get hashCode => root.hashCode ^ fingerprint.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AddPgpKeyToGpgIdRequest &&
+          runtimeType == other.runtimeType &&
+          root == other.root &&
+          fingerprint == other.fingerprint;
+}
 
 class AppStateDto {
   final String configPath;
@@ -531,6 +611,61 @@ class EntrySummaryDto {
           childCount == other.childCount;
 }
 
+class ExportPgpKeyRequest {
+  final String configPath;
+  final String? pgpExecutable;
+  final String fingerprint;
+  final String? confirmation;
+
+  const ExportPgpKeyRequest({
+    required this.configPath,
+    this.pgpExecutable,
+    required this.fingerprint,
+    this.confirmation,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      pgpExecutable.hashCode ^
+      fingerprint.hashCode ^
+      confirmation.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportPgpKeyRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          pgpExecutable == other.pgpExecutable &&
+          fingerprint == other.fingerprint &&
+          confirmation == other.confirmation;
+}
+
+class ExportSshKeyRequest {
+  final String sshDir;
+  final String name;
+  final String? confirmation;
+
+  const ExportSshKeyRequest({
+    required this.sshDir,
+    required this.name,
+    this.confirmation,
+  });
+
+  @override
+  int get hashCode => sshDir.hashCode ^ name.hashCode ^ confirmation.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportSshKeyRequest &&
+          runtimeType == other.runtimeType &&
+          sshDir == other.sshDir &&
+          name == other.name &&
+          confirmation == other.confirmation;
+}
+
 class GenerateEntryRequest {
   final String root;
   final String path;
@@ -611,6 +746,59 @@ class GenerateEntryResultDto {
           entryPath == other.entryPath &&
           password == other.password &&
           overwroteExisting == other.overwroteExisting;
+}
+
+class GeneratePgpKeyRequest {
+  final String configPath;
+  final String? pgpExecutable;
+  final String name;
+  final String email;
+  final String? passphrase;
+
+  const GeneratePgpKeyRequest({
+    required this.configPath,
+    this.pgpExecutable,
+    required this.name,
+    required this.email,
+    this.passphrase,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      pgpExecutable.hashCode ^
+      name.hashCode ^
+      email.hashCode ^
+      passphrase.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GeneratePgpKeyRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          pgpExecutable == other.pgpExecutable &&
+          name == other.name &&
+          email == other.email &&
+          passphrase == other.passphrase;
+}
+
+class GenerateSshKeyRequest {
+  final String sshDir;
+  final String name;
+
+  const GenerateSshKeyRequest({required this.sshDir, required this.name});
+
+  @override
+  int get hashCode => sshDir.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GenerateSshKeyRequest &&
+          runtimeType == other.runtimeType &&
+          sshDir == other.sshDir &&
+          name == other.name;
 }
 
 class GitArgsRequest {
@@ -716,6 +904,65 @@ class GitRequest {
       other is GitRequest &&
           runtimeType == other.runtimeType &&
           root == other.root;
+}
+
+class ImportKeyFileRequest {
+  final String configPath;
+  final String? sshDir;
+  final String? name;
+  final String path;
+
+  const ImportKeyFileRequest({
+    required this.configPath,
+    this.sshDir,
+    this.name,
+    required this.path,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^ sshDir.hashCode ^ name.hashCode ^ path.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImportKeyFileRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          sshDir == other.sshDir &&
+          name == other.name &&
+          path == other.path;
+}
+
+class ImportKeyTextRequest {
+  final String configPath;
+  final String? sshDir;
+  final String? name;
+  final String armoredText;
+
+  const ImportKeyTextRequest({
+    required this.configPath,
+    this.sshDir,
+    this.name,
+    required this.armoredText,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      sshDir.hashCode ^
+      name.hashCode ^
+      armoredText.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImportKeyTextRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          sshDir == other.sshDir &&
+          name == other.name &&
+          armoredText == other.armoredText;
 }
 
 class ImportLocalStoreRequest {
@@ -834,6 +1081,111 @@ class InspectAppStateRequest {
           pgpExecutable == other.pgpExecutable;
 }
 
+class KeyDetectionResponse {
+  final String? kind;
+  final BridgeFailure? error;
+
+  const KeyDetectionResponse({this.kind, this.error});
+
+  @override
+  int get hashCode => kind.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is KeyDetectionResponse &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          error == other.error;
+}
+
+class KeyExportDto {
+  final String armoredText;
+
+  const KeyExportDto({required this.armoredText});
+
+  @override
+  int get hashCode => armoredText.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is KeyExportDto &&
+          runtimeType == other.runtimeType &&
+          armoredText == other.armoredText;
+}
+
+class KeyExportResponse {
+  final KeyExportDto? export_;
+  final BridgeFailure? error;
+
+  const KeyExportResponse({this.export_, this.error});
+
+  @override
+  int get hashCode => export_.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is KeyExportResponse &&
+          runtimeType == other.runtimeType &&
+          export_ == other.export_ &&
+          error == other.error;
+}
+
+class KeyMutationResponse {
+  final KeyRecordDto? key;
+  final BridgeFailure? error;
+
+  const KeyMutationResponse({this.key, this.error});
+
+  @override
+  int get hashCode => key.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is KeyMutationResponse &&
+          runtimeType == other.runtimeType &&
+          key == other.key &&
+          error == other.error;
+}
+
+class KeyRecordDto {
+  final String keyType;
+  final String name;
+  final String fingerprint;
+  final String source;
+  final bool hasPrivateKey;
+
+  const KeyRecordDto({
+    required this.keyType,
+    required this.name,
+    required this.fingerprint,
+    required this.source,
+    required this.hasPrivateKey,
+  });
+
+  @override
+  int get hashCode =>
+      keyType.hashCode ^
+      name.hashCode ^
+      fingerprint.hashCode ^
+      source.hashCode ^
+      hasPrivateKey.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is KeyRecordDto &&
+          runtimeType == other.runtimeType &&
+          keyType == other.keyType &&
+          name == other.name &&
+          fingerprint == other.fingerprint &&
+          source == other.source &&
+          hasPrivateKey == other.hasPrivateKey;
+}
+
 class ListEntriesRequest {
   final String root;
   final String? target;
@@ -873,6 +1225,49 @@ class ListEntriesResponse {
       other is ListEntriesResponse &&
           runtimeType == other.runtimeType &&
           entries == other.entries &&
+          error == other.error;
+}
+
+class ListKeysRequest {
+  final String configPath;
+  final String? pgpExecutable;
+  final String? sshDir;
+
+  const ListKeysRequest({
+    required this.configPath,
+    this.pgpExecutable,
+    this.sshDir,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^ pgpExecutable.hashCode ^ sshDir.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ListKeysRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          pgpExecutable == other.pgpExecutable &&
+          sshDir == other.sshDir;
+}
+
+class ListKeysResponse {
+  final List<KeyRecordDto> keys;
+  final BridgeFailure? error;
+
+  const ListKeysResponse({required this.keys, this.error});
+
+  @override
+  int get hashCode => keys.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ListKeysResponse &&
+          runtimeType == other.runtimeType &&
+          keys == other.keys &&
           error == other.error;
 }
 
@@ -986,6 +1381,36 @@ class MutationResultDto {
       other is MutationResultDto &&
           runtimeType == other.runtimeType &&
           path == other.path;
+}
+
+class OpenExternalUrlResponse {
+  final String? url;
+  final BridgeFailure? error;
+
+  const OpenExternalUrlResponse({this.url, this.error});
+
+  @override
+  int get hashCode => url.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OpenExternalUrlResponse &&
+          runtimeType == other.runtimeType &&
+          url == other.url &&
+          error == other.error;
+}
+
+class OpenGithubSshSettingsRequest {
+  const OpenGithubSshSettingsRequest();
+
+  @override
+  int get hashCode => 0;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OpenGithubSshSettingsRequest && runtimeType == other.runtimeType;
 }
 
 class ParsedEntryFieldDto {

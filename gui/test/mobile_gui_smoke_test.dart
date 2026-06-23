@@ -215,6 +215,71 @@ class _InjectedRepository
   }) async {}
 
   @override
+  Future<KeyRecord> generatePgpKey({
+    required String name,
+    required String email,
+    String? passphrase,
+  }) async => keys.first;
+
+  @override
+  Future<KeyRecord> importPgpPublicKeyText(String armoredText) async =>
+      keys.first;
+
+  @override
+  Future<KeyRecord> importPgpPrivateKeyText(String armoredText) async =>
+      keys.first;
+
+  @override
+  Future<KeyRecord> importPgpPrivateKeyFile(String path) async => keys.first;
+
+  @override
+  Future<String> exportPgpPublicKey(String fingerprint) async => 'public';
+
+  @override
+  Future<String> exportPgpPrivateKey({
+    required String fingerprint,
+    required String confirmation,
+  }) async => 'private';
+
+  @override
+  Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}
+
+  @override
+  Future<KeyRecord> generateSshKey(String name) async => const KeyRecord(
+    type: KeyRecordType.ssh,
+    name: 'Injected SSH',
+    fingerprint: 'SHA256:injected',
+    source: 'Injected test',
+    hasPrivateKey: true,
+  );
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyText({
+    required String name,
+    required String privateKey,
+  }) async => generateSshKey(name);
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyFile({
+    required String name,
+    required String path,
+  }) async => generateSshKey(name);
+
+  @override
+  Future<String> exportSshPublicKey(String name) async =>
+      'ssh-ed25519 injected';
+
+  @override
+  Future<String> exportSshPrivateKey({
+    required String name,
+    required String confirmation,
+  }) async => 'private';
+
+  @override
+  Future<Uri> githubSshSettingsUri() async =>
+      Uri.parse('https://github.com/settings/keys');
+
+  @override
   List<PasswordEntry> search(String query) {
     final normalized = query.trim().toLowerCase();
     if (normalized.isEmpty) {

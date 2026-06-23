@@ -203,27 +203,27 @@ Decision: support both behind a Rust backend trait. Use system/bundled GPG first
 
 Goal: make PGP and SSH keys real, not just settings UI.
 
-- [ ] Implement PGP key list screen with real data.
-- [ ] Implement PGP key generation.
-- [ ] Implement PGP public key import.
-- [ ] Implement PGP private key import from file.
-- [ ] Implement PGP private key import from pasted armored text.
-- [ ] Implement PGP public key export/copy.
-- [ ] Implement PGP private key export with strong confirmation.
-- [ ] Implement add selected PGP public key to `.gpg-id`.
-- [ ] Implement SSH key list screen with real data.
-- [ ] Implement SSH ed25519 key generation.
-- [ ] Implement SSH private key import from file.
-- [ ] Implement SSH private key import from pasted text.
-- [ ] Implement SSH public key copy/export.
-- [ ] Implement SSH private key export with strong confirmation.
-- [ ] Implement open GitHub SSH settings action.
-- [ ] Add tests for key import detection:
-  - [ ] PGP public key
-  - [ ] PGP private key
-  - [ ] SSH private key
-  - [ ] invalid pasted text
-- [ ] Ensure private key material is never printed in logs or crash text.
+- [x] Implement PGP key list screen with real data.
+- [x] Implement PGP key generation.
+- [x] Implement PGP public key import.
+- [x] Implement PGP private key import from file.
+- [x] Implement PGP private key import from pasted armored text.
+- [x] Implement PGP public key export/copy.
+- [x] Implement PGP private key export with strong confirmation.
+- [x] Implement add selected PGP public key to `.gpg-id`.
+- [x] Implement SSH key list screen with real data.
+- [x] Implement SSH ed25519 key generation.
+- [x] Implement SSH private key import from file.
+- [x] Implement SSH private key import from pasted text.
+- [x] Implement SSH public key copy/export.
+- [x] Implement SSH private key export with strong confirmation.
+- [x] Implement open GitHub SSH settings action.
+- [x] Add tests for key import detection:
+  - [x] PGP public key
+  - [x] PGP private key
+  - [x] SSH private key
+  - [x] invalid pasted text
+- [x] Ensure private key material is never printed in logs or crash text.
 
 ## Milestone 6: Local Unlock, Biometrics, and Secret Storage
 
@@ -419,7 +419,7 @@ Recommended implementation order:
 2. [x] Flutter/Rust native bridge.
 3. [ ] Config and store lifecycle.
 4. [x] PGP backend strategy and packaging decision.
-5. [ ] Key management.
+5. [x] Key management.
 6. [ ] Local unlock, biometrics, and secret storage.
 7. [ ] Vault real data.
 8. [ ] Manage real operations.

@@ -158,4 +158,68 @@ class FakeParsRepository
     required String root,
     required String confirmation,
   }) async {}
+
+  @override
+  Future<KeyRecord> generatePgpKey({
+    required String name,
+    required String email,
+    String? passphrase,
+  }) async => keys.firstWhere((key) => key.type == KeyRecordType.pgp);
+
+  @override
+  Future<KeyRecord> importPgpPublicKeyText(String armoredText) async =>
+      keys.firstWhere((key) => key.type == KeyRecordType.pgp);
+
+  @override
+  Future<KeyRecord> importPgpPrivateKeyText(String armoredText) async =>
+      keys.firstWhere((key) => key.type == KeyRecordType.pgp);
+
+  @override
+  Future<KeyRecord> importPgpPrivateKeyFile(String path) async =>
+      keys.firstWhere((key) => key.type == KeyRecordType.pgp);
+
+  @override
+  Future<String> exportPgpPublicKey(String fingerprint) async =>
+      '-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----';
+
+  @override
+  Future<String> exportPgpPrivateKey({
+    required String fingerprint,
+    required String confirmation,
+  }) async =>
+      '-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----';
+
+  @override
+  Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}
+
+  @override
+  Future<KeyRecord> generateSshKey(String name) async =>
+      keys.firstWhere((key) => key.type == KeyRecordType.ssh);
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyText({
+    required String name,
+    required String privateKey,
+  }) async => keys.firstWhere((key) => key.type == KeyRecordType.ssh);
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyFile({
+    required String name,
+    required String path,
+  }) async => keys.firstWhere((key) => key.type == KeyRecordType.ssh);
+
+  @override
+  Future<String> exportSshPublicKey(String name) async =>
+      'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeKey';
+
+  @override
+  Future<String> exportSshPrivateKey({
+    required String name,
+    required String confirmation,
+  }) async =>
+      '-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----';
+
+  @override
+  Future<Uri> githubSshSettingsUri() async =>
+      Uri.parse('https://github.com/settings/keys');
 }

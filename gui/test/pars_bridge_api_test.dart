@@ -234,4 +234,126 @@ class _MockParsBridgeApi implements ParsBridgeApi {
     calledMethods.add('delete_local_store');
     return const frb.UnitResponse();
   }
+
+  @override
+  Future<frb.ListKeysResponse> listKeys({
+    required frb.ListKeysRequest request,
+  }) async {
+    calledMethods.add('list_keys');
+    return const frb.ListKeysResponse(keys: <frb.KeyRecordDto>[]);
+  }
+
+  @override
+  Future<frb.KeyDetectionResponse> detectImportedKey({
+    required frb.ImportKeyTextRequest request,
+  }) async {
+    calledMethods.add('detect_imported_key');
+    return const frb.KeyDetectionResponse(kind: 'pgp_public');
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> generatePgpKey({
+    required frb.GeneratePgpKeyRequest request,
+  }) async {
+    calledMethods.add('generate_pgp_key');
+    return const frb.KeyMutationResponse();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPublicKey({
+    required frb.ImportKeyTextRequest request,
+  }) async {
+    calledMethods.add('import_pgp_public_key');
+    return const frb.KeyMutationResponse();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPrivateKeyFile({
+    required frb.ImportKeyFileRequest request,
+  }) async {
+    calledMethods.add('import_pgp_private_key_file');
+    return const frb.KeyMutationResponse();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPrivateKeyText({
+    required frb.ImportKeyTextRequest request,
+  }) async {
+    calledMethods.add('import_pgp_private_key_text');
+    return const frb.KeyMutationResponse();
+  }
+
+  @override
+  Future<frb.KeyExportResponse> exportPgpPublicKey({
+    required frb.ExportPgpKeyRequest request,
+  }) async {
+    calledMethods.add('export_pgp_public_key');
+    return const frb.KeyExportResponse();
+  }
+
+  @override
+  Future<frb.KeyExportResponse> exportPgpPrivateKey({
+    required frb.ExportPgpKeyRequest request,
+  }) async {
+    calledMethods.add('export_pgp_private_key');
+    return const frb.KeyExportResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> addPgpKeyToGpgId({
+    required frb.AddPgpKeyToGpgIdRequest request,
+  }) async {
+    calledMethods.add('add_pgp_key_to_gpg_id');
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> generateSshKey({
+    required frb.GenerateSshKeyRequest request,
+  }) async {
+    calledMethods.add('generate_ssh_key');
+    return const frb.KeyMutationResponse();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importSshPrivateKeyFile({
+    required frb.ImportKeyFileRequest request,
+  }) async {
+    calledMethods.add('import_ssh_private_key_file');
+    return const frb.KeyMutationResponse();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importSshPrivateKeyText({
+    required frb.ImportKeyTextRequest request,
+  }) async {
+    calledMethods.add('import_ssh_private_key_text');
+    return const frb.KeyMutationResponse();
+  }
+
+  @override
+  Future<frb.KeyExportResponse> exportSshPublicKey({
+    required frb.ExportSshKeyRequest request,
+  }) async {
+    calledMethods.add('export_ssh_public_key');
+    return const frb.KeyExportResponse();
+  }
+
+  @override
+  Future<frb.KeyExportResponse> exportSshPrivateKey({
+    required frb.ExportSshKeyRequest request,
+  }) async {
+    calledMethods.add('export_ssh_private_key');
+    return const frb.KeyExportResponse();
+  }
+
+  @override
+  Future<frb.OpenExternalUrlResponse> openGithubSshSettings({
+    required frb.OpenGithubSshSettingsRequest request,
+  }) async {
+    calledMethods.add('open_github_ssh_settings');
+    return const frb.OpenExternalUrlResponse(
+      url: 'https://github.com/settings/keys',
+    );
+  }
 }

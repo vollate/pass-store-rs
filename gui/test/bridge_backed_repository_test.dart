@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
 import 'package:pars_gui/bridge/pars_bridge_api.dart';
+import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/services/bridge_backed_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
@@ -29,10 +30,12 @@ void main() {
         bridge.calledMethods,
         containsAll(<String>[
           'inspect_app_state',
+          'list_keys',
           'list_entries',
           'git_status',
         ]),
       );
+      expect(repository.keys.single.name, 'github-mobile');
     },
   );
 
@@ -75,6 +78,31 @@ void main() {
         'clone_store',
         'remove_store',
         'delete_local_store',
+      ]),
+    );
+  });
+
+  test('bridge-backed repository exposes key management operations', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      sshDir: '/tmp/pars-ssh',
+    );
+
+    final key = await repository.generateSshKey('github-mobile');
+    final publicKey = await repository.exportSshPublicKey('github-mobile');
+    final github = await repository.githubSshSettingsUri();
+
+    expect(key.type, KeyRecordType.ssh);
+    expect(publicKey, startsWith('ssh-ed25519 '));
+    expect(github.toString(), 'https://github.com/settings/keys');
+    expect(
+      bridge.calledMethods,
+      containsAll(<String>[
+        'generate_ssh_key',
+        'export_ssh_public_key',
+        'open_github_ssh_settings',
       ]),
     );
   });
@@ -152,6 +180,24 @@ class _LifecycleBridge implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.ListKeysResponse> listKeys({
+    required frb.ListKeysRequest request,
+  }) async {
+    calledMethods.add('list_keys');
+    return const frb.ListKeysResponse(
+      keys: <frb.KeyRecordDto>[
+        frb.KeyRecordDto(
+          keyType: 'ssh',
+          name: 'github-mobile',
+          fingerprint: 'SHA256:test',
+          source: 'SSH key directory',
+          hasPrivateKey: true,
+        ),
+      ],
+    );
+  }
+
+  @override
   Future<frb.UnitResponse> createLocalStore({
     required frb.CreateLocalStoreRequest request,
   }) async {
@@ -197,6 +243,42 @@ class _LifecycleBridge implements ParsBridgeApi {
   }) async {
     calledMethods.add('delete_local_store');
     return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> generateSshKey({
+    required frb.GenerateSshKeyRequest request,
+  }) async {
+    calledMethods.add('generate_ssh_key');
+    return const frb.KeyMutationResponse(
+      key: frb.KeyRecordDto(
+        keyType: 'ssh',
+        name: 'github-mobile',
+        fingerprint: 'SHA256:test',
+        source: 'SSH key directory',
+        hasPrivateKey: true,
+      ),
+    );
+  }
+
+  @override
+  Future<frb.KeyExportResponse> exportSshPublicKey({
+    required frb.ExportSshKeyRequest request,
+  }) async {
+    calledMethods.add('export_ssh_public_key');
+    return const frb.KeyExportResponse(
+      export_: frb.KeyExportDto(armoredText: 'ssh-ed25519 AAAAtest'),
+    );
+  }
+
+  @override
+  Future<frb.OpenExternalUrlResponse> openGithubSshSettings({
+    required frb.OpenGithubSshSettingsRequest request,
+  }) async {
+    calledMethods.add('open_github_ssh_settings');
+    return const frb.OpenExternalUrlResponse(
+      url: 'https://github.com/settings/keys',
+    );
   }
 
   @override
@@ -289,6 +371,83 @@ class _LifecycleBridge implements ParsBridgeApi {
   @override
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyDetectionResponse> detectImportedKey({
+    required frb.ImportKeyTextRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> generatePgpKey({
+    required frb.GeneratePgpKeyRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPublicKey({
+    required frb.ImportKeyTextRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPrivateKeyFile({
+    required frb.ImportKeyFileRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importPgpPrivateKeyText({
+    required frb.ImportKeyTextRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyExportResponse> exportPgpPublicKey({
+    required frb.ExportPgpKeyRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyExportResponse> exportPgpPrivateKey({
+    required frb.ExportPgpKeyRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.UnitResponse> addPgpKeyToGpgId({
+    required frb.AddPgpKeyToGpgIdRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importSshPrivateKeyFile({
+    required frb.ImportKeyFileRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyMutationResponse> importSshPrivateKeyText({
+    required frb.ImportKeyTextRequest request,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.KeyExportResponse> exportSshPrivateKey({
+    required frb.ExportSshKeyRequest request,
   }) {
     throw UnimplementedError();
   }

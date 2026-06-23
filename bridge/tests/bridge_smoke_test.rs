@@ -3,7 +3,9 @@ use std::pin::pin;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use pars_bridge::api::{
-    self, CreateLocalStoreRequest, InspectAppStateRequest, ListEntriesRequest, SUPPORTED_METHODS,
+    self, AddPgpKeyToGpgIdRequest, CreateLocalStoreRequest, ExportSshKeyRequest,
+    GenerateSshKeyRequest, ImportKeyTextRequest, InspectAppStateRequest, ListEntriesRequest,
+    ListKeysRequest, OpenGithubSshSettingsRequest, SUPPORTED_METHODS,
 };
 
 #[test]
@@ -44,9 +46,83 @@ fn bridge_method_table_matches_generated_api_surface() {
         "clone_store",
         "remove_store",
         "delete_local_store",
+        "list_keys",
+        "detect_imported_key",
+        "generate_pgp_key",
+        "import_pgp_public_key",
+        "import_pgp_private_key_file",
+        "import_pgp_private_key_text",
+        "export_pgp_public_key",
+        "export_pgp_private_key",
+        "add_pgp_key_to_gpg_id",
+        "generate_ssh_key",
+        "import_ssh_private_key_file",
+        "import_ssh_private_key_text",
+        "export_ssh_public_key",
+        "export_ssh_private_key",
+        "open_github_ssh_settings",
     ];
 
     assert_eq!(SUPPORTED_METHODS, expected);
+}
+
+#[test]
+fn key_management_bridge_lists_generates_exports_and_detects_keys() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let ssh_dir = temp.path().join("ssh");
+    let store_root = temp.path().join("store");
+    std::fs::create_dir_all(&store_root).unwrap();
+
+    let generated = block_on(api::generate_ssh_key(GenerateSshKeyRequest {
+        ssh_dir: ssh_dir.display().to_string(),
+        name: "github-mobile".to_string(),
+    }));
+    assert!(generated.error.is_none(), "{:?}", generated.error);
+    assert_eq!(generated.key.unwrap().name, "github-mobile");
+
+    let keys = block_on(api::list_keys(ListKeysRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: Some("/bin/false".to_string()),
+        ssh_dir: Some(ssh_dir.display().to_string()),
+    }));
+    assert!(keys.error.is_none(), "{:?}", keys.error);
+    assert!(keys.keys.iter().any(|key| key.key_type == "ssh" && key.name == "github-mobile"));
+
+    let public = block_on(api::export_ssh_public_key(ExportSshKeyRequest {
+        ssh_dir: ssh_dir.display().to_string(),
+        name: "github-mobile".to_string(),
+        confirmation: None,
+    }));
+    assert!(public.error.is_none(), "{:?}", public.error);
+    assert!(public.export.unwrap().armored_text.starts_with("ssh-ed25519 "));
+
+    let private_denied = block_on(api::export_ssh_private_key(ExportSshKeyRequest {
+        ssh_dir: ssh_dir.display().to_string(),
+        name: "github-mobile".to_string(),
+        confirmation: None,
+    }));
+    assert!(private_denied.error.unwrap().message.contains("confirmation"));
+
+    let detected = block_on(api::detect_imported_key(ImportKeyTextRequest {
+        config_path: config_path.display().to_string(),
+        ssh_dir: Some(ssh_dir.display().to_string()),
+        name: None,
+        armored_text:
+            "-----BEGIN PGP PUBLIC KEY BLOCK-----\nabc\n-----END PGP PUBLIC KEY BLOCK-----"
+                .to_string(),
+    }));
+    assert_eq!(detected.kind.as_deref(), Some("pgp_public"));
+
+    let add = block_on(api::add_pgp_key_to_gpg_id(AddPgpKeyToGpgIdRequest {
+        root: store_root.display().to_string(),
+        fingerprint: "A991D3B4A70291EF".to_string(),
+    }));
+    assert!(add.error.is_none(), "{:?}", add.error);
+    assert_eq!(std::fs::read_to_string(store_root.join(".gpg-id")).unwrap(), "A991D3B4A70291EF\n");
+
+    let github = block_on(api::open_github_ssh_settings(OpenGithubSshSettingsRequest {}));
+    assert_eq!(github.url.as_deref(), Some("https://github.com/settings/keys"));
 }
 
 #[test]

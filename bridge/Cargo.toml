@@ -12,6 +12,7 @@ crate-type = ["rlib", "staticlib", "cdylib"]
 [dependencies]
 flutter_rust_bridge = "=2.12.0"
 pars-core = { path = "../core" }
+secrecy = "0.10.3"
 toml = "1.1.2"
 
 [dev-dependencies]
