@@ -11,6 +11,7 @@ import 'package:pars_gui/services/settings_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/services/vault_repository.dart';
 import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
+import 'package:pars_gui/screens/vault/vault_screen.dart';
 import 'package:pars_gui/widgets/gesture_lock_input.dart';
 
 void main() {
@@ -48,6 +49,38 @@ void main() {
     expect(find.text('Copy password'), findsOneWidget);
     expect(find.text('Reveal'), findsOneWidget);
     expect(find.text('Raw notes'), findsNothing);
+  });
+
+  testWidgets('vault refresh loads bridge-backed entries and git status', (
+    tester,
+  ) async {
+    final repository = _RefreshingVaultRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: VaultScreen(
+            vaultRepository: repository,
+            gitRepository: repository,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.refreshCount, 1);
+    expect(find.text('Bridge Entry'), findsOneWidget);
+    expect(find.text('Need pull'), findsOneWidget);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 320));
+    await tester.pumpAndSettle();
+
+    expect(repository.refreshCount, 2);
+
+    await tester.enterText(find.byType(TextField), 'bridge/path');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bridge Entry'), findsOneWidget);
   });
 
   testWidgets('manage tab exposes batch management workflows', (tester) async {
@@ -621,5 +654,49 @@ class _InjectedRepository
     return entries
         .where((entry) => entry.path.toLowerCase().contains(normalized))
         .toList();
+  }
+}
+
+class _RefreshingVaultRepository implements VaultRepository, GitRepository {
+  var refreshCount = 0;
+  List<PasswordEntry> _entries = const <PasswordEntry>[];
+  RepoGitStatus _gitStatus = RepoGitStatus.syncFailed;
+
+  @override
+  String get currentRepoName => 'Bridge Store';
+
+  @override
+  RepoGitStatus get gitStatus => _gitStatus;
+
+  @override
+  List<PasswordEntry> get entries => _entries;
+
+  @override
+  Future<void> refresh() async {
+    refreshCount += 1;
+    _gitStatus = RepoGitStatus.needPull;
+    _entries = const <PasswordEntry>[
+      PasswordEntry(
+        path: 'bridge/path',
+        displayName: 'Bridge Entry',
+        repoName: 'Bridge Store',
+        encryptedContent: 'bridge-secret',
+      ),
+    ];
+  }
+
+  @override
+  List<PasswordEntry> search(String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return entries;
+    }
+    return entries
+        .where(
+          (entry) =>
+              entry.displayName.toLowerCase().contains(normalized) ||
+              entry.path.toLowerCase().contains(normalized),
+        )
+        .toList(growable: false);
   }
 }

@@ -267,13 +267,13 @@ Goal: protect local app access and optional PGP passphrase caching.
 
 Goal: make Vault operate on real password-store entries.
 
-- [ ] Replace demo entries with bridge-backed entry list.
+- [x] Replace demo entries with bridge-backed entry list.
 - [ ] Implement directory tree browsing from store paths.
-- [ ] Implement search by entry name/path.
+- [x] Implement search by entry name/path.
 - [ ] Implement recent entries persistence.
 - [ ] Implement favorites persistence.
-- [ ] Implement Git status indicator from real Git state.
-- [ ] Implement pull-to-refresh sync.
+- [x] Implement Git status indicator from real Git state.
+- [x] Implement pull-to-refresh sync.
 - [ ] Implement entry detail decrypt flow.
 - [ ] Implement passphrase prompt when PGP session is locked.
 - [ ] Implement decrypt failure recovery actions:

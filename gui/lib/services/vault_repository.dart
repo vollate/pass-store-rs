@@ -5,5 +5,7 @@ abstract interface class VaultRepository {
 
   List<PasswordEntry> get entries;
 
+  Future<void> refresh();
+
   List<PasswordEntry> search(String query);
 }

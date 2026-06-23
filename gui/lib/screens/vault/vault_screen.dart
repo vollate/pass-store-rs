@@ -24,6 +24,22 @@ class VaultScreen extends StatefulWidget {
 class _VaultScreenState extends State<VaultScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  bool _isLoading = false;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshVault();
+  }
+
+  @override
+  void didUpdateWidget(covariant VaultScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.vaultRepository != widget.vaultRepository) {
+      _refreshVault();
+    }
+  }
 
   @override
   void dispose() {
@@ -38,10 +54,9 @@ class _VaultScreenState extends State<VaultScreen> {
     final directories = entries.where((entry) => entry.isDirectory).toList();
 
     return RefreshIndicator(
-      onRefresh: () async {
-        await Future<void>.delayed(const Duration(milliseconds: 350));
-      },
+      onRefresh: _refreshVault,
       child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: <Widget>[
           SliverAppBar(
             pinned: true,
@@ -83,6 +98,20 @@ class _VaultScreenState extends State<VaultScreen> {
               ),
             ),
           ),
+          if (_isLoading)
+            const SliverToBoxAdapter(child: LinearProgressIndicator()),
+          if (_loadError != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text(
+                  _loadError!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            ),
           AppSection(
             title: _query.isEmpty ? 'Recent' : 'Search results',
             children:
@@ -114,6 +143,30 @@ class _VaultScreenState extends State<VaultScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _refreshVault() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      await widget.vaultRepository.refresh();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isLoading = false);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Could not load vault: $error';
+      });
+    }
   }
 
   void _showEntry(PasswordEntry entry) {
