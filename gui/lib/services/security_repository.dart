@@ -69,6 +69,46 @@ class FlutterSecureStorageAdapter implements SecureStorageAdapter {
 
 enum BiometricUnlockStatus { unavailable, disabled, available }
 
+enum PgpSessionExpiration {
+  immediately,
+  fiveMinutes,
+  fifteenMinutes,
+  oneHour,
+  untilAppExit,
+}
+
+extension PgpSessionExpirationLabel on PgpSessionExpiration {
+  String get label {
+    switch (this) {
+      case PgpSessionExpiration.immediately:
+        return 'Immediately';
+      case PgpSessionExpiration.fiveMinutes:
+        return '5 min';
+      case PgpSessionExpiration.fifteenMinutes:
+        return '15 min';
+      case PgpSessionExpiration.oneHour:
+        return '1 hour';
+      case PgpSessionExpiration.untilAppExit:
+        return 'Until app exit';
+    }
+  }
+
+  Duration? get duration {
+    switch (this) {
+      case PgpSessionExpiration.immediately:
+        return Duration.zero;
+      case PgpSessionExpiration.fiveMinutes:
+        return const Duration(minutes: 5);
+      case PgpSessionExpiration.fifteenMinutes:
+        return const Duration(minutes: 15);
+      case PgpSessionExpiration.oneHour:
+        return const Duration(hours: 1);
+      case PgpSessionExpiration.untilAppExit:
+        return null;
+    }
+  }
+}
+
 abstract interface class BiometricAuthAdapter {
   Future<bool> isAvailable();
 
@@ -111,6 +151,14 @@ abstract interface class SecurityRepository {
 
   bool get biometricUnlockEnabled;
 
+  bool get pgpPassphraseStorageEnabled;
+
+  bool get hasStoredPgpPassphrase;
+
+  bool get hasActivePgpSession;
+
+  PgpSessionExpiration get pgpSessionExpiration;
+
   Duration get autoLockTimeout;
 
   DateTime? get lastUnlockedAt;
@@ -131,6 +179,24 @@ abstract interface class SecurityRepository {
 
   Future<bool> unlockWithBiometrics();
 
+  Future<void> setPgpPassphraseStorageEnabled(bool enabled);
+
+  Future<void> savePgpPassphrase(String passphrase);
+
+  Future<String?> readPgpPassphrase();
+
+  Future<void> clearPgpPassphrase();
+
+  Future<void> startPgpSession(String passphrase);
+
+  Future<String?> readActivePgpPassphrase();
+
+  Future<void> clearPgpSession();
+
+  Future<void> setPgpSessionExpiration(PgpSessionExpiration expiration);
+
+  Future<void> expirePgpSessionIfNeeded(DateTime now);
+
   Future<void> setAutoLockTimeout(Duration timeout);
 
   bool shouldLock(DateTime now);
@@ -141,11 +207,20 @@ class InMemorySecurityRepository implements SecurityRepository {
     GestureVerifier? gestureVerifier,
     bool lockOnResume = false,
     bool biometricUnlockEnabled = false,
+    bool pgpPassphraseStorageEnabled = false,
+    String? pgpPassphrase,
+    String? activePgpPassphrase,
+    PgpSessionExpiration pgpSessionExpiration =
+        PgpSessionExpiration.fifteenMinutes,
     Duration autoLockTimeout = const Duration(minutes: 15),
     DateTime? lastUnlockedAt,
   }) : _gestureVerifier = gestureVerifier,
        _lockOnResume = lockOnResume,
        _biometricUnlockEnabled = biometricUnlockEnabled,
+       _pgpPassphraseStorageEnabled = pgpPassphraseStorageEnabled,
+       _pgpPassphrase = pgpPassphrase,
+       _activePgpPassphrase = activePgpPassphrase,
+       _pgpSessionExpiration = pgpSessionExpiration,
        _autoLockTimeout = autoLockTimeout,
        _lastUnlockedAt = lastUnlockedAt;
 
@@ -153,6 +228,11 @@ class InMemorySecurityRepository implements SecurityRepository {
     List<int> pattern, {
     bool lockOnResume = false,
     bool biometricUnlockEnabled = false,
+    bool pgpPassphraseStorageEnabled = false,
+    String? pgpPassphrase,
+    String? activePgpPassphrase,
+    PgpSessionExpiration pgpSessionExpiration =
+        PgpSessionExpiration.fifteenMinutes,
     Duration autoLockTimeout = const Duration(minutes: 15),
     DateTime? lastUnlockedAt,
   }) {
@@ -160,6 +240,10 @@ class InMemorySecurityRepository implements SecurityRepository {
       gestureVerifier: GestureVerifier.fromPattern(pattern),
       lockOnResume: lockOnResume,
       biometricUnlockEnabled: biometricUnlockEnabled,
+      pgpPassphraseStorageEnabled: pgpPassphraseStorageEnabled,
+      pgpPassphrase: pgpPassphrase,
+      activePgpPassphrase: activePgpPassphrase,
+      pgpSessionExpiration: pgpSessionExpiration,
       autoLockTimeout: autoLockTimeout,
       lastUnlockedAt: lastUnlockedAt,
     );
@@ -168,6 +252,11 @@ class InMemorySecurityRepository implements SecurityRepository {
   GestureVerifier? _gestureVerifier;
   bool _lockOnResume;
   bool _biometricUnlockEnabled;
+  bool _pgpPassphraseStorageEnabled;
+  String? _pgpPassphrase;
+  String? _activePgpPassphrase;
+  DateTime? _pgpSessionExpiresAt;
+  PgpSessionExpiration _pgpSessionExpiration;
   Duration _autoLockTimeout;
   DateTime? _lastUnlockedAt;
 
@@ -179,6 +268,24 @@ class InMemorySecurityRepository implements SecurityRepository {
 
   @override
   bool get biometricUnlockEnabled => _biometricUnlockEnabled;
+
+  @override
+  bool get pgpPassphraseStorageEnabled => _pgpPassphraseStorageEnabled;
+
+  @override
+  bool get hasStoredPgpPassphrase => _pgpPassphrase != null;
+
+  @override
+  bool get hasActivePgpSession {
+    if (_pgpSessionIsExpired(DateTime.now())) {
+      _activePgpPassphrase = null;
+      _pgpSessionExpiresAt = null;
+    }
+    return _activePgpPassphrase != null;
+  }
+
+  @override
+  PgpSessionExpiration get pgpSessionExpiration => _pgpSessionExpiration;
 
   @override
   Duration get autoLockTimeout => _autoLockTimeout;
@@ -203,6 +310,7 @@ class InMemorySecurityRepository implements SecurityRepository {
   @override
   Future<void> markLocked() async {
     _lastUnlockedAt = null;
+    await clearPgpSession();
   }
 
   @override
@@ -227,6 +335,81 @@ class InMemorySecurityRepository implements SecurityRepository {
   Future<bool> unlockWithBiometrics() async => false;
 
   @override
+  Future<void> setPgpPassphraseStorageEnabled(bool enabled) async {
+    _pgpPassphraseStorageEnabled = enabled;
+    if (!enabled) {
+      _pgpPassphrase = null;
+    }
+  }
+
+  @override
+  Future<void> savePgpPassphrase(String passphrase) async {
+    if (passphrase.isEmpty) {
+      throw ArgumentError.value(
+        passphrase,
+        'passphrase',
+        'Passphrase cannot be empty.',
+      );
+    }
+    _pgpPassphraseStorageEnabled = true;
+    _pgpPassphrase = passphrase;
+  }
+
+  @override
+  Future<String?> readPgpPassphrase() async {
+    if (!_pgpPassphraseStorageEnabled) {
+      return null;
+    }
+    return _pgpPassphrase;
+  }
+
+  @override
+  Future<void> clearPgpPassphrase() async {
+    _pgpPassphrase = null;
+  }
+
+  @override
+  Future<void> startPgpSession(String passphrase) async {
+    if (passphrase.isEmpty) {
+      throw ArgumentError.value(
+        passphrase,
+        'passphrase',
+        'Passphrase cannot be empty.',
+      );
+    }
+    _activePgpPassphrase = passphrase;
+    _pgpSessionExpiresAt = _sessionExpiresAt(DateTime.now());
+  }
+
+  @override
+  Future<String?> readActivePgpPassphrase() async {
+    await expirePgpSessionIfNeeded(DateTime.now());
+    return _activePgpPassphrase;
+  }
+
+  @override
+  Future<void> clearPgpSession() async {
+    _activePgpPassphrase = null;
+    _pgpSessionExpiresAt = null;
+  }
+
+  @override
+  Future<void> setPgpSessionExpiration(PgpSessionExpiration expiration) async {
+    _pgpSessionExpiration = expiration;
+    if (_activePgpPassphrase != null) {
+      _pgpSessionExpiresAt = _sessionExpiresAt(DateTime.now());
+      await expirePgpSessionIfNeeded(DateTime.now());
+    }
+  }
+
+  @override
+  Future<void> expirePgpSessionIfNeeded(DateTime now) async {
+    if (_pgpSessionIsExpired(now)) {
+      await clearPgpSession();
+    }
+  }
+
+  @override
   Future<void> setAutoLockTimeout(Duration timeout) async {
     _autoLockTimeout = timeout;
   }
@@ -242,6 +425,21 @@ class InMemorySecurityRepository implements SecurityRepository {
     }
     return now.difference(unlockedAt) >= _autoLockTimeout;
   }
+
+  DateTime? _sessionExpiresAt(DateTime now) {
+    final duration = _pgpSessionExpiration.duration;
+    if (duration == null) {
+      return null;
+    }
+    return now.add(duration);
+  }
+
+  bool _pgpSessionIsExpired(DateTime now) {
+    final expiresAt = _pgpSessionExpiresAt;
+    return _activePgpPassphrase != null &&
+        expiresAt != null &&
+        !now.isBefore(expiresAt);
+  }
 }
 
 class SecureStorageSecurityRepository implements SecurityRepository {
@@ -251,21 +449,34 @@ class SecureStorageSecurityRepository implements SecurityRepository {
     required GestureVerifier? gestureVerifier,
     required bool lockOnResume,
     required bool biometricUnlockEnabled,
+    required bool pgpPassphraseStorageEnabled,
+    required bool hasStoredPgpPassphrase,
+    required PgpSessionExpiration pgpSessionExpiration,
     required Duration autoLockTimeout,
   }) : _storage = storage,
        _biometricAuth = biometricAuth,
        _gestureVerifier = gestureVerifier,
        _lockOnResume = lockOnResume,
        _biometricUnlockEnabled = biometricUnlockEnabled,
+       _pgpPassphraseStorageEnabled = pgpPassphraseStorageEnabled,
+       _hasStoredPgpPassphrase = hasStoredPgpPassphrase,
+       _pgpSessionExpiration = pgpSessionExpiration,
        _autoLockTimeout = autoLockTimeout;
 
   static const _gestureVerifierKey = 'pars.security.gesture_verifier.v1';
   static const _lockOnResumeKey = 'pars.security.lock_on_resume.v1';
   static const _biometricUnlockEnabledKey =
       'pars.security.biometric_unlock_enabled.v1';
+  static const _pgpPassphraseStorageEnabledKey =
+      'pars.security.pgp_passphrase_storage_enabled.v1';
+  static const _pgpPassphraseKey = 'pars.security.pgp_passphrase.v1';
+  static const _pgpSessionExpirationKey =
+      'pars.security.pgp_session_expiration.v1';
   static const _autoLockTimeoutSecondsKey =
       'pars.security.auto_lock_timeout_seconds.v1';
   static const _defaultAutoLockTimeout = Duration(minutes: 15);
+  static const _defaultPgpSessionExpiration =
+      PgpSessionExpiration.fifteenMinutes;
 
   final SecureStorageAdapter _storage;
   final BiometricAuthAdapter _biometricAuth;
@@ -273,6 +484,11 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   GestureVerifier? _gestureVerifier;
   bool _lockOnResume;
   bool _biometricUnlockEnabled;
+  bool _pgpPassphraseStorageEnabled;
+  bool _hasStoredPgpPassphrase;
+  String? _activePgpPassphrase;
+  DateTime? _pgpSessionExpiresAt;
+  PgpSessionExpiration _pgpSessionExpiration;
   Duration _autoLockTimeout;
   DateTime? _lastUnlockedAt;
 
@@ -299,6 +515,12 @@ class SecureStorageSecurityRepository implements SecurityRepository {
         storage,
         _biometricUnlockEnabledKey,
       ),
+      pgpPassphraseStorageEnabled: await _readBool(
+        storage,
+        _pgpPassphraseStorageEnabledKey,
+      ),
+      hasStoredPgpPassphrase: await storage.read(_pgpPassphraseKey) != null,
+      pgpSessionExpiration: await _readPgpSessionExpiration(storage),
       autoLockTimeout: await _readDuration(
         storage,
         _autoLockTimeoutSecondsKey,
@@ -315,6 +537,24 @@ class SecureStorageSecurityRepository implements SecurityRepository {
 
   @override
   bool get biometricUnlockEnabled => _biometricUnlockEnabled;
+
+  @override
+  bool get pgpPassphraseStorageEnabled => _pgpPassphraseStorageEnabled;
+
+  @override
+  bool get hasStoredPgpPassphrase => _hasStoredPgpPassphrase;
+
+  @override
+  bool get hasActivePgpSession {
+    if (_pgpSessionIsExpired(DateTime.now())) {
+      _activePgpPassphrase = null;
+      _pgpSessionExpiresAt = null;
+    }
+    return _activePgpPassphrase != null;
+  }
+
+  @override
+  PgpSessionExpiration get pgpSessionExpiration => _pgpSessionExpiration;
 
   @override
   Duration get autoLockTimeout => _autoLockTimeout;
@@ -340,6 +580,7 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   @override
   Future<void> markLocked() async {
     _lastUnlockedAt = null;
+    await clearPgpSession();
   }
 
   @override
@@ -376,8 +617,96 @@ class SecureStorageSecurityRepository implements SecurityRepository {
     final unlocked = await _biometricAuth.authenticate();
     if (unlocked) {
       await markUnlocked(DateTime.now());
+      final cachedPassphrase = await readPgpPassphrase();
+      if (cachedPassphrase != null) {
+        await startPgpSession(cachedPassphrase);
+      }
     }
     return unlocked;
+  }
+
+  @override
+  Future<void> setPgpPassphraseStorageEnabled(bool enabled) async {
+    await _storage.write(
+      key: _pgpPassphraseStorageEnabledKey,
+      value: enabled ? '1' : '0',
+    );
+    _pgpPassphraseStorageEnabled = enabled;
+    if (!enabled) {
+      await clearPgpPassphrase();
+    }
+  }
+
+  @override
+  Future<void> savePgpPassphrase(String passphrase) async {
+    if (passphrase.isEmpty) {
+      throw ArgumentError.value(
+        passphrase,
+        'passphrase',
+        'Passphrase cannot be empty.',
+      );
+    }
+    await _storage.write(key: _pgpPassphraseKey, value: passphrase);
+    await _storage.write(key: _pgpPassphraseStorageEnabledKey, value: '1');
+    _pgpPassphraseStorageEnabled = true;
+    _hasStoredPgpPassphrase = true;
+  }
+
+  @override
+  Future<String?> readPgpPassphrase() async {
+    if (!_pgpPassphraseStorageEnabled) {
+      return null;
+    }
+    return _storage.read(_pgpPassphraseKey);
+  }
+
+  @override
+  Future<void> clearPgpPassphrase() async {
+    await _storage.delete(_pgpPassphraseKey);
+    _hasStoredPgpPassphrase = false;
+    await clearPgpSession();
+  }
+
+  @override
+  Future<void> startPgpSession(String passphrase) async {
+    if (passphrase.isEmpty) {
+      throw ArgumentError.value(
+        passphrase,
+        'passphrase',
+        'Passphrase cannot be empty.',
+      );
+    }
+    _activePgpPassphrase = passphrase;
+    _pgpSessionExpiresAt = _sessionExpiresAt(DateTime.now());
+  }
+
+  @override
+  Future<String?> readActivePgpPassphrase() async {
+    await expirePgpSessionIfNeeded(DateTime.now());
+    return _activePgpPassphrase;
+  }
+
+  @override
+  Future<void> clearPgpSession() async {
+    _activePgpPassphrase = null;
+    _pgpSessionExpiresAt = null;
+  }
+
+  @override
+  Future<void> setPgpSessionExpiration(PgpSessionExpiration expiration) async {
+    await _storage.write(key: _pgpSessionExpirationKey, value: expiration.name);
+    _pgpSessionExpiration = expiration;
+    if (_activePgpPassphrase != null) {
+      _pgpSessionExpiresAt = _sessionExpiresAt(DateTime.now());
+      await expirePgpSessionIfNeeded(DateTime.now());
+    }
+  }
+
+  @override
+  Future<void> expirePgpSessionIfNeeded(DateTime now) async {
+    if (_pgpSessionIsExpired(now)) {
+      await clearPgpSession();
+    }
   }
 
   @override
@@ -401,6 +730,21 @@ class SecureStorageSecurityRepository implements SecurityRepository {
     return now.difference(unlockedAt) >= _autoLockTimeout;
   }
 
+  DateTime? _sessionExpiresAt(DateTime now) {
+    final duration = _pgpSessionExpiration.duration;
+    if (duration == null) {
+      return null;
+    }
+    return now.add(duration);
+  }
+
+  bool _pgpSessionIsExpired(DateTime now) {
+    final expiresAt = _pgpSessionExpiresAt;
+    return _activePgpPassphrase != null &&
+        expiresAt != null &&
+        !now.isBefore(expiresAt);
+  }
+
   static Future<bool> _readBool(
     SecureStorageAdapter storage,
     String key,
@@ -419,5 +763,20 @@ class SecureStorageSecurityRepository implements SecurityRepository {
       return fallback;
     }
     return Duration(seconds: seconds);
+  }
+
+  static Future<PgpSessionExpiration> _readPgpSessionExpiration(
+    SecureStorageAdapter storage,
+  ) async {
+    final raw = await storage.read(_pgpSessionExpirationKey);
+    if (raw == null) {
+      return _defaultPgpSessionExpiration;
+    }
+    for (final expiration in PgpSessionExpiration.values) {
+      if (expiration.name == raw) {
+        return expiration;
+      }
+    }
+    return _defaultPgpSessionExpiration;
   }
 }

@@ -236,26 +236,26 @@ Goal: protect local app access and optional PGP passphrase caching.
 - [x] Implement app lock state.
 - [x] Implement lock on app resume option.
 - [x] Implement auto-lock timeout.
-- [ ] Add biometric unlock support:
+- [x] Add biometric unlock support:
   - [x] Android
   - [x] iOS
   - [x] desktop fallback or disabled state
-- [ ] Add KMS/Keychain storage for PGP passphrase:
-  - [ ] Android Keystore
-  - [ ] iOS Keychain/Secure Enclave where available
-  - [ ] macOS Keychain
-  - [ ] Windows Credential Manager or DPAPI
-  - [ ] Linux Secret Service fallback
-- [ ] Implement optional one-step unlock:
-  - [ ] biometric unlock opens app
-  - [ ] if enabled, retrieve PGP passphrase from platform secret storage
-  - [ ] start PGP session without asking passphrase again
-- [ ] Implement PGP session auth expiration:
-  - [ ] immediately
-  - [ ] 5 minutes
-  - [ ] 15 minutes
-  - [ ] 1 hour
-  - [ ] until app exit
+- [x] Add KMS/Keychain storage for PGP passphrase:
+  - [x] Android Keystore
+  - [x] iOS Keychain/Secure Enclave where available
+  - [x] macOS Keychain
+  - [x] Windows Credential Manager or DPAPI
+  - [x] Linux Secret Service fallback
+- [x] Implement optional one-step unlock:
+  - [x] biometric unlock opens app
+  - [x] if enabled, retrieve PGP passphrase from platform secret storage
+  - [x] start PGP session without asking passphrase again
+- [x] Implement PGP session auth expiration:
+  - [x] immediately
+  - [x] 5 minutes
+  - [x] 15 minutes
+  - [x] 1 hour
+  - [x] until app exit
 - [ ] Clear decrypted secrets when:
   - [ ] app locks
   - [ ] session expires

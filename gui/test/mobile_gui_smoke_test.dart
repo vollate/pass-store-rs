@@ -174,6 +174,39 @@ void main() {
     expect(securityRepository.autoLockTimeout, const Duration(minutes: 5));
   });
 
+  testWidgets('settings updates PGP session timeout', (tester) async {
+    final securityRepository = await SecureStorageSecurityRepository.load(
+      storage: _FakeSecureStorageAdapter(),
+      biometricAuth: _FakeBiometricAuthAdapter(),
+    );
+    await securityRepository.saveGestureVerifier(
+      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+    );
+    await securityRepository.markUnlocked(DateTime.now());
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PGP session timeout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1 hour'));
+    await tester.pumpAndSettle();
+
+    expect(
+      securityRepository.pgpSessionExpiration,
+      PgpSessionExpiration.oneHour,
+    );
+  });
+
   testWidgets('unlocks with biometrics when enabled', (tester) async {
     final biometrics = _FakeBiometricAuthAdapter(available: true);
     final securityRepository = await SecureStorageSecurityRepository.load(
@@ -184,6 +217,7 @@ void main() {
       GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
     );
     await securityRepository.setBiometricUnlockEnabled(true);
+    await securityRepository.savePgpPassphrase('pgp-passphrase');
 
     await tester.pumpWidget(
       ParsGuiApp(
@@ -203,6 +237,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Vault'), findsWidgets);
+    expect(securityRepository.hasActivePgpSession, isTrue);
+    expect(
+      await securityRepository.readActivePgpPassphrase(),
+      'pgp-passphrase',
+    );
     expect(biometrics.authenticateCount, 1);
   });
 
@@ -238,6 +277,50 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(securityRepository.biometricUnlockEnabled, isTrue);
+  });
+
+  testWidgets('settings stores and clears PGP passphrase cache', (
+    tester,
+  ) async {
+    final securityRepository = await SecureStorageSecurityRepository.load(
+      storage: _FakeSecureStorageAdapter(),
+      biometricAuth: _FakeBiometricAuthAdapter(),
+    );
+    await securityRepository.saveGestureVerifier(
+      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+    );
+    await securityRepository.markUnlocked(DateTime.now());
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('KMS / Keychain passphrase'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Store PGP passphrase'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'pgp-passphrase');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(securityRepository.hasStoredPgpPassphrase, isTrue);
+    expect(await securityRepository.readPgpPassphrase(), 'pgp-passphrase');
+    expect(find.text('pgp-passphrase'), findsNothing);
+
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+
+    expect(securityRepository.hasStoredPgpPassphrase, isFalse);
+    expect(await securityRepository.readPgpPassphrase(), isNull);
   });
 }
 

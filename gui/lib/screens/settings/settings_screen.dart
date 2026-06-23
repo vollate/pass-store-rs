@@ -54,19 +54,18 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   _SettingsTile(
                     title: 'PGP session timeout',
-                    subtitle: '15 min',
+                    subtitle: securityRepository.pgpSessionExpiration.label,
                     icon: Icons.timer_outlined,
-                    onTap: () => _showTextSheet(context, 'PGP session timeout'),
+                    onTap: () => _showPgpSessionTimeoutSheet(context),
                   ),
                   _SettingsTile(
                     title: 'KMS / Keychain passphrase',
-                    subtitle: 'Optional one-step unlock',
+                    subtitle:
+                        securityRepository.hasStoredPgpPassphrase
+                            ? 'PGP passphrase cached'
+                            : 'Optional encrypted passphrase cache',
                     icon: Icons.key_outlined,
-                    onTap:
-                        () => _showTextSheet(
-                          context,
-                          'KMS / Keychain passphrase',
-                        ),
+                    onTap: () => _showPgpPassphraseStorageSheet(context),
                   ),
                 ],
               ),
@@ -261,6 +260,168 @@ class SettingsScreen extends StatelessWidget {
       case BiometricUnlockStatus.unavailable:
         return 'Unavailable on this device';
     }
+  }
+
+  void _showPgpSessionTimeoutSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setSheetState) => SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'PGP session timeout',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            for (final expiration
+                                in PgpSessionExpiration.values)
+                              ChoiceChip(
+                                label: Text(expiration.label),
+                                selected:
+                                    securityRepository.pgpSessionExpiration ==
+                                    expiration,
+                                onSelected: (_) async {
+                                  await securityRepository
+                                      .setPgpSessionExpiration(expiration);
+                                  onSecuritySettingsChanged?.call();
+                                  setSheetState(() {});
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ),
+    );
+  }
+
+  void _showPgpPassphraseStorageSheet(BuildContext context) {
+    final passphrase = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setSheetState) => SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 20,
+                      bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'KMS / Keychain passphrase',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 12),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Store PGP passphrase'),
+                          subtitle: const Text(
+                            'Saved in the platform secure storage provider',
+                          ),
+                          value: securityRepository.pgpPassphraseStorageEnabled,
+                          onChanged: (value) async {
+                            await securityRepository
+                                .setPgpPassphraseStorageEnabled(value);
+                            onSecuritySettingsChanged?.call();
+                            setSheetState(() {});
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: passphrase,
+                          enabled:
+                              securityRepository.pgpPassphraseStorageEnabled,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText:
+                                securityRepository.hasStoredPgpPassphrase
+                                    ? 'Replace cached passphrase'
+                                    : 'PGP passphrase',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            FilledButton.icon(
+                              onPressed:
+                                  securityRepository.pgpPassphraseStorageEnabled
+                                      ? () async {
+                                        try {
+                                          await securityRepository
+                                              .savePgpPassphrase(
+                                                passphrase.text,
+                                              );
+                                          passphrase.clear();
+                                          onSecuritySettingsChanged?.call();
+                                          setSheetState(() {});
+                                        } catch (error) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(error.toString()),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                      : null,
+                              icon: const Icon(Icons.save_outlined),
+                              label: const Text('Save'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed:
+                                  securityRepository.hasStoredPgpPassphrase
+                                      ? () async {
+                                        await securityRepository
+                                            .clearPgpPassphrase();
+                                        onSecuritySettingsChanged?.call();
+                                        setSheetState(() {});
+                                      }
+                                      : null,
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Clear'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          securityRepository.hasStoredPgpPassphrase
+                              ? 'A PGP passphrase is currently cached.'
+                              : 'No PGP passphrase is cached.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ),
+    );
   }
 
   void _showKeys(BuildContext context, KeyRecordType type) {
