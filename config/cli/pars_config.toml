@@ -15,6 +15,10 @@ pgp_executable = "gpg2"
 editor_executable = "vim"
 git_executable = "git"
 
+[pgp_config]
+backend = "system_gpg"
+pure_rust_enabled = false
+
 [feature_config]
 clip_time = 45
 fuzzy_search = true

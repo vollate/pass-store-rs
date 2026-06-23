@@ -8,6 +8,7 @@ use log::warn;
 use serde::{Deserialize, Serialize};
 
 use crate::constants::default_constants::{EDITOR, GIT_EXECUTABLE, PGP_EXECUTABLE};
+use crate::pgp::backend::PgpBackendConfig;
 
 #[derive(Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
 #[serde(default)]
@@ -18,6 +19,8 @@ pub struct ParsConfig {
     pub path_config: PathConfig,
     #[serde(default = "ExecutableConfig::default")]
     pub executable_config: ExecutableConfig,
+    #[serde(default = "PgpBackendConfig::default")]
+    pub pgp_config: PgpBackendConfig,
     #[serde(default = "FeatureConfig::default")]
     pub feature_config: FeatureConfig,
 }
@@ -43,6 +46,15 @@ pub struct ExecutableConfig {
     pub pgp_executable: String,
     pub editor_executable: String,
     pub git_executable: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum PgpBackendKind {
+    #[serde(rename = "bundled")]
+    Bundled,
+    SystemGpg,
+    PureRust,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]

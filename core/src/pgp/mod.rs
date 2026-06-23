@@ -1,4 +1,5 @@
 #[allow(dead_code)]
+pub mod backend;
 pub mod crypto;
 pub mod key_management;
 pub mod utils;

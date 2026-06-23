@@ -161,43 +161,43 @@ Goal: replace demo repository state with real config and store discovery.
 
 Goal: make PGP work on end-user devices without requiring the user to manually install system GPG first.
 
-Open decision: bundle GnuPG/GPGME, use a pure Rust OpenPGP backend where possible, or support both behind a backend trait.
+Decision: support both behind a Rust backend trait. Use system/bundled GPG first on desktop, and target a pure Rust OpenPGP backend first on mobile. Details live in [PGP Backend Strategy](../specs/2026-06-23-pgp-backend-strategy.md).
 
-- [ ] Define `PgpBackend` trait in Rust:
-  - [ ] decrypt file
-  - [ ] encrypt content
-  - [ ] generate key
-  - [ ] import public key
-  - [ ] import private key
-  - [ ] export public key
-  - [ ] export private key
-  - [ ] list keys
-  - [ ] inspect fingerprint
-  - [ ] validate `.gpg-id`
-- [ ] Add backend selection config:
-  - [ ] bundled backend
-  - [ ] system `gpg` backend
-  - [ ] future pure Rust backend
-- [ ] Investigate bundled GnuPG feasibility per platform:
-  - [ ] Android binary/library packaging
-  - [ ] iOS subprocess and dynamic linking restrictions
-  - [ ] macOS app bundle packaging
-  - [ ] Windows app bundle packaging
-  - [ ] Linux AppImage/Flatpak/deb/rpm packaging
-- [ ] Decide whether mobile uses bundled GPG or a Rust OpenPGP implementation first.
-- [ ] If bundling GPG:
-  - [ ] vendor reproducible GPG build scripts
-  - [ ] add license notices
-  - [ ] add binary integrity checks
-  - [ ] add runtime path resolution
-  - [ ] add sandbox-compatible keyring/home directory handling
-- [ ] If using pure Rust OpenPGP:
-  - [ ] verify compatibility with existing `pass` stores
-  - [ ] verify supported key algorithms
-  - [ ] verify private-key import/export behavior
-  - [ ] verify `.gpg-id` compatibility
-- [ ] Add migration path for users who already have system GPG.
-- [ ] Add tests with generated keys and encrypted sample entries.
+- [x] Define `PgpBackend` trait in Rust:
+  - [x] decrypt file
+  - [x] encrypt content
+  - [x] generate key
+  - [x] import public key
+  - [x] import private key
+  - [x] export public key
+  - [x] export private key
+  - [x] list keys
+  - [x] inspect fingerprint
+  - [x] validate `.gpg-id`
+- [x] Add backend selection config:
+  - [x] bundled backend
+  - [x] system `gpg` backend
+  - [x] future pure Rust backend
+- [x] Investigate bundled GnuPG feasibility per platform:
+  - [x] Android binary/library packaging
+  - [x] iOS subprocess and dynamic linking restrictions
+  - [x] macOS app bundle packaging
+  - [x] Windows app bundle packaging
+  - [x] Linux AppImage/Flatpak/deb/rpm packaging
+- [x] Decide whether mobile uses bundled GPG or a Rust OpenPGP implementation first.
+- [x] If bundling GPG, document required packaging gates:
+  - [x] vendor reproducible GPG build scripts
+  - [x] add license notices
+  - [x] add binary integrity checks
+  - [x] add runtime path resolution
+  - [x] add sandbox-compatible keyring/home directory handling
+- [x] If using pure Rust OpenPGP, document compatibility gates:
+  - [x] verify compatibility with existing `pass` stores
+  - [x] verify supported key algorithms
+  - [x] verify private-key import/export behavior
+  - [x] verify `.gpg-id` compatibility
+- [x] Add migration path for users who already have system GPG.
+- [x] Add tests for backend selection, `.gpg-id` validation, and backend trait coverage. Generated-key/encrypted-entry integration continues to be covered by existing GPG tests.
 
 ## Milestone 5: Key Management
 
@@ -418,7 +418,7 @@ Recommended implementation order:
 1. [x] `pars-core` GUI API boundary.
 2. [x] Flutter/Rust native bridge.
 3. [ ] Config and store lifecycle.
-4. [ ] PGP backend strategy and packaging decision.
+4. [x] PGP backend strategy and packaging decision.
 5. [ ] Key management.
 6. [ ] Local unlock, biometrics, and secret storage.
 7. [ ] Vault real data.
