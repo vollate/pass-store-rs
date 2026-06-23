@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
-import '../../widgets/gesture_lock_input.dart';
+import '../../widgets/gesture_setup_panel.dart';
 
-class OnboardingScreen extends StatelessWidget {
+class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
     super.key,
     required this.onComplete,
@@ -18,9 +18,23 @@ class OnboardingScreen extends StatelessWidget {
   final SettingsRepository? settingsRepository;
 
   @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  late bool _gestureConfigured;
+
+  @override
+  void initState() {
+    super.initState();
+    _gestureConfigured = widget.securityRepository.hasGestureVerifier;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final lifecycle = settingsRepository?.lifecycle;
+    final lifecycle = widget.settingsRepository?.lifecycle;
     final needsStoreSetup = lifecycle?.onboardingState.requiresSetup ?? false;
+    final needsGestureSetup = !_gestureConfigured;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -30,33 +44,45 @@ class OnboardingScreen extends StatelessWidget {
             children: <Widget>[
               const SizedBox(height: 24),
               Text(
-                needsStoreSetup ? 'Set up password store' : 'Set gesture lock',
+                needsGestureSetup
+                    ? 'Set gesture lock'
+                    : 'Set up password store',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                needsStoreSetup
+                needsGestureSetup
+                    ? 'Use a 9-dot gesture as the local Pars unlock method. Biometrics can be enabled after setup.'
+                    : needsStoreSetup
                     ? lifecycle!.onboardingState.label
-                    : 'Use a 9-dot gesture as the local Pars unlock method. Biometrics can be enabled after setup.',
+                    : 'Your local unlock method is configured.',
               ),
               const SizedBox(height: 24),
               Expanded(
                 child:
-                    needsStoreSetup
+                    needsGestureSetup
+                        ? GestureSetupPanel(
+                          securityRepository: widget.securityRepository,
+                          onSaved: () {
+                            if (needsStoreSetup) {
+                              setState(() => _gestureConfigured = true);
+                            } else {
+                              widget.onComplete();
+                            }
+                          },
+                        )
+                        : needsStoreSetup
                         ? _StoreSetupActions(
-                          repository: settingsRepository!,
+                          repository: widget.settingsRepository!,
                           lifecycle: lifecycle!,
                         )
-                        : _GestureSetup(
-                          securityRepository: securityRepository,
-                          onComplete: onComplete,
-                        ),
+                        : const SizedBox.shrink(),
               ),
-              if (needsStoreSetup)
+              if (!needsGestureSetup && needsStoreSetup)
                 FilledButton(
-                  onPressed: onComplete,
+                  onPressed: widget.onComplete,
                   child: const SizedBox(
                     width: double.infinity,
                     child: Center(child: Text('Continue')),
@@ -67,120 +93,6 @@ class OnboardingScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _GestureSetup extends StatefulWidget {
-  const _GestureSetup({
-    required this.securityRepository,
-    required this.onComplete,
-  });
-
-  final SecurityRepository securityRepository;
-  final VoidCallback onComplete;
-
-  @override
-  State<_GestureSetup> createState() => _GestureSetupState();
-}
-
-class _GestureSetupState extends State<_GestureSetup> {
-  List<int>? _initialPattern;
-  String? _message;
-  bool _isSaving = false;
-
-  bool get _isConfirming => _initialPattern != null;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        Expanded(
-          child: Center(
-            child: GestureLockInput(
-              enabled: !_isSaving,
-              onCompleted: (pattern) => _handlePattern(context, pattern),
-            ),
-          ),
-        ),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 160),
-          child: Text(
-            _message ??
-                (_isConfirming
-                    ? 'Draw the same gesture again.'
-                    : 'Draw at least 4 dots.'),
-            key: ValueKey<String>(_message ?? 'default-$_isConfirming'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color:
-                  _message == null
-                      ? Theme.of(context).colorScheme.onSurfaceVariant
-                      : Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        OutlinedButton(
-          onPressed:
-              _initialPattern == null || _isSaving
-                  ? null
-                  : () => setState(() {
-                    _initialPattern = null;
-                    _message = 'Start again with a new gesture.';
-                  }),
-          child: const SizedBox(
-            width: double.infinity,
-            child: Center(child: Text('Reset gesture')),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _handlePattern(BuildContext context, List<int> pattern) async {
-    if (pattern.length < 4) {
-      setState(() => _message = 'Use at least 4 dots.');
-      return;
-    }
-    final first = _initialPattern;
-    if (first == null) {
-      setState(() {
-        _initialPattern = pattern;
-        _message = 'Gesture captured. Confirm it once more.';
-      });
-      return;
-    }
-    if (!_samePattern(first, pattern)) {
-      setState(() {
-        _initialPattern = null;
-        _message = 'Gestures did not match. Start again.';
-      });
-      return;
-    }
-    setState(() {
-      _isSaving = true;
-      _message = 'Gesture confirmed.';
-    });
-    await widget.securityRepository.saveGestureVerifier(
-      GestureVerifier.fromPattern(pattern),
-    );
-    await widget.securityRepository.markUnlocked(DateTime.now());
-    if (context.mounted) {
-      widget.onComplete();
-    }
-  }
-
-  bool _samePattern(List<int> left, List<int> right) {
-    if (left.length != right.length) {
-      return false;
-    }
-    for (var i = 0; i < left.length; i += 1) {
-      if (left[i] != right[i]) {
-        return false;
-      }
-    }
-    return true;
   }
 }
 

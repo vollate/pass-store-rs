@@ -6,6 +6,7 @@ import '../../services/key_repository.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
+import '../../widgets/gesture_setup_panel.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
@@ -146,6 +147,8 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showSecuritySheet(BuildContext context) {
+    final rootContext = context;
+    var isChangingGesture = false;
     final timeoutOptions = <Duration>[
       const Duration(minutes: 1),
       const Duration(minutes: 5),
@@ -155,91 +158,140 @@ class SettingsScreen extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       builder:
           (context) => StatefulBuilder(
-            builder:
-                (context, setSheetState) => SafeArea(
+            builder: (context, setSheetState) {
+              if (isChangingGesture) {
+                return SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'Gesture lock and biometrics',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 12),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Require unlock on app resume'),
-                          subtitle: const Text(
-                            'Gesture unlock is used as fallback',
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.72,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            'Change gesture',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800),
                           ),
-                          value: securityRepository.lockOnResume,
-                          onChanged: (value) async {
-                            await securityRepository.setLockOnResume(value);
-                            onSecuritySettingsChanged?.call();
-                            setSheetState(() {});
-                          },
-                        ),
-                        FutureBuilder<BiometricUnlockStatus>(
-                          future: securityRepository.biometricUnlockStatus(),
-                          builder: (context, snapshot) {
-                            final status =
-                                snapshot.data ??
-                                BiometricUnlockStatus.unavailable;
-                            return SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Biometric unlock'),
-                              subtitle: Text(_biometricSubtitle(status)),
-                              value:
-                                  status == BiometricUnlockStatus.available &&
-                                  securityRepository.biometricUnlockEnabled,
-                              onChanged:
-                                  status == BiometricUnlockStatus.unavailable
-                                      ? null
-                                      : (value) async {
-                                        await securityRepository
-                                            .setBiometricUnlockEnabled(value);
-                                        onSecuritySettingsChanged?.call();
-                                        setSheetState(() {});
-                                      },
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Auto-lock timeout',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: <Widget>[
-                            for (final timeout in timeoutOptions)
-                              ChoiceChip(
-                                label: Text(_timeoutLabel(timeout)),
-                                selected:
-                                    securityRepository.autoLockTimeout ==
-                                    timeout,
-                                onSelected: (_) async {
-                                  await securityRepository.setAutoLockTimeout(
-                                    timeout,
-                                  );
-                                  onSecuritySettingsChanged?.call();
-                                  setSheetState(() {});
-                                },
-                              ),
-                          ],
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Draw and confirm a new local unlock gesture.',
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: GestureSetupPanel(
+                              securityRepository: securityRepository,
+                              onSaved: () {
+                                onSecuritySettingsChanged?.call();
+                                setSheetState(() => isChangingGesture = false);
+                                ScaffoldMessenger.of(rootContext).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Gesture updated'),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                );
+              }
+
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Gesture lock and biometrics',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed:
+                            () => setSheetState(() => isChangingGesture = true),
+                        icon: const Icon(Icons.pattern),
+                        label: const Text('Change gesture'),
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Require unlock on app resume'),
+                        subtitle: const Text(
+                          'Gesture unlock is used as fallback',
+                        ),
+                        value: securityRepository.lockOnResume,
+                        onChanged: (value) async {
+                          await securityRepository.setLockOnResume(value);
+                          onSecuritySettingsChanged?.call();
+                          setSheetState(() {});
+                        },
+                      ),
+                      FutureBuilder<BiometricUnlockStatus>(
+                        future: securityRepository.biometricUnlockStatus(),
+                        builder: (context, snapshot) {
+                          final status =
+                              snapshot.data ??
+                              BiometricUnlockStatus.unavailable;
+                          return SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Biometric unlock'),
+                            subtitle: Text(_biometricSubtitle(status)),
+                            value:
+                                status == BiometricUnlockStatus.available &&
+                                securityRepository.biometricUnlockEnabled,
+                            onChanged:
+                                status == BiometricUnlockStatus.unavailable
+                                    ? null
+                                    : (value) async {
+                                      await securityRepository
+                                          .setBiometricUnlockEnabled(value);
+                                      onSecuritySettingsChanged?.call();
+                                      setSheetState(() {});
+                                    },
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Auto-lock timeout',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          for (final timeout in timeoutOptions)
+                            ChoiceChip(
+                              label: Text(_timeoutLabel(timeout)),
+                              selected:
+                                  securityRepository.autoLockTimeout == timeout,
+                              onSelected: (_) async {
+                                await securityRepository.setAutoLockTimeout(
+                                  timeout,
+                                );
+                                onSecuritySettingsChanged?.call();
+                                setSheetState(() {});
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
+              );
+            },
           ),
     );
   }

@@ -32,6 +32,52 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
   });
 
+  testWidgets('onboarding captures gesture before store setup', (tester) async {
+    const repository = _StoreSetupRepository();
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository(),
+      ),
+    );
+
+    expect(find.text('Set gesture lock'), findsOneWidget);
+    expect(find.text('Set up password store'), findsNothing);
+
+    await _completeGestureSetup(tester);
+
+    expect(find.text('Set up password store'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
+  });
+
+  testWidgets('existing gesture resumes incomplete store setup', (
+    tester,
+  ) async {
+    const repository = _StoreSetupRepository();
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(const <int>[
+          0,
+          1,
+          2,
+          5,
+        ], lastUnlockedAt: DateTime.now()),
+      ),
+    );
+
+    expect(find.text('Set up password store'), findsOneWidget);
+    expect(find.text('Vault'), findsNothing);
+  });
+
   testWidgets('vault searches entries and opens detail sheet', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
     await _completeGestureSetup(tester);
@@ -269,6 +315,46 @@ void main() {
     expect(securityRepository.autoLockTimeout, const Duration(minutes: 5));
   });
 
+  testWidgets('settings changes gesture lock pattern', (tester) async {
+    final securityRepository = InMemorySecurityRepository.withPattern(
+      const <int>[6, 3, 0, 1],
+      lastUnlockedAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Change gesture'));
+    await tester.pumpAndSettle();
+
+    const newPattern = <int>[0, 1, 2, 5];
+    await _drawGesture(tester, newPattern);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Gesture captured. Confirm it once more.'),
+      findsOneWidget,
+    );
+    await _drawGesture(tester, newPattern);
+    await tester.pumpAndSettle();
+
+    expect(
+      await securityRepository.verifyGesture(const <int>[6, 3, 0, 1]),
+      isFalse,
+    );
+    expect(await securityRepository.verifyGesture(newPattern), isTrue);
+  });
+
   testWidgets('settings updates PGP session timeout', (tester) async {
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
@@ -427,7 +513,10 @@ Future<void> _completeGestureSetup(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _drawGesture(WidgetTester tester) async {
+Future<void> _drawGesture(
+  WidgetTester tester, [
+  List<int> pattern = const <int>[0, 1, 2, 5],
+]) async {
   final box = tester.renderObject<RenderBox>(find.byType(GestureLockInput));
   final topLeft = box.localToGlobal(Offset.zero);
   final cell = box.size.width / 3;
@@ -436,16 +525,14 @@ Future<void> _drawGesture(WidgetTester tester) async {
       Offset(cell * (index % 3) + cell / 2, cell * (index ~/ 3) + cell / 2);
 
   final gesture = await tester.createGesture();
-  await gesture.down(dot(0));
+  await gesture.down(dot(pattern.first));
   await tester.pump();
-  await gesture.moveTo(dot(0) + Offset(cell / 4, 0));
+  await gesture.moveTo(dot(pattern.first) + Offset(cell / 4, 0));
   await tester.pump();
-  await gesture.moveTo(dot(1));
-  await tester.pump();
-  await gesture.moveTo(dot(2));
-  await tester.pump();
-  await gesture.moveTo(dot(5));
-  await tester.pump();
+  for (final index in pattern.skip(1)) {
+    await gesture.moveTo(dot(index));
+    await tester.pump();
+  }
   await gesture.up();
 }
 
@@ -699,4 +786,138 @@ class _RefreshingVaultRepository implements VaultRepository, GitRepository {
         )
         .toList(growable: false);
   }
+}
+
+class _StoreSetupRepository
+    implements
+        VaultRepository,
+        SettingsRepository,
+        KeyRepository,
+        GitRepository {
+  const _StoreSetupRepository();
+
+  @override
+  String get currentRepoName => 'No store selected';
+
+  @override
+  StoreLifecycleSnapshot get lifecycle => const StoreLifecycleSnapshot(
+    configPath: '/tmp/pars_config.toml',
+    configExists: false,
+    onboardingState: StoreOnboardingState.noConfig,
+    issues: <String>['no_config'],
+    stores: <StoreStatus>[],
+  );
+
+  @override
+  List<StoreStatus> get stores => lifecycle.stores;
+
+  @override
+  RepoGitStatus get gitStatus => RepoGitStatus.syncFailed;
+
+  @override
+  List<PasswordEntry> get entries => const <PasswordEntry>[];
+
+  @override
+  List<KeyRecord> get keys => const <KeyRecord>[];
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  List<PasswordEntry> search(String query) => entries;
+
+  @override
+  Future<void> selectStore(String root) async {}
+
+  @override
+  Future<void> createLocalStore({
+    required String name,
+    required String root,
+    required List<String> pgpKeys,
+    required bool setDefault,
+    required bool initializeGit,
+  }) async {}
+
+  @override
+  Future<void> importLocalStore({
+    required String root,
+    required bool setDefault,
+  }) async {}
+
+  @override
+  Future<void> cloneStore({
+    required String remoteUrl,
+    required String root,
+    required bool setDefault,
+  }) async {}
+
+  @override
+  Future<void> removeStore({required String root}) async {}
+
+  @override
+  Future<void> deleteLocalStore({
+    required String root,
+    required String confirmation,
+  }) async {}
+
+  @override
+  Future<KeyRecord> generatePgpKey({
+    required String name,
+    required String email,
+    String? passphrase,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<KeyRecord> importPgpPublicKeyText(String armoredText) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<KeyRecord> importPgpPrivateKeyText(String armoredText) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<KeyRecord> importPgpPrivateKeyFile(String path) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<String> exportPgpPublicKey(String fingerprint) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<String> exportPgpPrivateKey({
+    required String fingerprint,
+    required String confirmation,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}
+
+  @override
+  Future<KeyRecord> generateSshKey(String name) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyText({
+    required String name,
+    required String privateKey,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyFile({
+    required String name,
+    required String path,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<String> exportSshPublicKey(String name) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<String> exportSshPrivateKey({
+    required String name,
+    required String confirmation,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<Uri> githubSshSettingsUri() async => throw UnimplementedError();
 }

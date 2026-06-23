@@ -2,6 +2,16 @@
 
 A new Flutter project.
 
+## Local package mirrors
+
+The workspace VS Code settings set:
+
+- `PUB_HOSTED_URL=https://pub.flutter-io.cn`
+- `FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn`
+
+For terminal runs outside VS Code, export the same variables before running
+`flutter pub get`, `flutter run`, or `flutter build`.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

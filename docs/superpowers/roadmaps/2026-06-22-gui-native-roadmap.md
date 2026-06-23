@@ -346,7 +346,7 @@ Goal: make Git settings and sync work safely.
 Goal: make first-run setup functional end-to-end.
 
 - [ ] Implement complete onboarding state machine.
-- [ ] Step 1: gesture lock setup.
+- [x] Step 1: gesture lock setup.
 - [ ] Step 2: optional biometric setup.
 - [ ] Step 3: choose/create/clone store.
 - [ ] Step 4: choose/create/import PGP key.

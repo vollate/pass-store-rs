@@ -10,6 +10,7 @@ import '../services/git_repository.dart';
 import '../services/key_repository.dart';
 import '../services/security_repository.dart';
 import '../services/settings_repository.dart';
+import '../services/store_lifecycle.dart';
 import '../services/vault_repository.dart';
 import 'pars_theme.dart';
 
@@ -54,7 +55,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _isOnboardingComplete = widget.securityRepository.hasGestureVerifier;
+    _isOnboardingComplete = _isOnboardingSatisfied;
     _isLocked =
         _isOnboardingComplete &&
         widget.securityRepository.shouldLock(DateTime.now());
@@ -142,4 +143,8 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
       setState(() => _isLocked = true);
     }
   }
+
+  bool get _isOnboardingSatisfied =>
+      widget.securityRepository.hasGestureVerifier &&
+      !widget.settingsRepository.lifecycle.onboardingState.requiresSetup;
 }

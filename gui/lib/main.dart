@@ -9,6 +9,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
   final repository = BridgeBackedRepository.defaultInstance();
+  try {
+    await repository.refresh();
+  } catch (_) {
+    // Keep the empty lifecycle so onboarding can present recovery actions.
+  }
   final securityRepository = await SecureStorageSecurityRepository.load();
   runApp(
     ParsGuiApp(
