@@ -5,16 +5,35 @@ use std::path::PathBuf;
 use pars_core::config::cli::{
     load_config as load_core_config, save_config as save_core_config, ParsConfig,
 };
+pub use pars_core::gui::ListEntriesRequest;
 use pars_core::gui::{
     self, CoreError, DeleteEntryRequest, DeleteEntryResult, EditEntryRequest, EntryMutationResult,
     EntrySecret, GenerateEntryRequest, GenerateEntryResult, GitCommandOutput, GitOperationRequest,
     InsertEntryRequest, InsertEntryResult, MoveEntryRequest, ReadEntryRequest, StoreId, StoreInfo,
 };
-pub use pars_core::gui::ListEntriesRequest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub type BridgeResult<T> = Result<T, BridgeError>;
+
+pub const SUPPORTED_METHODS: &[&str] = &[
+    "load_config",
+    "save_config",
+    "list_stores",
+    "list_entries",
+    "read_entry",
+    "copy_entry_password",
+    "insert_entry",
+    "generate_entry",
+    "edit_entry",
+    "move_entry",
+    "delete_entry",
+    "git_status",
+    "git_pull",
+    "git_push",
+    "git_commit",
+    "run_git_args",
+];
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BridgeError {
@@ -59,18 +78,12 @@ impl From<CoreError> for BridgeError {
                 conflict_kind: None,
                 path: None,
             },
-            CoreError::PgpError(message) => Self {
-                category: "PgpError".to_string(),
-                message,
-                conflict_kind: None,
-                path: None,
-            },
-            CoreError::GitError(message) => Self {
-                category: "GitError".to_string(),
-                message,
-                conflict_kind: None,
-                path: None,
-            },
+            CoreError::PgpError(message) => {
+                Self { category: "PgpError".to_string(), message, conflict_kind: None, path: None }
+            }
+            CoreError::GitError(message) => {
+                Self { category: "GitError".to_string(), message, conflict_kind: None, path: None }
+            }
             CoreError::ClipboardError(message) => Self {
                 category: "ClipboardError".to_string(),
                 message,
@@ -252,9 +265,7 @@ pub fn dispatch(envelope: BridgeEnvelope) -> BridgeResult<Value> {
             to_value(run_git_command(request.root, vec!["commit", "-m", request.message.as_str()])?)
         }
         "run_git_args" => to_value(gui::run_git_args(from_value(envelope.payload)?)?),
-        method => Err(BridgeError::unsupported(format!(
-            "unsupported bridge method: {method}"
-        ))),
+        method => Err(BridgeError::unsupported(format!("unsupported bridge method: {method}"))),
     }
 }
 
@@ -264,11 +275,9 @@ pub fn bridge_call_json(request_json: &str) -> String {
             Ok(result) => BridgeWireResponse { ok: true, result: Some(result), error: None },
             Err(error) => BridgeWireResponse { ok: false, result: None, error: Some(error) },
         },
-        Err(error) => BridgeWireResponse {
-            ok: false,
-            result: None,
-            error: Some(BridgeError::from(error)),
-        },
+        Err(error) => {
+            BridgeWireResponse { ok: false, result: None, error: Some(BridgeError::from(error)) }
+        }
     };
 
     serde_json::to_string(&response).unwrap_or_else(|error| {
@@ -325,8 +334,7 @@ fn list_stores_sync(request: ListStoresRequest) -> BridgeResult<Vec<StoreInfo>> 
         .enumerate()
         .map(|(index, root)| {
             let root = PathBuf::from(root);
-            let name =
-                root.file_name().and_then(|name| name.to_str()).unwrap_or("password-store");
+            let name = root.file_name().and_then(|name| name.to_str()).unwrap_or("password-store");
             StoreInfo {
                 id: StoreId(format!("store-{index}")),
                 name: name.to_string(),

@@ -53,8 +53,9 @@ class _MockParsBridgeApi implements ParsBridgeApi {
       _record('read_entry');
 
   @override
-  Future<Map<String, Object?>> copyEntryPassword(Map<String, Object?> request) =>
-      _record('copy_entry_password');
+  Future<Map<String, Object?>> copyEntryPassword(
+    Map<String, Object?> request,
+  ) => _record('copy_entry_password');
 
   @override
   Future<Map<String, Object?>> insertEntry(Map<String, Object?> request) =>

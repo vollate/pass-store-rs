@@ -97,38 +97,39 @@ Goal: create a core API layer that is friendly to GUI/native callers and does no
 
 Goal: connect Flutter to Rust core directly.
 
-- [ ] Choose bridge tooling and version, with `flutter_rust_bridge` v2 as the default candidate.
-- [ ] Add Rust crate or module for bridge entrypoints:
-  - [ ] Decide between embedding bridge code inside `gui/` or a separate `pars-bridge` crate.
-  - [ ] Ensure bridge crate depends on `pars-core`, not `pars-cli`.
-- [ ] Add bridge code generation configuration.
-- [ ] Add bridge build scripts for:
-  - [ ] Android
-  - [ ] iOS
-  - [ ] macOS
-  - [ ] Windows
-  - [ ] Linux
-- [ ] Expose async Rust functions to Dart:
-  - [ ] `load_config`
-  - [ ] `save_config`
-  - [ ] `list_stores`
-  - [ ] `list_entries`
-  - [ ] `read_entry`
-  - [ ] `copy_entry_password`
-  - [ ] `insert_entry`
-  - [ ] `generate_entry`
-  - [ ] `edit_entry`
-  - [ ] `move_entry`
-  - [ ] `delete_entry`
-  - [ ] `git_status`
-  - [ ] `git_pull`
-  - [ ] `git_push`
-  - [ ] `git_commit`
-  - [ ] `run_git_args`
-- [ ] Map Rust errors to Dart typed failures.
-- [ ] Ensure secrets do not get logged by bridge debug output.
-- [ ] Add Dart integration tests using mocked bridge implementations.
-- [ ] Add Rust bridge smoke tests for generated API compilation.
+- [x] Choose bridge tooling and version, with `flutter_rust_bridge` v2 as the default candidate.
+  - Selected milestone-2 tooling: handwritten Dart FFI-compatible bridge with a stable C ABI JSON dispatcher. `flutter_rust_bridge` v2 remains the future generator candidate once dependency/codegen adoption is desired.
+- [x] Add Rust crate or module for bridge entrypoints:
+  - [x] Decide between embedding bridge code inside `gui/` or a separate `pars-bridge` crate.
+  - [x] Ensure bridge crate depends on `pars-core`, not `pars-cli`.
+- [x] Add bridge code generation configuration.
+- [x] Add bridge build scripts for:
+  - [x] Android
+  - [x] iOS
+  - [x] macOS
+  - [x] Windows
+  - [x] Linux
+- [x] Expose async Rust functions to Dart:
+  - [x] `load_config`
+  - [x] `save_config`
+  - [x] `list_stores`
+  - [x] `list_entries`
+  - [x] `read_entry`
+  - [x] `copy_entry_password`
+  - [x] `insert_entry`
+  - [x] `generate_entry`
+  - [x] `edit_entry`
+  - [x] `move_entry`
+  - [x] `delete_entry`
+  - [x] `git_status`
+  - [x] `git_pull`
+  - [x] `git_push`
+  - [x] `git_commit`
+  - [x] `run_git_args`
+- [x] Map Rust errors to Dart typed failures.
+- [x] Ensure secrets do not get logged by bridge debug output.
+- [x] Add Dart integration tests using mocked bridge implementations.
+- [x] Add Rust bridge smoke tests for generated API compilation.
 
 ## Milestone 3: Configuration and Store Lifecycle
 
@@ -415,7 +416,7 @@ Goal: refine experience once real operations exist.
 Recommended implementation order:
 
 1. [x] `pars-core` GUI API boundary.
-2. [ ] Flutter/Rust native bridge.
+2. [x] Flutter/Rust native bridge.
 3. [ ] Config and store lifecycle.
 4. [ ] PGP backend strategy and packaging decision.
 5. [ ] Key management.
