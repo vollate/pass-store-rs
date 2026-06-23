@@ -9,13 +9,14 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
   final repository = BridgeBackedRepository.defaultInstance();
+  final securityRepository = await SecureStorageSecurityRepository.load();
   runApp(
     ParsGuiApp(
       vaultRepository: repository,
       settingsRepository: repository,
       keyRepository: repository,
       gitRepository: repository,
-      securityRepository: InMemorySecurityRepository(),
+      securityRepository: securityRepository,
     ),
   );
 }

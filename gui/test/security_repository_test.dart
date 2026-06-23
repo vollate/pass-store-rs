@@ -47,4 +47,65 @@ void main() {
       expect(repository.shouldLock(DateTime(2026, 1, 1, 0, 5)), isTrue);
     });
   });
+
+  group('SecureStorageSecurityRepository', () {
+    test('persists gesture verifier and settings in secure storage', () async {
+      final storage = _FakeSecureStorageAdapter();
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: storage,
+      );
+
+      await repository.saveGestureVerifier(
+        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+      );
+      await repository.setLockOnResume(true);
+      await repository.setAutoLockTimeout(const Duration(minutes: 5));
+
+      final reloaded = await SecureStorageSecurityRepository.load(
+        storage: storage,
+      );
+
+      expect(reloaded.hasGestureVerifier, isTrue);
+      expect(await reloaded.verifyGesture(const <int>[0, 1, 2, 5]), isTrue);
+      expect(await reloaded.verifyGesture(const <int>[0, 1, 5, 2]), isFalse);
+      expect(reloaded.lockOnResume, isTrue);
+      expect(reloaded.autoLockTimeout, const Duration(minutes: 5));
+    });
+
+    test('does not persist active unlock sessions', () async {
+      final storage = _FakeSecureStorageAdapter();
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: storage,
+      );
+
+      await repository.saveGestureVerifier(
+        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+      );
+      await repository.markUnlocked(DateTime(2026));
+
+      final reloaded = await SecureStorageSecurityRepository.load(
+        storage: storage,
+      );
+
+      expect(repository.shouldLock(DateTime(2026)), isFalse);
+      expect(reloaded.shouldLock(DateTime(2026)), isTrue);
+    });
+  });
+}
+
+class _FakeSecureStorageAdapter implements SecureStorageAdapter {
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    _values.remove(key);
+  }
 }

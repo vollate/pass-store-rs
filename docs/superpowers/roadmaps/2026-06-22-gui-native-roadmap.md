@@ -232,7 +232,7 @@ Goal: protect local app access and optional PGP passphrase caching.
 
 - [x] Implement 9-dot gesture capture widget.
 - [x] Implement gesture confirmation flow.
-- [ ] Store gesture verifier securely.
+- [x] Store gesture verifier securely.
 - [x] Implement app lock state.
 - [x] Implement lock on app resume option.
 - [x] Implement auto-lock timeout.
