@@ -30,6 +30,13 @@ methods = [
   "git_push",
   "git_commit",
   "run_git_args",
+  "inspect_app_state",
+  "select_store",
+  "create_local_store",
+  "import_local_store",
+  "clone_store",
+  "remove_store",
+  "delete_local_store",
 ]
 
 [security]

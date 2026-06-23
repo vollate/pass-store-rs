@@ -22,13 +22,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AppStateDto dco_decode_app_state_dto(dynamic raw);
+
+  @protected
+  AppStateResponse dco_decode_app_state_response(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
+
+  @protected
+  AppStateDto dco_decode_box_autoadd_app_state_dto(dynamic raw);
 
   @protected
   BridgeFailure dco_decode_box_autoadd_bridge_failure(dynamic raw);
 
   @protected
+  CloneStoreRequest dco_decode_box_autoadd_clone_store_request(dynamic raw);
+
+  @protected
   CopyEntryPasswordResult dco_decode_box_autoadd_copy_entry_password_result(
+    dynamic raw,
+  );
+
+  @protected
+  CreateLocalStoreRequest dco_decode_box_autoadd_create_local_store_request(
     dynamic raw,
   );
 
@@ -37,6 +54,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeleteEntryResultDto dco_decode_box_autoadd_delete_entry_result_dto(
+    dynamic raw,
+  );
+
+  @protected
+  DeleteLocalStoreRequest dco_decode_box_autoadd_delete_local_store_request(
     dynamic raw,
   );
 
@@ -77,10 +99,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_box_autoadd_i_32(dynamic raw);
 
   @protected
+  ImportLocalStoreRequest dco_decode_box_autoadd_import_local_store_request(
+    dynamic raw,
+  );
+
+  @protected
   InsertEntryRequest dco_decode_box_autoadd_insert_entry_request(dynamic raw);
 
   @protected
   InsertEntryResultDto dco_decode_box_autoadd_insert_entry_result_dto(
+    dynamic raw,
+  );
+
+  @protected
+  InspectAppStateRequest dco_decode_box_autoadd_inspect_app_state_request(
     dynamic raw,
   );
 
@@ -100,13 +132,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MutationResultDto dco_decode_box_autoadd_mutation_result_dto(dynamic raw);
 
   @protected
+  RemoveStoreRequest dco_decode_box_autoadd_remove_store_request(dynamic raw);
+
+  @protected
   SaveConfigRequest dco_decode_box_autoadd_save_config_request(dynamic raw);
+
+  @protected
+  SelectStoreRequest dco_decode_box_autoadd_select_store_request(dynamic raw);
 
   @protected
   BridgeFailure dco_decode_bridge_failure(dynamic raw);
 
   @protected
   BridgeFailureCategory dco_decode_bridge_failure_category(dynamic raw);
+
+  @protected
+  CloneStoreRequest dco_decode_clone_store_request(dynamic raw);
 
   @protected
   ConfigResponse dco_decode_config_response(dynamic raw);
@@ -120,6 +161,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CopyEntryPasswordResult dco_decode_copy_entry_password_result(dynamic raw);
 
   @protected
+  CreateLocalStoreRequest dco_decode_create_local_store_request(dynamic raw);
+
+  @protected
   DeleteEntryRequest dco_decode_delete_entry_request(dynamic raw);
 
   @protected
@@ -127,6 +171,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeleteEntryResultDto dco_decode_delete_entry_result_dto(dynamic raw);
+
+  @protected
+  DeleteLocalStoreRequest dco_decode_delete_local_store_request(dynamic raw);
 
   @protected
   EditEntryRequest dco_decode_edit_entry_request(dynamic raw);
@@ -171,6 +218,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  ImportLocalStoreRequest dco_decode_import_local_store_request(dynamic raw);
+
+  @protected
   InsertEntryRequest dco_decode_insert_entry_request(dynamic raw);
 
   @protected
@@ -178,6 +228,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InsertEntryResultDto dco_decode_insert_entry_result_dto(dynamic raw);
+
+  @protected
+  InspectAppStateRequest dco_decode_inspect_app_state_request(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
@@ -201,6 +254,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<StoreInfoDto> dco_decode_list_store_info_dto(dynamic raw);
 
   @protected
+  List<StoreStatusDto> dco_decode_list_store_status_dto(dynamic raw);
+
+  @protected
   ListStoresRequest dco_decode_list_stores_request(dynamic raw);
 
   @protected
@@ -220,6 +276,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  AppStateDto? dco_decode_opt_box_autoadd_app_state_dto(dynamic raw);
 
   @protected
   BridgeFailure? dco_decode_opt_box_autoadd_bridge_failure(dynamic raw);
@@ -263,10 +322,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ParsedEntryFieldDto dco_decode_parsed_entry_field_dto(dynamic raw);
 
   @protected
+  RemoveStoreRequest dco_decode_remove_store_request(dynamic raw);
+
+  @protected
   SaveConfigRequest dco_decode_save_config_request(dynamic raw);
 
   @protected
+  SelectStoreRequest dco_decode_select_store_request(dynamic raw);
+
+  @protected
   StoreInfoDto dco_decode_store_info_dto(dynamic raw);
+
+  @protected
+  StoreStatusDto dco_decode_store_status_dto(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -284,7 +352,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  AppStateDto sse_decode_app_state_dto(SseDeserializer deserializer);
+
+  @protected
+  AppStateResponse sse_decode_app_state_response(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
+  AppStateDto sse_decode_box_autoadd_app_state_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   BridgeFailure sse_decode_box_autoadd_bridge_failure(
@@ -292,7 +371,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  CloneStoreRequest sse_decode_box_autoadd_clone_store_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   CopyEntryPasswordResult sse_decode_box_autoadd_copy_entry_password_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  CreateLocalStoreRequest sse_decode_box_autoadd_create_local_store_request(
     SseDeserializer deserializer,
   );
 
@@ -303,6 +392,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeleteEntryResultDto sse_decode_box_autoadd_delete_entry_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DeleteLocalStoreRequest sse_decode_box_autoadd_delete_local_store_request(
     SseDeserializer deserializer,
   );
 
@@ -353,12 +447,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
 
   @protected
+  ImportLocalStoreRequest sse_decode_box_autoadd_import_local_store_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   InsertEntryRequest sse_decode_box_autoadd_insert_entry_request(
     SseDeserializer deserializer,
   );
 
   @protected
   InsertEntryResultDto sse_decode_box_autoadd_insert_entry_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InspectAppStateRequest sse_decode_box_autoadd_inspect_app_state_request(
     SseDeserializer deserializer,
   );
 
@@ -388,7 +492,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RemoveStoreRequest sse_decode_box_autoadd_remove_store_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   SaveConfigRequest sse_decode_box_autoadd_save_config_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SelectStoreRequest sse_decode_box_autoadd_select_store_request(
     SseDeserializer deserializer,
   );
 
@@ -397,6 +511,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BridgeFailureCategory sse_decode_bridge_failure_category(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  CloneStoreRequest sse_decode_clone_store_request(
     SseDeserializer deserializer,
   );
 
@@ -414,6 +533,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  CreateLocalStoreRequest sse_decode_create_local_store_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   DeleteEntryRequest sse_decode_delete_entry_request(
     SseDeserializer deserializer,
   );
@@ -425,6 +549,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeleteEntryResultDto sse_decode_delete_entry_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DeleteLocalStoreRequest sse_decode_delete_local_store_request(
     SseDeserializer deserializer,
   );
 
@@ -483,6 +612,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  ImportLocalStoreRequest sse_decode_import_local_store_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   InsertEntryRequest sse_decode_insert_entry_request(
     SseDeserializer deserializer,
   );
@@ -494,6 +628,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InsertEntryResultDto sse_decode_insert_entry_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InspectAppStateRequest sse_decode_inspect_app_state_request(
     SseDeserializer deserializer,
   );
 
@@ -529,6 +668,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<StoreStatusDto> sse_decode_list_store_status_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ListStoresRequest sse_decode_list_stores_request(
     SseDeserializer deserializer,
   );
@@ -556,6 +700,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  AppStateDto? sse_decode_opt_box_autoadd_app_state_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   BridgeFailure? sse_decode_opt_box_autoadd_bridge_failure(
@@ -607,12 +756,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RemoveStoreRequest sse_decode_remove_store_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   SaveConfigRequest sse_decode_save_config_request(
     SseDeserializer deserializer,
   );
 
   @protected
+  SelectStoreRequest sse_decode_select_store_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   StoreInfoDto sse_decode_store_info_dto(SseDeserializer deserializer);
+
+  @protected
+  StoreStatusDto sse_decode_store_status_dto(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -630,7 +792,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_app_state_dto(AppStateDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_app_state_response(
+    AppStateResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_app_state_dto(
+    AppStateDto self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_bridge_failure(
@@ -639,8 +816,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_clone_store_request(
+    CloneStoreRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_copy_entry_password_result(
     CopyEntryPasswordResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_create_local_store_request(
+    CreateLocalStoreRequest self,
     SseSerializer serializer,
   );
 
@@ -653,6 +842,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_delete_entry_result_dto(
     DeleteEntryResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_delete_local_store_request(
+    DeleteLocalStoreRequest self,
     SseSerializer serializer,
   );
 
@@ -714,6 +909,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_import_local_store_request(
+    ImportLocalStoreRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_insert_entry_request(
     InsertEntryRequest self,
     SseSerializer serializer,
@@ -722,6 +923,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_insert_entry_result_dto(
     InsertEntryResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_inspect_app_state_request(
+    InspectAppStateRequest self,
     SseSerializer serializer,
   );
 
@@ -756,8 +963,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_remove_store_request(
+    RemoveStoreRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_save_config_request(
     SaveConfigRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_select_store_request(
+    SelectStoreRequest self,
     SseSerializer serializer,
   );
 
@@ -767,6 +986,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_bridge_failure_category(
     BridgeFailureCategory self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_clone_store_request(
+    CloneStoreRequest self,
     SseSerializer serializer,
   );
 
@@ -789,6 +1014,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_create_local_store_request(
+    CreateLocalStoreRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_delete_entry_request(
     DeleteEntryRequest self,
     SseSerializer serializer,
@@ -803,6 +1034,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_delete_entry_result_dto(
     DeleteEntryResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_delete_local_store_request(
+    DeleteLocalStoreRequest self,
     SseSerializer serializer,
   );
 
@@ -882,6 +1119,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_import_local_store_request(
+    ImportLocalStoreRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_insert_entry_request(
     InsertEntryRequest self,
     SseSerializer serializer,
@@ -896,6 +1139,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_insert_entry_result_dto(
     InsertEntryResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_inspect_app_state_request(
+    InspectAppStateRequest self,
     SseSerializer serializer,
   );
 
@@ -939,6 +1188,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_store_status_dto(
+    List<StoreStatusDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_stores_request(
     ListStoresRequest self,
     SseSerializer serializer,
@@ -976,6 +1231,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_app_state_dto(
+    AppStateDto? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_bridge_failure(
@@ -1035,13 +1296,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_remove_store_request(
+    RemoveStoreRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_save_config_request(
     SaveConfigRequest self,
     SseSerializer serializer,
   );
 
   @protected
+  void sse_encode_select_store_request(
+    SelectStoreRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_store_info_dto(StoreInfoDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_store_status_dto(
+    StoreStatusDto self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

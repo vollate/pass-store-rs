@@ -1,4 +1,10 @@
-use pars_bridge::api::{self, ListEntriesRequest, SUPPORTED_METHODS};
+use std::future::Future;
+use std::pin::pin;
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+use pars_bridge::api::{
+    self, CreateLocalStoreRequest, InspectAppStateRequest, ListEntriesRequest, SUPPORTED_METHODS,
+};
 
 #[test]
 fn rust_bridge_api_exposes_list_entries_future() {
@@ -31,7 +37,90 @@ fn bridge_method_table_matches_generated_api_surface() {
         "git_push",
         "git_commit",
         "run_git_args",
+        "inspect_app_state",
+        "select_store",
+        "create_local_store",
+        "import_local_store",
+        "clone_store",
+        "remove_store",
+        "delete_local_store",
     ];
 
     assert_eq!(SUPPORTED_METHODS, expected);
+}
+
+#[test]
+fn inspect_app_state_reports_first_run_recovery_branches() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+
+    let no_config = block_on(api::inspect_app_state(InspectAppStateRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+    }));
+    let no_config_state = no_config.state.expect("state response");
+    assert_eq!(no_config_state.onboarding_state, "no_config");
+    assert!(no_config_state.issues.contains(&"no_config".to_string()));
+
+    let store_root = temp.path().join("store");
+    let created = block_on(api::create_local_store(CreateLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        name: "Personal".to_string(),
+        root: store_root.display().to_string(),
+        pgp_keys: vec!["missing@example.com".to_string()],
+        set_default: true,
+        initialize_git: true,
+    }));
+    assert!(created.error.is_none(), "{:?}", created.error);
+
+    std::fs::remove_file(store_root.join(".gpg-id")).unwrap();
+    let missing_gpg = block_on(api::inspect_app_state(InspectAppStateRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+    }));
+    let missing_gpg_store = &missing_gpg.state.expect("state response").stores[0];
+    assert!(missing_gpg_store.issues.contains(&"missing_gpg_id".to_string()));
+
+    std::fs::write(store_root.join(".gpg-id"), "missing@example.com").unwrap();
+    let missing_remote_and_key = block_on(api::inspect_app_state(InspectAppStateRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: Some("/bin/false".to_string()),
+    }));
+    let store = &missing_remote_and_key.state.expect("state response").stores[0];
+    assert!(store.issues.contains(&"git_remote_missing".to_string()));
+    assert!(store.issues.contains(&"pgp_key_missing".to_string()));
+
+    std::fs::remove_dir_all(&store_root).unwrap();
+    let missing_store = block_on(api::inspect_app_state(InspectAppStateRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+    }));
+    let missing_store_state = missing_store.state.expect("state response");
+    assert_eq!(missing_store_state.onboarding_state, "store_missing");
+    assert!(missing_store_state.stores[0].issues.contains(&"store_missing".to_string()));
+}
+
+fn block_on<T>(future: impl Future<Output = T>) -> T {
+    let waker = noop_waker();
+    let mut context = Context::from_waker(&waker);
+    let mut future = pin!(future);
+    match Future::poll(future.as_mut(), &mut context) {
+        Poll::Ready(value) => value,
+        Poll::Pending => panic!("bridge future unexpectedly pending"),
+    }
+}
+
+fn noop_waker() -> Waker {
+    unsafe fn clone(_: *const ()) -> RawWaker {
+        raw_waker()
+    }
+    unsafe fn wake(_: *const ()) {}
+    unsafe fn wake_by_ref(_: *const ()) {}
+    unsafe fn drop(_: *const ()) {}
+
+    fn raw_waker() -> RawWaker {
+        RawWaker::new(std::ptr::null(), &RawWakerVTable::new(clone, wake, wake_by_ref, drop))
+    }
+
+    unsafe { Waker::from_raw(raw_waker()) }
 }

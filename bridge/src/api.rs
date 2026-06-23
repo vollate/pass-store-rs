@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use pars_core::config::cli::{
     load_config as load_core_config, save_config as save_core_config, ParsConfig,
@@ -22,6 +24,13 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "git_push",
     "git_commit",
     "run_git_args",
+    "inspect_app_state",
+    "select_store",
+    "create_local_store",
+    "import_local_store",
+    "clone_store",
+    "remove_store",
+    "delete_local_store",
 ];
 
 #[derive(Debug, Clone)]
@@ -46,6 +55,12 @@ pub struct BridgeFailure {
 
 #[derive(Debug, Clone)]
 pub struct UnitResponse {
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AppStateResponse {
+    pub state: Option<AppStateDto>,
     pub error: Option<BridgeFailure>,
 }
 
@@ -232,6 +247,80 @@ pub struct GitCommitRequest {
 pub struct GitArgsRequest {
     pub root: String,
     pub args: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct InspectAppStateRequest {
+    pub config_path: String,
+    pub pgp_executable: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectStoreRequest {
+    pub config_path: String,
+    pub root: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateLocalStoreRequest {
+    pub config_path: String,
+    pub name: String,
+    pub root: String,
+    pub pgp_keys: Vec<String>,
+    pub set_default: bool,
+    pub initialize_git: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportLocalStoreRequest {
+    pub config_path: String,
+    pub root: String,
+    pub set_default: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct CloneStoreRequest {
+    pub config_path: String,
+    pub remote_url: String,
+    pub root: String,
+    pub set_default: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct RemoveStoreRequest {
+    pub config_path: String,
+    pub root: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeleteLocalStoreRequest {
+    pub config_path: String,
+    pub root: String,
+    pub confirmation: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct AppStateDto {
+    pub config_path: String,
+    pub config_exists: bool,
+    pub selected_store_id: Option<String>,
+    pub selected_store_root: Option<String>,
+    pub onboarding_state: String,
+    pub issues: Vec<String>,
+    pub stores: Vec<StoreStatusDto>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StoreStatusDto {
+    pub id: String,
+    pub name: String,
+    pub root: String,
+    pub is_default: bool,
+    pub exists: bool,
+    pub has_gpg_id: bool,
+    pub has_git_remote: bool,
+    pub pgp_key_missing: bool,
+    pub issues: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -467,6 +556,37 @@ pub async fn run_git_args(request: GitArgsRequest) -> GitCommandResponse {
     }
 }
 
+pub async fn inspect_app_state(request: InspectAppStateRequest) -> AppStateResponse {
+    match inspect_app_state_inner(request) {
+        Ok(state) => AppStateResponse { state: Some(state), error: None },
+        Err(error) => AppStateResponse { state: None, error: Some(error) },
+    }
+}
+
+pub async fn select_store(request: SelectStoreRequest) -> UnitResponse {
+    UnitResponse { error: select_store_inner(request).err() }
+}
+
+pub async fn create_local_store(request: CreateLocalStoreRequest) -> UnitResponse {
+    UnitResponse { error: create_local_store_inner(request).err() }
+}
+
+pub async fn import_local_store(request: ImportLocalStoreRequest) -> UnitResponse {
+    UnitResponse { error: import_local_store_inner(request).err() }
+}
+
+pub async fn clone_store(request: CloneStoreRequest) -> UnitResponse {
+    UnitResponse { error: clone_store_inner(request).err() }
+}
+
+pub async fn remove_store(request: RemoveStoreRequest) -> UnitResponse {
+    UnitResponse { error: remove_store_inner(request).err() }
+}
+
+pub async fn delete_local_store(request: DeleteLocalStoreRequest) -> UnitResponse {
+    UnitResponse { error: delete_local_store_inner(request).err() }
+}
+
 fn list_stores_inner(request: ListStoresRequest) -> Result<Vec<StoreInfoDto>, BridgeFailure> {
     let config = match request.config_path {
         Some(path) => load_core_config(path)
@@ -492,6 +612,327 @@ fn list_stores_inner(request: ListStoresRequest) -> Result<Vec<StoreInfoDto>, Br
         })
         .map(StoreInfoDto::from)
         .collect())
+}
+
+fn inspect_app_state_inner(request: InspectAppStateRequest) -> Result<AppStateDto, BridgeFailure> {
+    let config_path = PathBuf::from(&request.config_path);
+    let config_exists = config_path.is_file();
+    if !config_exists {
+        return Ok(AppStateDto {
+            config_path: request.config_path,
+            config_exists: false,
+            selected_store_id: None,
+            selected_store_root: None,
+            onboarding_state: "no_config".to_string(),
+            issues: vec!["no_config".to_string()],
+            stores: Vec::new(),
+        });
+    }
+
+    let config = load_core_config(&config_path)
+        .map_err(|error| CoreError::ConfigError(error.to_string()))
+        .map_err(BridgeFailure::from)?;
+    let default_repo = config.path_config.default_repo.clone();
+    let stores = config
+        .path_config
+        .repos
+        .iter()
+        .enumerate()
+        .map(|(index, root)| {
+            inspect_store(index, root, root == &default_repo, request.pgp_executable.as_deref())
+        })
+        .collect::<Vec<_>>();
+    let selected = stores.iter().find(|store| store.is_default).or_else(|| stores.first());
+    let issues = stores.iter().flat_map(|store| store.issues.iter().cloned()).collect::<Vec<_>>();
+    let onboarding_state = onboarding_state(&stores, &issues);
+
+    Ok(AppStateDto {
+        config_path: request.config_path,
+        config_exists,
+        selected_store_id: selected.map(|store| store.id.clone()),
+        selected_store_root: selected.map(|store| store.root.clone()),
+        onboarding_state,
+        issues,
+        stores,
+    })
+}
+
+fn inspect_store(
+    index: usize,
+    root: &str,
+    is_default: bool,
+    pgp_executable: Option<&str>,
+) -> StoreStatusDto {
+    let root_path = PathBuf::from(root);
+    let name = store_name(&root_path);
+    let exists = root_path.is_dir();
+    let gpg_id_path = root_path.join(".gpg-id");
+    let has_gpg_id = gpg_id_path.is_file();
+    let has_git_remote = exists && git_remote_exists(&root_path);
+    let pgp_key_missing = has_gpg_id && pgp_key_missing(&gpg_id_path, pgp_executable);
+    let mut issues = Vec::new();
+
+    if !exists {
+        issues.push("store_missing".to_string());
+    }
+    if exists && !has_gpg_id {
+        issues.push("missing_gpg_id".to_string());
+    }
+    if exists && !has_git_remote {
+        issues.push("git_remote_missing".to_string());
+    }
+    if exists && pgp_key_missing {
+        issues.push("pgp_key_missing".to_string());
+    }
+
+    StoreStatusDto {
+        id: format!("store-{index}"),
+        name,
+        root: root.to_string(),
+        is_default,
+        exists,
+        has_gpg_id,
+        has_git_remote,
+        pgp_key_missing,
+        issues,
+    }
+}
+
+fn onboarding_state(stores: &[StoreStatusDto], issues: &[String]) -> String {
+    if stores.is_empty() {
+        return "store_missing".to_string();
+    }
+    for state in ["store_missing", "missing_gpg_id", "git_remote_missing", "pgp_key_missing"] {
+        if issues.iter().any(|issue| issue == state) {
+            return state.to_string();
+        }
+    }
+    "ready".to_string()
+}
+
+fn select_store_inner(request: SelectStoreRequest) -> Result<(), BridgeFailure> {
+    let mut config = load_config_for_mutation(&request.config_path)?;
+    let root = normalize_store_root(&request.root)?;
+    if !config.path_config.repos.iter().any(|repo| repo == &root) {
+        return Err(BridgeFailure::from(CoreError::ValidationError(format!(
+            "store is not configured: {root}"
+        ))));
+    }
+    config.path_config.default_repo = root;
+    save_config_for_mutation(&config, &request.config_path)
+}
+
+fn create_local_store_inner(request: CreateLocalStoreRequest) -> Result<(), BridgeFailure> {
+    let root = normalize_store_root(&request.root)?;
+    let keys = normalized_keys(request.pgp_keys)?;
+    fs::create_dir_all(&root).map_err(store_failure)?;
+    fs::write(Path::new(&root).join(".gpg-id"), keys.join("\n")).map_err(store_failure)?;
+    if request.initialize_git && !Path::new(&root).join(".git").exists() {
+        run_git(Path::new(&root), &["init"])?;
+    }
+
+    let mut config = load_config_for_mutation(&request.config_path)?;
+    add_store_to_config(&mut config, &root, request.set_default);
+    save_config_for_mutation(&config, &request.config_path)
+}
+
+fn import_local_store_inner(request: ImportLocalStoreRequest) -> Result<(), BridgeFailure> {
+    let root = normalize_store_root(&request.root)?;
+    if !Path::new(&root).is_dir() {
+        return Err(BridgeFailure::from(CoreError::StoreError(format!(
+            "password store root does not exist: {root}"
+        ))));
+    }
+    let mut config = load_config_for_mutation(&request.config_path)?;
+    add_store_to_config(&mut config, &root, request.set_default);
+    save_config_for_mutation(&config, &request.config_path)
+}
+
+fn clone_store_inner(request: CloneStoreRequest) -> Result<(), BridgeFailure> {
+    let root = normalize_store_root(&request.root)?;
+    let root_path = PathBuf::from(&root);
+    if root_path.exists() {
+        return Err(BridgeFailure::from(CoreError::Conflict(gui::EntryConflict {
+            kind: gui::EntryConflictKind::EntryAlreadyExists,
+            path: root,
+        })));
+    }
+    if let Some(parent) = root_path.parent() {
+        fs::create_dir_all(parent).map_err(store_failure)?;
+    }
+    let output = Command::new("git")
+        .args(["clone", &request.remote_url, &root_path.display().to_string()])
+        .output()
+        .map_err(|error| BridgeFailure::from(CoreError::GitError(error.to_string())))?;
+    if !output.status.success() {
+        return Err(BridgeFailure::from(CoreError::GitError(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        )));
+    }
+    let mut config = load_config_for_mutation(&request.config_path)?;
+    add_store_to_config(&mut config, &root_path.display().to_string(), request.set_default);
+    save_config_for_mutation(&config, &request.config_path)
+}
+
+fn remove_store_inner(request: RemoveStoreRequest) -> Result<(), BridgeFailure> {
+    let root = normalize_store_root(&request.root)?;
+    let mut config = load_config_for_mutation(&request.config_path)?;
+    config.path_config.repos.retain(|repo| repo != &root);
+    if config.path_config.default_repo == root {
+        config.path_config.default_repo =
+            config.path_config.repos.first().cloned().unwrap_or_default();
+    }
+    save_config_for_mutation(&config, &request.config_path)
+}
+
+fn delete_local_store_inner(request: DeleteLocalStoreRequest) -> Result<(), BridgeFailure> {
+    let root = normalize_store_root(&request.root)?;
+    if request.confirmation != root {
+        return Err(BridgeFailure::from(CoreError::ValidationError(
+            "delete confirmation must match the full store root".to_string(),
+        )));
+    }
+    let mut config = load_config_for_mutation(&request.config_path)?;
+    if !config.path_config.repos.iter().any(|repo| repo == &root) {
+        return Err(BridgeFailure::from(CoreError::ValidationError(format!(
+            "refusing to delete unconfigured store: {root}"
+        ))));
+    }
+    let root_path = PathBuf::from(&root);
+    if !root_path.is_dir() {
+        return Err(BridgeFailure::from(CoreError::StoreError(format!(
+            "password store root does not exist: {root}"
+        ))));
+    }
+    if root_path.parent().is_none() || root_path == Path::new("/") {
+        return Err(BridgeFailure::from(CoreError::ValidationError(
+            "refusing to delete filesystem root".to_string(),
+        )));
+    }
+
+    config.path_config.repos.retain(|repo| repo != &root);
+    if config.path_config.default_repo == root {
+        config.path_config.default_repo =
+            config.path_config.repos.first().cloned().unwrap_or_default();
+    }
+    save_config_for_mutation(&config, &request.config_path)?;
+    fs::remove_dir_all(root_path).map_err(store_failure)
+}
+
+fn load_config_for_mutation(config_path: &str) -> Result<ParsConfig, BridgeFailure> {
+    let path = PathBuf::from(config_path);
+    if path.is_file() {
+        return load_core_config(path)
+            .map_err(|error| CoreError::ConfigError(error.to_string()))
+            .map_err(BridgeFailure::from);
+    }
+
+    let mut config = ParsConfig::default();
+    config.path_config.repos.clear();
+    config.path_config.default_repo.clear();
+    Ok(config)
+}
+
+fn save_config_for_mutation(config: &ParsConfig, config_path: &str) -> Result<(), BridgeFailure> {
+    let path = PathBuf::from(config_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(store_failure)?;
+    }
+    save_core_config(config, path)
+        .map_err(|error| CoreError::ConfigError(error.to_string()))
+        .map_err(BridgeFailure::from)
+}
+
+fn add_store_to_config(config: &mut ParsConfig, root: &str, set_default: bool) {
+    if !config.path_config.repos.iter().any(|repo| repo == root) {
+        config.path_config.repos.push(root.to_string());
+    }
+    if set_default || config.path_config.default_repo.is_empty() {
+        config.path_config.default_repo = root.to_string();
+    }
+}
+
+fn normalize_store_root(root: &str) -> Result<String, BridgeFailure> {
+    let trimmed = root.trim();
+    if trimmed.is_empty() {
+        return Err(BridgeFailure::from(CoreError::ValidationError(
+            "store root cannot be empty".to_string(),
+        )));
+    }
+    if trimmed.contains('\0') {
+        return Err(BridgeFailure::from(CoreError::ValidationError(
+            "store root cannot contain NUL bytes".to_string(),
+        )));
+    }
+    Ok(PathBuf::from(trimmed).display().to_string())
+}
+
+fn normalized_keys(keys: Vec<String>) -> Result<Vec<String>, BridgeFailure> {
+    let keys = keys
+        .into_iter()
+        .map(|key| key.trim().to_string())
+        .filter(|key| !key.is_empty())
+        .collect::<Vec<_>>();
+    if keys.is_empty() {
+        return Err(BridgeFailure::from(CoreError::ValidationError(
+            "at least one PGP key is required".to_string(),
+        )));
+    }
+    Ok(keys)
+}
+
+fn store_name(root: &Path) -> String {
+    root.file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("password-store")
+        .to_string()
+}
+
+fn git_remote_exists(root: &Path) -> bool {
+    let Ok(output) = Command::new("git").arg("remote").current_dir(root).output() else {
+        return false;
+    };
+    output.status.success() && !String::from_utf8_lossy(&output.stdout).trim().is_empty()
+}
+
+fn pgp_key_missing(gpg_id_path: &Path, pgp_executable: Option<&str>) -> bool {
+    let Ok(content) = fs::read_to_string(gpg_id_path) else {
+        return true;
+    };
+    let keys = content.lines().map(str::trim).filter(|line| !line.is_empty()).collect::<Vec<_>>();
+    if keys.is_empty() {
+        return true;
+    }
+    let Some(executable) = pgp_executable else {
+        return false;
+    };
+    keys.iter().any(|key| {
+        Command::new(executable)
+            .args(["--list-secret-keys", key])
+            .output()
+            .map(|output| !output.status.success())
+            .unwrap_or(true)
+    })
+}
+
+fn run_git(root: &Path, args: &[&str]) -> Result<(), BridgeFailure> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .map_err(|error| BridgeFailure::from(CoreError::GitError(error.to_string())))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(BridgeFailure::from(CoreError::GitError(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        )))
+    }
+}
+
+fn store_failure(error: std::io::Error) -> BridgeFailure {
+    BridgeFailure::from(CoreError::StoreError(error.to_string()))
 }
 
 fn read_entry_inner(request: EntryRequest) -> Result<EntrySecretDto, BridgeFailure> {

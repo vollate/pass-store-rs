@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/shell/mobile_shell.dart';
-import '../services/demo_vault_repository.dart';
+import '../services/fake_pars_repository.dart';
 import '../services/git_repository.dart';
 import '../services/key_repository.dart';
 import '../services/settings_repository.dart';
@@ -12,14 +12,22 @@ import 'pars_theme.dart';
 class ParsGuiApp extends StatefulWidget {
   const ParsGuiApp({
     super.key,
-    VaultRepository? vaultRepository,
-    SettingsRepository? settingsRepository,
-    KeyRepository? keyRepository,
-    GitRepository? gitRepository,
-  }) : vaultRepository = vaultRepository ?? const DemoVaultRepository(),
-       settingsRepository = settingsRepository ?? const DemoVaultRepository(),
-       keyRepository = keyRepository ?? const DemoVaultRepository(),
-       gitRepository = gitRepository ?? const DemoVaultRepository();
+    required this.vaultRepository,
+    required this.settingsRepository,
+    required this.keyRepository,
+    required this.gitRepository,
+  });
+
+  factory ParsGuiApp.fake({Key? key}) {
+    const repository = FakeParsRepository();
+    return ParsGuiApp(
+      key: key,
+      vaultRepository: repository,
+      settingsRepository: repository,
+      keyRepository: repository,
+      gitRepository: repository,
+    );
+  }
 
   final VaultRepository vaultRepository;
   final SettingsRepository settingsRepository;
@@ -48,6 +56,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> {
                 gitRepository: widget.gitRepository,
               )
               : OnboardingScreen(
+                settingsRepository: widget.settingsRepository,
                 onComplete: () {
                   setState(() => _isOnboardingComplete = true);
                 },

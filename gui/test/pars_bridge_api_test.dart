@@ -178,4 +178,60 @@ class _MockParsBridgeApi implements ParsBridgeApi {
     calledMethods.add('run_git_args');
     return const frb.GitCommandResponse();
   }
+
+  @override
+  Future<frb.AppStateResponse> inspectAppState({
+    required frb.InspectAppStateRequest request,
+  }) async {
+    calledMethods.add('inspect_app_state');
+    return const frb.AppStateResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> selectStore({
+    required frb.SelectStoreRequest request,
+  }) async {
+    calledMethods.add('select_store');
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> createLocalStore({
+    required frb.CreateLocalStoreRequest request,
+  }) async {
+    calledMethods.add('create_local_store');
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> importLocalStore({
+    required frb.ImportLocalStoreRequest request,
+  }) async {
+    calledMethods.add('import_local_store');
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> cloneStore({
+    required frb.CloneStoreRequest request,
+  }) async {
+    calledMethods.add('clone_store');
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> removeStore({
+    required frb.RemoveStoreRequest request,
+  }) async {
+    calledMethods.add('remove_store');
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> deleteLocalStore({
+    required frb.DeleteLocalStoreRequest request,
+  }) async {
+    calledMethods.add('delete_local_store');
+    return const frb.UnitResponse();
+  }
 }

@@ -140,22 +140,22 @@ Goal: replace demo repository state with real config and store discovery.
   - [x] `SettingsRepository`
   - [x] `KeyRepository`
   - [x] `GitRepository`
-- [ ] Replace `DemoVaultRepository` with bridge-backed implementation.
+- [x] Replace `DemoVaultRepository` with bridge-backed implementation.
 - [x] Keep a fake implementation for widget tests.
-- [ ] Implement config load/save through `pars-core`.
-- [ ] Implement first-run detection:
-  - [ ] no config
-  - [ ] config exists but store missing
-  - [ ] store exists but missing `.gpg-id`
-  - [ ] Git remote missing
-  - [ ] PGP key missing
-- [ ] Implement password store selection.
-- [ ] Implement local store creation.
-- [ ] Implement existing local store import.
-- [ ] Implement Git clone store flow.
-- [ ] Implement remove-store-from-app flow.
-- [ ] Implement delete-local-store flow with strong confirmation.
-- [ ] Add tests for onboarding branches and recovery states.
+- [x] Implement config load/save through `pars-core`.
+- [x] Implement first-run detection:
+  - [x] no config
+  - [x] config exists but store missing
+  - [x] store exists but missing `.gpg-id`
+  - [x] Git remote missing
+  - [x] PGP key missing
+- [x] Implement password store selection.
+- [x] Implement local store creation.
+- [x] Implement existing local store import.
+- [x] Implement Git clone store flow.
+- [x] Implement remove-store-from-app flow.
+- [x] Implement delete-local-store flow with strong confirmation.
+- [x] Add tests for onboarding branches and recovery states.
 
 ## Milestone 4: GPG/OpenPGP Backend Strategy and Packaging
 

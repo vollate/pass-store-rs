@@ -3,15 +3,42 @@ import '../models/password_entry.dart';
 import 'git_repository.dart';
 import 'key_repository.dart';
 import 'settings_repository.dart';
+import 'store_lifecycle.dart';
 import 'vault_repository.dart';
 
-class DemoVaultRepository
+class FakeParsRepository
     implements
         VaultRepository,
         SettingsRepository,
         KeyRepository,
         GitRepository {
-  const DemoVaultRepository();
+  const FakeParsRepository();
+
+  static const StoreStatus _store = StoreStatus(
+    id: 'fake-store',
+    name: '~/.password-store',
+    root: '~/.password-store',
+    isDefault: true,
+    exists: true,
+    hasGpgId: true,
+    hasGitRemote: true,
+    pgpKeyMissing: false,
+    issues: <String>[],
+  );
+
+  @override
+  StoreLifecycleSnapshot get lifecycle => const StoreLifecycleSnapshot(
+    configPath: '~/.config/pars/pars_config.toml',
+    configExists: true,
+    selectedStoreId: 'fake-store',
+    selectedStoreRoot: '~/.password-store',
+    onboardingState: StoreOnboardingState.ready,
+    issues: <String>[],
+    stores: <StoreStatus>[_store],
+  );
+
+  @override
+  List<StoreStatus> get stores => const <StoreStatus>[_store];
 
   @override
   String get currentRepoName => '~/.password-store';
@@ -81,6 +108,9 @@ class DemoVaultRepository
   ];
 
   @override
+  Future<void> refresh() async {}
+
+  @override
   List<PasswordEntry> search(String query) {
     final normalized = query.trim().toLowerCase();
     if (normalized.isEmpty) {
@@ -92,6 +122,40 @@ class DemoVaultRepository
               entry.displayName.toLowerCase().contains(normalized) ||
               entry.path.toLowerCase().contains(normalized),
         )
-        .toList();
+        .toList(growable: false);
   }
+
+  @override
+  Future<void> selectStore(String root) async {}
+
+  @override
+  Future<void> createLocalStore({
+    required String name,
+    required String root,
+    required List<String> pgpKeys,
+    required bool setDefault,
+    required bool initializeGit,
+  }) async {}
+
+  @override
+  Future<void> importLocalStore({
+    required String root,
+    required bool setDefault,
+  }) async {}
+
+  @override
+  Future<void> cloneStore({
+    required String remoteUrl,
+    required String root,
+    required bool setDefault,
+  }) async {}
+
+  @override
+  Future<void> removeStore({required String root}) async {}
+
+  @override
+  Future<void> deleteLocalStore({
+    required String root,
+    required String confirmation,
+  }) async {}
 }

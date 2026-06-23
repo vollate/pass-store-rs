@@ -6,18 +6,19 @@ import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/services/git_repository.dart';
 import 'package:pars_gui/services/key_repository.dart';
 import 'package:pars_gui/services/settings_repository.dart';
+import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/services/vault_repository.dart';
 
 void main() {
   testWidgets('shows onboarding before entering the vault', (tester) async {
-    await tester.pumpWidget(const ParsGuiApp());
+    await tester.pumpWidget(ParsGuiApp.fake());
 
     expect(find.text('Set gesture lock'), findsOneWidget);
     expect(find.text('Continue'), findsOneWidget);
   });
 
   testWidgets('enters the mobile shell after onboarding', (tester) async {
-    await tester.pumpWidget(const ParsGuiApp());
+    await tester.pumpWidget(ParsGuiApp.fake());
 
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
@@ -28,7 +29,7 @@ void main() {
   });
 
   testWidgets('vault searches entries and opens detail sheet', (tester) async {
-    await tester.pumpWidget(const ParsGuiApp());
+    await tester.pumpWidget(ParsGuiApp.fake());
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
@@ -48,7 +49,7 @@ void main() {
   });
 
   testWidgets('manage tab exposes batch management workflows', (tester) async {
-    await tester.pumpWidget(const ParsGuiApp());
+    await tester.pumpWidget(ParsGuiApp.fake());
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
@@ -64,7 +65,7 @@ void main() {
   testWidgets('settings tab exposes security keys stores and git sections', (
     tester,
   ) async {
-    await tester.pumpWidget(const ParsGuiApp());
+    await tester.pumpWidget(ParsGuiApp.fake());
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
@@ -127,6 +128,32 @@ class _InjectedRepository
   String get currentRepoName => 'Example Store';
 
   @override
+  StoreLifecycleSnapshot get lifecycle => const StoreLifecycleSnapshot(
+    configPath: '/tmp/example-config.toml',
+    configExists: true,
+    selectedStoreId: 'example-store',
+    selectedStoreRoot: '/tmp/example-store',
+    onboardingState: StoreOnboardingState.ready,
+    issues: <String>[],
+    stores: <StoreStatus>[
+      StoreStatus(
+        id: 'example-store',
+        name: 'Example Store',
+        root: '/tmp/example-store',
+        isDefault: true,
+        exists: true,
+        hasGpgId: true,
+        hasGitRemote: true,
+        pgpKeyMissing: false,
+        issues: <String>[],
+      ),
+    ],
+  );
+
+  @override
+  List<StoreStatus> get stores => lifecycle.stores;
+
+  @override
   RepoGitStatus get gitStatus => RepoGitStatus.needPull;
 
   @override
@@ -149,6 +176,43 @@ class _InjectedRepository
       hasPrivateKey: true,
     ),
   ];
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<void> selectStore(String root) async {}
+
+  @override
+  Future<void> createLocalStore({
+    required String name,
+    required String root,
+    required List<String> pgpKeys,
+    required bool setDefault,
+    required bool initializeGit,
+  }) async {}
+
+  @override
+  Future<void> importLocalStore({
+    required String root,
+    required bool setDefault,
+  }) async {}
+
+  @override
+  Future<void> cloneStore({
+    required String remoteUrl,
+    required String root,
+    required bool setDefault,
+  }) async {}
+
+  @override
+  Future<void> removeStore({required String root}) async {}
+
+  @override
+  Future<void> deleteLocalStore({
+    required String root,
+    required String confirmation,
+  }) async {}
 
   @override
   List<PasswordEntry> search(String query) {

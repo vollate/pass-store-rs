@@ -56,6 +56,32 @@ abstract interface class ParsBridgeApi {
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
   });
+
+  Future<frb.AppStateResponse> inspectAppState({
+    required frb.InspectAppStateRequest request,
+  });
+
+  Future<frb.UnitResponse> selectStore({
+    required frb.SelectStoreRequest request,
+  });
+
+  Future<frb.UnitResponse> createLocalStore({
+    required frb.CreateLocalStoreRequest request,
+  });
+
+  Future<frb.UnitResponse> importLocalStore({
+    required frb.ImportLocalStoreRequest request,
+  });
+
+  Future<frb.UnitResponse> cloneStore({required frb.CloneStoreRequest request});
+
+  Future<frb.UnitResponse> removeStore({
+    required frb.RemoveStoreRequest request,
+  });
+
+  Future<frb.UnitResponse> deleteLocalStore({
+    required frb.DeleteLocalStoreRequest request,
+  });
 }
 
 final class FrbParsBridgeApi implements ParsBridgeApi {
@@ -137,4 +163,39 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
   }) => frb.runGitArgs(request: request);
+
+  @override
+  Future<frb.AppStateResponse> inspectAppState({
+    required frb.InspectAppStateRequest request,
+  }) => frb.inspectAppState(request: request);
+
+  @override
+  Future<frb.UnitResponse> selectStore({
+    required frb.SelectStoreRequest request,
+  }) => frb.selectStore(request: request);
+
+  @override
+  Future<frb.UnitResponse> createLocalStore({
+    required frb.CreateLocalStoreRequest request,
+  }) => frb.createLocalStore(request: request);
+
+  @override
+  Future<frb.UnitResponse> importLocalStore({
+    required frb.ImportLocalStoreRequest request,
+  }) => frb.importLocalStore(request: request);
+
+  @override
+  Future<frb.UnitResponse> cloneStore({
+    required frb.CloneStoreRequest request,
+  }) => frb.cloneStore(request: request);
+
+  @override
+  Future<frb.UnitResponse> removeStore({
+    required frb.RemoveStoreRequest request,
+  }) => frb.removeStore(request: request);
+
+  @override
+  Future<frb.UnitResponse> deleteLocalStore({
+    required frb.DeleteLocalStoreRequest request,
+  }) => frb.deleteLocalStore(request: request);
 }
