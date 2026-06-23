@@ -3,9 +3,8 @@ lto = "fat"
 opt-level = "z"
 
 [workspace]
-members = ["cli", "core"]
+members = ["bridge", "cli", "core"]
 resolver = "2"
 
 [patch.crates-io]
 pars-core = { path = "core" }
-

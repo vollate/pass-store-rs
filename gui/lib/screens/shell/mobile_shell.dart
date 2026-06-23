@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
 
-import '../../services/demo_vault_repository.dart';
+import '../../services/git_repository.dart';
+import '../../services/key_repository.dart';
+import '../../services/settings_repository.dart';
+import '../../services/vault_repository.dart';
 import '../manage/manage_screen.dart';
 import '../settings/settings_screen.dart';
 import '../vault/vault_screen.dart';
 
 class MobileShell extends StatefulWidget {
-  const MobileShell({super.key, required this.repository});
+  const MobileShell({
+    super.key,
+    required this.vaultRepository,
+    required this.settingsRepository,
+    required this.keyRepository,
+    required this.gitRepository,
+  });
 
-  final DemoVaultRepository repository;
+  final VaultRepository vaultRepository;
+  final SettingsRepository settingsRepository;
+  final KeyRepository keyRepository;
+  final GitRepository gitRepository;
 
   @override
   State<MobileShell> createState() => _MobileShellState();
@@ -20,9 +32,16 @@ class _MobileShellState extends State<MobileShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      VaultScreen(repository: widget.repository),
-      ManageScreen(repository: widget.repository),
-      SettingsScreen(repository: widget.repository),
+      VaultScreen(
+        vaultRepository: widget.vaultRepository,
+        gitRepository: widget.gitRepository,
+      ),
+      ManageScreen(repository: widget.vaultRepository),
+      SettingsScreen(
+        settingsRepository: widget.settingsRepository,
+        keyRepository: widget.keyRepository,
+        gitRepository: widget.gitRepository,
+      ),
     ];
 
     return Scaffold(

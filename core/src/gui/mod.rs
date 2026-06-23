@@ -23,6 +23,7 @@ pub enum CoreError {
     GitError(String),
     ClipboardError(String),
     ValidationError(String),
+    Conflict(EntryConflict),
     UnsupportedPlatform(String),
 }
 
@@ -35,6 +36,7 @@ impl Display for CoreError {
             CoreError::GitError(message) => write!(f, "git error: {message}"),
             CoreError::ClipboardError(message) => write!(f, "clipboard error: {message}"),
             CoreError::ValidationError(message) => write!(f, "validation error: {message}"),
+            CoreError::Conflict(conflict) => write!(f, "conflict: {conflict}"),
             CoreError::UnsupportedPlatform(message) => {
                 write!(f, "unsupported platform: {message}")
             }
@@ -90,6 +92,33 @@ pub struct GitCommandOutput {
     pub stderr: String,
     pub exit_code: Option<i32>,
     pub success: bool,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub enum EntryConflictKind {
+    EntryAlreadyExists,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EntryConflict {
+    pub kind: EntryConflictKind,
+    pub path: String,
+}
+
+impl EntryConflict {
+    pub fn already_exists(path: impl Into<String>) -> Self {
+        Self { kind: EntryConflictKind::EntryAlreadyExists, path: path.into() }
+    }
+}
+
+impl Display for EntryConflict {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.kind {
+            EntryConflictKind::EntryAlreadyExists => {
+                write!(f, "entry already exists: {}", self.path)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -420,10 +449,7 @@ pub fn insert_entry(request: InsertEntryRequest) -> GuiResult<InsertEntryResult>
     let overwrote_existing = encrypted_path.exists();
 
     if overwrote_existing && !request.overwrite {
-        return Err(CoreError::ValidationError(format!(
-            "entry already exists: {}",
-            request.entry.path
-        )));
+        return Err(CoreError::Conflict(EntryConflict::already_exists(request.entry.path)));
     }
 
     if let Some(parent) = encrypted_path.parent() {
@@ -510,10 +536,7 @@ pub fn move_entry(request: MoveEntryRequest) -> GuiResult<EntryMutationResult> {
     }
 
     if to_path.exists() && !request.overwrite {
-        return Err(CoreError::ValidationError(format!(
-            "entry already exists: {}",
-            request.to.path
-        )));
+        return Err(CoreError::Conflict(EntryConflict::already_exists(request.to.path)));
     }
 
     if to_path.exists() && !to_path.is_file() {

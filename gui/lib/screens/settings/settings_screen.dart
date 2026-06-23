@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../../models/key_record.dart';
-import '../../services/demo_vault_repository.dart';
+import '../../services/git_repository.dart';
+import '../../services/key_repository.dart';
+import '../../services/settings_repository.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.repository});
+  const SettingsScreen({
+    super.key,
+    required this.settingsRepository,
+    required this.keyRepository,
+    required this.gitRepository,
+  });
 
-  final DemoVaultRepository repository;
+  final SettingsRepository settingsRepository;
+  final KeyRepository keyRepository;
+  final GitRepository gitRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +41,11 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Gesture lock and biometrics',
                     subtitle: 'Gesture fallback, biometric quick unlock',
                     icon: Icons.pattern,
-                    onTap: () =>
-                        _showTextSheet(context, 'Gesture lock and biometrics'),
+                    onTap:
+                        () => _showTextSheet(
+                          context,
+                          'Gesture lock and biometrics',
+                        ),
                   ),
                   _SettingsTile(
                     title: 'PGP session timeout',
@@ -45,8 +57,11 @@ class SettingsScreen extends StatelessWidget {
                     title: 'KMS / Keychain passphrase',
                     subtitle: 'Optional one-step unlock',
                     icon: Icons.key_outlined,
-                    onTap: () =>
-                        _showTextSheet(context, 'KMS / Keychain passphrase'),
+                    onTap:
+                        () => _showTextSheet(
+                          context,
+                          'KMS / Keychain passphrase',
+                        ),
                   ),
                 ],
               ),
@@ -72,7 +87,7 @@ class SettingsScreen extends StatelessWidget {
                 children: <Widget>[
                   _SettingsTile(
                     title: 'Password stores',
-                    subtitle: repository.currentRepoName,
+                    subtitle: settingsRepository.currentRepoName,
                     icon: Icons.folder_outlined,
                     onTap: () => _showTextSheet(context, 'Password stores'),
                   ),
@@ -80,7 +95,8 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Git sync and remotes',
                     subtitle: 'Pull, push, status, remotes',
                     icon: Icons.sync,
-                    onTap: () => _showTextSheet(context, 'Git sync and remotes'),
+                    onTap:
+                        () => _showTextSheet(context, 'Git sync and remotes'),
                   ),
                   _SettingsTile(
                     title: 'Advanced git args',
@@ -100,84 +116,91 @@ class SettingsScreen extends StatelessWidget {
   void _showTextSheet(BuildContext context, String title) {
     showModalBottomSheet<void>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'This configuration surface is mocked in phase 1 and will be wired to platform services later.',
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'This configuration surface is mocked in phase 1 and will be wired to platform services later.',
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
   void _showKeys(BuildContext context, KeyRecordType type) {
-    final keys = repository.keys.where((key) => key.type == type).toList();
+    final keys = keyRepository.keys.where((key) => key.type == type).toList();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  type == KeyRecordType.pgp ? 'PGP keys' : 'SSH keys',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 12),
-                for (final key in keys)
-                  Card(
-                    child: ListTile(
-                      title: Text(key.name),
-                      subtitle: Text('${key.fingerprint}\n${key.source}'),
-                      isThreeLine: true,
-                      trailing: Text(key.hasPrivateKey ? 'Private' : 'Public'),
-                    ),
-                  ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    FilledButton(onPressed: () {}, child: const Text('Create')),
-                    OutlinedButton(
-                      onPressed: () {},
-                      child: const Text('Import'),
+                    Text(
+                      type == KeyRecordType.pgp ? 'PGP keys' : 'SSH keys',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    OutlinedButton(
-                      onPressed: () {},
-                      child: const Text('Export public'),
-                    ),
-                    OutlinedButton(
-                      onPressed: () {},
-                      child: const Text('Export private'),
+                    const SizedBox(height: 12),
+                    for (final key in keys)
+                      Card(
+                        child: ListTile(
+                          title: Text(key.name),
+                          subtitle: Text('${key.fingerprint}\n${key.source}'),
+                          isThreeLine: true,
+                          trailing: Text(
+                            key.hasPrivateKey ? 'Private' : 'Public',
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <Widget>[
+                        FilledButton(
+                          onPressed: () {},
+                          child: const Text('Create'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () {},
+                          child: const Text('Import'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () {},
+                          child: const Text('Export public'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () {},
+                          child: const Text('Export private'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 
@@ -185,51 +208,57 @@ class SettingsScreen extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Advanced git args',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
-              const SizedBox(height: 8),
-              const Text('Only enter arguments after git. Shell syntax is not accepted.'),
-              const SizedBox(height: 12),
-              Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const Text('git', style: TextStyle(fontWeight: FontWeight.w800)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      decoration: const InputDecoration(hintText: 'status'),
-                      controller: TextEditingController(text: 'status'),
+                  Text(
+                    'Advanced git args',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Only enter arguments after git. Shell syntax is not accepted.',
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: <Widget>[
+                      const Text(
+                        'git',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          decoration: const InputDecoration(hintText: 'status'),
+                          controller: TextEditingController(text: 'status'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () {},
+                    child: const SizedBox(
+                      width: double.infinity,
+                      child: Center(child: Text('Run selected command')),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () {},
-                child: const SizedBox(
-                  width: double.infinity,
-                  child: Center(child: Text('Run selected command')),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 }

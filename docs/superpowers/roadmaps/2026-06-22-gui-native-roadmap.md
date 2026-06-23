@@ -37,7 +37,11 @@ This roadmap tracks the remaining work needed to turn the current Flutter GUI sh
 
 Goal: create a core API layer that is friendly to GUI/native callers and does not depend on terminal streams.
 
-- [ ] Audit current `core/src/operation/*` APIs and classify each as GUI-ready, CLI-shaped, or reusable with adapter.
+- [x] Audit current `core/src/operation/*` APIs and classify each as GUI-ready, CLI-shaped, or reusable with adapter.
+  - GUI-safe boundary lives in `core/src/gui/mod.rs`; Flutter/native bridge code should call this module, not `core/src/operation/*` directly.
+  - Reusable through GUI adapters: entry listing/showing, insert, generate, edit, move/copy-style rename, delete, and advanced Git args.
+  - CLI-shaped only: `insert_io`, `generate_io`, `remove_io`, `copy_rename_io`, `git_io`, `edit`, `init`, `find_term`, and terminal tree rendering paths because they prompt, inherit stdio, launch editors, print directly, or shape output for terminals.
+  - Keep CLI-specific operations for `pars-cli`; add or extend `core::gui` APIs when the GUI needs behavior.
 - [x] Add a `core::gui` or `core::api` module for GUI-safe request/response structs.
 - [x] Define `CoreError` with typed error categories:
   - [x] `ConfigError`
@@ -73,8 +77,8 @@ Goal: create a core API layer that is friendly to GUI/native callers and does no
   - [x] `DeleteEntryRequest`
   - [x] `BatchOperationRequest`
   - [x] `GitOperationRequest`
-- [ ] Remove interactive stdin/stdout assumptions from GUI-callable operations.
-- [ ] Replace CLI overwrite prompts with explicit request flags and typed conflicts.
+- [x] Remove interactive stdin/stdout assumptions from GUI-callable operations.
+- [x] Replace CLI overwrite prompts with explicit request flags and typed conflicts.
 - [x] Add non-interactive `read_entry` GUI API that decrypts and parses entries.
 - [x] Add non-interactive `insert_entry` GUI API using explicit `overwrite` flag.
 - [x] Add non-interactive `generate_entry` GUI API using explicit `overwrite` flag.
@@ -130,13 +134,13 @@ Goal: connect Flutter to Rust core directly.
 
 Goal: replace demo repository state with real config and store discovery.
 
-- [ ] Create Flutter repository interface:
-  - [ ] `VaultRepository`
-  - [ ] `SettingsRepository`
-  - [ ] `KeyRepository`
-  - [ ] `GitRepository`
+- [x] Create Flutter repository interface:
+  - [x] `VaultRepository`
+  - [x] `SettingsRepository`
+  - [x] `KeyRepository`
+  - [x] `GitRepository`
 - [ ] Replace `DemoVaultRepository` with bridge-backed implementation.
-- [ ] Keep a fake implementation for widget tests.
+- [x] Keep a fake implementation for widget tests.
 - [ ] Implement config load/save through `pars-core`.
 - [ ] Implement first-run detection:
   - [ ] no config
@@ -410,7 +414,7 @@ Goal: refine experience once real operations exist.
 
 Recommended implementation order:
 
-1. [ ] `pars-core` GUI API boundary.
+1. [x] `pars-core` GUI API boundary.
 2. [ ] Flutter/Rust native bridge.
 3. [ ] Config and store lifecycle.
 4. [ ] PGP backend strategy and packaging decision.

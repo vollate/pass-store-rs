@@ -1,13 +1,25 @@
 import '../models/key_record.dart';
 import '../models/password_entry.dart';
+import 'git_repository.dart';
+import 'key_repository.dart';
+import 'settings_repository.dart';
+import 'vault_repository.dart';
 
-class DemoVaultRepository {
+class DemoVaultRepository
+    implements
+        VaultRepository,
+        SettingsRepository,
+        KeyRepository,
+        GitRepository {
   const DemoVaultRepository();
 
+  @override
   String get currentRepoName => '~/.password-store';
 
+  @override
   RepoGitStatus get gitStatus => RepoGitStatus.clean;
 
+  @override
   List<PasswordEntry> get entries => const <PasswordEntry>[
     PasswordEntry(
       path: 'work/dev/github',
@@ -50,6 +62,7 @@ class DemoVaultRepository {
     ),
   ];
 
+  @override
   List<KeyRecord> get keys => const <KeyRecord>[
     KeyRecord(
       type: KeyRecordType.pgp,
@@ -67,6 +80,7 @@ class DemoVaultRepository {
     ),
   ];
 
+  @override
   List<PasswordEntry> search(String query) {
     final normalized = query.trim().toLowerCase();
     if (normalized.isEmpty) {

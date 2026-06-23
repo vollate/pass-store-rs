@@ -4,9 +4,10 @@ use std::process::{self, Command, Stdio};
 
 use pars_core::gui::{
     delete_entry, edit_entry, generate_entry, insert_entry, list_entries, move_entry,
-    parse_entry_secret, read_entry, run_git_args, validate_git_args, DeleteEntryRequest,
-    EditEntryRequest, EntryRef, EntryType, GenerateEntryRequest, GitOperationRequest,
-    InsertEntryRequest, ListEntriesRequest, MoveEntryRequest, ReadEntryRequest,
+    parse_entry_secret, read_entry, run_git_args, validate_git_args, CoreError, DeleteEntryRequest,
+    EditEntryRequest, EntryConflictKind, EntryRef, EntryType, GenerateEntryRequest,
+    GitOperationRequest, InsertEntryRequest, ListEntriesRequest, MoveEntryRequest,
+    ReadEntryRequest,
 };
 use pars_core::pgp::key_management::key_gen_batch;
 use pars_core::pgp::PGPClient;
@@ -18,6 +19,16 @@ fn create_file(path: PathBuf) {
         fs::create_dir_all(parent).unwrap();
     }
     fs::write(path, "").unwrap();
+}
+
+fn assert_entry_already_exists_conflict(err: CoreError, expected_path: &str) {
+    match err {
+        CoreError::Conflict(conflict) => {
+            assert_eq!(conflict.kind, EntryConflictKind::EntryAlreadyExists);
+            assert_eq!(conflict.path, expected_path);
+        }
+        other => panic!("expected entry conflict, got {other:?}"),
+    }
 }
 
 struct TestKey {
@@ -313,7 +324,7 @@ fn insert_entry_requires_explicit_overwrite_for_existing_passwords() {
         pgp_executable: executable.clone(),
     })
     .unwrap_err();
-    assert!(err.to_string().contains("already exists"));
+    assert_entry_already_exists_conflict(err, "github");
 
     let result = insert_entry(InsertEntryRequest {
         entry: EntryRef::new(root.clone(), "github").unwrap(),
@@ -390,7 +401,7 @@ fn generate_entry_requires_explicit_overwrite_for_existing_passwords() {
         pgp_executable: executable.clone(),
     })
     .unwrap_err();
-    assert!(err.to_string().contains("already exists"));
+    assert_entry_already_exists_conflict(err, "github");
 
     let result = generate_entry(GenerateEntryRequest {
         entry: EntryRef::new(root, "github").unwrap(),
@@ -474,7 +485,7 @@ fn move_entry_rejects_existing_destination_without_overwrite() {
     })
     .unwrap_err();
 
-    assert!(err.to_string().contains("already exists"));
+    assert_entry_already_exists_conflict(err, "archive/github");
     assert!(root.join("work/github.gpg").exists());
     assert!(root.join("archive/github.gpg").exists());
 }

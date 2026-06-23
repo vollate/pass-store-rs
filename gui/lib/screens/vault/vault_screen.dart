@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../../models/password_entry.dart';
-import '../../services/demo_vault_repository.dart';
+import '../../services/git_repository.dart';
+import '../../services/vault_repository.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/entry_tile.dart';
 import 'entry_detail_sheet.dart';
 
 class VaultScreen extends StatefulWidget {
-  const VaultScreen({super.key, required this.repository});
+  const VaultScreen({
+    super.key,
+    required this.vaultRepository,
+    required this.gitRepository,
+  });
 
-  final DemoVaultRepository repository;
+  final VaultRepository vaultRepository;
+  final GitRepository gitRepository;
 
   @override
   State<VaultScreen> createState() => _VaultScreenState();
@@ -27,7 +33,7 @@ class _VaultScreenState extends State<VaultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final entries = widget.repository.search(_query);
+    final entries = widget.vaultRepository.search(_query);
     final recent = entries.where((entry) => !entry.isDirectory).toList();
     final directories = entries.where((entry) => entry.isDirectory).toList();
 
@@ -44,12 +50,12 @@ class _VaultScreenState extends State<VaultScreen> {
               children: <Widget>[
                 Text(
                   'Vault',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 Text(
-                  widget.repository.currentRepoName,
+                  widget.vaultRepository.currentRepoName,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -58,7 +64,7 @@ class _VaultScreenState extends State<VaultScreen> {
               Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: Chip(
-                  label: Text(widget.repository.gitStatus.label),
+                  label: Text(widget.gitRepository.gitStatus.label),
                   avatar: const Icon(Icons.check_circle_outline, size: 18),
                 ),
               ),
@@ -79,28 +85,30 @@ class _VaultScreenState extends State<VaultScreen> {
           ),
           AppSection(
             title: _query.isEmpty ? 'Recent' : 'Search results',
-            children: recent
-                .map(
-                  (entry) => EntryTile(
-                    entry: entry,
-                    onTap: () => _showEntry(entry),
-                    onCopy: () => _showCopied(entry),
-                  ),
-                )
-                .toList(),
+            children:
+                recent
+                    .map(
+                      (entry) => EntryTile(
+                        entry: entry,
+                        onTap: () => _showEntry(entry),
+                        onCopy: () => _showCopied(entry),
+                      ),
+                    )
+                    .toList(),
           ),
           if (_query.isEmpty)
             AppSection(
               title: 'Browse',
-              children: directories
-                  .map(
-                    (entry) => EntryTile(
-                      entry: entry,
-                      onTap: () {},
-                      onCopy: () {},
-                    ),
-                  )
-                  .toList(),
+              children:
+                  directories
+                      .map(
+                        (entry) => EntryTile(
+                          entry: entry,
+                          onTap: () {},
+                          onCopy: () {},
+                        ),
+                      )
+                      .toList(),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../services/demo_vault_repository.dart';
+import '../../services/vault_repository.dart';
 
 class ManageScreen extends StatelessWidget {
   const ManageScreen({super.key, required this.repository});
 
-  final DemoVaultRepository repository;
+  final VaultRepository repository;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +31,8 @@ class ManageScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _ManageActionCard(
                 title: 'Generate and save',
-                subtitle: 'Create one or many entries with generated passwords.',
+                subtitle:
+                    'Create one or many entries with generated passwords.',
                 icon: Icons.auto_fix_high,
                 onTap: () => _showPreview(context, 'Generate and save'),
               ),
@@ -50,7 +51,8 @@ class ManageScreen extends StatelessWidget {
               ),
               _ManageActionCard(
                 title: 'Batch delete',
-                subtitle: 'Preview full paths before removing selected entries.',
+                subtitle:
+                    'Preview full paths before removing selected entries.',
                 icon: Icons.delete_outline,
                 isDanger: true,
                 onTap: () => _showPreview(context, 'Batch delete'),
@@ -124,9 +126,10 @@ class _ManageActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDanger
-        ? Theme.of(context).colorScheme.error
-        : Theme.of(context).colorScheme.primary;
+    final color =
+        isDanger
+            ? Theme.of(context).colorScheme.error
+            : Theme.of(context).colorScheme.primary;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(

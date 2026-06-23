@@ -1130,6 +1130,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pars-bridge"
+version = "0.1.0"
+dependencies = [
+ "pars-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "pars-cli"
 version = "0.2.0"
 dependencies = [
