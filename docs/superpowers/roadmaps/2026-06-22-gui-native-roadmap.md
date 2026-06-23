@@ -256,11 +256,11 @@ Goal: protect local app access and optional PGP passphrase caching.
   - [x] 15 minutes
   - [x] 1 hour
   - [x] until app exit
-- [ ] Clear decrypted secrets when:
-  - [ ] app locks
-  - [ ] session expires
-  - [ ] detail sheet closes
-  - [ ] app goes background if configured
+- [x] Clear decrypted secrets when:
+  - [x] app locks
+  - [x] session expires
+  - [x] detail sheet closes
+  - [x] app goes background if configured
 - [x] Add widget and unit tests for lock/session state transitions.
 
 ## Milestone 7: Vault Real Data

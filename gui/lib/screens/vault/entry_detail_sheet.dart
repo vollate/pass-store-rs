@@ -4,9 +4,14 @@ import '../../models/password_entry.dart';
 import '../../services/pass_entry_parser.dart';
 
 class EntryDetailSheet extends StatefulWidget {
-  const EntryDetailSheet({super.key, required this.entry});
+  const EntryDetailSheet({
+    super.key,
+    required this.entry,
+    this.onSecretCleared,
+  });
 
   final PasswordEntry entry;
+  final VoidCallback? onSecretCleared;
 
   @override
   State<EntryDetailSheet> createState() => _EntryDetailSheetState();
@@ -14,11 +19,35 @@ class EntryDetailSheet extends StatefulWidget {
 
 class _EntryDetailSheetState extends State<EntryDetailSheet> {
   bool _isRevealed = false;
+  SecretContent? _content;
+
+  @override
+  void initState() {
+    super.initState();
+    _content = PassEntryParser.parse(widget.entry.encryptedContent);
+  }
+
+  @override
+  void didUpdateWidget(covariant EntryDetailSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.encryptedContent != widget.entry.encryptedContent) {
+      _clearSecret();
+      _content = PassEntryParser.parse(widget.entry.encryptedContent);
+    }
+  }
+
+  @override
+  void dispose() {
+    _clearSecret();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final content = PassEntryParser.parse(widget.entry.encryptedContent);
-
+    final content = _content;
+    if (content == null) {
+      return const SafeArea(child: SizedBox.shrink());
+    }
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -83,8 +112,8 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                       ),
                       IconButton(
                         tooltip: _isRevealed ? 'Hide' : 'Reveal',
-                        onPressed: () =>
-                            setState(() => _isRevealed = !_isRevealed),
+                        onPressed:
+                            () => setState(() => _isRevealed = !_isRevealed),
                         icon: Icon(
                           _isRevealed
                               ? Icons.visibility_off_outlined
@@ -106,8 +135,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                     label: const Text('Copy password'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () =>
-                        setState(() => _isRevealed = !_isRevealed),
+                    onPressed: () => setState(() => _isRevealed = !_isRevealed),
                     icon: const Icon(Icons.visibility_outlined),
                     label: const Text('Reveal'),
                   ),
@@ -170,5 +198,11 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
         ),
       ),
     );
+  }
+
+  void _clearSecret() {
+    _isRevealed = false;
+    _content = null;
+    widget.onSecretCleared?.call();
   }
 }

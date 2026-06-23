@@ -10,6 +10,7 @@ import 'package:pars_gui/services/security_repository.dart';
 import 'package:pars_gui/services/settings_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/services/vault_repository.dart';
+import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/widgets/gesture_lock_input.dart';
 
 void main() {
@@ -142,6 +143,67 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Vault'), findsWidgets);
+  });
+
+  testWidgets('background lock clears active PGP session', (tester) async {
+    final securityRepository = InMemorySecurityRepository.withPattern(
+      const <int>[0, 1, 2, 5],
+      lockOnResume: true,
+      activePgpPassphrase: 'pgp-passphrase',
+      lastUnlockedAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+
+    expect(find.text('Vault'), findsWidgets);
+    expect(securityRepository.hasActivePgpSession, isTrue);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock Pars'), findsOneWidget);
+    expect(securityRepository.hasActivePgpSession, isFalse);
+  });
+
+  testWidgets('entry detail clears parsed secret when closed', (tester) async {
+    var secretCleared = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: EntryDetailSheet(
+            entry: const PasswordEntry(
+              path: 'personal/test',
+              displayName: 'Test Entry',
+              repoName: 'Example Store',
+              encryptedContent: 'super-secret\nusername: alice\nplain note',
+            ),
+            onSecretCleared: () => secretCleared = true,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Reveal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('super-secret'), findsOneWidget);
+    expect(find.text('alice'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+
+    expect(secretCleared, isTrue);
+    expect(find.text('super-secret'), findsNothing);
+    expect(find.text('alice'), findsNothing);
   });
 
   testWidgets('settings updates local unlock controls', (tester) async {

@@ -72,8 +72,16 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_isOnboardingComplete) {
+      return;
+    }
+    final isBackgrounded =
+        state == AppLifecycleState.paused || state == AppLifecycleState.hidden;
+    if (isBackgrounded && widget.securityRepository.lockOnResume) {
+      _lock();
+      return;
+    }
     if (state == AppLifecycleState.resumed &&
-        _isOnboardingComplete &&
         (widget.securityRepository.lockOnResume ||
             widget.securityRepository.shouldLock(DateTime.now()))) {
       _lock();
