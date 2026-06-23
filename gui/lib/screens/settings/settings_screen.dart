@@ -185,6 +185,31 @@ class SettingsScreen extends StatelessWidget {
                             setSheetState(() {});
                           },
                         ),
+                        FutureBuilder<BiometricUnlockStatus>(
+                          future: securityRepository.biometricUnlockStatus(),
+                          builder: (context, snapshot) {
+                            final status =
+                                snapshot.data ??
+                                BiometricUnlockStatus.unavailable;
+                            return SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Biometric unlock'),
+                              subtitle: Text(_biometricSubtitle(status)),
+                              value:
+                                  status == BiometricUnlockStatus.available &&
+                                  securityRepository.biometricUnlockEnabled,
+                              onChanged:
+                                  status == BiometricUnlockStatus.unavailable
+                                      ? null
+                                      : (value) async {
+                                        await securityRepository
+                                            .setBiometricUnlockEnabled(value);
+                                        onSecuritySettingsChanged?.call();
+                                        setSheetState(() {});
+                                      },
+                            );
+                          },
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           'Auto-lock timeout',
@@ -212,16 +237,6 @@ class SettingsScreen extends StatelessWidget {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.fingerprint_outlined),
-                          title: const Text('Biometric unlock'),
-                          subtitle: const Text(
-                            'Unavailable until platform integration',
-                          ),
-                          trailing: const Icon(Icons.lock_outline),
-                        ),
                       ],
                     ),
                   ),
@@ -235,6 +250,17 @@ class SettingsScreen extends StatelessWidget {
       return '${timeout.inMinutes} min';
     }
     return '${timeout.inHours} hour';
+  }
+
+  String _biometricSubtitle(BiometricUnlockStatus status) {
+    switch (status) {
+      case BiometricUnlockStatus.available:
+        return 'Use device biometrics, with gesture fallback';
+      case BiometricUnlockStatus.disabled:
+        return 'Available on this device';
+      case BiometricUnlockStatus.unavailable:
+        return 'Unavailable on this device';
+    }
   }
 
   void _showKeys(BuildContext context, KeyRecordType type) {

@@ -173,6 +173,72 @@ void main() {
     expect(securityRepository.lockOnResume, isTrue);
     expect(securityRepository.autoLockTimeout, const Duration(minutes: 5));
   });
+
+  testWidgets('unlocks with biometrics when enabled', (tester) async {
+    final biometrics = _FakeBiometricAuthAdapter(available: true);
+    final securityRepository = await SecureStorageSecurityRepository.load(
+      storage: _FakeSecureStorageAdapter(),
+      biometricAuth: biometrics,
+    );
+    await securityRepository.saveGestureVerifier(
+      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+    );
+    await securityRepository.setBiometricUnlockEnabled(true);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock Pars'), findsOneWidget);
+    expect(find.text('Unlock with biometrics'), findsOneWidget);
+
+    await tester.tap(find.text('Unlock with biometrics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vault'), findsWidgets);
+    expect(biometrics.authenticateCount, 1);
+  });
+
+  testWidgets('settings enables biometric unlock when available', (
+    tester,
+  ) async {
+    final securityRepository = await SecureStorageSecurityRepository.load(
+      storage: _FakeSecureStorageAdapter(),
+      biometricAuth: _FakeBiometricAuthAdapter(available: true),
+    );
+    await securityRepository.saveGestureVerifier(
+      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+    );
+    await securityRepository.markUnlocked(DateTime.now());
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Available on this device'), findsOneWidget);
+    await tester.tap(find.text('Biometric unlock'));
+    await tester.pumpAndSettle();
+
+    expect(securityRepository.biometricUnlockEnabled, isTrue);
+  });
 }
 
 Future<void> _completeGestureSetup(WidgetTester tester) async {
@@ -203,6 +269,39 @@ Future<void> _drawGesture(WidgetTester tester) async {
   await gesture.moveTo(dot(5));
   await tester.pump();
   await gesture.up();
+}
+
+class _FakeSecureStorageAdapter implements SecureStorageAdapter {
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    _values.remove(key);
+  }
+}
+
+class _FakeBiometricAuthAdapter implements BiometricAuthAdapter {
+  _FakeBiometricAuthAdapter({this.available = false});
+
+  final bool available;
+  int authenticateCount = 0;
+
+  @override
+  Future<bool> isAvailable() async => available;
+
+  @override
+  Future<bool> authenticate() async {
+    authenticateCount += 1;
+    return true;
+  }
 }
 
 class _InjectedRepository

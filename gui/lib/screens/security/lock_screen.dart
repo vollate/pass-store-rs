@@ -19,6 +19,13 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   String? _error;
+  late Future<BiometricUnlockStatus> _biometricStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _biometricStatus = widget.securityRepository.biometricUnlockStatus();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +46,24 @@ class _LockScreenState extends State<LockScreen> {
               const SizedBox(height: 8),
               const Text('Draw your gesture to open the local app session.'),
               const Spacer(),
+              FutureBuilder<BiometricUnlockStatus>(
+                future: _biometricStatus,
+                builder: (context, snapshot) {
+                  if (snapshot.data != BiometricUnlockStatus.available) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Center(
+                      child: FilledButton.icon(
+                        onPressed: () => _unlockWithBiometrics(context),
+                        icon: const Icon(Icons.fingerprint),
+                        label: const Text('Unlock with biometrics'),
+                      ),
+                    ),
+                  );
+                },
+              ),
               Center(
                 child: GestureLockInput(
                   onCompleted: (pattern) => _unlock(context, pattern),
@@ -77,5 +102,17 @@ class _LockScreenState extends State<LockScreen> {
     if (context.mounted) {
       widget.onUnlocked();
     }
+  }
+
+  Future<void> _unlockWithBiometrics(BuildContext context) async {
+    final unlocked = await widget.securityRepository.unlockWithBiometrics();
+    if (!context.mounted) {
+      return;
+    }
+    if (!unlocked) {
+      setState(() => _error = 'Biometric unlock failed');
+      return;
+    }
+    widget.onUnlocked();
   }
 }

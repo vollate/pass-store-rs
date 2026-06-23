@@ -237,8 +237,8 @@ Goal: protect local app access and optional PGP passphrase caching.
 - [x] Implement lock on app resume option.
 - [x] Implement auto-lock timeout.
 - [ ] Add biometric unlock support:
-  - [ ] Android
-  - [ ] iOS
+  - [x] Android
+  - [x] iOS
   - [x] desktop fallback or disabled state
 - [ ] Add KMS/Keychain storage for PGP passphrase:
   - [ ] Android Keystore

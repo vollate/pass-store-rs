@@ -53,6 +53,7 @@ void main() {
       final storage = _FakeSecureStorageAdapter();
       final repository = await SecureStorageSecurityRepository.load(
         storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
       await repository.saveGestureVerifier(
@@ -63,6 +64,7 @@ void main() {
 
       final reloaded = await SecureStorageSecurityRepository.load(
         storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
       expect(reloaded.hasGestureVerifier, isTrue);
@@ -76,6 +78,7 @@ void main() {
       final storage = _FakeSecureStorageAdapter();
       final repository = await SecureStorageSecurityRepository.load(
         storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
       await repository.saveGestureVerifier(
@@ -85,11 +88,72 @@ void main() {
 
       final reloaded = await SecureStorageSecurityRepository.load(
         storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
       expect(repository.shouldLock(DateTime(2026)), isFalse);
       expect(reloaded.shouldLock(DateTime(2026)), isTrue);
     });
+
+    test('unlocks with biometrics when enabled and available', () async {
+      final storage = _FakeSecureStorageAdapter();
+      final biometrics = _FakeBiometricAuthAdapter(available: true);
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: biometrics,
+      );
+
+      await repository.saveGestureVerifier(
+        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+      );
+      await repository.setBiometricUnlockEnabled(true);
+
+      expect(
+        await repository.biometricUnlockStatus(),
+        BiometricUnlockStatus.available,
+      );
+      expect(await repository.unlockWithBiometrics(), isTrue);
+      expect(repository.shouldLock(DateTime.now()), isFalse);
+      expect(biometrics.authenticateCount, 1);
+    });
+
+    test('keeps session locked when biometric authentication fails', () async {
+      final biometrics = _FakeBiometricAuthAdapter(
+        available: true,
+        authenticateResult: false,
+      );
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: _FakeSecureStorageAdapter(),
+        biometricAuth: biometrics,
+      );
+
+      await repository.saveGestureVerifier(
+        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+      );
+      await repository.setBiometricUnlockEnabled(true);
+
+      expect(await repository.unlockWithBiometrics(), isFalse);
+      expect(repository.shouldLock(DateTime.now()), isTrue);
+      expect(biometrics.authenticateCount, 1);
+    });
+
+    test(
+      'keeps biometrics unavailable when the platform cannot use them',
+      () async {
+        final repository = await SecureStorageSecurityRepository.load(
+          storage: _FakeSecureStorageAdapter(),
+          biometricAuth: _FakeBiometricAuthAdapter(available: false),
+        );
+
+        await repository.setBiometricUnlockEnabled(true);
+
+        expect(
+          await repository.biometricUnlockStatus(),
+          BiometricUnlockStatus.unavailable,
+        );
+        expect(await repository.unlockWithBiometrics(), isFalse);
+      },
+    );
   });
 }
 
@@ -107,5 +171,25 @@ class _FakeSecureStorageAdapter implements SecureStorageAdapter {
   @override
   Future<void> delete(String key) async {
     _values.remove(key);
+  }
+}
+
+class _FakeBiometricAuthAdapter implements BiometricAuthAdapter {
+  _FakeBiometricAuthAdapter({
+    this.available = false,
+    this.authenticateResult = true,
+  });
+
+  final bool available;
+  final bool authenticateResult;
+  int authenticateCount = 0;
+
+  @override
+  Future<bool> isAvailable() async => available;
+
+  @override
+  Future<bool> authenticate() async {
+    authenticateCount += 1;
+    return authenticateResult;
   }
 }

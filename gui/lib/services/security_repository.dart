@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:local_auth/local_auth.dart';
 
 class GestureVerifier {
   const GestureVerifier._(this.value);
@@ -66,10 +67,49 @@ class FlutterSecureStorageAdapter implements SecureStorageAdapter {
   Future<void> delete(String key) => _storage.delete(key: key);
 }
 
+enum BiometricUnlockStatus { unavailable, disabled, available }
+
+abstract interface class BiometricAuthAdapter {
+  Future<bool> isAvailable();
+
+  Future<bool> authenticate();
+}
+
+class LocalAuthBiometricAdapter implements BiometricAuthAdapter {
+  LocalAuthBiometricAdapter([LocalAuthentication? auth])
+    : _auth = auth ?? LocalAuthentication();
+
+  final LocalAuthentication _auth;
+
+  @override
+  Future<bool> isAvailable() async {
+    try {
+      return await _auth.canCheckBiometrics && await _auth.isDeviceSupported();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> authenticate() async {
+    try {
+      return await _auth.authenticate(
+        localizedReason: 'Unlock the local Pars app session',
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
 abstract interface class SecurityRepository {
   bool get hasGestureVerifier;
 
   bool get lockOnResume;
+
+  bool get biometricUnlockEnabled;
 
   Duration get autoLockTimeout;
 
@@ -85,6 +125,12 @@ abstract interface class SecurityRepository {
 
   Future<void> setLockOnResume(bool enabled);
 
+  Future<void> setBiometricUnlockEnabled(bool enabled);
+
+  Future<BiometricUnlockStatus> biometricUnlockStatus();
+
+  Future<bool> unlockWithBiometrics();
+
   Future<void> setAutoLockTimeout(Duration timeout);
 
   bool shouldLock(DateTime now);
@@ -94,22 +140,26 @@ class InMemorySecurityRepository implements SecurityRepository {
   InMemorySecurityRepository({
     GestureVerifier? gestureVerifier,
     bool lockOnResume = false,
+    bool biometricUnlockEnabled = false,
     Duration autoLockTimeout = const Duration(minutes: 15),
     DateTime? lastUnlockedAt,
   }) : _gestureVerifier = gestureVerifier,
        _lockOnResume = lockOnResume,
+       _biometricUnlockEnabled = biometricUnlockEnabled,
        _autoLockTimeout = autoLockTimeout,
        _lastUnlockedAt = lastUnlockedAt;
 
   factory InMemorySecurityRepository.withPattern(
     List<int> pattern, {
     bool lockOnResume = false,
+    bool biometricUnlockEnabled = false,
     Duration autoLockTimeout = const Duration(minutes: 15),
     DateTime? lastUnlockedAt,
   }) {
     return InMemorySecurityRepository(
       gestureVerifier: GestureVerifier.fromPattern(pattern),
       lockOnResume: lockOnResume,
+      biometricUnlockEnabled: biometricUnlockEnabled,
       autoLockTimeout: autoLockTimeout,
       lastUnlockedAt: lastUnlockedAt,
     );
@@ -117,6 +167,7 @@ class InMemorySecurityRepository implements SecurityRepository {
 
   GestureVerifier? _gestureVerifier;
   bool _lockOnResume;
+  bool _biometricUnlockEnabled;
   Duration _autoLockTimeout;
   DateTime? _lastUnlockedAt;
 
@@ -125,6 +176,9 @@ class InMemorySecurityRepository implements SecurityRepository {
 
   @override
   bool get lockOnResume => _lockOnResume;
+
+  @override
+  bool get biometricUnlockEnabled => _biometricUnlockEnabled;
 
   @override
   Duration get autoLockTimeout => _autoLockTimeout;
@@ -157,6 +211,22 @@ class InMemorySecurityRepository implements SecurityRepository {
   }
 
   @override
+  Future<void> setBiometricUnlockEnabled(bool enabled) async {
+    _biometricUnlockEnabled = enabled;
+  }
+
+  @override
+  Future<BiometricUnlockStatus> biometricUnlockStatus() async {
+    if (!_biometricUnlockEnabled) {
+      return BiometricUnlockStatus.disabled;
+    }
+    return BiometricUnlockStatus.unavailable;
+  }
+
+  @override
+  Future<bool> unlockWithBiometrics() async => false;
+
+  @override
   Future<void> setAutoLockTimeout(Duration timeout) async {
     _autoLockTimeout = timeout;
   }
@@ -177,29 +247,38 @@ class InMemorySecurityRepository implements SecurityRepository {
 class SecureStorageSecurityRepository implements SecurityRepository {
   SecureStorageSecurityRepository._({
     required SecureStorageAdapter storage,
+    required BiometricAuthAdapter biometricAuth,
     required GestureVerifier? gestureVerifier,
     required bool lockOnResume,
+    required bool biometricUnlockEnabled,
     required Duration autoLockTimeout,
   }) : _storage = storage,
+       _biometricAuth = biometricAuth,
        _gestureVerifier = gestureVerifier,
        _lockOnResume = lockOnResume,
+       _biometricUnlockEnabled = biometricUnlockEnabled,
        _autoLockTimeout = autoLockTimeout;
 
   static const _gestureVerifierKey = 'pars.security.gesture_verifier.v1';
   static const _lockOnResumeKey = 'pars.security.lock_on_resume.v1';
+  static const _biometricUnlockEnabledKey =
+      'pars.security.biometric_unlock_enabled.v1';
   static const _autoLockTimeoutSecondsKey =
       'pars.security.auto_lock_timeout_seconds.v1';
   static const _defaultAutoLockTimeout = Duration(minutes: 15);
 
   final SecureStorageAdapter _storage;
+  final BiometricAuthAdapter _biometricAuth;
 
   GestureVerifier? _gestureVerifier;
   bool _lockOnResume;
+  bool _biometricUnlockEnabled;
   Duration _autoLockTimeout;
   DateTime? _lastUnlockedAt;
 
   static Future<SecureStorageSecurityRepository> load({
     SecureStorageAdapter storage = const FlutterSecureStorageAdapter(),
+    BiometricAuthAdapter? biometricAuth,
   }) async {
     final verifierValue = await storage.read(_gestureVerifierKey);
     GestureVerifier? verifier;
@@ -213,8 +292,13 @@ class SecureStorageSecurityRepository implements SecurityRepository {
 
     return SecureStorageSecurityRepository._(
       storage: storage,
+      biometricAuth: biometricAuth ?? LocalAuthBiometricAdapter(),
       gestureVerifier: verifier,
       lockOnResume: await _readBool(storage, _lockOnResumeKey),
+      biometricUnlockEnabled: await _readBool(
+        storage,
+        _biometricUnlockEnabledKey,
+      ),
       autoLockTimeout: await _readDuration(
         storage,
         _autoLockTimeoutSecondsKey,
@@ -228,6 +312,9 @@ class SecureStorageSecurityRepository implements SecurityRepository {
 
   @override
   bool get lockOnResume => _lockOnResume;
+
+  @override
+  bool get biometricUnlockEnabled => _biometricUnlockEnabled;
 
   @override
   Duration get autoLockTimeout => _autoLockTimeout;
@@ -259,6 +346,38 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   Future<void> setLockOnResume(bool enabled) async {
     await _storage.write(key: _lockOnResumeKey, value: enabled ? '1' : '0');
     _lockOnResume = enabled;
+  }
+
+  @override
+  Future<void> setBiometricUnlockEnabled(bool enabled) async {
+    await _storage.write(
+      key: _biometricUnlockEnabledKey,
+      value: enabled ? '1' : '0',
+    );
+    _biometricUnlockEnabled = enabled;
+  }
+
+  @override
+  Future<BiometricUnlockStatus> biometricUnlockStatus() async {
+    if (!await _biometricAuth.isAvailable()) {
+      return BiometricUnlockStatus.unavailable;
+    }
+    if (!_biometricUnlockEnabled) {
+      return BiometricUnlockStatus.disabled;
+    }
+    return BiometricUnlockStatus.available;
+  }
+
+  @override
+  Future<bool> unlockWithBiometrics() async {
+    if (await biometricUnlockStatus() != BiometricUnlockStatus.available) {
+      return false;
+    }
+    final unlocked = await _biometricAuth.authenticate();
+    if (unlocked) {
+      await markUnlocked(DateTime.now());
+    }
+    return unlocked;
   }
 
   @override
