@@ -1,94 +1,140 @@
-enum BridgeFailureCategory {
-  configError,
-  storeError,
-  pgpError,
-  gitError,
-  clipboardError,
-  validationError,
-  conflict,
-  unsupportedPlatform,
-  unknown,
-}
+import 'frb_generated/api.dart' as frb;
 
 abstract interface class ParsBridgeApi {
-  Future<Map<String, Object?>> loadConfig(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> saveConfig(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> listStores(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> listEntries(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> readEntry(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> copyEntryPassword(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> insertEntry(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> generateEntry(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> editEntry(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> moveEntry(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> deleteEntry(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> gitStatus(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> gitPull(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> gitPush(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> gitCommit(Map<String, Object?> request);
-
-  Future<Map<String, Object?>> runGitArgs(Map<String, Object?> request);
-}
-
-class BridgeFailure implements Exception {
-  const BridgeFailure({
-    required this.category,
-    required this.message,
-    this.conflictKind,
-    this.path,
+  Future<frb.ConfigResponse> loadConfig({
+    required frb.LoadConfigRequest request,
   });
 
-  factory BridgeFailure.fromJson(Map<String, Object?> json) {
-    return BridgeFailure(
-      category: _categoryFromRustName(json['category'] as String?),
-      message: json['message'] as String? ?? 'Unknown bridge failure',
-      conflictKind: json['conflict_kind'] as String?,
-      path: json['path'] as String?,
-    );
-  }
+  Future<frb.UnitResponse> saveConfig({required frb.SaveConfigRequest request});
 
-  final BridgeFailureCategory category;
-  final String message;
-  final String? conflictKind;
-  final String? path;
+  Future<frb.ListStoresResponse> listStores({
+    required frb.ListStoresRequest request,
+  });
 
-  static BridgeFailureCategory _categoryFromRustName(String? category) {
-    switch (category) {
-      case 'ConfigError':
-        return BridgeFailureCategory.configError;
-      case 'StoreError':
-        return BridgeFailureCategory.storeError;
-      case 'PgpError':
-        return BridgeFailureCategory.pgpError;
-      case 'GitError':
-        return BridgeFailureCategory.gitError;
-      case 'ClipboardError':
-        return BridgeFailureCategory.clipboardError;
-      case 'ValidationError':
-        return BridgeFailureCategory.validationError;
-      case 'Conflict':
-        return BridgeFailureCategory.conflict;
-      case 'UnsupportedPlatform':
-        return BridgeFailureCategory.unsupportedPlatform;
-      default:
-        return BridgeFailureCategory.unknown;
-    }
-  }
+  Future<frb.ListEntriesResponse> listEntries({
+    required frb.ListEntriesRequest request,
+  });
+
+  Future<frb.EntrySecretResponse> readEntry({
+    required frb.EntryRequest request,
+  });
+
+  Future<frb.CopyEntryPasswordResponse> copyEntryPassword({
+    required frb.EntryRequest request,
+  });
+
+  Future<frb.InsertEntryResponse> insertEntry({
+    required frb.InsertEntryRequest request,
+  });
+
+  Future<frb.GenerateEntryResponse> generateEntry({
+    required frb.GenerateEntryRequest request,
+  });
+
+  Future<frb.MutationResponse> editEntry({
+    required frb.EditEntryRequest request,
+  });
+
+  Future<frb.MutationResponse> moveEntry({
+    required frb.MoveEntryRequest request,
+  });
+
+  Future<frb.DeleteEntryResponse> deleteEntry({
+    required frb.DeleteEntryRequest request,
+  });
+
+  Future<frb.GitCommandResponse> gitStatus({required frb.GitRequest request});
+
+  Future<frb.GitCommandResponse> gitPull({required frb.GitRequest request});
+
+  Future<frb.GitCommandResponse> gitPush({required frb.GitRequest request});
+
+  Future<frb.GitCommandResponse> gitCommit({
+    required frb.GitCommitRequest request,
+  });
+
+  Future<frb.GitCommandResponse> runGitArgs({
+    required frb.GitArgsRequest request,
+  });
+}
+
+final class FrbParsBridgeApi implements ParsBridgeApi {
+  const FrbParsBridgeApi();
 
   @override
-  String toString() => 'BridgeFailure(${category.name}): $message';
+  Future<frb.ConfigResponse> loadConfig({
+    required frb.LoadConfigRequest request,
+  }) => frb.loadConfig(request: request);
+
+  @override
+  Future<frb.UnitResponse> saveConfig({
+    required frb.SaveConfigRequest request,
+  }) => frb.saveConfig(request: request);
+
+  @override
+  Future<frb.ListStoresResponse> listStores({
+    required frb.ListStoresRequest request,
+  }) => frb.listStores(request: request);
+
+  @override
+  Future<frb.ListEntriesResponse> listEntries({
+    required frb.ListEntriesRequest request,
+  }) => frb.listEntries(request: request);
+
+  @override
+  Future<frb.EntrySecretResponse> readEntry({
+    required frb.EntryRequest request,
+  }) => frb.readEntry(request: request);
+
+  @override
+  Future<frb.CopyEntryPasswordResponse> copyEntryPassword({
+    required frb.EntryRequest request,
+  }) => frb.copyEntryPassword(request: request);
+
+  @override
+  Future<frb.InsertEntryResponse> insertEntry({
+    required frb.InsertEntryRequest request,
+  }) => frb.insertEntry(request: request);
+
+  @override
+  Future<frb.GenerateEntryResponse> generateEntry({
+    required frb.GenerateEntryRequest request,
+  }) => frb.generateEntry(request: request);
+
+  @override
+  Future<frb.MutationResponse> editEntry({
+    required frb.EditEntryRequest request,
+  }) => frb.editEntry(request: request);
+
+  @override
+  Future<frb.MutationResponse> moveEntry({
+    required frb.MoveEntryRequest request,
+  }) => frb.moveEntry(request: request);
+
+  @override
+  Future<frb.DeleteEntryResponse> deleteEntry({
+    required frb.DeleteEntryRequest request,
+  }) => frb.deleteEntry(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> gitStatus({required frb.GitRequest request}) =>
+      frb.gitStatus(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> gitPull({required frb.GitRequest request}) =>
+      frb.gitPull(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> gitPush({required frb.GitRequest request}) =>
+      frb.gitPush(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> gitCommit({
+    required frb.GitCommitRequest request,
+  }) => frb.gitCommit(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> runGitArgs({
+    required frb.GitArgsRequest request,
+  }) => frb.runGitArgs(request: request);
 }

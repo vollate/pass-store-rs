@@ -1,18 +1,18 @@
 [tooling]
-selected = "manual-dart-ffi"
-reason = "No external code generator is required for the milestone-2 bridge surface; Rust exports a stable C ABI JSON dispatcher and Dart consumes it through a mockable async API."
-future_candidate = "flutter_rust_bridge v2"
+selected = "flutter_rust_bridge"
+version = "2.12.0"
+reason = "Use flutter_rust_bridge v2 for generated Dart/Rust bindings instead of maintaining a handwritten transport protocol."
 
 [rust]
 crate = "pars-bridge"
 entrypoint = "bridge/src/api.rs"
-c_abi_call = "pars_bridge_call"
-c_abi_free = "pars_bridge_free_string"
+generated = "bridge/src/frb_generated.rs"
 depends_on = ["pars-core"]
 must_not_depend_on = ["pars-cli"]
 
 [dart]
 api = "gui/lib/bridge/pars_bridge_api.dart"
+generated = "gui/lib/bridge/frb_generated/api.dart"
 methods = [
   "load_config",
   "save_config",

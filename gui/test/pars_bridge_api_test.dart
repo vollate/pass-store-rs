@@ -1,31 +1,35 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
 import 'package:pars_gui/bridge/pars_bridge_api.dart';
 
 void main() {
-  test('mock bridge exposes async entry list calls', () async {
+  test('mock bridge exposes async FRB entry list calls', () async {
     final bridge = _MockParsBridgeApi();
 
-    final entries = await bridge.listEntries(<String, Object?>{
-      'root': '/tmp/password-store',
-      'recursive': true,
-    });
+    final response = await bridge.listEntries(
+      request: const frb.ListEntriesRequest(
+        root: '/tmp/password-store',
+        recursive: true,
+      ),
+    );
 
-    expect(entries['count'], 2);
+    expect(response.entries, hasLength(2));
+    expect(response.entries.first.path, 'github');
     expect(bridge.calledMethods, contains('list_entries'));
   });
 
-  test('bridge failures preserve typed Rust error fields', () {
-    final failure = BridgeFailure.fromJson(<String, Object?>{
-      'category': 'Conflict',
-      'message': 'entry already exists: github',
-      'conflict_kind': 'EntryAlreadyExists',
-      'path': 'github',
-    });
+  test('FRB generated failures preserve typed Rust error fields', () {
+    const failure = frb.BridgeFailure(
+      category: frb.BridgeFailureCategory.conflict,
+      message: 'entry already exists: github',
+      conflictKind: 'EntryAlreadyExists',
+      path: 'github',
+    );
 
-    expect(failure.category, BridgeFailureCategory.conflict);
+    expect(failure.category, frb.BridgeFailureCategory.conflict);
     expect(failure.conflictKind, 'EntryAlreadyExists');
     expect(failure.path, 'github');
-    expect(failure.toString(), contains('entry already exists'));
+    expect(failure.message, contains('entry already exists'));
   });
 }
 
@@ -33,75 +37,145 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   final List<String> calledMethods = <String>[];
 
   @override
-  Future<Map<String, Object?>> loadConfig(Map<String, Object?> request) =>
-      _record('load_config');
+  Future<frb.ConfigResponse> loadConfig({
+    required frb.LoadConfigRequest request,
+  }) async {
+    calledMethods.add('load_config');
+    return const frb.ConfigResponse(configToml: '');
+  }
 
   @override
-  Future<Map<String, Object?>> saveConfig(Map<String, Object?> request) =>
-      _record('save_config');
+  Future<frb.UnitResponse> saveConfig({
+    required frb.SaveConfigRequest request,
+  }) async {
+    calledMethods.add('save_config');
+    return const frb.UnitResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> listStores(Map<String, Object?> request) =>
-      _record('list_stores');
+  Future<frb.ListStoresResponse> listStores({
+    required frb.ListStoresRequest request,
+  }) async {
+    calledMethods.add('list_stores');
+    return const frb.ListStoresResponse(stores: <frb.StoreInfoDto>[]);
+  }
 
   @override
-  Future<Map<String, Object?>> listEntries(Map<String, Object?> request) =>
-      _record('list_entries', <String, Object?>{'count': 2});
+  Future<frb.ListEntriesResponse> listEntries({
+    required frb.ListEntriesRequest request,
+  }) async {
+    calledMethods.add('list_entries');
+    return frb.ListEntriesResponse(
+      entries: <frb.EntrySummaryDto>[
+        frb.EntrySummaryDto(
+          path: 'github',
+          name: 'github',
+          entryType: 'File',
+          childCount: 0,
+        ),
+        frb.EntrySummaryDto(
+          path: 'work',
+          name: 'work',
+          entryType: 'Directory',
+          childCount: 1,
+        ),
+      ],
+    );
+  }
 
   @override
-  Future<Map<String, Object?>> readEntry(Map<String, Object?> request) =>
-      _record('read_entry');
+  Future<frb.EntrySecretResponse> readEntry({
+    required frb.EntryRequest request,
+  }) async {
+    calledMethods.add('read_entry');
+    return const frb.EntrySecretResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> copyEntryPassword(
-    Map<String, Object?> request,
-  ) => _record('copy_entry_password');
+  Future<frb.CopyEntryPasswordResponse> copyEntryPassword({
+    required frb.EntryRequest request,
+  }) async {
+    calledMethods.add('copy_entry_password');
+    return const frb.CopyEntryPasswordResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> insertEntry(Map<String, Object?> request) =>
-      _record('insert_entry');
+  Future<frb.InsertEntryResponse> insertEntry({
+    required frb.InsertEntryRequest request,
+  }) async {
+    calledMethods.add('insert_entry');
+    return const frb.InsertEntryResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> generateEntry(Map<String, Object?> request) =>
-      _record('generate_entry');
+  Future<frb.GenerateEntryResponse> generateEntry({
+    required frb.GenerateEntryRequest request,
+  }) async {
+    calledMethods.add('generate_entry');
+    return const frb.GenerateEntryResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> editEntry(Map<String, Object?> request) =>
-      _record('edit_entry');
+  Future<frb.MutationResponse> editEntry({
+    required frb.EditEntryRequest request,
+  }) async {
+    calledMethods.add('edit_entry');
+    return const frb.MutationResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> moveEntry(Map<String, Object?> request) =>
-      _record('move_entry');
+  Future<frb.MutationResponse> moveEntry({
+    required frb.MoveEntryRequest request,
+  }) async {
+    calledMethods.add('move_entry');
+    return const frb.MutationResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> deleteEntry(Map<String, Object?> request) =>
-      _record('delete_entry');
+  Future<frb.DeleteEntryResponse> deleteEntry({
+    required frb.DeleteEntryRequest request,
+  }) async {
+    calledMethods.add('delete_entry');
+    return const frb.DeleteEntryResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> gitStatus(Map<String, Object?> request) =>
-      _record('git_status');
+  Future<frb.GitCommandResponse> gitStatus({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_status');
+    return const frb.GitCommandResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> gitPull(Map<String, Object?> request) =>
-      _record('git_pull');
+  Future<frb.GitCommandResponse> gitPull({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_pull');
+    return const frb.GitCommandResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> gitPush(Map<String, Object?> request) =>
-      _record('git_push');
+  Future<frb.GitCommandResponse> gitPush({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_push');
+    return const frb.GitCommandResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> gitCommit(Map<String, Object?> request) =>
-      _record('git_commit');
+  Future<frb.GitCommandResponse> gitCommit({
+    required frb.GitCommitRequest request,
+  }) async {
+    calledMethods.add('git_commit');
+    return const frb.GitCommandResponse();
+  }
 
   @override
-  Future<Map<String, Object?>> runGitArgs(Map<String, Object?> request) =>
-      _record('run_git_args');
-
-  Future<Map<String, Object?>> _record(
-    String method, [
-    Map<String, Object?> response = const <String, Object?>{},
-  ]) async {
-    calledMethods.add(method);
-    return response;
+  Future<frb.GitCommandResponse> runGitArgs({
+    required frb.GitArgsRequest request,
+  }) async {
+    calledMethods.add('run_git_args');
+    return const frb.GitCommandResponse();
   }
 }

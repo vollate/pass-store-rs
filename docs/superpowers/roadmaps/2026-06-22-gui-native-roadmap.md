@@ -12,7 +12,7 @@ This roadmap tracks the remaining work needed to turn the current Flutter GUI sh
 - [x] Phase 1 Flutter UI shell implemented with demo data.
 - [ ] Do not execute `pars-cli` from Flutter for normal product behavior.
 - [ ] Expose stable Rust APIs from `pars-core` for GUI use.
-- [ ] Use `flutter_rust_bridge` or an equivalent Flutter/Rust native bridge for Dart-to-Rust calls.
+- [x] Use `flutter_rust_bridge` or an equivalent Flutter/Rust native bridge for Dart-to-Rust calls.
 - [ ] Keep CLI-specific prompting, terminal I/O, and colorized tree output out of the GUI API.
 - [ ] Treat bundled GPG/OpenPGP support as a first-class platform packaging problem, not a late afterthought.
 - [ ] Update this roadmap checkbox-by-checkbox as tasks are completed.
@@ -98,7 +98,7 @@ Goal: create a core API layer that is friendly to GUI/native callers and does no
 Goal: connect Flutter to Rust core directly.
 
 - [x] Choose bridge tooling and version, with `flutter_rust_bridge` v2 as the default candidate.
-  - Selected milestone-2 tooling: handwritten Dart FFI-compatible bridge with a stable C ABI JSON dispatcher. `flutter_rust_bridge` v2 remains the future generator candidate once dependency/codegen adoption is desired.
+  - Selected milestone-2 tooling: `flutter_rust_bridge` v2.12.0 generates the Dart/Rust bridge surface from `bridge/src/api.rs`.
 - [x] Add Rust crate or module for bridge entrypoints:
   - [x] Decide between embedding bridge code inside `gui/` or a separate `pars-bridge` crate.
   - [x] Ensure bridge crate depends on `pars-core`, not `pars-cli`.
