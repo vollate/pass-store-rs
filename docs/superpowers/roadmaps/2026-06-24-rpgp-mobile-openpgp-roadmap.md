@@ -1,5 +1,7 @@
 # rPGP Mobile OpenPGP Roadmap
 
+Status: completed
+
 Goal: ship mobile PGP without requiring bundled GnuPG or an external OpenPGP
 provider.
 

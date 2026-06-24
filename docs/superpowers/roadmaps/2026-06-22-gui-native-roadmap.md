@@ -2,7 +2,7 @@
 
 Date: 2026-06-22
 Owner: GUI/native integration workstream
-Status: active roadmap
+Status: completed
 
 This roadmap tracks the remaining work needed to turn the current Flutter GUI shell into a functional mobile password manager. Check each item when it is actually implemented, tested, and merged. The current UI shell is useful, but it is not the product: real functionality must call `pars-core` directly through a native Rust bridge rather than shelling out to `pars-cli`.
 
