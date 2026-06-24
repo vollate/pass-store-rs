@@ -14,7 +14,12 @@ The backend choices in config are:
 - `system_gpg`: use an installed GnuPG executable.
 - `bundled`: use an app-packaged GnuPG executable resolved from config or platform
   packaging.
-- `pure_rust`: reserved for the future Rust OpenPGP implementation.
+- `pure_rust`: use the in-process Rust OpenPGP backend.
+
+The first pure Rust implementation uses the `pgp` crate from
+[rpgp/rpgp](https://github.com/rpgp/rpgp). This follows the same broad direction
+as Android Password Store's move away from OpenKeychain and into an app-owned
+OpenPGP backend, while keeping Pars' CLI/desktop default on system GnuPG.
 
 The compatibility target remains existing `pass` stores: `.gpg-id` recipient
 selection, armored key import/export, generated key support, and encrypted `.gpg`
@@ -56,6 +61,12 @@ default, it must pass compatibility tests for:
 - Public and private key import/export.
 - Fingerprint inspection matching GnuPG expectations.
 - Decrypt/encrypt round trips against GnuPG-generated sample entries.
+
+The first rPGP milestone intentionally implements the smallest pass-compatible
+subset: app-owned key import/export/listing, fingerprint lookup, `.gpg-id`
+recipient resolution, entry encryption, and entry decryption. Advanced OpenPGP
+semantics such as revocation policy, Web of Trust, keyserver interaction,
+smart cards, and GnuPG ownertrust are outside this milestone.
 
 ## Migration
 

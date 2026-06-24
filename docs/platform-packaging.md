@@ -22,13 +22,18 @@ the native Rust bridge.
 
 ## Crypto And Git Backends
 
-Phase 1 keeps Git and OpenPGP as configured system backends:
+Phase 1 keeps Git as a configured system backend and uses pure Rust OpenPGP on
+mobile:
 
 - Git is invoked through the selected store path using the system `git` command.
-- OpenPGP uses the configured `gpg` executable or the `PATH` default.
-- Bundled OpenPGP/Git binaries are reserved for target-specific release work.
-  Release packages that include bundled binaries must place them under the app
-  resources directory, set the config backend path, and include their notices in
+- CLI and desktop PGP operations use GnuPG (`gpg`) through the existing
+  external-command backend by default.
+- Android and iOS use the `pure_rust` backend built on the rPGP `pgp` crate.
+  This avoids mobile subprocess and dynamic-linking constraints.
+- Bundled GnuPG is a fallback packaging route for desktop or specialist builds,
+  not the mobile default.
+- Release packages that include bundled binaries must include their exact
+  version, source URL, license, and packaged path in
   [THIRD_PARTY_PACKAGING_NOTICES.md](THIRD_PARTY_PACKAGING_NOTICES.md).
 
 The Settings runtime diagnostics sheet shows the bridge load state, core
