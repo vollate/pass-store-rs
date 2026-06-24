@@ -388,7 +388,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _showError(Object error) {
-    setState(() => _error = error.toString());
+    final message = error is StateError ? error.message : error.toString();
+    setState(() => _error = message);
   }
 
   Future<void> _usePgpKey(KeyRepository repository, KeyRecord key) async {

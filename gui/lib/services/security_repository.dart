@@ -625,6 +625,14 @@ class SecureStorageSecurityRepository implements SecurityRepository {
 
   @override
   Future<void> setBiometricUnlockEnabled(bool enabled) async {
+    if (enabled && !_biometricUnlockEnabled) {
+      if (!await _biometricAuth.isAvailable()) {
+        throw StateError('Biometric unlock is unavailable on this device.');
+      }
+      if (!await _biometricAuth.authenticate()) {
+        throw StateError('Biometric authentication failed.');
+      }
+    }
     await _storage.write(
       key: _biometricUnlockEnabledKey,
       value: enabled ? '1' : '0',

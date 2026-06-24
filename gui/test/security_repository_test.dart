@@ -140,6 +140,55 @@ void main() {
       expect(reloaded.shouldLock(DateTime(2026)), isTrue);
     });
 
+    test('enabling biometric unlock authenticates before persisting', () async {
+      final storage = _FakeSecureStorageAdapter();
+      final biometrics = _FakeBiometricAuthAdapter(available: true);
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: biometrics,
+      );
+
+      await repository.setBiometricUnlockEnabled(true);
+
+      expect(biometrics.authenticateCount, 1);
+      expect(repository.biometricUnlockEnabled, isTrue);
+
+      final reloaded = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(available: true),
+      );
+      expect(reloaded.biometricUnlockEnabled, isTrue);
+    });
+
+    test(
+      'does not enable biometric unlock when authentication fails',
+      () async {
+        final storage = _FakeSecureStorageAdapter();
+        final biometrics = _FakeBiometricAuthAdapter(
+          available: true,
+          authenticateResult: false,
+        );
+        final repository = await SecureStorageSecurityRepository.load(
+          storage: storage,
+          biometricAuth: biometrics,
+        );
+
+        await expectLater(
+          repository.setBiometricUnlockEnabled(true),
+          throwsStateError,
+        );
+
+        expect(biometrics.authenticateCount, 1);
+        expect(repository.biometricUnlockEnabled, isFalse);
+
+        final reloaded = await SecureStorageSecurityRepository.load(
+          storage: storage,
+          biometricAuth: _FakeBiometricAuthAdapter(available: true),
+        );
+        expect(reloaded.biometricUnlockEnabled, isFalse);
+      },
+    );
+
     test('unlocks with biometrics when enabled and available', () async {
       final storage = _FakeSecureStorageAdapter();
       final biometrics = _FakeBiometricAuthAdapter(available: true);
@@ -159,7 +208,7 @@ void main() {
       );
       expect(await repository.unlockWithBiometrics(), isTrue);
       expect(repository.shouldLock(DateTime.now()), isFalse);
-      expect(biometrics.authenticateCount, 1);
+      expect(biometrics.authenticateCount, 2);
     });
 
     test(
@@ -251,7 +300,7 @@ void main() {
     test('keeps session locked when biometric authentication fails', () async {
       final biometrics = _FakeBiometricAuthAdapter(
         available: true,
-        authenticateResult: false,
+        authenticateResults: const <bool>[true, false],
       );
       final repository = await SecureStorageSecurityRepository.load(
         storage: _FakeSecureStorageAdapter(),
@@ -265,7 +314,7 @@ void main() {
 
       expect(await repository.unlockWithBiometrics(), isFalse);
       expect(repository.shouldLock(DateTime.now()), isTrue);
-      expect(biometrics.authenticateCount, 1);
+      expect(biometrics.authenticateCount, 2);
     });
 
     test(
@@ -276,7 +325,10 @@ void main() {
           biometricAuth: _FakeBiometricAuthAdapter(available: false),
         );
 
-        await repository.setBiometricUnlockEnabled(true);
+        await expectLater(
+          repository.setBiometricUnlockEnabled(true),
+          throwsStateError,
+        );
 
         expect(
           await repository.biometricUnlockStatus(),
@@ -351,10 +403,12 @@ class _FakeBiometricAuthAdapter implements BiometricAuthAdapter {
   _FakeBiometricAuthAdapter({
     this.available = false,
     this.authenticateResult = true,
-  });
+    List<bool>? authenticateResults,
+  }) : _authenticateResults = authenticateResults ?? const <bool>[];
 
   final bool available;
   final bool authenticateResult;
+  final List<bool> _authenticateResults;
   int authenticateCount = 0;
 
   @override
@@ -363,6 +417,9 @@ class _FakeBiometricAuthAdapter implements BiometricAuthAdapter {
   @override
   Future<bool> authenticate() async {
     authenticateCount += 1;
+    if (authenticateCount <= _authenticateResults.length) {
+      return _authenticateResults[authenticateCount - 1];
+    }
     return authenticateResult;
   }
 }

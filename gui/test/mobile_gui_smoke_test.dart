@@ -1451,15 +1451,16 @@ void main() {
       await securityRepository.readActivePgpPassphrase(),
       'pgp-passphrase',
     );
-    expect(biometrics.authenticateCount, 1);
+    expect(biometrics.authenticateCount, 2);
   });
 
   testWidgets('settings enables biometric unlock when available', (
     tester,
   ) async {
+    final biometrics = _FakeBiometricAuthAdapter(available: true);
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
-      biometricAuth: _FakeBiometricAuthAdapter(available: true),
+      biometricAuth: biometrics,
     );
     await securityRepository.saveGestureVerifier(
       GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
@@ -1487,6 +1488,47 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(securityRepository.biometricUnlockEnabled, isTrue);
+    expect(biometrics.authenticateCount, 1);
+  });
+
+  testWidgets('settings keeps biometric unlock disabled when auth fails', (
+    tester,
+  ) async {
+    final biometrics = _FakeBiometricAuthAdapter(
+      available: true,
+      authenticateResult: false,
+    );
+    final securityRepository = await SecureStorageSecurityRepository.load(
+      storage: _FakeSecureStorageAdapter(),
+      biometricAuth: biometrics,
+    );
+    await securityRepository.saveGestureVerifier(
+      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+    );
+    await securityRepository.markUnlocked(DateTime.now());
+    await securityRepository.setOnboardingComplete(true);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Biometric unlock'));
+    await tester.pumpAndSettle();
+
+    expect(securityRepository.biometricUnlockEnabled, isFalse);
+    expect(biometrics.authenticateCount, 1);
+    expect(find.text('Biometric authentication failed.'), findsOneWidget);
   });
 
   testWidgets('settings stores and clears PGP passphrase cache', (
@@ -1645,9 +1687,13 @@ class _FakeSecureStorageAdapter implements SecureStorageAdapter {
 }
 
 class _FakeBiometricAuthAdapter implements BiometricAuthAdapter {
-  _FakeBiometricAuthAdapter({this.available = false});
+  _FakeBiometricAuthAdapter({
+    this.available = false,
+    this.authenticateResult = true,
+  });
 
   final bool available;
+  final bool authenticateResult;
   int authenticateCount = 0;
 
   @override
@@ -1656,7 +1702,7 @@ class _FakeBiometricAuthAdapter implements BiometricAuthAdapter {
   @override
   Future<bool> authenticate() async {
     authenticateCount += 1;
-    return true;
+    return authenticateResult;
   }
 }
 

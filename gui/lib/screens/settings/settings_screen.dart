@@ -339,9 +339,23 @@ class SettingsScreen extends StatelessWidget {
                                 status == BiometricUnlockStatus.unavailable
                                     ? null
                                     : (value) async {
-                                      await securityRepository
-                                          .setBiometricUnlockEnabled(value);
-                                      onSecuritySettingsChanged?.call();
+                                      try {
+                                        await securityRepository
+                                            .setBiometricUnlockEnabled(value);
+                                        onSecuritySettingsChanged?.call();
+                                      } catch (error) {
+                                        if (rootContext.mounted) {
+                                          final message =
+                                              error is StateError
+                                                  ? error.message
+                                                  : '$error';
+                                          ScaffoldMessenger.of(
+                                            rootContext,
+                                          ).showSnackBar(
+                                            SnackBar(content: Text(message)),
+                                          );
+                                        }
+                                      }
                                       setSheetState(() {});
                                     },
                           );
