@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.pars_gui"
+    namespace = "top.vollate.pars_gui"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

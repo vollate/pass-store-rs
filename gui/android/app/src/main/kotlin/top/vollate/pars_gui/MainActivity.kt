@@ -1,4 +1,4 @@
-package com.example.pars_gui
+package top.vollate.pars_gui
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

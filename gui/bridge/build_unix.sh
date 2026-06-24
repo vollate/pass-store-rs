@@ -26,13 +26,23 @@ GUI_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${GUI_DIR}/.." && pwd)"
 PROFILE="${PARS_BRIDGE_PROFILE:-debug}"
 
-cargo_args() {
-  printf '%s\n' build -p pars-bridge
+is_release_profile() {
   case "$1" in
     release|Release|profile|Profile)
-      printf '%s\n' --release
+      return 0
       ;;
   esac
+  return 1
+}
+
+run_cargo_build() {
+  local profile="$1"
+  shift
+  if is_release_profile "$profile"; then
+    cargo build -p pars-bridge --release "$@"
+  else
+    cargo build -p pars-bridge "$@"
+  fi
 }
 
 profile_dir() {
@@ -53,8 +63,7 @@ build_linux() {
   local output_dir="${PARS_LINUX_OUTPUT_DIR:-${GUI_DIR}/build/native/linux}"
 
   cd "$REPO_ROOT"
-  mapfile -t args < <(cargo_args "$profile")
-  cargo "${args[@]}"
+  run_cargo_build "$profile"
   mkdir -p "$output_dir"
   cp "${REPO_ROOT}/target/${dir}/libpars_bridge.so" "${output_dir}/libpars_bridge.so"
 }
@@ -70,14 +79,23 @@ build_android() {
   fi
 
   cd "$REPO_ROOT"
-  mapfile -t args < <(cargo_args "$profile")
-  cargo ndk \
-    -t armeabi-v7a \
-    -t arm64-v8a \
-    -t x86 \
-    -t x86_64 \
-    -o "$output_dir" \
-    "${args[@]}"
+  if is_release_profile "$profile"; then
+    cargo ndk \
+      -t armeabi-v7a \
+      -t arm64-v8a \
+      -t x86 \
+      -t x86_64 \
+      -o "$output_dir" \
+      build -p pars-bridge --release
+  else
+    cargo ndk \
+      -t armeabi-v7a \
+      -t arm64-v8a \
+      -t x86 \
+      -t x86_64 \
+      -o "$output_dir" \
+      build -p pars-bridge
+  fi
 }
 
 build_ios_target() {
@@ -88,8 +106,7 @@ build_ios_target() {
 
   rustup target add "$target" >&2
   cd "$REPO_ROOT"
-  mapfile -t args < <(cargo_args "$profile")
-  cargo "${args[@]}" --target "$target"
+  run_cargo_build "$profile" --target "$target"
   printf '%s\n' "${REPO_ROOT}/target/${target}/${dir}/libpars_bridge.a"
 }
 
