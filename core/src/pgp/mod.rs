@@ -2,6 +2,7 @@
 pub mod backend;
 pub mod crypto;
 pub mod key_management;
+pub mod rpgp_backend;
 pub mod utils;
 
 use std::error::Error;

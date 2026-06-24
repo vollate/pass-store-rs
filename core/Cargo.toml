@@ -21,6 +21,8 @@ regex = "1.11.1"
 secrecy = "0.10.3"
 tempfile = "3.18.0"
 zeroize = "1.8.1"
+pgp = "0.20.0"
+rand08 = { package = "rand", version = "0.8.6" }
 bumpalo = { version = "3.17.0", features = ["collections"] }
 walkdir = "2.5.0"
 os_pipe = "1.2.1"

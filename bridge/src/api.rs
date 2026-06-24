@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use pars_core::config::cli::{
-    load_config as load_core_config, save_config as save_core_config, ParsConfig,
+    load_config as load_core_config, save_config as save_core_config, ParsConfig, PgpBackendKind,
 };
 use pars_core::gui::{
     self, CoreError, EntryRef, GitOperationRequest, KeyExportResult, PgpKeySummary, SshKeySummary,
@@ -17,11 +17,13 @@ use pars_core::key_management::{
     ImportedKeyKind, PrivateKeyConfirmation,
 };
 use pars_core::pgp::backend::{KeyGenerationRequest, PgpBackend, SystemGpgBackend};
+use pars_core::pgp::rpgp_backend::RpgpBackend;
 use secrecy::SecretString;
 
 pub const SUPPORTED_METHODS: &[&str] = &[
     "load_config",
     "save_config",
+    "configure_pgp_backend",
     "list_stores",
     "list_entries",
     "read_entry",
@@ -229,12 +231,21 @@ pub struct SaveConfigRequest {
 }
 
 #[derive(Debug, Clone)]
+pub struct ConfigurePgpBackendRequest {
+    pub config_path: String,
+    pub backend: String,
+    pub keyring_home: Option<String>,
+    pub pgp_executable: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ListStoresRequest {
     pub config_path: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct EntryRequest {
+    pub config_path: String,
     pub root: String,
     pub path: String,
     pub pgp_executable: Option<String>,
@@ -249,6 +260,7 @@ pub struct ListEntriesRequest {
 
 #[derive(Debug, Clone)]
 pub struct InsertEntryRequest {
+    pub config_path: String,
     pub root: String,
     pub path: String,
     pub content: String,
@@ -258,6 +270,7 @@ pub struct InsertEntryRequest {
 
 #[derive(Debug, Clone)]
 pub struct GenerateEntryRequest {
+    pub config_path: String,
     pub root: String,
     pub path: String,
     pub length: u32,
@@ -268,6 +281,7 @@ pub struct GenerateEntryRequest {
 
 #[derive(Debug, Clone)]
 pub struct EditEntryRequest {
+    pub config_path: String,
     pub root: String,
     pub path: String,
     pub content: String,
@@ -375,6 +389,7 @@ pub struct GeneratePgpKeyRequest {
 #[derive(Debug, Clone)]
 pub struct ImportKeyTextRequest {
     pub config_path: String,
+    pub pgp_executable: Option<String>,
     pub ssh_dir: Option<String>,
     pub name: Option<String>,
     pub armored_text: String,
@@ -383,6 +398,7 @@ pub struct ImportKeyTextRequest {
 #[derive(Debug, Clone)]
 pub struct ImportKeyFileRequest {
     pub config_path: String,
+    pub pgp_executable: Option<String>,
     pub ssh_dir: Option<String>,
     pub name: Option<String>,
     pub path: String,
@@ -548,6 +564,10 @@ pub async fn save_config(request: SaveConfigRequest) -> UnitResponse {
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
 
+pub async fn configure_pgp_backend(request: ConfigurePgpBackendRequest) -> UnitResponse {
+    UnitResponse { error: configure_pgp_backend_inner(request).err() }
+}
+
 pub async fn list_stores(request: ListStoresRequest) -> ListStoresResponse {
     match list_stores_inner(request) {
         Ok(stores) => ListStoresResponse { stores, error: None },
@@ -590,31 +610,45 @@ pub async fn copy_entry_password(request: EntryRequest) -> CopyEntryPasswordResp
 }
 
 pub async fn insert_entry(request: InsertEntryRequest) -> InsertEntryResponse {
-    match gui::insert_entry(gui::InsertEntryRequest {
-        entry: match entry_ref(&request.root, &request.path) {
-            Ok(entry) => entry,
-            Err(error) => return InsertEntryResponse { result: None, error: Some(error) },
+    let backend = match pgp_backend(&request.config_path, Some(&request.pgp_executable)) {
+        Ok(backend) => backend,
+        Err(error) => return InsertEntryResponse { result: None, error: Some(error) },
+    };
+    match gui::insert_entry_with_backend(
+        gui::InsertEntryRequest {
+            entry: match entry_ref(&request.root, &request.path) {
+                Ok(entry) => entry,
+                Err(error) => return InsertEntryResponse { result: None, error: Some(error) },
+            },
+            content: request.content,
+            overwrite: request.overwrite,
+            pgp_executable: request.pgp_executable,
         },
-        content: request.content,
-        overwrite: request.overwrite,
-        pgp_executable: request.pgp_executable,
-    }) {
+        backend.as_ref(),
+    ) {
         Ok(result) => InsertEntryResponse { result: Some(result.into()), error: None },
         Err(error) => InsertEntryResponse { result: None, error: Some(BridgeFailure::from(error)) },
     }
 }
 
 pub async fn generate_entry(request: GenerateEntryRequest) -> GenerateEntryResponse {
-    match gui::generate_entry(gui::GenerateEntryRequest {
-        entry: match entry_ref(&request.root, &request.path) {
-            Ok(entry) => entry,
-            Err(error) => return GenerateEntryResponse { result: None, error: Some(error) },
+    let backend = match pgp_backend(&request.config_path, Some(&request.pgp_executable)) {
+        Ok(backend) => backend,
+        Err(error) => return GenerateEntryResponse { result: None, error: Some(error) },
+    };
+    match gui::generate_entry_with_backend(
+        gui::GenerateEntryRequest {
+            entry: match entry_ref(&request.root, &request.path) {
+                Ok(entry) => entry,
+                Err(error) => return GenerateEntryResponse { result: None, error: Some(error) },
+            },
+            length: request.length as usize,
+            no_symbols: request.no_symbols,
+            overwrite: request.overwrite,
+            pgp_executable: request.pgp_executable,
         },
-        length: request.length as usize,
-        no_symbols: request.no_symbols,
-        overwrite: request.overwrite,
-        pgp_executable: request.pgp_executable,
-    }) {
+        backend.as_ref(),
+    ) {
         Ok(result) => GenerateEntryResponse { result: Some(result.into()), error: None },
         Err(error) => {
             GenerateEntryResponse { result: None, error: Some(BridgeFailure::from(error)) }
@@ -623,14 +657,21 @@ pub async fn generate_entry(request: GenerateEntryRequest) -> GenerateEntryRespo
 }
 
 pub async fn edit_entry(request: EditEntryRequest) -> MutationResponse {
-    match gui::edit_entry(gui::EditEntryRequest {
-        entry: match entry_ref(&request.root, &request.path) {
-            Ok(entry) => entry,
-            Err(error) => return MutationResponse { result: None, error: Some(error) },
+    let backend = match pgp_backend(&request.config_path, Some(&request.pgp_executable)) {
+        Ok(backend) => backend,
+        Err(error) => return MutationResponse { result: None, error: Some(error) },
+    };
+    match gui::edit_entry_with_backend(
+        gui::EditEntryRequest {
+            entry: match entry_ref(&request.root, &request.path) {
+                Ok(entry) => entry,
+                Err(error) => return MutationResponse { result: None, error: Some(error) },
+            },
+            content: request.content,
+            pgp_executable: request.pgp_executable,
         },
-        content: request.content,
-        pgp_executable: request.pgp_executable,
-    }) {
+        backend.as_ref(),
+    ) {
         Ok(result) => MutationResponse { result: Some(result.into()), error: None },
         Err(error) => MutationResponse { result: None, error: Some(BridgeFailure::from(error)) },
     }
@@ -776,6 +817,7 @@ pub async fn import_pgp_private_key_file(request: ImportKeyFileRequest) -> KeyMu
         Ok(armored_text) => import_pgp_key_text(
             ImportKeyTextRequest {
                 config_path: request.config_path,
+                pgp_executable: request.pgp_executable,
                 ssh_dir: request.ssh_dir,
                 name: request.name,
                 armored_text,
@@ -859,6 +901,7 @@ pub async fn import_ssh_private_key_file(request: ImportKeyFileRequest) -> KeyMu
         Ok(armored_text) => {
             import_ssh_private_key_text(ImportKeyTextRequest {
                 config_path: request.config_path,
+                pgp_executable: request.pgp_executable,
                 ssh_dir: request.ssh_dir,
                 name: request.name,
                 armored_text,
@@ -957,7 +1000,8 @@ fn import_pgp_key_text(request: ImportKeyTextRequest, private_key: bool) -> KeyM
         }
     }
 
-    match pgp_backend(&request.config_path, None).and_then(|backend| {
+    let pgp_executable = request.pgp_executable.clone();
+    match pgp_backend(&request.config_path, pgp_executable.as_deref()).and_then(|backend| {
         if private_key {
             backend
                 .import_private_key(&SecretString::from(request.armored_text))
@@ -986,7 +1030,7 @@ fn import_pgp_key_text(request: ImportKeyTextRequest, private_key: bool) -> KeyM
 fn pgp_backend(
     config_path: &str,
     pgp_executable: Option<&str>,
-) -> Result<SystemGpgBackend, BridgeFailure> {
+) -> Result<Box<dyn PgpBackend>, BridgeFailure> {
     let mut config = if Path::new(config_path).is_file() {
         load_core_config(config_path)
             .map_err(|error| CoreError::ConfigError(error.to_string()))
@@ -995,10 +1039,19 @@ fn pgp_backend(
         ParsConfig::default()
     };
     if let Some(executable) = pgp_executable {
-        config.pgp_config.system_gpg_path = Some(executable.to_string());
+        if matches!(config.pgp_config.backend, PgpBackendKind::SystemGpg) {
+            config.pgp_config.system_gpg_path = Some(executable.to_string());
+        }
     }
-    SystemGpgBackend::from_config(&config.pgp_config)
-        .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+    match config.pgp_config.backend {
+        PgpBackendKind::SystemGpg | PgpBackendKind::Bundled => {
+            SystemGpgBackend::from_config(&config.pgp_config)
+                .map(|backend| Box::new(backend) as Box<dyn PgpBackend>)
+        }
+        PgpBackendKind::PureRust => RpgpBackend::from_config(&config.pgp_config)
+            .map(|backend| Box::new(backend) as Box<dyn PgpBackend>),
+    }
+    .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
 }
 
 fn imported_key_kind(kind: ImportedKeyKind) -> String {
@@ -1247,6 +1300,36 @@ fn save_config_for_mutation(config: &ParsConfig, config_path: &str) -> Result<()
         .map_err(BridgeFailure::from)
 }
 
+fn configure_pgp_backend_inner(request: ConfigurePgpBackendRequest) -> Result<(), BridgeFailure> {
+    let mut config = load_config_for_mutation(&request.config_path)?;
+    match request.backend.as_str() {
+        "system_gpg" => {
+            config.pgp_config.backend = PgpBackendKind::SystemGpg;
+            config.pgp_config.system_gpg_path = request.pgp_executable;
+        }
+        "bundled" => {
+            config.pgp_config.backend = PgpBackendKind::Bundled;
+            config.pgp_config.bundled_gpg_path = request.pgp_executable;
+        }
+        "pure_rust" => {
+            let keyring_home = request.keyring_home.ok_or_else(|| {
+                BridgeFailure::from(CoreError::ConfigError(
+                    "pure_rust PGP backend requires keyring_home".to_string(),
+                ))
+            })?;
+            config.pgp_config.backend = PgpBackendKind::PureRust;
+            config.pgp_config.keyring_home = Some(keyring_home);
+            config.pgp_config.pure_rust_enabled = true;
+        }
+        other => {
+            return Err(BridgeFailure::from(CoreError::ConfigError(format!(
+                "unsupported PGP backend: {other}"
+            ))));
+        }
+    }
+    save_config_for_mutation(&config, &request.config_path)
+}
+
 fn add_store_to_config(config: &mut ParsConfig, root: &str, set_default: bool) {
     if !config.path_config.repos.iter().any(|repo| repo == root) {
         config.path_config.repos.push(root.to_string());
@@ -1340,10 +1423,15 @@ fn store_failure(error: std::io::Error) -> BridgeFailure {
 }
 
 fn read_entry_inner(request: EntryRequest) -> Result<EntrySecretDto, BridgeFailure> {
-    gui::read_entry(gui::ReadEntryRequest {
-        entry: entry_ref(&request.root, &request.path)?,
-        pgp_executable: request.pgp_executable.unwrap_or_else(|| "gpg".to_string()),
-    })
+    let executable = request.pgp_executable.clone().unwrap_or_else(|| "gpg".to_string());
+    let backend = pgp_backend(&request.config_path, Some(&executable))?;
+    gui::read_entry_with_backend(
+        gui::ReadEntryRequest {
+            entry: entry_ref(&request.root, &request.path)?,
+            pgp_executable: executable,
+        },
+        backend.as_ref(),
+    )
     .map(EntrySecretDto::from)
     .map_err(BridgeFailure::from)
 }

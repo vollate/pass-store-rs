@@ -3,9 +3,10 @@ use std::pin::pin;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use pars_bridge::api::{
-    self, AddPgpKeyToGpgIdRequest, CreateLocalStoreRequest, ExportSshKeyRequest,
-    GenerateSshKeyRequest, ImportKeyTextRequest, InspectAppStateRequest, ListEntriesRequest,
-    ListKeysRequest, OpenGithubSshSettingsRequest, SUPPORTED_METHODS,
+    self, AddPgpKeyToGpgIdRequest, ConfigurePgpBackendRequest, CreateLocalStoreRequest,
+    EntryRequest, ExportPgpKeyRequest, ExportSshKeyRequest, GeneratePgpKeyRequest,
+    GenerateSshKeyRequest, ImportKeyTextRequest, InsertEntryRequest, InspectAppStateRequest,
+    ListEntriesRequest, ListKeysRequest, OpenGithubSshSettingsRequest, SUPPORTED_METHODS,
 };
 
 #[test]
@@ -25,6 +26,7 @@ fn bridge_method_table_matches_generated_api_surface() {
     let expected = [
         "load_config",
         "save_config",
+        "configure_pgp_backend",
         "list_stores",
         "list_entries",
         "read_entry",
@@ -67,6 +69,25 @@ fn bridge_method_table_matches_generated_api_surface() {
 }
 
 #[test]
+fn configure_pgp_backend_writes_pure_rust_config() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let keyring_home = temp.path().join("pgp");
+
+    let response = block_on(api::configure_pgp_backend(ConfigurePgpBackendRequest {
+        config_path: config_path.display().to_string(),
+        backend: "pure_rust".to_string(),
+        keyring_home: Some(keyring_home.display().to_string()),
+        pgp_executable: None,
+    }));
+    assert!(response.error.is_none(), "{:?}", response.error);
+
+    let config_toml = std::fs::read_to_string(config_path).unwrap();
+    assert!(config_toml.contains("backend = \"pure_rust\""));
+    assert!(config_toml.contains("keyring_home"));
+}
+
+#[test]
 fn key_management_bridge_lists_generates_exports_and_detects_keys() {
     let temp = tempfile::tempdir().unwrap();
     let config_path = temp.path().join("pars_config.toml");
@@ -106,6 +127,7 @@ fn key_management_bridge_lists_generates_exports_and_detects_keys() {
 
     let detected = block_on(api::detect_imported_key(ImportKeyTextRequest {
         config_path: config_path.display().to_string(),
+        pgp_executable: Some("/bin/false".to_string()),
         ssh_dir: Some(ssh_dir.display().to_string()),
         name: None,
         armored_text:
@@ -123,6 +145,99 @@ fn key_management_bridge_lists_generates_exports_and_detects_keys() {
 
     let github = block_on(api::open_github_ssh_settings(OpenGithubSshSettingsRequest {}));
     assert_eq!(github.url.as_deref(), Some("https://github.com/settings/keys"));
+}
+
+#[test]
+fn pure_rust_pgp_bridge_generates_lists_and_exports_keys() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let keyring_home = temp.path().join("pgp");
+    std::fs::write(
+        &config_path,
+        format!(
+            "[pgp_config]\nbackend = \"pure_rust\"\nkeyring_home = \"{}\"\n",
+            keyring_home.display()
+        ),
+    )
+    .unwrap();
+
+    let generated = block_on(api::generate_pgp_key(GeneratePgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        name: "Alice Example".to_string(),
+        email: "alice@example.com".to_string(),
+        passphrase: None,
+    }));
+    assert!(generated.error.is_none(), "{:?}", generated.error);
+    let generated_key = generated.key.expect("generated key");
+    assert_eq!(generated_key.key_type, "pgp");
+    assert!(generated_key.has_private_key);
+
+    let keys = block_on(api::list_keys(ListKeysRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        ssh_dir: Some(temp.path().join("ssh").display().to_string()),
+    }));
+    assert!(keys.error.is_none(), "{:?}", keys.error);
+    assert!(keys.keys.iter().any(|key| key.fingerprint == generated_key.fingerprint));
+
+    let exported = block_on(api::export_pgp_public_key(ExportPgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        fingerprint: generated_key.fingerprint,
+        confirmation: None,
+    }));
+    assert!(exported.error.is_none(), "{:?}", exported.error);
+    assert!(exported.export.unwrap().armored_text.contains("BEGIN PGP PUBLIC KEY BLOCK"));
+}
+
+#[test]
+fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let keyring_home = temp.path().join("pgp");
+    let store_root = temp.path().join("store");
+    std::fs::create_dir_all(&store_root).unwrap();
+    std::fs::write(
+        &config_path,
+        format!(
+            "[pgp_config]\nbackend = \"pure_rust\"\nkeyring_home = \"{}\"\n",
+            keyring_home.display()
+        ),
+    )
+    .unwrap();
+
+    let generated = block_on(api::generate_pgp_key(GeneratePgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        name: "Entry Example".to_string(),
+        email: "entry@example.com".to_string(),
+        passphrase: None,
+    }))
+    .key
+    .expect("generated key");
+    std::fs::write(store_root.join(".gpg-id"), format!("{}\n", generated.fingerprint)).unwrap();
+
+    let inserted = block_on(api::insert_entry(InsertEntryRequest {
+        config_path: config_path.display().to_string(),
+        root: store_root.display().to_string(),
+        path: "work/example".to_string(),
+        content: "entry-secret\nusername: entry".to_string(),
+        overwrite: false,
+        pgp_executable: String::new(),
+    }));
+    assert!(inserted.error.is_none(), "{:?}", inserted.error);
+
+    let read = block_on(api::read_entry(EntryRequest {
+        config_path: config_path.display().to_string(),
+        root: store_root.display().to_string(),
+        path: "work/example".to_string(),
+        pgp_executable: None,
+    }));
+    assert!(read.error.is_none(), "{:?}", read.error);
+    let secret = read.secret.expect("secret");
+    assert_eq!(secret.password, "entry-secret");
+    assert_eq!(secret.fields[0].value, "entry");
 }
 
 #[test]

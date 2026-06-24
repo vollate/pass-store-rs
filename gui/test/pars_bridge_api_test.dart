@@ -53,6 +53,14 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.UnitResponse> configurePgpBackend({
+    required frb.ConfigurePgpBackendRequest request,
+  }) async {
+    calledMethods.add('configure_pgp_backend');
+    return const frb.UnitResponse();
+  }
+
+  @override
   Future<frb.ListStoresResponse> listStores({
     required frb.ListStoresRequest request,
   }) async {

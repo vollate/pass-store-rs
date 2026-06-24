@@ -34,22 +34,29 @@ class BridgeBackedRepository
     required this.bridge,
     required this.configPath,
     this.pgpExecutable,
+    this.pgpBackendLabel,
     this.sshDir,
     VaultMetadataStore? metadataStore,
   }) : _metadataStore =
            metadataStore ?? FileVaultMetadataStore.forConfigPath(configPath),
        _lifecycle = StoreLifecycleSnapshot.empty(configPath);
 
-  factory BridgeBackedRepository.defaultInstance() {
+  factory BridgeBackedRepository.defaultInstance({
+    String? pgpExecutable,
+    String? pgpBackendLabel,
+  }) {
     return BridgeBackedRepository(
       bridge: const FrbParsBridgeApi(),
       configPath: defaultConfigPath(),
+      pgpExecutable: pgpExecutable,
+      pgpBackendLabel: pgpBackendLabel,
     );
   }
 
   final ParsBridgeApi bridge;
   final String configPath;
   final String? pgpExecutable;
+  final String? pgpBackendLabel;
   final String? sshDir;
   final VaultMetadataStore _metadataStore;
 
@@ -88,10 +95,7 @@ class BridgeBackedRepository
     return RuntimeDiagnostics(
       bridgeLoaded: true,
       coreVersion: 'pars-core 0.2.5',
-      pgpBackend:
-          pgpExecutable == null || pgpExecutable!.trim().isEmpty
-              ? 'System GPG from PATH'
-              : 'System GPG at $pgpExecutable',
+      pgpBackend: pgpBackendLabel ?? _pgpBackendLabel(),
       gitBackend: 'System git command',
       keyStorageBackend: keyStorageBackendLabel(securityRepository),
       nativeLibrary: 'pars_bridge',
@@ -103,7 +107,7 @@ class BridgeBackedRepository
     final stateResponse = await bridge.inspectAppState(
       request: frb.InspectAppStateRequest(
         configPath: configPath,
-        pgpExecutable: pgpExecutable,
+        pgpExecutable: _optionalPgpExecutable(),
       ),
     );
     _throwIfFailure(stateResponse.error);
@@ -116,7 +120,7 @@ class BridgeBackedRepository
     final keyResponse = await bridge.listKeys(
       request: frb.ListKeysRequest(
         configPath: configPath,
-        pgpExecutable: pgpExecutable,
+        pgpExecutable: _optionalPgpExecutable(),
         sshDir: sshDir,
       ),
     );
@@ -235,6 +239,7 @@ class BridgeBackedRepository
   }) async {
     final response = await bridge.generateEntry(
       request: frb.GenerateEntryRequest(
+        configPath: configPath,
         root: _requiredStoreRoot(),
         path: path,
         length: length,
@@ -265,6 +270,7 @@ class BridgeBackedRepository
   }) async {
     final response = await bridge.insertEntry(
       request: frb.InsertEntryRequest(
+        configPath: configPath,
         root: _requiredStoreRoot(),
         path: path,
         content: content,
@@ -293,6 +299,7 @@ class BridgeBackedRepository
   }) async {
     final response = await bridge.editEntry(
       request: frb.EditEntryRequest(
+        configPath: configPath,
         root: _requiredStoreRoot(),
         path: path,
         content: content,
@@ -543,7 +550,7 @@ class BridgeBackedRepository
     final response = await bridge.generatePgpKey(
       request: frb.GeneratePgpKeyRequest(
         configPath: configPath,
-        pgpExecutable: pgpExecutable,
+        pgpExecutable: _optionalPgpExecutable(),
         name: name,
         email: email,
         passphrase: passphrase,
@@ -557,6 +564,7 @@ class BridgeBackedRepository
     final response = await bridge.importPgpPublicKey(
       request: frb.ImportKeyTextRequest(
         configPath: configPath,
+        pgpExecutable: _optionalPgpExecutable(),
         sshDir: sshDir,
         armoredText: armoredText,
       ),
@@ -569,6 +577,7 @@ class BridgeBackedRepository
     final response = await bridge.importPgpPrivateKeyText(
       request: frb.ImportKeyTextRequest(
         configPath: configPath,
+        pgpExecutable: _optionalPgpExecutable(),
         sshDir: sshDir,
         armoredText: armoredText,
       ),
@@ -581,6 +590,7 @@ class BridgeBackedRepository
     final response = await bridge.importPgpPrivateKeyFile(
       request: frb.ImportKeyFileRequest(
         configPath: configPath,
+        pgpExecutable: _optionalPgpExecutable(),
         sshDir: sshDir,
         path: path,
       ),
@@ -593,7 +603,7 @@ class BridgeBackedRepository
     final response = await bridge.exportPgpPublicKey(
       request: frb.ExportPgpKeyRequest(
         configPath: configPath,
-        pgpExecutable: pgpExecutable,
+        pgpExecutable: _optionalPgpExecutable(),
         fingerprint: fingerprint,
       ),
     );
@@ -608,7 +618,7 @@ class BridgeBackedRepository
     final response = await bridge.exportPgpPrivateKey(
       request: frb.ExportPgpKeyRequest(
         configPath: configPath,
-        pgpExecutable: pgpExecutable,
+        pgpExecutable: _optionalPgpExecutable(),
         fingerprint: fingerprint,
         confirmation: confirmation,
       ),
@@ -948,6 +958,7 @@ class BridgeBackedRepository
 
   frb.EntryRequest _entryRequest(PasswordEntry entry) {
     return frb.EntryRequest(
+      configPath: configPath,
       root: _requiredStoreRoot(),
       path: entry.path,
       pgpExecutable: pgpExecutable,
@@ -962,7 +973,23 @@ class BridgeBackedRepository
     return root;
   }
 
-  String _pgpExecutable() => pgpExecutable ?? 'gpg';
+  String _pgpExecutable() {
+    final executable = pgpExecutable?.trim();
+    return executable == null || executable.isEmpty ? 'gpg' : executable;
+  }
+
+  String? _optionalPgpExecutable() {
+    final executable = pgpExecutable?.trim();
+    return executable == null || executable.isEmpty ? null : executable;
+  }
+
+  String _pgpBackendLabel() {
+    final executable = pgpExecutable?.trim();
+    if (executable == null || executable.isEmpty) {
+      return 'System GPG from PATH';
+    }
+    return 'System GPG at $executable';
+  }
 
   String _normalizedBrowseParent(String? directoryPath) {
     final path = directoryPath?.trim();

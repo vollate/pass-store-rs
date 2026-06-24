@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
 import 'package:pars_gui/bridge/pars_bridge_api.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/services/bridge_backed_repository.dart';
+import 'package:pars_gui/services/mobile_pgp_backend.dart';
+import 'package:pars_gui/services/security_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/services/vault_metadata_store.dart';
 
@@ -38,6 +42,7 @@ void main() {
       expect(copiedPassword, 'bridge-secret');
       expect(bridge.lastEntryRequest?.root, '/tmp/personal-store');
       expect(bridge.lastEntryRequest?.path, 'work/github');
+      expect(bridge.lastEntryRequest?.configPath, '/tmp/pars_config.toml');
       expect(
         bridge.calledMethods,
         containsAll(<String>[
@@ -52,6 +57,62 @@ void main() {
       expect(repository.keys.single.name, 'github-mobile');
     },
   );
+
+  test(
+    'bridge-backed repository passes custom system gpg path to bridge',
+    () async {
+      final bridge = _LifecycleBridge();
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        pgpExecutable: '/usr/local/bin/gpg',
+        pgpBackendLabel: 'System GPG at /usr/local/bin/gpg',
+      );
+
+      await repository.refresh();
+
+      expect(
+        bridge.lastInspectAppStateRequest?.pgpExecutable,
+        '/usr/local/bin/gpg',
+      );
+      expect(bridge.lastListKeysRequest?.pgpExecutable, '/usr/local/bin/gpg');
+      expect(
+        repository.runtimeDiagnostics(InMemorySecurityRepository()).pgpBackend,
+        'System GPG at /usr/local/bin/gpg',
+      );
+    },
+  );
+
+  test('mobile pgp runtime configures pure rust backend', () async {
+    final supportDir = await Directory.systemTemp.createTemp(
+      'pars-mobile-pgp-',
+    );
+    addTearDown(() => supportDir.delete(recursive: true));
+    final bridge = _LifecycleBridge();
+
+    final runtime = await configureDefaultPgpRuntime(
+      bridge: bridge,
+      desktopConfigPath: '/tmp/desktop_config.toml',
+      environment: PgpRuntimeEnvironment(
+        isMobile: true,
+        supportDirectory: () async => supportDir,
+      ),
+    );
+
+    expect(runtime.configPath, '${supportDir.path}/pars_config.toml');
+    expect(runtime.pgpExecutable, isNull);
+    expect(runtime.diagnosticsLabel, 'Pure Rust OpenPGP (rPGP)');
+    expect(
+      bridge.lastConfigurePgpBackendRequest?.configPath,
+      '${supportDir.path}/pars_config.toml',
+    );
+    expect(bridge.lastConfigurePgpBackendRequest?.backend, 'pure_rust');
+    expect(
+      bridge.lastConfigurePgpBackendRequest?.keyringHome,
+      '${supportDir.path}/pgp',
+    );
+    expect(await Directory('${supportDir.path}/pgp').exists(), isTrue);
+  });
 
   test('bridge-backed repository persists vault metadata', () async {
     final metadataStore = InMemoryVaultMetadataStore();
@@ -136,9 +197,15 @@ void main() {
     expect(deleted.action, 'Deleted');
     expect(commit.success, isTrue);
     expect(bridge.lastInsertRequest?.content, 'new-secret');
+    expect(bridge.lastInsertRequest?.configPath, '/tmp/pars_config.toml');
+    expect(bridge.lastInsertRequest?.pgpExecutable, 'gpg');
     expect(bridge.lastGenerateRequest?.length, 32);
+    expect(bridge.lastGenerateRequest?.configPath, '/tmp/pars_config.toml');
+    expect(bridge.lastGenerateRequest?.pgpExecutable, 'gpg');
     expect(bridge.lastGenerateRequest?.noSymbols, isTrue);
     expect(bridge.lastEditRequest?.content, contains('rotated-secret'));
+    expect(bridge.lastEditRequest?.configPath, '/tmp/pars_config.toml');
+    expect(bridge.lastEditRequest?.pgpExecutable, 'gpg');
     expect(bridge.lastEditRequest?.content, contains('username: alice'));
     expect(bridge.lastMoveRequest?.fromPath, 'work/new');
     expect(bridge.lastMoveRequest?.toPath, 'archive/new');
@@ -275,6 +342,9 @@ void main() {
 
 class _LifecycleBridge implements ParsBridgeApi {
   final List<String> calledMethods = <String>[];
+  frb.InspectAppStateRequest? lastInspectAppStateRequest;
+  frb.ConfigurePgpBackendRequest? lastConfigurePgpBackendRequest;
+  frb.ListKeysRequest? lastListKeysRequest;
   frb.EntryRequest? lastEntryRequest;
   frb.InsertEntryRequest? lastInsertRequest;
   frb.GenerateEntryRequest? lastGenerateRequest;
@@ -289,6 +359,7 @@ class _LifecycleBridge implements ParsBridgeApi {
     required frb.InspectAppStateRequest request,
   }) async {
     calledMethods.add('inspect_app_state');
+    lastInspectAppStateRequest = request;
     return const frb.AppStateResponse(
       state: frb.AppStateDto(
         configPath: '/tmp/pars_config.toml',
@@ -357,6 +428,7 @@ class _LifecycleBridge implements ParsBridgeApi {
     required frb.ListKeysRequest request,
   }) async {
     calledMethods.add('list_keys');
+    lastListKeysRequest = request;
     return const frb.ListKeysResponse(
       keys: <frb.KeyRecordDto>[
         frb.KeyRecordDto(
@@ -466,6 +538,15 @@ class _LifecycleBridge implements ParsBridgeApi {
     required frb.SaveConfigRequest request,
   }) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<frb.UnitResponse> configurePgpBackend({
+    required frb.ConfigurePgpBackendRequest request,
+  }) async {
+    calledMethods.add('configure_pgp_backend');
+    lastConfigurePgpBackendRequest = request;
+    return const frb.UnitResponse();
   }
 
   @override

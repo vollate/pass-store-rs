@@ -7,6 +7,10 @@ abstract interface class ParsBridgeApi {
 
   Future<frb.UnitResponse> saveConfig({required frb.SaveConfigRequest request});
 
+  Future<frb.UnitResponse> configurePgpBackend({
+    required frb.ConfigurePgpBackendRequest request,
+  });
+
   Future<frb.ListStoresResponse> listStores({
     required frb.ListStoresRequest request,
   });
@@ -154,6 +158,11 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   Future<frb.UnitResponse> saveConfig({
     required frb.SaveConfigRequest request,
   }) => frb.saveConfig(request: request);
+
+  @override
+  Future<frb.UnitResponse> configurePgpBackend({
+    required frb.ConfigurePgpBackendRequest request,
+  }) => frb.configurePgpBackend(request: request);
 
   @override
   Future<frb.ListStoresResponse> listStores({

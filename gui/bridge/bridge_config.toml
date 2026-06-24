@@ -16,6 +16,7 @@ generated = "gui/lib/bridge/frb_generated/api.dart"
 methods = [
   "load_config",
   "save_config",
+  "configure_pgp_backend",
   "list_stores",
   "list_entries",
   "read_entry",

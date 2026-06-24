@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1168233033;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1860401696;
 
 // Section: executor
 
@@ -113,6 +113,45 @@ fn wire__crate__api__clone_store_impl(
                     (move || async move {
                         let output_ok =
                             Result::<_, ()>::Ok(crate::api::clone_store(api_request).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__configure_pgp_backend_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "configure_pgp_backend",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::ConfigurePgpBackendRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::configure_pgp_backend(api_request).await,
+                        )?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1586,6 +1625,22 @@ impl SseDecode for crate::api::ConfigResponse {
     }
 }
 
+impl SseDecode for crate::api::ConfigurePgpBackendRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
+        let mut var_backend = <String>::sse_decode(deserializer);
+        let mut var_keyringHome = <Option<String>>::sse_decode(deserializer);
+        let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
+        return crate::api::ConfigurePgpBackendRequest {
+            config_path: var_configPath,
+            backend: var_backend,
+            keyring_home: var_keyringHome,
+            pgp_executable: var_pgpExecutable,
+        };
+    }
+}
+
 impl SseDecode for crate::api::CopyEntryPasswordResponse {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1677,11 +1732,13 @@ impl SseDecode for crate::api::DeleteLocalStoreRequest {
 impl SseDecode for crate::api::EditEntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
         let mut var_path = <String>::sse_decode(deserializer);
         let mut var_content = <String>::sse_decode(deserializer);
         let mut var_pgpExecutable = <String>::sse_decode(deserializer);
         return crate::api::EditEntryRequest {
+            config_path: var_configPath,
             root: var_root,
             path: var_path,
             content: var_content,
@@ -1693,10 +1750,12 @@ impl SseDecode for crate::api::EditEntryRequest {
 impl SseDecode for crate::api::EntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
         let mut var_path = <String>::sse_decode(deserializer);
         let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
         return crate::api::EntryRequest {
+            config_path: var_configPath,
             root: var_root,
             path: var_path,
             pgp_executable: var_pgpExecutable,
@@ -1778,6 +1837,7 @@ impl SseDecode for crate::api::ExportSshKeyRequest {
 impl SseDecode for crate::api::GenerateEntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
         let mut var_path = <String>::sse_decode(deserializer);
         let mut var_length = <u32>::sse_decode(deserializer);
@@ -1785,6 +1845,7 @@ impl SseDecode for crate::api::GenerateEntryRequest {
         let mut var_overwrite = <bool>::sse_decode(deserializer);
         let mut var_pgpExecutable = <String>::sse_decode(deserializer);
         return crate::api::GenerateEntryRequest {
+            config_path: var_configPath,
             root: var_root,
             path: var_path,
             length: var_length,
@@ -1909,11 +1970,13 @@ impl SseDecode for crate::api::ImportKeyFileRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_configPath = <String>::sse_decode(deserializer);
+        let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
         let mut var_sshDir = <Option<String>>::sse_decode(deserializer);
         let mut var_name = <Option<String>>::sse_decode(deserializer);
         let mut var_path = <String>::sse_decode(deserializer);
         return crate::api::ImportKeyFileRequest {
             config_path: var_configPath,
+            pgp_executable: var_pgpExecutable,
             ssh_dir: var_sshDir,
             name: var_name,
             path: var_path,
@@ -1925,11 +1988,13 @@ impl SseDecode for crate::api::ImportKeyTextRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_configPath = <String>::sse_decode(deserializer);
+        let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
         let mut var_sshDir = <Option<String>>::sse_decode(deserializer);
         let mut var_name = <Option<String>>::sse_decode(deserializer);
         let mut var_armoredText = <String>::sse_decode(deserializer);
         return crate::api::ImportKeyTextRequest {
             config_path: var_configPath,
+            pgp_executable: var_pgpExecutable,
             ssh_dir: var_sshDir,
             name: var_name,
             armored_text: var_armoredText,
@@ -1954,12 +2019,14 @@ impl SseDecode for crate::api::ImportLocalStoreRequest {
 impl SseDecode for crate::api::InsertEntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
         let mut var_path = <String>::sse_decode(deserializer);
         let mut var_content = <String>::sse_decode(deserializer);
         let mut var_overwrite = <bool>::sse_decode(deserializer);
         let mut var_pgpExecutable = <String>::sse_decode(deserializer);
         return crate::api::InsertEntryRequest {
+            config_path: var_configPath,
             root: var_root,
             path: var_path,
             content: var_content,
@@ -2523,42 +2590,43 @@ fn pde_ffi_dispatcher_primary_impl(
     match func_id {
         1 => wire__crate__api__add_pgp_key_to_gpg_id_impl(port, ptr, rust_vec_len, data_len),
         2 => wire__crate__api__clone_store_impl(port, ptr, rust_vec_len, data_len),
-        3 => wire__crate__api__copy_entry_password_impl(port, ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__create_local_store_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__delete_entry_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__delete_local_store_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__detect_imported_key_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__edit_entry_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__export_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__export_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__export_ssh_private_key_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__export_ssh_public_key_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__generate_entry_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__generate_pgp_key_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__generate_ssh_key_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__git_commit_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__git_pull_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__git_push_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__git_status_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__import_local_store_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__import_pgp_private_key_file_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__import_pgp_private_key_text_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__import_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__import_ssh_private_key_file_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__import_ssh_private_key_text_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__insert_entry_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__inspect_app_state_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__list_entries_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__list_keys_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__list_stores_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__load_config_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__move_entry_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__open_github_ssh_settings_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__read_entry_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__remove_store_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__run_git_args_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__save_config_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__select_store_impl(port, ptr, rust_vec_len, data_len),
+        3 => wire__crate__api__configure_pgp_backend_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire__crate__api__copy_entry_password_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__create_local_store_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__delete_entry_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__delete_local_store_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__detect_imported_key_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__edit_entry_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__export_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__export_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__export_ssh_private_key_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__export_ssh_public_key_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__generate_entry_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__generate_pgp_key_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__generate_ssh_key_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__git_commit_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__git_pull_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__git_push_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__git_status_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__import_local_store_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__import_pgp_private_key_file_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__import_pgp_private_key_text_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__import_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__import_ssh_private_key_file_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__import_ssh_private_key_text_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__insert_entry_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__inspect_app_state_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__list_entries_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__list_keys_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__list_stores_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__load_config_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__move_entry_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__open_github_ssh_settings_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__read_entry_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__remove_store_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__run_git_args_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__save_config_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__select_store_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2710,6 +2778,29 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ConfigResponse> for crate::ap
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ConfigurePgpBackendRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.config_path.into_into_dart().into_dart(),
+            self.backend.into_into_dart().into_dart(),
+            self.keyring_home.into_into_dart().into_dart(),
+            self.pgp_executable.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::ConfigurePgpBackendRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ConfigurePgpBackendRequest>
+    for crate::api::ConfigurePgpBackendRequest
+{
+    fn into_into_dart(self) -> crate::api::ConfigurePgpBackendRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::CopyEntryPasswordResponse {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [self.result.into_into_dart().into_dart(), self.error.into_into_dart().into_dart()]
@@ -2857,6 +2948,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::DeleteLocalStoreRequest>
 impl flutter_rust_bridge::IntoDart for crate::api::EditEntryRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.config_path.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
             self.path.into_into_dart().into_dart(),
             self.content.into_into_dart().into_dart(),
@@ -2877,6 +2969,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::EditEntryRequest>
 impl flutter_rust_bridge::IntoDart for crate::api::EntryRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.config_path.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
             self.path.into_into_dart().into_dart(),
             self.pgp_executable.into_into_dart().into_dart(),
@@ -2995,6 +3088,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ExportSshKeyRequest>
 impl flutter_rust_bridge::IntoDart for crate::api::GenerateEntryRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.config_path.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
             self.path.into_into_dart().into_dart(),
             self.length.into_into_dart().into_dart(),
@@ -3184,6 +3278,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::ImportKeyFileRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.config_path.into_into_dart().into_dart(),
+            self.pgp_executable.into_into_dart().into_dart(),
             self.ssh_dir.into_into_dart().into_dart(),
             self.name.into_into_dart().into_dart(),
             self.path.into_into_dart().into_dart(),
@@ -3207,6 +3302,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::ImportKeyTextRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.config_path.into_into_dart().into_dart(),
+            self.pgp_executable.into_into_dart().into_dart(),
             self.ssh_dir.into_into_dart().into_dart(),
             self.name.into_into_dart().into_dart(),
             self.armored_text.into_into_dart().into_dart(),
@@ -3251,6 +3347,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ImportLocalStoreRequest>
 impl flutter_rust_bridge::IntoDart for crate::api::InsertEntryRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.config_path.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
             self.path.into_into_dart().into_dart(),
             self.content.into_into_dart().into_dart(),
@@ -3835,6 +3932,16 @@ impl SseEncode for crate::api::ConfigResponse {
     }
 }
 
+impl SseEncode for crate::api::ConfigurePgpBackendRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
+        <String>::sse_encode(self.backend, serializer);
+        <Option<String>>::sse_encode(self.keyring_home, serializer);
+        <Option<String>>::sse_encode(self.pgp_executable, serializer);
+    }
+}
+
 impl SseEncode for crate::api::CopyEntryPasswordResponse {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3900,6 +4007,7 @@ impl SseEncode for crate::api::DeleteLocalStoreRequest {
 impl SseEncode for crate::api::EditEntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
         <String>::sse_encode(self.root, serializer);
         <String>::sse_encode(self.path, serializer);
         <String>::sse_encode(self.content, serializer);
@@ -3910,6 +4018,7 @@ impl SseEncode for crate::api::EditEntryRequest {
 impl SseEncode for crate::api::EntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
         <String>::sse_encode(self.root, serializer);
         <String>::sse_encode(self.path, serializer);
         <Option<String>>::sse_encode(self.pgp_executable, serializer);
@@ -3966,6 +4075,7 @@ impl SseEncode for crate::api::ExportSshKeyRequest {
 impl SseEncode for crate::api::GenerateEntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
         <String>::sse_encode(self.root, serializer);
         <String>::sse_encode(self.path, serializer);
         <u32>::sse_encode(self.length, serializer);
@@ -4064,6 +4174,7 @@ impl SseEncode for crate::api::ImportKeyFileRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.config_path, serializer);
+        <Option<String>>::sse_encode(self.pgp_executable, serializer);
         <Option<String>>::sse_encode(self.ssh_dir, serializer);
         <Option<String>>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.path, serializer);
@@ -4074,6 +4185,7 @@ impl SseEncode for crate::api::ImportKeyTextRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.config_path, serializer);
+        <Option<String>>::sse_encode(self.pgp_executable, serializer);
         <Option<String>>::sse_encode(self.ssh_dir, serializer);
         <Option<String>>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.armored_text, serializer);
@@ -4092,6 +4204,7 @@ impl SseEncode for crate::api::ImportLocalStoreRequest {
 impl SseEncode for crate::api::InsertEntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
         <String>::sse_encode(self.root, serializer);
         <String>::sse_encode(self.path, serializer);
         <String>::sse_encode(self.content, serializer);

@@ -50,6 +50,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CloneStoreRequest dco_decode_box_autoadd_clone_store_request(dynamic raw);
 
   @protected
+  ConfigurePgpBackendRequest
+  dco_decode_box_autoadd_configure_pgp_backend_request(dynamic raw);
+
+  @protected
   CopyEntryPasswordResult dco_decode_box_autoadd_copy_entry_password_result(
     dynamic raw,
   );
@@ -204,6 +208,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ConfigResponse dco_decode_config_response(dynamic raw);
+
+  @protected
+  ConfigurePgpBackendRequest dco_decode_configure_pgp_backend_request(
+    dynamic raw,
+  );
 
   @protected
   CopyEntryPasswordResponse dco_decode_copy_entry_password_response(
@@ -495,6 +504,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ConfigurePgpBackendRequest
+  sse_decode_box_autoadd_configure_pgp_backend_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   CopyEntryPasswordResult sse_decode_box_autoadd_copy_entry_password_result(
     SseDeserializer deserializer,
   );
@@ -691,6 +706,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ConfigResponse sse_decode_config_response(SseDeserializer deserializer);
+
+  @protected
+  ConfigurePgpBackendRequest sse_decode_configure_pgp_backend_request(
+    SseDeserializer deserializer,
+  );
 
   @protected
   CopyEntryPasswordResponse sse_decode_copy_entry_password_response(
@@ -1086,6 +1106,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_configure_pgp_backend_request(
+    ConfigurePgpBackendRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_copy_entry_password_result(
     CopyEntryPasswordResult self,
     SseSerializer serializer,
@@ -1322,6 +1348,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_config_response(
     ConfigResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_configure_pgp_backend_request(
+    ConfigurePgpBackendRequest self,
     SseSerializer serializer,
   );
 

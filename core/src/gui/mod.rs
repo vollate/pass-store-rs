@@ -10,8 +10,7 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
-use crate::pgp::PGPClient;
-use crate::util::fs_util::{create_or_overwrite, get_dir_gpg_id_content, path_to_str};
+use crate::pgp::backend::{PgpBackend, SystemGpgBackend};
 
 pub type GuiResult<T> = Result<T, CoreError>;
 
@@ -445,6 +444,14 @@ pub fn delete_entry(request: DeleteEntryRequest) -> GuiResult<DeleteEntryResult>
 }
 
 pub fn insert_entry(request: InsertEntryRequest) -> GuiResult<InsertEntryResult> {
+    let backend = SystemGpgBackend::new(request.pgp_executable.clone());
+    insert_entry_with_backend(request, &backend)
+}
+
+pub fn insert_entry_with_backend(
+    request: InsertEntryRequest,
+    backend: &dyn PgpBackend,
+) -> GuiResult<InsertEntryResult> {
     let encrypted_path = request.entry.encrypted_path();
     let overwrote_existing = encrypted_path.exists();
 
@@ -461,19 +468,26 @@ pub fn insert_entry(request: InsertEntryRequest) -> GuiResult<InsertEntryResult>
         )));
     }
 
-    let keys = get_dir_gpg_id_content(&request.entry.root, &encrypted_path)
-        .map_err(|err| CoreError::PgpError(err.to_string()))?;
-    let key_refs = keys.iter().map(String::as_str).collect::<Vec<_>>();
-    let client = PGPClient::new(&request.pgp_executable, &key_refs)
-        .map_err(|err| CoreError::PgpError(err.to_string()))?;
     let content = SecretString::new(request.content.into());
-    create_or_overwrite(&client, &encrypted_path, &content)
+    let recipients = backend
+        .validate_gpg_id(&request.entry.root, &encrypted_path)
+        .map_err(|err| CoreError::PgpError(err.to_string()))?;
+    backend
+        .encrypt_content(&content, &encrypted_path, &recipients)
         .map_err(|err| CoreError::PgpError(err.to_string()))?;
 
     Ok(InsertEntryResult { entry_path: request.entry.path, overwrote_existing })
 }
 
 pub fn generate_entry(request: GenerateEntryRequest) -> GuiResult<GenerateEntryResult> {
+    let backend = SystemGpgBackend::new(request.pgp_executable.clone());
+    generate_entry_with_backend(request, &backend)
+}
+
+pub fn generate_entry_with_backend(
+    request: GenerateEntryRequest,
+    backend: &dyn PgpBackend,
+) -> GuiResult<GenerateEntryResult> {
     if request.length == 0 {
         return Err(CoreError::ValidationError(
             "password length must be greater than 0".to_string(),
@@ -492,12 +506,15 @@ pub fn generate_entry(request: GenerateEntryRequest) -> GuiResult<GenerateEntryR
     let password =
         generator.generate_one().map_err(|err| CoreError::ValidationError(err.to_string()))?;
 
-    let insert_result = insert_entry(InsertEntryRequest {
-        entry: request.entry,
-        content: password.clone(),
-        overwrite: request.overwrite,
-        pgp_executable: request.pgp_executable,
-    })?;
+    let insert_result = insert_entry_with_backend(
+        InsertEntryRequest {
+            entry: request.entry,
+            content: password.clone(),
+            overwrite: request.overwrite,
+            pgp_executable: request.pgp_executable,
+        },
+        backend,
+    )?;
 
     Ok(GenerateEntryResult {
         entry_path: insert_result.entry_path,
@@ -507,16 +524,27 @@ pub fn generate_entry(request: GenerateEntryRequest) -> GuiResult<GenerateEntryR
 }
 
 pub fn edit_entry(request: EditEntryRequest) -> GuiResult<EntryMutationResult> {
+    let backend = SystemGpgBackend::new(request.pgp_executable.clone());
+    edit_entry_with_backend(request, &backend)
+}
+
+pub fn edit_entry_with_backend(
+    request: EditEntryRequest,
+    backend: &dyn PgpBackend,
+) -> GuiResult<EntryMutationResult> {
     if !request.entry.encrypted_path().is_file() {
         return Err(CoreError::StoreError(format!("entry does not exist: {}", request.entry.path)));
     }
 
-    let result = insert_entry(InsertEntryRequest {
-        entry: request.entry,
-        content: request.content,
-        overwrite: true,
-        pgp_executable: request.pgp_executable,
-    })?;
+    let result = insert_entry_with_backend(
+        InsertEntryRequest {
+            entry: request.entry,
+            content: request.content,
+            overwrite: true,
+            pgp_executable: request.pgp_executable,
+        },
+        backend,
+    )?;
 
     Ok(EntryMutationResult { path: result.entry_path })
 }
@@ -564,20 +592,21 @@ pub fn move_entry(request: MoveEntryRequest) -> GuiResult<EntryMutationResult> {
 }
 
 pub fn read_entry(request: ReadEntryRequest) -> GuiResult<EntrySecret> {
+    let backend = SystemGpgBackend::new(request.pgp_executable.clone());
+    read_entry_with_backend(request, &backend)
+}
+
+pub fn read_entry_with_backend(
+    request: ReadEntryRequest,
+    backend: &dyn PgpBackend,
+) -> GuiResult<EntrySecret> {
     let encrypted_path = request.entry.encrypted_path();
     if !encrypted_path.is_file() {
         return Err(CoreError::StoreError(format!("entry does not exist: {}", request.entry.path)));
     }
 
-    let keys = get_dir_gpg_id_content(&request.entry.root, &encrypted_path)
-        .map_err(|err| CoreError::PgpError(err.to_string()))?;
-    let key_refs = keys.iter().map(String::as_str).collect::<Vec<_>>();
-    let client = PGPClient::new(&request.pgp_executable, &key_refs)
-        .map_err(|err| CoreError::PgpError(err.to_string()))?;
-    let encrypted_path =
-        path_to_str(&encrypted_path).map_err(|err| CoreError::StoreError(err.to_string()))?;
-    let plain_text = client
-        .decrypt_stdin(&request.entry.root, encrypted_path)
+    let plain_text = backend
+        .decrypt_file(&encrypted_path)
         .map_err(|err| CoreError::PgpError(err.to_string()))?;
 
     Ok(parse_entry_secret(plain_text.expose_secret()))
@@ -717,4 +746,56 @@ fn child_counts(paths: &BTreeSet<String>) -> BTreeMap<String, usize> {
     }
 
     counts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::cli::PgpBackendKind;
+    use crate::pgp::backend::{KeyGenerationRequest, PgpBackend, PgpBackendConfig};
+    use crate::pgp::rpgp_backend::RpgpBackend;
+
+    #[test]
+    fn entry_crypto_can_use_pure_rust_backend() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path().join("store");
+        let keyring_home = temp.path().join("pgp");
+        fs::create_dir_all(&root).expect("store");
+
+        let backend = RpgpBackend::from_config(&PgpBackendConfig {
+            backend: PgpBackendKind::PureRust,
+            keyring_home: Some(keyring_home.display().to_string()),
+            ..Default::default()
+        })
+        .expect("backend");
+        let key = backend
+            .generate_key(KeyGenerationRequest {
+                name: "GUI Example".to_string(),
+                email: "gui@example.com".to_string(),
+                passphrase: None,
+            })
+            .expect("key");
+        fs::write(root.join(".gpg-id"), format!("{}\n", key.fingerprint)).expect("gpg-id");
+
+        let entry = EntryRef::new(root.clone(), "work/example").expect("entry");
+        insert_entry_with_backend(
+            InsertEntryRequest {
+                entry: entry.clone(),
+                content: "secret\nusername: gui".to_string(),
+                overwrite: false,
+                pgp_executable: String::new(),
+            },
+            &backend,
+        )
+        .expect("insert");
+
+        let secret = read_entry_with_backend(
+            ReadEntryRequest { entry, pgp_executable: String::new() },
+            &backend,
+        )
+        .expect("read");
+
+        assert_eq!(secret.password, "secret");
+        assert_eq!(secret.field_value("username"), Some("gui"));
+    }
 }
