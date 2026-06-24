@@ -101,15 +101,8 @@ class _GestureLockInputState extends State<GestureLockInput> {
   }
 
   void _appendDot(int index) {
-    if (_selected.isNotEmpty) {
-      final previous = _selected.last;
-      if (previous == index) {
-        return;
-      }
-      final skipped = _skippedDotBetween(previous, index);
-      if (skipped != null && skipped != previous && skipped != index) {
-        _selected.add(skipped);
-      }
+    if (_selected.isNotEmpty && _selected.last == index) {
+      return;
     }
     _selected.add(index);
   }
@@ -233,26 +226,4 @@ Offset _gestureGridCenterFor(int index, Size size) {
     left + step * (index % _gestureDimension) + step / 2,
     top + step * (index ~/ _gestureDimension) + step / 2,
   );
-}
-
-int? _skippedDotBetween(int from, int to) {
-  final fromRow = from ~/ _gestureDimension;
-  final fromColumn = from % _gestureDimension;
-  final toRow = to ~/ _gestureDimension;
-  final toColumn = to % _gestureDimension;
-  final rowDelta = toRow - fromRow;
-  final columnDelta = toColumn - fromColumn;
-
-  final skipsRow = rowDelta.abs() == 2;
-  final skipsColumn = columnDelta.abs() == 2;
-  final straightSkip =
-      (skipsRow && columnDelta == 0) || (skipsColumn && rowDelta == 0);
-  final diagonalSkip = skipsRow && skipsColumn;
-  if (!straightSkip && !diagonalSkip) {
-    return null;
-  }
-
-  final skippedRow = (fromRow + toRow) ~/ 2;
-  final skippedColumn = (fromColumn + toColumn) ~/ 2;
-  return skippedRow * _gestureDimension + skippedColumn;
 }

@@ -26,21 +26,17 @@ void main() {
     expect(completed.single, const <int>[0, 1, 2, 5]);
   });
 
-  testWidgets('gesture input fills skipped midpoint dots', (tester) async {
+  testWidgets('gesture input records only the dots actually touched', (
+    tester,
+  ) async {
     final completed = <List<int>>[];
     await _pumpGestureInput(tester, completed);
 
     await _drawGesture(tester, const <int>[0, 8]);
-    expect(completed.single, const <int>[0, 4, 8]);
+    expect(completed.single, const <int>[0, 8]);
 
-    await _drawGesture(tester, const <int>[2, 6]);
-    expect(completed.last, const <int>[2, 4, 6]);
-
-    await _drawGesture(tester, const <int>[0, 2]);
-    expect(completed.last, const <int>[0, 1, 2]);
-
-    await _drawGesture(tester, const <int>[0, 6]);
-    expect(completed.last, const <int>[0, 3, 6]);
+    await _drawGesture(tester, const <int>[0, 2, 1, 7, 4]);
+    expect(completed.last, const <int>[0, 2, 1, 7, 4]);
   });
 
   testWidgets('gesture input preserves deliberate node jumps', (tester) async {
