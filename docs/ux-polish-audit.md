@@ -43,6 +43,9 @@ labels short enough for later extraction into `AppLocalizations`.
 
 ## Manual Device Note
 
-No physical phone was attached during this pass. The current substitute is the
-phone-sized widget audit plus release-build smoke checks in CI; physical device
-testing remains a release qualification step.
+Android physical-device smoke testing was completed on device `7eaf4718` on
+2026-06-24. The debug arm64 APK built successfully, installed over the previous
+app, launched package `top.vollate.pars_gui`, and stayed running without an
+`AndroidRuntime` crash in the app PID log. Phone-sized widget coverage remains
+the repeatable CI substitute; physical device testing is still required before
+release cuts.

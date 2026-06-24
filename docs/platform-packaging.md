@@ -45,4 +45,7 @@ for installed builds.
 Release smoke checks should run the platform build, verify the native bridge
 artifact exists in the expected bundle location, and then run Flutter widget
 tests plus Rust workspace tests. CI records the same contract in
-[GuiPackaging.yml](../.github/workflows/GuiPackaging.yml).
+[GuiPackaging.yml](../.github/workflows/GuiPackaging.yml). Android release
+qualification also includes installing the debug or release APK on a physical
+arm64 device, launching `top.vollate.pars_gui`, and checking the app PID log for
+startup crashes.

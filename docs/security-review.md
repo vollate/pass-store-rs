@@ -50,11 +50,16 @@ long-lived storage is limited to explicit opt-in secure storage.
 
 ## OpenPGP Update Story
 
-Phase 1 uses configured system GPG. Bundled OpenPGP artifacts are not shipped
-yet; when a platform package bundles them, the release must pin the version,
-document the source and license in `THIRD_PARTY_PACKAGING_NOTICES.md`, expose
-the active backend in runtime diagnostics, and include an update procedure in
-the platform release notes.
+Phase 1 uses configured system GPG on CLI and desktop builds. Android and iOS
+packages ship the in-process rPGP backend through the Rust bridge, with the
+exact crate version pinned by `Cargo.lock` and documented in
+`THIRD_PARTY_PACKAGING_NOTICES.md`. Runtime diagnostics expose the active PGP
+backend so installed builds can be audited without guessing.
+
+Bundled GnuPG remains a fallback route for desktop or specialist builds, not
+the mobile default. Any package that adds bundled GnuPG or another crypto
+component must pin the exact version, document source and license, expose the
+packaged path, and include an update procedure in the platform release notes.
 
 ## Residual Risks
 
@@ -63,5 +68,5 @@ decrypted entry content.
 - Clipboard managers may retain history outside the app's control.
 - User-configured Git remotes can still be malicious; the app prevents shell
 injection but cannot make remote content trustworthy.
-- Full mobile secure-enclave/keychain behavior still requires device-level
-manual testing during release qualification.
+- Deeper mobile secure-enclave/keychain behavior still requires release
+  qualification testing beyond the basic Android install and launch smoke.
