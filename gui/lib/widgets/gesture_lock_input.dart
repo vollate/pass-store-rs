@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+const double _gestureDotSize = 38;
+
 class GestureLockInput extends StatefulWidget {
   const GestureLockInput({
     super.key,
@@ -53,13 +55,14 @@ class _GestureLockInputState extends State<GestureLockInput> {
                 ),
                 child: Stack(
                   children: List<Widget>.generate(9, (index) {
-                    final alignment = Alignment(
-                      (-1 + (index % 3)).toDouble(),
-                      (-1 + (index ~/ 3)).toDouble(),
-                    );
                     final isSelected = _selected.contains(index);
-                    return Align(
-                      alignment: alignment,
+                    final center = _gestureGridCenterFor(
+                      index,
+                      constraints.biggest,
+                    );
+                    return Positioned(
+                      left: center.dx - _gestureDotSize / 2,
+                      top: center.dy - _gestureDotSize / 2,
                       child: _GestureDot(
                         index: index,
                         selected: isSelected,
@@ -142,8 +145,8 @@ class _GestureDot extends StatelessWidget {
         radius: 28,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          width: 38,
-          height: 38,
+          width: _gestureDotSize,
+          height: _gestureDotSize,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: selected ? colorScheme.primaryContainer : Colors.white,
@@ -186,11 +189,7 @@ class _GestureLockPainter extends CustomPainter {
   }
 
   Offset _centerFor(int index, Size size) {
-    final cell = size.width / 3;
-    return Offset(
-      cell * (index % 3) + cell / 2,
-      cell * (index ~/ 3) + cell / 2,
-    );
+    return _gestureGridCenterFor(index, size);
   }
 
   @override
@@ -198,4 +197,14 @@ class _GestureLockPainter extends CustomPainter {
       oldDelegate.selected != selected ||
       oldDelegate.activeColor != activeColor ||
       oldDelegate.inactiveColor != inactiveColor;
+}
+
+Offset _gestureGridCenterFor(int index, Size size) {
+  final cell = size.shortestSide / 3;
+  final left = (size.width - size.shortestSide) / 2;
+  final top = (size.height - size.shortestSide) / 2;
+  return Offset(
+    left + cell * (index % 3) + cell / 2,
+    top + cell * (index ~/ 3) + cell / 2,
+  );
 }
