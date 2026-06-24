@@ -3,6 +3,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/widgets/gesture_lock_input.dart';
 
 void main() {
+  testWidgets('gesture input uses a larger default touch area', (tester) async {
+    final completed = <List<int>>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(child: GestureLockInput(onCompleted: completed.add)),
+        ),
+      ),
+    );
+
+    final box = tester.renderObject<RenderBox>(find.byType(GestureLockInput));
+    expect(box.size.shortestSide, greaterThanOrEqualTo(300));
+  });
+
   testWidgets('gesture input completes selected dots in order', (tester) async {
     final completed = <List<int>>[];
     await _pumpGestureInput(tester, completed);
@@ -28,6 +42,15 @@ void main() {
     await _drawGesture(tester, const <int>[0, 6]);
     expect(completed.last, const <int>[0, 3, 6]);
   });
+
+  testWidgets('gesture input preserves deliberate node jumps', (tester) async {
+    final completed = <List<int>>[];
+    await _pumpGestureInput(tester, completed);
+
+    await _drawGesture(tester, const <int>[1, 0, 1, 2]);
+
+    expect(completed.single, const <int>[1, 0, 1, 2]);
+  });
 }
 
 Future<void> _pumpGestureInput(
@@ -50,16 +73,15 @@ Future<void> _drawGesture(WidgetTester tester, List<int> pattern) async {
   final box = tester.renderObject<RenderBox>(find.byType(GestureLockInput));
   final topLeft = box.localToGlobal(Offset.zero);
   const dimension = 3;
-  const relativePadding = 0.5;
   final shortestSide = box.size.shortestSide;
   final left = (box.size.width - shortestSide) / 2;
   final top = (box.size.height - shortestSide) / 2;
-  final step = shortestSide / (dimension - 1 + relativePadding * 2);
+  final step = shortestSide / dimension;
   Offset dot(int index) {
     return topLeft +
         Offset(
-          left + step * (index % dimension + relativePadding),
-          top + step * (index ~/ dimension + relativePadding),
+          left + step * (index % dimension) + step / 2,
+          top + step * (index ~/ dimension) + step / 2,
         );
   }
 

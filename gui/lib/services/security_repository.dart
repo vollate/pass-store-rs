@@ -8,8 +8,12 @@ class GestureVerifier {
     if (pattern.length < 4) {
       throw ArgumentError.value(pattern, 'pattern', 'Use at least 4 dots.');
     }
-    if (pattern.toSet().length != pattern.length) {
-      throw ArgumentError.value(pattern, 'pattern', 'Do not repeat dots.');
+    if (_hasConsecutiveRepeatedDots(pattern)) {
+      throw ArgumentError.value(
+        pattern,
+        'pattern',
+        'Do not repeat the same dot without moving away.',
+      );
     }
     for (final dot in pattern) {
       if (dot < 0 || dot > 8) {
@@ -40,6 +44,15 @@ class GestureVerifier {
     hash ^= pattern.length;
     return hash.toRadixString(16).padLeft(8, '0');
   }
+}
+
+bool _hasConsecutiveRepeatedDots(List<int> pattern) {
+  for (var index = 1; index < pattern.length; index += 1) {
+    if (pattern[index - 1] == pattern[index]) {
+      return true;
+    }
+  }
+  return false;
 }
 
 abstract interface class SecureStorageAdapter {

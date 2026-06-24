@@ -10,7 +10,7 @@ void main() {
       expect(verifier.matches(const <int>[0, 1, 5, 2]), isFalse);
     });
 
-    test('rejects short or repeated gestures', () {
+    test('rejects short or immediately repeated gestures', () {
       expect(
         () => GestureVerifier.fromPattern(const <int>[0, 1, 2]),
         throwsArgumentError,
@@ -19,6 +19,13 @@ void main() {
         () => GestureVerifier.fromPattern(const <int>[0, 1, 1, 2]),
         throwsArgumentError,
       );
+    });
+
+    test('allows deliberate node jumps in gesture passwords', () {
+      final verifier = GestureVerifier.fromPattern(const <int>[1, 0, 1, 2]);
+
+      expect(verifier.matches(const <int>[1, 0, 1, 2]), isTrue);
+      expect(verifier.matches(const <int>[1, 1, 1, 2]), isFalse);
     });
   });
 
