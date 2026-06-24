@@ -29,6 +29,7 @@ enum _OnboardingStep { gesture, biometrics, pgp, ssh, store, review }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late _OnboardingStep _step;
+  final List<_OnboardingStep> _stepHistory = <_OnboardingStep>[];
   String? _error;
   String? _selectedPgpFingerprint;
 
@@ -72,11 +73,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               const SizedBox(height: 24),
-              Text(
-                _stepTitle(_step),
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                children: <Widget>[
+                  if (_stepHistory.isNotEmpty)
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: _goBack,
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                  Expanded(
+                    child: Text(
+                      _stepTitle(_step),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(_stepSubtitle(_step)),
@@ -357,11 +369,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  void _setStep(_OnboardingStep step) {
+  void _setStep(_OnboardingStep step, {bool recordHistory = true}) {
     setState(() {
+      if (recordHistory && step != _step) {
+        _stepHistory.add(_step);
+      }
       _step = step;
       _error = null;
     });
+  }
+
+  void _goBack() {
+    if (_stepHistory.isEmpty) {
+      return;
+    }
+    final previous = _stepHistory.removeLast();
+    _setStep(previous, recordHistory: false);
   }
 
   void _showError(Object error) {
@@ -551,52 +574,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       context: context,
       isScrollControlled: true,
       builder:
-          (context) => SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...fields,
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () async {
-                        try {
-                          await onSubmit();
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-                        } catch (error) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(error.toString())),
-                            );
-                          }
-                        }
-                      },
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: Center(child: Text(submitLabel)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          (context) => _OnboardingFormSheet(
+            title: title,
+            fields: fields,
+            submitLabel: submitLabel,
+            onSubmit: onSubmit,
           ),
     );
   }
@@ -766,6 +748,113 @@ class _BiometricSetupStep extends StatelessWidget {
         return 'Available on this device';
       case BiometricUnlockStatus.unavailable:
         return 'Unavailable on this device';
+    }
+  }
+}
+
+class _OnboardingFormSheet extends StatefulWidget {
+  const _OnboardingFormSheet({
+    required this.title,
+    required this.fields,
+    required this.submitLabel,
+    required this.onSubmit,
+  });
+
+  final String title;
+  final List<Widget> fields;
+  final String submitLabel;
+  final Future<void> Function() onSubmit;
+
+  @override
+  State<_OnboardingFormSheet> createState() => _OnboardingFormSheetState();
+}
+
+class _OnboardingFormSheetState extends State<_OnboardingFormSheet> {
+  bool _isSubmitting = false;
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                widget.title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              ...widget.fields,
+              if (_error != null) ...<Widget>[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _isSubmitting ? null : _submit,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Center(
+                    child:
+                        _isSubmitting
+                            ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color:
+                                        Theme.of(context).colorScheme.onPrimary,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(widget.submitLabel),
+                              ],
+                            )
+                            : Text(widget.submitLabel),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _isSubmitting = true;
+      _error = null;
+    });
+    try {
+      await widget.onSubmit();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _isSubmitting = false;
+        });
+      }
     }
   }
 }
@@ -974,56 +1063,17 @@ class _StoreSetupActions extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       builder:
-          (context) => SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...fields,
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed:
-                          onSubmit == null
-                              ? null
-                              : () async {
-                                try {
-                                  await onSubmit();
-                                  await onStoreChanged();
-                                  if (context.mounted) {
-                                    Navigator.of(context).pop();
-                                  }
-                                } catch (error) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(error.toString())),
-                                    );
-                                  }
-                                }
-                              },
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: Center(child: Text(submitLabel)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          (context) => _OnboardingFormSheet(
+            title: title,
+            fields: fields,
+            submitLabel: submitLabel,
+            onSubmit:
+                onSubmit == null
+                    ? () async {}
+                    : () async {
+                      await onSubmit();
+                      await onStoreChanged();
+                    },
           ),
     );
   }

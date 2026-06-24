@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/app/pars_gui_app.dart';
 import 'package:pars_gui/models/key_record.dart';
@@ -125,6 +128,39 @@ void main() {
       find.widgetWithText(OutlinedButton, 'Clone Git store'),
     );
     expect(cloneButton.onPressed, isNull);
+  });
+
+  testWidgets('onboarding setup steps can return to the previous page', (
+    tester,
+  ) async {
+    final repository = _OnboardingBranchRepository(storeReady: false);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          biometricUnlockEnabled: true,
+          onboardingComplete: false,
+          lastUnlockedAt: DateTime.now(),
+        ),
+      ),
+    );
+
+    expect(find.text('Choose PGP key'), findsOneWidget);
+    expect(find.byTooltip('Back'), findsNothing);
+
+    await tester.tap(find.text('Use PGP key'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose PGP key'), findsOneWidget);
   });
 
   for (final branch in <_StoreBranch>[
@@ -260,6 +296,94 @@ void main() {
       expect(find.text('Set up SSH for GitHub'), findsOneWidget);
     });
   }
+
+  testWidgets(
+    'onboarding key form shows inline errors above the action button',
+    (tester) async {
+      final repository = _FailingOnboardingRepository(
+        error: Exception('PGP failed visibly'),
+      );
+
+      await tester.pumpWidget(
+        ParsGuiApp(
+          vaultRepository: repository,
+          settingsRepository: repository,
+          keyRepository: repository,
+          gitRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            onboardingComplete: false,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Create PGP key'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), 'Alice');
+      await tester.enterText(find.byType(TextField).at(1), 'alice@example.com');
+      await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+      await tester.pump();
+
+      final bottomSheet = find.byType(BottomSheet);
+      final error = find.textContaining('PGP failed visibly');
+      expect(find.descendant(of: bottomSheet, matching: error), findsOneWidget);
+      final errorTop = tester.getTopLeft(error).dy;
+      final buttonTop =
+          tester.getTopLeft(find.widgetWithText(FilledButton, 'Create')).dy;
+      expect(errorTop, lessThan(buttonTop));
+    },
+  );
+
+  testWidgets('onboarding key form shows progress while generating keys', (
+    tester,
+  ) async {
+    final repository = _SlowOnboardingRepository();
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          biometricUnlockEnabled: true,
+          onboardingComplete: false,
+          lastUnlockedAt: DateTime.now(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Create PGP key'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'Alice');
+    await tester.enterText(find.byType(TextField).at(1), 'alice@example.com');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await tester.pump();
+
+    expect(repository.started, isTrue);
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+    final button = tester.widget<FilledButton>(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    expect(button.onPressed, isNull);
+
+    repository.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+  });
 
   for (final branch in <_SshBranch>[_SshBranch.generate, _SshBranch.import]) {
     testWidgets('onboarding completes ${branch.label} SSH key branch', (
@@ -1961,6 +2085,52 @@ class _OnboardingBranchRepository extends _InjectedRepository {
     );
     _keys.add(key);
     return key;
+  }
+}
+
+class _FailingOnboardingRepository extends _OnboardingBranchRepository {
+  _FailingOnboardingRepository({required this.error})
+    : super(initialKeys: const <KeyRecord>[]);
+
+  final Object error;
+
+  @override
+  Future<KeyRecord> generatePgpKey({
+    required String name,
+    required String email,
+    String? passphrase,
+  }) async {
+    throw error;
+  }
+}
+
+class _SlowOnboardingRepository extends _OnboardingBranchRepository {
+  _SlowOnboardingRepository() : super(initialKeys: const <KeyRecord>[]);
+
+  final Completer<KeyRecord> _completer = Completer<KeyRecord>();
+  bool started = false;
+
+  @override
+  Future<KeyRecord> generatePgpKey({
+    required String name,
+    required String email,
+    String? passphrase,
+  }) {
+    started = true;
+    keyActions.add('generate-pgp:$name:$email:${passphrase != null}');
+    return _completer.future;
+  }
+
+  void complete() {
+    final key = const KeyRecord(
+      type: KeyRecordType.pgp,
+      name: 'Generated Slow PGP',
+      fingerprint: 'SLOW PGP',
+      source: 'Generated during onboarding',
+      hasPrivateKey: true,
+    );
+    _keys.add(key);
+    _completer.complete(key);
   }
 }
 
