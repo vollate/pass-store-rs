@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:pattern_lock/pattern_lock.dart';
 
-const double _gestureDotSize = 38;
+const int _patternDimension = 3;
+const double _patternPointRadius = 19;
+const double _patternRelativePadding = 0.5;
+const int _patternSelectThreshold = 28;
 
-class GestureLockInput extends StatefulWidget {
+class GestureLockInput extends StatelessWidget {
   const GestureLockInput({
     super.key,
     required this.onCompleted,
@@ -15,142 +19,26 @@ class GestureLockInput extends StatefulWidget {
   final double size;
 
   @override
-  State<GestureLockInput> createState() => _GestureLockInputState();
-}
-
-class _GestureLockInputState extends State<GestureLockInput> {
-  final List<int> _selected = <int>[];
-
-  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Semantics(
       label: 'Gesture pattern input',
       child: SizedBox.square(
-        dimension: widget.size,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onPanStart:
-                  widget.enabled
-                      ? (details) => _selectDotAt(
-                        details.localPosition,
-                        constraints.biggest,
-                      )
-                      : null,
-              onPanUpdate:
-                  widget.enabled
-                      ? (details) => _selectDotAt(
-                        details.localPosition,
-                        constraints.biggest,
-                      )
-                      : null,
-              onPanEnd: widget.enabled ? (_) => _completePattern() : null,
-              child: CustomPaint(
-                painter: _GestureLockPainter(
-                  selected: List<int>.unmodifiable(_selected),
-                  activeColor: colorScheme.primary,
-                  inactiveColor: colorScheme.outlineVariant,
-                ),
-                child: Stack(
-                  children: List<Widget>.generate(9, (index) {
-                    final isSelected = _selected.contains(index);
-                    final center = _gestureGridCenterFor(
-                      index,
-                      constraints.biggest,
-                    );
-                    return Positioned(
-                      left: center.dx - _gestureDotSize / 2,
-                      top: center.dy - _gestureDotSize / 2,
-                      child: _GestureDot(
-                        index: index,
-                        selected: isSelected,
-                        enabled: widget.enabled,
-                        onTap: () => _toggleDot(index),
-                      ),
-                    );
-                  }),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  void _toggleDot(int index) {
-    if (!widget.enabled) {
-      return;
-    }
-    setState(() {
-      if (_selected.contains(index)) {
-        _selected.remove(index);
-      } else {
-        _selected.add(index);
-      }
-    });
-  }
-
-  void _selectDotAt(Offset position, Size size) {
-    final cell = size.width / 3;
-    if (position.dx < 0 ||
-        position.dy < 0 ||
-        position.dx > size.width ||
-        position.dy > size.height) {
-      return;
-    }
-    final column = (position.dx / cell).floor().clamp(0, 2);
-    final row = (position.dy / cell).floor().clamp(0, 2);
-    final index = row * 3 + column;
-    if (_selected.contains(index)) {
-      return;
-    }
-    setState(() => _selected.add(index));
-  }
-
-  void _completePattern() {
-    if (_selected.isEmpty) {
-      return;
-    }
-    widget.onCompleted(List<int>.unmodifiable(_selected));
-    setState(_selected.clear);
-  }
-}
-
-class _GestureDot extends StatelessWidget {
-  const _GestureDot({
-    required this.index,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final int index;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final color = selected ? colorScheme.primary : colorScheme.outline;
-    return Semantics(
-      button: true,
-      label: 'Gesture dot ${index + 1}',
-      child: InkResponse(
-        key: ValueKey<String>('gesture-dot-$index'),
-        onTap: enabled ? onTap : null,
-        radius: 28,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          width: _gestureDotSize,
-          height: _gestureDotSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: selected ? colorScheme.primaryContainer : Colors.white,
-            border: Border.all(color: color, width: selected ? 3 : 2),
+        dimension: size,
+        child: AbsorbPointer(
+          absorbing: !enabled,
+          child: PatternLock(
+            dimension: _patternDimension,
+            relativePadding: _patternRelativePadding,
+            selectedColor: colorScheme.primary,
+            notSelectedColor: colorScheme.outline,
+            pointRadius: _patternPointRadius,
+            showInput: true,
+            selectThreshold: _patternSelectThreshold,
+            fillPoints: false,
+            onInputComplete: (input) {
+              onCompleted(_normalizePattern(input));
+            },
           ),
         ),
       ),
@@ -158,53 +46,43 @@ class _GestureDot extends StatelessWidget {
   }
 }
 
-class _GestureLockPainter extends CustomPainter {
-  const _GestureLockPainter({
-    required this.selected,
-    required this.activeColor,
-    required this.inactiveColor,
-  });
-
-  final List<int> selected;
-  final Color activeColor;
-  final Color inactiveColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (selected.length < 2) {
-      return;
+List<int> _normalizePattern(List<int> input) {
+  final normalized = <int>[];
+  for (final dot in input) {
+    if (dot < 0 || dot >= _patternDimension * _patternDimension) {
+      continue;
     }
-    final paint =
-        Paint()
-          ..color = activeColor
-          ..strokeCap = StrokeCap.round
-          ..strokeWidth = 5;
-    for (var i = 1; i < selected.length; i += 1) {
-      canvas.drawLine(
-        _centerFor(selected[i - 1], size),
-        _centerFor(selected[i], size),
-        paint,
-      );
+    if (normalized.isNotEmpty) {
+      final skipped = _skippedDotBetween(normalized.last, dot);
+      if (skipped != null && !normalized.contains(skipped)) {
+        normalized.add(skipped);
+      }
+    }
+    if (!normalized.contains(dot)) {
+      normalized.add(dot);
     }
   }
-
-  Offset _centerFor(int index, Size size) {
-    return _gestureGridCenterFor(index, size);
-  }
-
-  @override
-  bool shouldRepaint(_GestureLockPainter oldDelegate) =>
-      oldDelegate.selected != selected ||
-      oldDelegate.activeColor != activeColor ||
-      oldDelegate.inactiveColor != inactiveColor;
+  return List<int>.unmodifiable(normalized);
 }
 
-Offset _gestureGridCenterFor(int index, Size size) {
-  final cell = size.shortestSide / 3;
-  final left = (size.width - size.shortestSide) / 2;
-  final top = (size.height - size.shortestSide) / 2;
-  return Offset(
-    left + cell * (index % 3) + cell / 2,
-    top + cell * (index ~/ 3) + cell / 2,
-  );
+int? _skippedDotBetween(int from, int to) {
+  final fromRow = from ~/ _patternDimension;
+  final fromColumn = from % _patternDimension;
+  final toRow = to ~/ _patternDimension;
+  final toColumn = to % _patternDimension;
+  final rowDelta = toRow - fromRow;
+  final columnDelta = toColumn - fromColumn;
+
+  final skipsRow = rowDelta.abs() == 2;
+  final skipsColumn = columnDelta.abs() == 2;
+  final straightSkip =
+      (skipsRow && columnDelta == 0) || (skipsColumn && rowDelta == 0);
+  final diagonalSkip = skipsRow && skipsColumn;
+  if (!straightSkip && !diagonalSkip) {
+    return null;
+  }
+
+  final skippedRow = (fromRow + toRow) ~/ 2;
+  final skippedColumn = (fromColumn + toColumn) ~/ 2;
+  return skippedRow * _patternDimension + skippedColumn;
 }
