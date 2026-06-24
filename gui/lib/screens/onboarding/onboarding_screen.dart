@@ -25,11 +25,12 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-enum _OnboardingStep { gesture, biometrics, store, pgp, ssh, review }
+enum _OnboardingStep { gesture, biometrics, pgp, ssh, store, review }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late _OnboardingStep _step;
   String? _error;
+  String? _selectedPgpFingerprint;
 
   StoreLifecycleSnapshot? get _lifecycle =>
       widget.settingsRepository?.lifecycle;
@@ -50,6 +51,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           .where((key) => key.type == KeyRecordType.ssh)
           .toList(growable: false) ??
       const <KeyRecord>[];
+
+  String? get _effectivePgpFingerprint =>
+      _selectedPgpFingerprint ??
+      (_pgpKeys.length == 1 ? _pgpKeys.single.fingerprint : null);
 
   @override
   void initState() {
@@ -98,7 +103,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return _OnboardingStep.gesture;
     }
     if (_needsStoreSetup) {
-      return _OnboardingStep.store;
+      return _OnboardingStep.pgp;
     }
     if (!widget.securityRepository.biometricUnlockEnabled) {
       return _OnboardingStep.biometrics;
@@ -116,22 +121,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       case _OnboardingStep.biometrics:
         return _BiometricSetupStep(
           securityRepository: widget.securityRepository,
-          onEnable:
-              () => _setStep(
-                _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.pgp,
-              ),
-          onSkip:
-              () => _setStep(
-                _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.pgp,
-              ),
+          onEnable: () => _setStep(_OnboardingStep.pgp),
+          onSkip: () => _setStep(_OnboardingStep.pgp),
           onError: _showError,
         );
-      case _OnboardingStep.store:
-        return _buildStoreStep(context);
       case _OnboardingStep.pgp:
         return _buildPgpStep(context);
       case _OnboardingStep.ssh:
         return _buildSshStep(context);
+      case _OnboardingStep.store:
+        return _buildStoreStep(context);
       case _OnboardingStep.review:
         return _buildReviewStep(context);
     }
@@ -145,7 +144,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         icon: Icons.folder_off_outlined,
         title: 'No store repository available',
         buttonLabel: 'Continue',
-        onPressed: () => _setStep(_OnboardingStep.pgp),
+        onPressed: () => _setStep(_OnboardingStep.review),
       );
     }
 
@@ -162,7 +161,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: () => _setStep(_OnboardingStep.pgp),
+            onPressed: () => _setStep(_OnboardingStep.review),
             child: const SizedBox(
               width: double.infinity,
               child: Center(child: Text('Continue')),
@@ -175,13 +174,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return _StoreSetupActions(
       repository: repository,
       lifecycle: lifecycle,
+      selectedPgpFingerprint: _effectivePgpFingerprint,
+      hasSshKey: _sshKeys.isNotEmpty,
       onStoreChanged: () async {
+        await repository.refresh();
+        await _attachSelectedPgpKeyToCurrentStore();
         await repository.refresh();
         if (!mounted) {
           return;
         }
         if (!_needsStoreSetup) {
-          _setStep(_OnboardingStep.pgp);
+          _setStep(_OnboardingStep.review);
           return;
         }
         setState(() {});
@@ -293,7 +296,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               label: const Text('GitHub settings'),
             ),
             TextButton(
-              onPressed: () => _setStep(_OnboardingStep.review),
+              onPressed:
+                  () => _setStep(
+                    _needsStoreSetup
+                        ? _OnboardingStep.store
+                        : _OnboardingStep.review,
+                  ),
               child: const Text('Skip SSH'),
             ),
           ],
@@ -362,9 +370,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _usePgpKey(KeyRepository repository, KeyRecord key) async {
     await _runOnboardingAction(() async {
-      await repository.addPgpKeyToSelectedStore(key.fingerprint);
-      _setStep(_OnboardingStep.ssh);
+      await _finishPgpStep(repository, key);
     });
+  }
+
+  Future<void> _finishPgpStep(KeyRepository repository, KeyRecord key) async {
+    _selectedPgpFingerprint = key.fingerprint;
+    if (!_needsStoreSetup) {
+      await repository.addPgpKeyToSelectedStore(key.fingerprint);
+    }
+    _setStep(_OnboardingStep.ssh);
+  }
+
+  Future<void> _attachSelectedPgpKeyToCurrentStore() async {
+    final fingerprint = _effectivePgpFingerprint;
+    final repository = _keyRepository;
+    if (fingerprint == null ||
+        repository == null ||
+        _lifecycle?.selectedStore == null ||
+        !_needsStoreSetup) {
+      return;
+    }
+    await repository.addPgpKeyToSelectedStore(fingerprint);
   }
 
   void _showCreatePgpKeyForm(BuildContext context, KeyRepository repository) {
@@ -397,8 +424,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             email: email.text,
             passphrase: passphrase.text.trim().isEmpty ? null : passphrase.text,
           );
-          await repository.addPgpKeyToSelectedStore(key.fingerprint);
-          _setStep(_OnboardingStep.ssh);
+          await _finishPgpStep(repository, key);
         } finally {
           passphrase.clear();
         }
@@ -426,8 +452,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               keyText.text.contains('PGP PRIVATE KEY BLOCK')
                   ? await repository.importPgpPrivateKeyText(keyText.text)
                   : await repository.importPgpPublicKeyText(keyText.text);
-          await repository.addPgpKeyToSelectedStore(key.fingerprint);
-          _setStep(_OnboardingStep.ssh);
+          await _finishPgpStep(repository, key);
         } finally {
           keyText.clear();
         }
@@ -449,7 +474,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       submitLabel: 'Generate',
       onSubmit: () async {
         await repository.generateSshKey(name.text);
-        _setStep(_OnboardingStep.review);
+        _setStep(
+          _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.review,
+        );
       },
     );
   }
@@ -479,7 +506,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             name: name.text,
             privateKey: privateKey.text,
           );
-          _setStep(_OnboardingStep.review);
+          _setStep(
+            _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.review,
+          );
         } finally {
           privateKey.clear();
         }
@@ -597,12 +626,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return 'Set gesture lock';
       case _OnboardingStep.biometrics:
         return 'Enable biometric unlock';
-      case _OnboardingStep.store:
-        return 'Set up password store';
       case _OnboardingStep.pgp:
         return 'Choose PGP key';
       case _OnboardingStep.ssh:
         return 'Set up SSH for GitHub';
+      case _OnboardingStep.store:
+        return 'Set up password store';
       case _OnboardingStep.review:
         return 'Review setup';
     }
@@ -614,13 +643,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return 'Use a 9-dot gesture as the local Pars unlock method.';
       case _OnboardingStep.biometrics:
         return 'Biometrics are optional and keep the gesture as fallback.';
-      case _OnboardingStep.store:
-        return _lifecycle?.onboardingState.label ??
-            'Create, import, or clone a password store.';
       case _OnboardingStep.pgp:
         return 'Select, create, or import the key used by pass entries.';
       case _OnboardingStep.ssh:
         return 'SSH is optional and helps Git sync with GitHub.';
+      case _OnboardingStep.store:
+        return _lifecycle?.onboardingState.label ??
+            'Create, import, or clone a password store.';
       case _OnboardingStep.review:
         return 'Confirm the setup before entering Pars.';
     }
@@ -654,12 +683,12 @@ class _StepRail extends StatelessWidget {
         return 'Gesture';
       case _OnboardingStep.biometrics:
         return 'Biometrics';
-      case _OnboardingStep.store:
-        return 'Store';
       case _OnboardingStep.pgp:
         return 'PGP';
       case _OnboardingStep.ssh:
         return 'SSH';
+      case _OnboardingStep.store:
+        return 'Store';
       case _OnboardingStep.review:
         return 'Review';
     }
@@ -805,11 +834,15 @@ class _StoreSetupActions extends StatelessWidget {
   const _StoreSetupActions({
     required this.repository,
     required this.lifecycle,
+    required this.selectedPgpFingerprint,
+    required this.hasSshKey,
     required this.onStoreChanged,
   });
 
   final SettingsRepository repository;
   final StoreLifecycleSnapshot lifecycle;
+  final String? selectedPgpFingerprint;
+  final bool hasSshKey;
   final Future<void> Function() onStoreChanged;
 
   @override
@@ -840,10 +873,16 @@ class _StoreSetupActions extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
-          onPressed: () => _showCloneStore(context),
+          onPressed: hasSshKey ? () => _showCloneStore(context) : null,
           icon: const Icon(Icons.cloud_download_outlined),
           label: const Text('Clone Git store'),
         ),
+        if (!hasSshKey)
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.info_outline),
+            title: Text('Add an SSH key before cloning a Git store.'),
+          ),
       ],
     );
   }
@@ -851,7 +890,6 @@ class _StoreSetupActions extends StatelessWidget {
   void _showCreateLocalStore(BuildContext context) {
     final name = TextEditingController(text: 'Personal');
     final root = TextEditingController();
-    final keys = TextEditingController();
     _showStoreForm(
       context: context,
       title: 'Create local store',
@@ -864,21 +902,16 @@ class _StoreSetupActions extends StatelessWidget {
           controller: root,
           decoration: const InputDecoration(labelText: 'Local path'),
         ),
-        TextField(
-          controller: keys,
-          decoration: const InputDecoration(labelText: 'PGP keys'),
-        ),
       ],
       submitLabel: 'Create',
       onSubmit:
           () => repository.createLocalStore(
             name: name.text,
             root: root.text,
-            pgpKeys: keys.text
-                .split(',')
-                .map((key) => key.trim())
-                .where((key) => key.isNotEmpty)
-                .toList(growable: false),
+            pgpKeys:
+                selectedPgpFingerprint == null
+                    ? const <String>[]
+                    : <String>[selectedPgpFingerprint!],
             setDefault: true,
             initializeGit: true,
           ),
@@ -920,11 +953,13 @@ class _StoreSetupActions extends StatelessWidget {
       ],
       submitLabel: 'Clone',
       onSubmit:
-          () => repository.cloneStore(
-            remoteUrl: remote.text,
-            root: root.text,
-            setDefault: true,
-          ),
+          hasSshKey
+              ? () => repository.cloneStore(
+                remoteUrl: remote.text,
+                root: root.text,
+                setDefault: true,
+              )
+              : null,
     );
   }
 
@@ -933,7 +968,7 @@ class _StoreSetupActions extends StatelessWidget {
     required String title,
     required List<Widget> fields,
     required String submitLabel,
-    required Future<void> Function() onSubmit,
+    required Future<void> Function()? onSubmit,
   }) {
     showModalBottomSheet<void>(
       context: context,
@@ -962,21 +997,24 @@ class _StoreSetupActions extends StatelessWidget {
                     ...fields,
                     const SizedBox(height: 16),
                     FilledButton(
-                      onPressed: () async {
-                        try {
-                          await onSubmit();
-                          await onStoreChanged();
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-                        } catch (error) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(error.toString())),
-                            );
-                          }
-                        }
-                      },
+                      onPressed:
+                          onSubmit == null
+                              ? null
+                              : () async {
+                                try {
+                                  await onSubmit();
+                                  await onStoreChanged();
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                } catch (error) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(error.toString())),
+                                    );
+                                  }
+                                }
+                              },
                       child: SizedBox(
                         width: double.infinity,
                         child: Center(child: Text(submitLabel)),

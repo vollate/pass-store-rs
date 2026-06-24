@@ -35,7 +35,7 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
   });
 
-  testWidgets('onboarding captures gesture before store setup', (tester) async {
+  testWidgets('onboarding captures gesture before key setup', (tester) async {
     const repository = _StoreSetupRepository();
 
     await tester.pumpWidget(
@@ -58,12 +58,12 @@ void main() {
     await tester.tap(find.text('Skip biometrics'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Set up password store'), findsOneWidget);
-    expect(find.text('Create local store'), findsOneWidget);
+    expect(find.text('Choose PGP key'), findsOneWidget);
+    expect(find.text('Set up password store'), findsNothing);
     expect(find.text('Continue'), findsNothing);
   });
 
-  testWidgets('existing gesture resumes incomplete store setup', (
+  testWidgets('existing gesture resumes prerequisite key setup', (
     tester,
   ) async {
     const repository = _StoreSetupRepository();
@@ -83,8 +83,48 @@ void main() {
       ),
     );
 
-    expect(find.text('Set up password store'), findsOneWidget);
+    expect(find.text('Choose PGP key'), findsOneWidget);
+    expect(find.text('Set up password store'), findsNothing);
     expect(find.text('Vault'), findsNothing);
+  });
+
+  testWidgets('onboarding prepares PGP and SSH before store setup', (
+    tester,
+  ) async {
+    final repository = _OnboardingBranchRepository(storeReady: false);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          biometricUnlockEnabled: true,
+          onboardingComplete: false,
+          lastUnlockedAt: DateTime.now(),
+        ),
+      ),
+    );
+
+    expect(find.text('Choose PGP key'), findsOneWidget);
+    expect(find.text('Set up password store'), findsNothing);
+
+    await tester.tap(find.text('Use PGP key'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+    expect(find.text('Set up password store'), findsNothing);
+
+    await tester.tap(find.text('Skip SSH'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up password store'), findsOneWidget);
+    final cloneButton = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, 'Clone Git store'),
+    );
+    expect(cloneButton.onPressed, isNull);
   });
 
   for (final branch in <_StoreBranch>[
@@ -111,6 +151,19 @@ void main() {
         ),
       );
 
+      await tester.tap(find.text('Use PGP key'));
+      await tester.pumpAndSettle();
+      if (branch == _StoreBranch.clone) {
+        await tester.tap(find.text('Generate SSH key'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField).last, 'github-test');
+        await tester.tap(find.widgetWithText(FilledButton, 'Generate'));
+        await tester.pumpAndSettle();
+      } else {
+        await tester.tap(find.text('Skip SSH'));
+        await tester.pumpAndSettle();
+      }
+
       expect(find.text('Set up password store'), findsOneWidget);
 
       switch (branch) {
@@ -118,7 +171,7 @@ void main() {
           await tester.tap(find.text('Create local store'));
           await tester.pumpAndSettle();
           await tester.enterText(find.byType(TextField).at(1), '/tmp/pass');
-          await tester.enterText(find.byType(TextField).at(2), 'ABCD 1234');
+          expect(find.text('PGP keys'), findsNothing);
           await tester.tap(find.widgetWithText(FilledButton, 'Create'));
           break;
         case _StoreBranch.import:
@@ -141,7 +194,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.storeActions.single, startsWith(branch.actionPrefix));
-      expect(find.text('Choose PGP key'), findsOneWidget);
+      if (branch == _StoreBranch.create) {
+        expect(
+          repository.storeActions.single,
+          'create:Personal:/tmp/pass:ABCD 1234',
+        );
+      }
+      expect(find.text('Review setup'), findsOneWidget);
     });
   }
 
@@ -2113,16 +2172,14 @@ class _EmptyVaultRepository implements VaultRepository, GitRepository {
     required int length,
     required bool noSymbols,
     required bool overwrite,
-  }) async =>
-      throw UnimplementedError();
+  }) async => throw UnimplementedError();
 
   @override
   Future<EntryOperationResult> saveEntry({
     required String path,
     required String content,
     required bool overwrite,
-  }) async =>
-      throw UnimplementedError();
+  }) async => throw UnimplementedError();
 }
 
 class _RefreshingVaultRepository implements VaultRepository, GitRepository {
