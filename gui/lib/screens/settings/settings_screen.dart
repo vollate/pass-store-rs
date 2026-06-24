@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../models/key_record.dart';
+import '../../models/password_entry.dart';
 import '../../services/git_repository.dart';
 import '../../services/key_repository.dart';
+import '../../services/runtime_diagnostics.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
@@ -16,6 +18,7 @@ class SettingsScreen extends StatelessWidget {
     required this.gitRepository,
     required this.securityRepository,
     this.onSecuritySettingsChanged,
+    this.onOnboardingReset,
   });
 
   final SettingsRepository settingsRepository;
@@ -23,6 +26,7 @@ class SettingsScreen extends StatelessWidget {
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
   final VoidCallback? onSecuritySettingsChanged;
+  final VoidCallback? onOnboardingReset;
 
   @override
   Widget build(BuildContext context) {
@@ -100,8 +104,7 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Git sync and remotes',
                     subtitle: 'Pull, push, status, remotes',
                     icon: Icons.sync,
-                    onTap:
-                        () => _showTextSheet(context, 'Git sync and remotes'),
+                    onTap: () => _showGitSync(context),
                   ),
                   _SettingsTile(
                     title: 'Advanced git args',
@@ -111,12 +114,33 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              _SettingsSection(
+                title: 'Platform',
+                children: <Widget>[
+                  _SettingsTile(
+                    title: 'Runtime diagnostics',
+                    subtitle: 'Bridge, core, crypto, Git, key storage',
+                    icon: Icons.health_and_safety_outlined,
+                    onTap: () => _showRuntimeDiagnostics(context),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ],
     );
   }
+
+  GitOperationsRepository? get _gitOperations =>
+      gitRepository is GitOperationsRepository
+          ? gitRepository as GitOperationsRepository
+          : null;
+
+  RuntimeDiagnosticsRepository? get _runtimeDiagnostics =>
+      settingsRepository is RuntimeDiagnosticsRepository
+          ? settingsRepository as RuntimeDiagnosticsRepository
+          : null;
 
   void _showTextSheet(BuildContext context, String title) {
     showModalBottomSheet<void>(
@@ -140,6 +164,68 @@ class SettingsScreen extends StatelessWidget {
                     'This configuration surface is mocked in phase 1 and will be wired to platform services later.',
                   ),
                 ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  void _showRuntimeDiagnostics(BuildContext context) {
+    final diagnostics =
+        _runtimeDiagnostics?.runtimeDiagnostics(securityRepository) ??
+        RuntimeDiagnostics(
+          bridgeLoaded: false,
+          coreVersion: 'Unavailable',
+          pgpBackend: 'Unavailable',
+          gitBackend: 'Unavailable',
+          keyStorageBackend: keyStorageBackendLabel(securityRepository),
+          nativeLibrary: 'Unavailable',
+        );
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Runtime diagnostics',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _DiagnosticRow(
+                      label: 'Bridge loaded',
+                      value: diagnostics.bridgeLoaded ? 'Yes' : 'No',
+                    ),
+                    _DiagnosticRow(
+                      label: 'Core version',
+                      value: diagnostics.coreVersion,
+                    ),
+                    _DiagnosticRow(
+                      label: 'Native library',
+                      value: diagnostics.nativeLibrary,
+                    ),
+                    _DiagnosticRow(
+                      label: 'PGP backend',
+                      value: diagnostics.pgpBackend,
+                    ),
+                    _DiagnosticRow(
+                      label: 'Git backend',
+                      value: diagnostics.gitBackend,
+                    ),
+                    _DiagnosticRow(
+                      label: 'Key storage backend',
+                      value: diagnostics.keyStorageBackend,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -286,6 +372,18 @@ class SettingsScreen extends StatelessWidget {
                               },
                             ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          await securityRepository.setOnboardingComplete(false);
+                          onOnboardingReset?.call();
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        icon: const Icon(Icons.restart_alt),
+                        label: const Text('Reset onboarding'),
                       ),
                     ],
                   ),
@@ -497,6 +595,17 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    if (keys.isEmpty)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.key_off_outlined),
+                        title: Text(
+                          type == KeyRecordType.pgp
+                              ? 'No PGP keys'
+                              : 'No SSH keys',
+                        ),
+                        subtitle: const Text('Create or import a key.'),
+                      ),
                     for (final key in keys)
                       Card(
                         child: ListTile(
@@ -602,20 +711,22 @@ class SettingsScreen extends StatelessWidget {
               ),
               FilledButton(
                 onPressed:
-                    () => _runKeyAction(
-                      context,
-                      () =>
-                          type == KeyRecordType.pgp
-                              ? keyRepository.generatePgpKey(
-                                name: name.text,
-                                email: email.text,
-                                passphrase:
-                                    passphrase.text.trim().isEmpty
-                                        ? null
-                                        : passphrase.text,
-                              )
-                              : keyRepository.generateSshKey(name.text),
-                    ),
+                    () => _runKeyAction(context, () async {
+                      try {
+                        return type == KeyRecordType.pgp
+                            ? await keyRepository.generatePgpKey(
+                              name: name.text,
+                              email: email.text,
+                              passphrase:
+                                  passphrase.text.trim().isEmpty
+                                      ? null
+                                      : passphrase.text,
+                            )
+                            : await keyRepository.generateSshKey(name.text);
+                      } finally {
+                        passphrase.clear();
+                      }
+                    }),
                 child: const Text('Create'),
               ),
             ],
@@ -656,19 +767,25 @@ class SettingsScreen extends StatelessWidget {
               ),
               FilledButton(
                 onPressed:
-                    () => _runKeyAction(context, () {
-                      if (type == KeyRecordType.ssh) {
-                        return keyRepository.importSshPrivateKeyText(
-                          name: name.text,
-                          privateKey: keyText.text,
-                        );
-                      }
-                      if (keyText.text.contains('PGP PRIVATE KEY BLOCK')) {
-                        return keyRepository.importPgpPrivateKeyText(
+                    () => _runKeyAction(context, () async {
+                      try {
+                        if (type == KeyRecordType.ssh) {
+                          return await keyRepository.importSshPrivateKeyText(
+                            name: name.text,
+                            privateKey: keyText.text,
+                          );
+                        }
+                        if (keyText.text.contains('PGP PRIVATE KEY BLOCK')) {
+                          return await keyRepository.importPgpPrivateKeyText(
+                            keyText.text,
+                          );
+                        }
+                        return await keyRepository.importPgpPublicKeyText(
                           keyText.text,
                         );
+                      } finally {
+                        keyText.clear();
                       }
-                      return keyRepository.importPgpPublicKeyText(keyText.text);
                     }),
                 child: const Text('Import'),
               ),
@@ -879,6 +996,13 @@ class SettingsScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(settingsRepository.lifecycle.onboardingState.label),
                     const SizedBox(height: 12),
+                    if (settingsRepository.stores.isEmpty)
+                      const ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.folder_off_outlined),
+                        title: Text('No password stores'),
+                        subtitle: Text('Create, import, or clone a store.'),
+                      ),
                     for (final store in settingsRepository.stores)
                       Card(
                         child: ListTile(
@@ -1140,61 +1264,497 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
-  void _showGitArgs(BuildContext context) {
+  void _showGitSync(BuildContext context) {
+    final git = _gitOperations;
+    if (git == null) {
+      _showTextSheet(context, 'Git sync and remotes');
+      return;
+    }
+
+    var message = 'Update password store';
+    var remoteName = 'origin';
+    var remoteUrl = '';
+    var deleteConfirmation = '';
+    var pushAfterCommit = false;
+    var running = false;
+    GitOperationResult? output;
+    List<GitRemote> remotes = const <GitRemote>[];
+    String? errorText;
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder:
-          (context) => SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Advanced git args',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+          (sheetContext) => StatefulBuilder(
+            builder: (context, setSheetState) {
+              Future<void> refreshRemotes() async {
+                try {
+                  final loaded = await git.listRemotes();
+                  if (sheetContext.mounted) {
+                    setSheetState(() => remotes = loaded);
+                  }
+                } catch (error) {
+                  if (sheetContext.mounted) {
+                    setSheetState(() => errorText = error.toString());
+                  }
+                }
+              }
+
+              Future<void> run(
+                Future<GitOperationResult> Function() action,
+              ) async {
+                setSheetState(() {
+                  running = true;
+                  errorText = null;
+                });
+                try {
+                  final result = await action();
+                  if (sheetContext.mounted) {
+                    setSheetState(() {
+                      output = result;
+                      running = false;
+                    });
+                  }
+                } catch (error) {
+                  if (sheetContext.mounted) {
+                    setSheetState(() {
+                      errorText = error.toString();
+                      running = false;
+                    });
+                  }
+                }
+              }
+
+              return SafeArea(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      20,
+                      20,
+                      MediaQuery.of(context).viewInsets.bottom + 20,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Only enter arguments after git. Shell syntax is not accepted.',
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      const Text(
-                        'git',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          decoration: const InputDecoration(hintText: 'status'),
-                          controller: TextEditingController(text: 'status'),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Git sync and remotes',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () {},
-                    child: const SizedBox(
-                      width: double.infinity,
-                      child: Center(child: Text('Run selected command')),
+                        const SizedBox(height: 12),
+                        Chip(label: Text(gitRepository.gitStatus.label)),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            FilledButton.icon(
+                              onPressed:
+                                  running
+                                      ? null
+                                      : () => run(git.refreshGitStatus),
+                              icon: const Icon(Icons.info_outline),
+                              label: const Text('Status'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: running ? null : () => run(git.pull),
+                              icon: const Icon(Icons.download_outlined),
+                              label: const Text('Pull'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: running ? null : () => run(git.push),
+                              icon: const Icon(Icons.upload_outlined),
+                              label: const Text('Push'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed:
+                                  running ? null : () => run(git.recoverByPull),
+                              icon: const Icon(Icons.healing_outlined),
+                              label: const Text('Recover pull'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'Commit message',
+                          ),
+                          onChanged: (value) => message = value,
+                        ),
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: pushAfterCommit,
+                          onChanged:
+                              running
+                                  ? null
+                                  : (value) => setSheetState(
+                                    () => pushAfterCommit = value ?? false,
+                                  ),
+                          title: const Text('Push after commit'),
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton.icon(
+                          onPressed:
+                              running
+                                  ? null
+                                  : () => run(() async {
+                                    final commit = await git.commit(message);
+                                    if (!pushAfterCommit) {
+                                      return commit;
+                                    }
+                                    final push = await git.push();
+                                    return _combineGitOutput(commit, push);
+                                  }),
+                          icon: const Icon(Icons.add_task_outlined),
+                          label: const Text('Commit'),
+                        ),
+                        const Divider(height: 28),
+                        _RemoteList(remotes: remotes),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            OutlinedButton.icon(
+                              onPressed: running ? null : refreshRemotes,
+                              icon: const Icon(Icons.list_alt_outlined),
+                              label: const Text('List remotes'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'Remote name',
+                          ),
+                          onChanged: (value) => remoteName = value,
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'Remote URL',
+                          ),
+                          onChanged: (value) => remoteUrl = value,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            FilledButton(
+                              onPressed:
+                                  running
+                                      ? null
+                                      : () => run(
+                                        () => git.addRemote(
+                                          name: remoteName,
+                                          url: remoteUrl,
+                                        ),
+                                      ),
+                              child: const Text('Add remote'),
+                            ),
+                            OutlinedButton(
+                              onPressed:
+                                  running
+                                      ? null
+                                      : () => run(
+                                        () => git.editRemote(
+                                          name: remoteName,
+                                          url: remoteUrl,
+                                        ),
+                                      ),
+                              child: const Text('Update remote'),
+                            ),
+                            OutlinedButton(
+                              onPressed:
+                                  running
+                                      ? null
+                                      : () => run(
+                                        () => git.removeRemote(remoteName),
+                                      ),
+                              child: const Text('Remove remote'),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 28),
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'Delete confirmation',
+                          ),
+                          onChanged: (value) => deleteConfirmation = value,
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton.tonalIcon(
+                          onPressed:
+                              running
+                                  ? null
+                                  : () => run(
+                                    () => git.deleteLocalRepo(
+                                      confirmation: deleteConfirmation,
+                                    ),
+                                  ),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Delete local repo'),
+                        ),
+                        if (running) ...const <Widget>[
+                          SizedBox(height: 12),
+                          LinearProgressIndicator(),
+                        ],
+                        if (errorText != null) ...<Widget>[
+                          const SizedBox(height: 12),
+                          Text(
+                            errorText!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                        if (output != null) ...<Widget>[
+                          const SizedBox(height: 12),
+                          _GitOutputPanel(output: output!),
+                        ],
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
+    );
+  }
+
+  void _showGitArgs(BuildContext context) {
+    final git = _gitOperations;
+    var argsText = 'status';
+    var running = false;
+    GitOperationResult? output;
+    String? errorText;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder:
+          (sheetContext) => StatefulBuilder(
+            builder: (context, setSheetState) {
+              Future<void> run() async {
+                if (git == null) {
+                  setSheetState(
+                    () => errorText = 'Git operations are not available.',
+                  );
+                  return;
+                }
+                setSheetState(() {
+                  running = true;
+                  errorText = null;
+                });
+                try {
+                  final result = await git.runArgs(_parseGitArgs(argsText));
+                  if (sheetContext.mounted) {
+                    setSheetState(() {
+                      output = result;
+                      running = false;
+                    });
+                  }
+                } catch (error) {
+                  if (sheetContext.mounted) {
+                    setSheetState(() {
+                      errorText = error.toString();
+                      running = false;
+                    });
+                  }
+                }
+              }
+
+              return SafeArea(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 20,
+                      bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Advanced git args',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Only enter arguments after git. Shell syntax is not accepted.',
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: <Widget>[
+                            const Text(
+                              'git',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                initialValue: argsText,
+                                decoration: const InputDecoration(
+                                  hintText: 'status',
+                                ),
+                                onChanged: (value) {
+                                  argsText = value;
+                                  setSheetState(() {});
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText('git ${argsText.trim()}'),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: running ? null : run,
+                          child: const SizedBox(
+                            width: double.infinity,
+                            child: Center(child: Text('Run selected command')),
+                          ),
+                        ),
+                        if (running) ...const <Widget>[
+                          SizedBox(height: 12),
+                          LinearProgressIndicator(),
+                        ],
+                        if (errorText != null) ...<Widget>[
+                          const SizedBox(height: 12),
+                          Text(
+                            errorText!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                        if (output != null) ...<Widget>[
+                          const SizedBox(height: 12),
+                          _GitOutputPanel(output: output!),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+    );
+  }
+
+  List<String> _parseGitArgs(String value) {
+    return value
+        .split(RegExp(r'\s+'))
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  GitOperationResult _combineGitOutput(
+    GitOperationResult first,
+    GitOperationResult second,
+  ) {
+    return GitOperationResult(
+      command: '${first.command}\n${second.command}',
+      stdout: '${first.stdout}${second.stdout}',
+      stderr: '${first.stderr}${second.stderr}',
+      exitCode: second.exitCode,
+      success: first.success && second.success,
+    );
+  }
+}
+
+class _RemoteList extends StatelessWidget {
+  const _RemoteList({required this.remotes});
+
+  final List<GitRemote> remotes;
+
+  @override
+  Widget build(BuildContext context) {
+    if (remotes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: remotes
+          .map(
+            (remote) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.cloud_queue_outlined),
+              title: Text(remote.name),
+              subtitle: Text('${remote.fetchUrl}\n${remote.pushUrl}'),
+              isThreeLine: true,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
+class _GitOutputPanel extends StatelessWidget {
+  const _GitOutputPanel({required this.output});
+
+  final GitOperationResult output;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SelectableText(
+              output.command,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text('Exit: ${output.exitCode ?? 'signal'}'),
+            Text(output.success ? 'Success' : 'Failed'),
+            if (output.stdout.trim().isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              const Text(
+                'stdout',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              SelectableText(output.stdout),
+            ],
+            if (output.stderr.trim().isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              const Text(
+                'stderr',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              SelectableText(output.stderr),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiagnosticRow extends StatelessWidget {
+  const _DiagnosticRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label),
+      subtitle: SelectableText(value),
     );
   }
 }
@@ -1216,7 +1776,7 @@ class _SettingsSection extends StatelessWidget {
             title.toUpperCase(),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: const Color(0xFF64748B),
-              letterSpacing: 0.6,
+              letterSpacing: 0,
               fontWeight: FontWeight.w700,
             ),
           ),

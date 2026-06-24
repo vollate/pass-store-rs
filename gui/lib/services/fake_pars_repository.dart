@@ -2,16 +2,20 @@ import '../models/key_record.dart';
 import '../models/password_entry.dart';
 import 'git_repository.dart';
 import 'key_repository.dart';
+import 'pass_entry_parser.dart';
+import 'runtime_diagnostics.dart';
+import 'security_repository.dart';
 import 'settings_repository.dart';
 import 'store_lifecycle.dart';
 import 'vault_repository.dart';
 
 class FakeParsRepository
     implements
-        VaultRepository,
+        ManageRepository,
         SettingsRepository,
         KeyRepository,
-        GitRepository {
+        RuntimeDiagnosticsRepository,
+        GitOperationsRepository {
   const FakeParsRepository();
 
   static const StoreStatus _store = StoreStatus(
@@ -45,6 +49,145 @@ class FakeParsRepository
 
   @override
   RepoGitStatus get gitStatus => RepoGitStatus.clean;
+
+  @override
+  RuntimeDiagnostics runtimeDiagnostics(SecurityRepository securityRepository) {
+    return RuntimeDiagnostics(
+      bridgeLoaded: true,
+      coreVersion: 'pars-core 0.2.5',
+      pgpBackend: 'Mock system GPG',
+      gitBackend: 'Mock git command',
+      keyStorageBackend: keyStorageBackendLabel(securityRepository),
+      nativeLibrary: 'mock pars_bridge',
+    );
+  }
+
+  @override
+  Future<GitOperationResult> refreshGitStatus() async {
+    return const GitOperationResult(
+      command: 'git status --short --branch',
+      stdout: '## main\n',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> pull() async {
+    return const GitOperationResult(
+      command: 'git pull',
+      stdout: 'Already up to date.',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> push() async {
+    return const GitOperationResult(
+      command: 'git push',
+      stdout: 'Pushed main.',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> commit(String message) async {
+    return GitOperationResult(
+      command: 'git commit -m "$message"',
+      stdout: 'Committed',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> runArgs(List<String> args) async {
+    return GitOperationResult(
+      command: 'git ${args.join(' ')}',
+      stdout:
+          args.join(' ') == 'remote -v'
+              ? 'origin\tgit@example.com:org/pass.git (fetch)\norigin\tgit@example.com:org/pass.git (push)\n'
+              : 'ok',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<List<GitRemote>> listRemotes() async {
+    return const <GitRemote>[
+      GitRemote(
+        name: 'origin',
+        fetchUrl: 'git@example.com:org/pass.git',
+        pushUrl: 'git@example.com:org/pass.git',
+      ),
+    ];
+  }
+
+  @override
+  Future<GitOperationResult> addRemote({
+    required String name,
+    required String url,
+  }) async {
+    return GitOperationResult(
+      command: 'git remote add $name $url',
+      stdout: '',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> editRemote({
+    required String name,
+    required String url,
+  }) async {
+    return GitOperationResult(
+      command: 'git remote set-url $name $url',
+      stdout: '',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> removeRemote(String name) async {
+    return GitOperationResult(
+      command: 'git remote remove $name',
+      stdout: '',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> autoPullOnOpen() => pull();
+
+  @override
+  Future<GitOperationResult> recoverByPull() => pull();
+
+  @override
+  Future<GitOperationResult> deleteLocalRepo({
+    required String confirmation,
+  }) async {
+    return const GitOperationResult(
+      command: 'delete local repo',
+      stdout: 'Deleted local repository.',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
 
   @override
   List<PasswordEntry> get entries => const <PasswordEntry>[
@@ -123,6 +266,164 @@ class FakeParsRepository
               entry.path.toLowerCase().contains(normalized),
         )
         .toList(growable: false);
+  }
+
+  @override
+  List<PasswordEntry> browseEntries(String? directoryPath) {
+    final parent = directoryPath ?? currentRepoName;
+    return entries
+        .where((entry) => entry.parentPath == parent)
+        .toList(growable: false);
+  }
+
+  @override
+  List<PasswordEntry> recentEntries() {
+    final recent = entries
+        .where((entry) => !entry.isDirectory && entry.lastUsedLabel != null)
+        .toList(growable: false);
+    if (recent.isNotEmpty) {
+      return recent;
+    }
+    return entries.where((entry) => !entry.isDirectory).toList(growable: false);
+  }
+
+  @override
+  Future<SecretContent> readEntry(PasswordEntry entry) async {
+    return PassEntryParser.parse(entry.encryptedContent);
+  }
+
+  @override
+  Future<String> copyEntryPassword(PasswordEntry entry) async {
+    return PassEntryParser.parse(entry.encryptedContent).password;
+  }
+
+  @override
+  Future<void> toggleFavorite(PasswordEntry entry) async {}
+
+  @override
+  Future<EntryOperationResult> generateEntry({
+    required String path,
+    required int length,
+    required bool noSymbols,
+    required bool overwrite,
+  }) async {
+    return EntryOperationResult(path: path, overwroteExisting: false);
+  }
+
+  @override
+  Future<EntryOperationResult> saveEntry({
+    required String path,
+    required String content,
+    required bool overwrite,
+  }) async {
+    return EntryOperationResult(path: path, overwroteExisting: false);
+  }
+
+  @override
+  Future<EntryOperationResult> editEntry({
+    required String path,
+    required String content,
+  }) async {
+    return EntryOperationResult(
+      path: path,
+      overwroteExisting: true,
+      action: 'Edited',
+    );
+  }
+
+  @override
+  Future<EntryOperationResult> replaceEntryPassword({
+    required PasswordEntry entry,
+    required String password,
+  }) async {
+    return EntryOperationResult(
+      path: entry.path,
+      overwroteExisting: true,
+      action: 'Replaced password for',
+    );
+  }
+
+  @override
+  Future<EntryOperationResult> moveEntry({
+    required String fromPath,
+    required String toPath,
+    required bool overwrite,
+  }) async {
+    return EntryOperationResult(
+      path: toPath,
+      overwroteExisting: overwrite,
+      action: 'Moved',
+    );
+  }
+
+  @override
+  Future<EntryOperationResult> deleteEntry({
+    required String path,
+    required bool recursive,
+  }) async {
+    return EntryOperationResult(
+      path: path,
+      overwroteExisting: false,
+      action: 'Deleted',
+    );
+  }
+
+  @override
+  Future<BatchOperationResult> batchMoveEntries({
+    required List<PasswordEntry> entries,
+    required String destinationDirectory,
+    required bool overwrite,
+  }) async {
+    return BatchOperationResult(
+      action: 'Moved',
+      affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
+    );
+  }
+
+  @override
+  Future<BatchOperationResult> batchRenameEntries({
+    required List<PasswordEntry> entries,
+    required String prefix,
+    required String suffix,
+    required bool overwrite,
+  }) async {
+    return BatchOperationResult(
+      action: 'Renamed',
+      affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
+    );
+  }
+
+  @override
+  Future<BatchOperationResult> batchDeleteEntries({
+    required List<PasswordEntry> entries,
+  }) async {
+    return BatchOperationResult(
+      action: 'Deleted',
+      affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
+    );
+  }
+
+  @override
+  Future<BatchOperationResult> batchRegenerateEntries({
+    required List<PasswordEntry> entries,
+    required int length,
+    required bool noSymbols,
+  }) async {
+    return BatchOperationResult(
+      action: 'Regenerated',
+      affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
+    );
+  }
+
+  @override
+  Future<GitOperationResult> commitChanges(String message) async {
+    return GitOperationResult(
+      command: 'git commit -m "$message"',
+      stdout: 'Committed',
+      stderr: '',
+      success: true,
+      exitCode: 0,
+    );
   }
 
   @override

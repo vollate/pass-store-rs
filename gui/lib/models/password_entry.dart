@@ -1,11 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-enum RepoGitStatus {
-  clean,
-  needPull,
-  uncommitted,
-  syncFailed,
-}
+enum RepoGitStatus { clean, needPull, uncommitted, syncFailed }
 
 extension RepoGitStatusLabel on RepoGitStatus {
   String get label {
@@ -42,6 +37,19 @@ class PasswordEntry {
   final int childCount;
   final bool isFavorite;
   final String? lastUsedLabel;
+
+  PasswordEntry copyWith({bool? isFavorite, String? lastUsedLabel}) {
+    return PasswordEntry(
+      path: path,
+      displayName: displayName,
+      repoName: repoName,
+      encryptedContent: encryptedContent,
+      isDirectory: isDirectory,
+      childCount: childCount,
+      isFavorite: isFavorite ?? this.isFavorite,
+      lastUsedLabel: lastUsedLabel ?? this.lastUsedLabel,
+    );
+  }
 
   String get parentPath {
     final index = path.lastIndexOf('/');
@@ -90,4 +98,92 @@ class SecretContent {
     }
     return null;
   }
+}
+
+class EntryOperationResult {
+  const EntryOperationResult({
+    required this.path,
+    required this.overwroteExisting,
+    this.action = 'Saved',
+    this.committed = false,
+  });
+
+  final String path;
+  final bool overwroteExisting;
+  final String action;
+  final bool committed;
+
+  EntryOperationResult copyWith({
+    String? path,
+    bool? overwroteExisting,
+    String? action,
+    bool? committed,
+  }) {
+    return EntryOperationResult(
+      path: path ?? this.path,
+      overwroteExisting: overwroteExisting ?? this.overwroteExisting,
+      action: action ?? this.action,
+      committed: committed ?? this.committed,
+    );
+  }
+
+  String get summary {
+    final overwrite = overwroteExisting ? ' (overwrote existing)' : '';
+    final commit = committed ? ' and committed' : '';
+    return '$action $path$overwrite$commit';
+  }
+}
+
+class BatchOperationFailure {
+  const BatchOperationFailure({required this.path, required this.message});
+
+  final String path;
+  final String message;
+}
+
+class BatchOperationResult {
+  const BatchOperationResult({
+    required this.action,
+    required this.affectedPaths,
+    this.failures = const <BatchOperationFailure>[],
+    this.committed = false,
+  });
+
+  final String action;
+  final List<String> affectedPaths;
+  final List<BatchOperationFailure> failures;
+  final bool committed;
+
+  BatchOperationResult copyWith({bool? committed}) {
+    return BatchOperationResult(
+      action: action,
+      affectedPaths: affectedPaths,
+      failures: failures,
+      committed: committed ?? this.committed,
+    );
+  }
+
+  String get summary {
+    final commit = committed ? ' and committed' : '';
+    if (failures.isEmpty) {
+      return '$action ${affectedPaths.length} entries$commit';
+    }
+    return '$action ${affectedPaths.length} entries$commit; ${failures.length} failed';
+  }
+}
+
+class GitOperationResult {
+  const GitOperationResult({
+    required this.command,
+    required this.stdout,
+    required this.stderr,
+    required this.success,
+    this.exitCode,
+  });
+
+  final String command;
+  final String stdout;
+  final String stderr;
+  final int? exitCode;
+  final bool success;
 }

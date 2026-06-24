@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import '../bridge/frb_generated/api.dart' as frb;
 import '../bridge/pars_bridge_api.dart';
@@ -6,8 +7,11 @@ import '../models/key_record.dart';
 import '../models/password_entry.dart';
 import 'git_repository.dart';
 import 'key_repository.dart';
+import 'runtime_diagnostics.dart';
+import 'security_repository.dart';
 import 'settings_repository.dart';
 import 'store_lifecycle.dart';
+import 'vault_metadata_store.dart';
 import 'vault_repository.dart';
 
 class BridgeRepositoryException implements Exception {
@@ -21,16 +25,20 @@ class BridgeRepositoryException implements Exception {
 
 class BridgeBackedRepository
     implements
-        VaultRepository,
+        ManageRepository,
         SettingsRepository,
         KeyRepository,
-        GitRepository {
+        RuntimeDiagnosticsRepository,
+        GitOperationsRepository {
   BridgeBackedRepository({
     required this.bridge,
     required this.configPath,
     this.pgpExecutable,
     this.sshDir,
-  }) : _lifecycle = StoreLifecycleSnapshot.empty(configPath);
+    VaultMetadataStore? metadataStore,
+  }) : _metadataStore =
+           metadataStore ?? FileVaultMetadataStore.forConfigPath(configPath),
+       _lifecycle = StoreLifecycleSnapshot.empty(configPath);
 
   factory BridgeBackedRepository.defaultInstance() {
     return BridgeBackedRepository(
@@ -43,11 +51,13 @@ class BridgeBackedRepository
   final String configPath;
   final String? pgpExecutable;
   final String? sshDir;
+  final VaultMetadataStore _metadataStore;
 
   StoreLifecycleSnapshot _lifecycle;
   List<PasswordEntry> _entries = const <PasswordEntry>[];
   List<KeyRecord> _keys = const <KeyRecord>[];
   RepoGitStatus _gitStatus = RepoGitStatus.syncFailed;
+  VaultMetadata _metadata = const VaultMetadata.empty();
 
   @override
   StoreLifecycleSnapshot get lifecycle => _lifecycle;
@@ -72,6 +82,21 @@ class BridgeBackedRepository
 
   @override
   List<KeyRecord> get keys => _keys;
+
+  @override
+  RuntimeDiagnostics runtimeDiagnostics(SecurityRepository securityRepository) {
+    return RuntimeDiagnostics(
+      bridgeLoaded: true,
+      coreVersion: 'pars-core 0.2.5',
+      pgpBackend:
+          pgpExecutable == null || pgpExecutable!.trim().isEmpty
+              ? 'System GPG from PATH'
+              : 'System GPG at $pgpExecutable',
+      gitBackend: 'System git command',
+      keyStorageBackend: keyStorageBackendLabel(securityRepository),
+      nativeLibrary: 'pars_bridge',
+    );
+  }
 
   @override
   Future<void> refresh() async {
@@ -105,6 +130,7 @@ class BridgeBackedRepository
       return;
     }
 
+    _metadata = await _metadataStore.load();
     final entriesResponse = await bridge.listEntries(
       request: frb.ListEntriesRequest(
         root: selected.root,
@@ -136,6 +162,286 @@ class BridgeBackedRepository
               entry.path.toLowerCase().contains(normalized),
         )
         .toList(growable: false);
+  }
+
+  @override
+  List<PasswordEntry> browseEntries(String? directoryPath) {
+    final parent = _normalizedBrowseParent(directoryPath);
+    final browsed = entries
+        .where((entry) => entry.parentPath == parent)
+        .toList(growable: false);
+    return _sortBrowseEntries(browsed);
+  }
+
+  @override
+  List<PasswordEntry> recentEntries() {
+    final byPath = <String, PasswordEntry>{
+      for (final entry in entries)
+        if (!entry.isDirectory) entry.path: entry,
+    };
+    final recent = _metadata.recentPaths
+        .map((path) => byPath[path])
+        .whereType<PasswordEntry>()
+        .toList(growable: false);
+    if (recent.isNotEmpty) {
+      return recent;
+    }
+    return entries.where((entry) => !entry.isDirectory).toList(growable: false);
+  }
+
+  @override
+  Future<SecretContent> readEntry(PasswordEntry entry) async {
+    final response = await bridge.readEntry(request: _entryRequest(entry));
+    _throwIfFailure(response.error);
+    final secret = response.secret;
+    if (secret == null) {
+      throw const BridgeRepositoryException('Bridge did not return an entry.');
+    }
+    await _rememberEntry(entry.path);
+    return _secretFromBridge(secret);
+  }
+
+  @override
+  Future<String> copyEntryPassword(PasswordEntry entry) async {
+    final response = await bridge.copyEntryPassword(
+      request: _entryRequest(entry),
+    );
+    _throwIfFailure(response.error);
+    final result = response.result;
+    if (result == null) {
+      throw const BridgeRepositoryException(
+        'Bridge did not return a copied password.',
+      );
+    }
+    await _rememberEntry(entry.path);
+    return result.password;
+  }
+
+  @override
+  Future<void> toggleFavorite(PasswordEntry entry) async {
+    final favorites = _metadata.favoritePaths.toSet();
+    if (!favorites.add(entry.path)) {
+      favorites.remove(entry.path);
+    }
+    await _saveMetadata(_metadata.copyWith(favoritePaths: favorites));
+  }
+
+  @override
+  Future<EntryOperationResult> generateEntry({
+    required String path,
+    required int length,
+    required bool noSymbols,
+    required bool overwrite,
+  }) async {
+    final response = await bridge.generateEntry(
+      request: frb.GenerateEntryRequest(
+        root: _requiredStoreRoot(),
+        path: path,
+        length: length,
+        noSymbols: noSymbols,
+        overwrite: overwrite,
+        pgpExecutable: _pgpExecutable(),
+      ),
+    );
+    _throwIfFailure(response.error);
+    final result = response.result;
+    if (result == null) {
+      throw const BridgeRepositoryException(
+        'Bridge did not return a generated entry result.',
+      );
+    }
+    await refresh();
+    return EntryOperationResult(
+      path: result.entryPath,
+      overwroteExisting: result.overwroteExisting,
+    );
+  }
+
+  @override
+  Future<EntryOperationResult> saveEntry({
+    required String path,
+    required String content,
+    required bool overwrite,
+  }) async {
+    final response = await bridge.insertEntry(
+      request: frb.InsertEntryRequest(
+        root: _requiredStoreRoot(),
+        path: path,
+        content: content,
+        overwrite: overwrite,
+        pgpExecutable: _pgpExecutable(),
+      ),
+    );
+    _throwIfFailure(response.error);
+    final result = response.result;
+    if (result == null) {
+      throw const BridgeRepositoryException(
+        'Bridge did not return a saved entry result.',
+      );
+    }
+    await refresh();
+    return EntryOperationResult(
+      path: result.entryPath,
+      overwroteExisting: result.overwroteExisting,
+    );
+  }
+
+  @override
+  Future<EntryOperationResult> editEntry({
+    required String path,
+    required String content,
+  }) async {
+    final response = await bridge.editEntry(
+      request: frb.EditEntryRequest(
+        root: _requiredStoreRoot(),
+        path: path,
+        content: content,
+        pgpExecutable: _pgpExecutable(),
+      ),
+    );
+    _throwIfFailure(response.error);
+    final result = response.result;
+    if (result == null) {
+      throw const BridgeRepositoryException(
+        'Bridge did not return an edited entry result.',
+      );
+    }
+    await refresh();
+    return EntryOperationResult(
+      path: result.path,
+      overwroteExisting: true,
+      action: 'Edited',
+    );
+  }
+
+  @override
+  Future<EntryOperationResult> replaceEntryPassword({
+    required PasswordEntry entry,
+    required String password,
+  }) async {
+    final secret = await readEntry(entry);
+    final result = await editEntry(
+      path: entry.path,
+      content: _entryContent(password, secret.fields, secret.rawNotes),
+    );
+    return result.copyWith(action: 'Replaced password for');
+  }
+
+  @override
+  Future<EntryOperationResult> moveEntry({
+    required String fromPath,
+    required String toPath,
+    required bool overwrite,
+  }) async {
+    final response = await bridge.moveEntry(
+      request: frb.MoveEntryRequest(
+        root: _requiredStoreRoot(),
+        fromPath: fromPath,
+        toPath: toPath,
+        overwrite: overwrite,
+      ),
+    );
+    _throwIfFailure(response.error);
+    final result = response.result;
+    if (result == null) {
+      throw const BridgeRepositoryException(
+        'Bridge did not return a moved entry result.',
+      );
+    }
+    await refresh();
+    return EntryOperationResult(
+      path: result.path,
+      overwroteExisting: overwrite,
+      action: 'Moved',
+    );
+  }
+
+  @override
+  Future<EntryOperationResult> deleteEntry({
+    required String path,
+    required bool recursive,
+  }) async {
+    final response = await bridge.deleteEntry(
+      request: frb.DeleteEntryRequest(
+        root: _requiredStoreRoot(),
+        path: path,
+        recursive: recursive,
+      ),
+    );
+    _throwIfFailure(response.error);
+    final result = response.result;
+    if (result == null) {
+      throw const BridgeRepositoryException(
+        'Bridge did not return a deleted entry result.',
+      );
+    }
+    await refresh();
+    return EntryOperationResult(
+      path: result.deletedPath,
+      overwroteExisting: false,
+      action: 'Deleted',
+    );
+  }
+
+  @override
+  Future<BatchOperationResult> batchMoveEntries({
+    required List<PasswordEntry> entries,
+    required String destinationDirectory,
+    required bool overwrite,
+  }) async {
+    final destination = destinationDirectory.trim();
+    return _runBatch('Moved', entries, (entry) {
+      final target = _joinEntryPath(destination, _basename(entry.path));
+      return moveEntry(
+        fromPath: entry.path,
+        toPath: target,
+        overwrite: overwrite,
+      );
+    });
+  }
+
+  @override
+  Future<BatchOperationResult> batchRenameEntries({
+    required List<PasswordEntry> entries,
+    required String prefix,
+    required String suffix,
+    required bool overwrite,
+  }) async {
+    return _runBatch('Renamed', entries, (entry) {
+      final parent = _dirname(entry.path);
+      final name = '${prefix.trim()}${_basename(entry.path)}${suffix.trim()}';
+      return moveEntry(
+        fromPath: entry.path,
+        toPath: _joinEntryPath(parent, name),
+        overwrite: overwrite,
+      );
+    });
+  }
+
+  @override
+  Future<BatchOperationResult> batchDeleteEntries({
+    required List<PasswordEntry> entries,
+  }) async {
+    return _runBatch('Deleted', entries, (entry) {
+      return deleteEntry(path: entry.path, recursive: entry.isDirectory);
+    });
+  }
+
+  @override
+  Future<BatchOperationResult> batchRegenerateEntries({
+    required List<PasswordEntry> entries,
+    required int length,
+    required bool noSymbols,
+  }) async {
+    return _runBatch('Regenerated', entries, (entry) async {
+      final password = _generatePassword(length: length, noSymbols: noSymbols);
+      return replaceEntryPassword(entry: entry, password: password);
+    });
+  }
+
+  @override
+  Future<GitOperationResult> commitChanges(String message) async {
+    return commit(message.trim().isEmpty ? 'Update password store' : message);
   }
 
   @override
@@ -401,6 +707,118 @@ class BridgeBackedRepository
     return Uri.parse(url);
   }
 
+  @override
+  Future<GitOperationResult> refreshGitStatus() async {
+    final response = await bridge.gitStatus(
+      request: frb.GitRequest(root: _requiredStoreRoot()),
+    );
+    _gitStatus = _gitStatusFromBridge(response);
+    return _gitResultFromBridge(response);
+  }
+
+  @override
+  Future<GitOperationResult> pull() async {
+    final response = await bridge.gitPull(
+      request: frb.GitRequest(root: _requiredStoreRoot()),
+    );
+    final result = _gitResultFromBridge(response);
+    await refresh();
+    return result;
+  }
+
+  @override
+  Future<GitOperationResult> push() async {
+    final response = await bridge.gitPush(
+      request: frb.GitRequest(root: _requiredStoreRoot()),
+    );
+    final result = _gitResultFromBridge(response);
+    await refresh();
+    return result;
+  }
+
+  @override
+  Future<GitOperationResult> commit(String message) async {
+    final response = await bridge.gitCommit(
+      request: frb.GitCommitRequest(
+        root: _requiredStoreRoot(),
+        message: message.trim().isEmpty ? 'Update password store' : message,
+      ),
+    );
+    final result = _gitResultFromBridge(response);
+    await refresh();
+    return result;
+  }
+
+  @override
+  Future<GitOperationResult> runArgs(List<String> args) async {
+    final response = await bridge.runGitArgs(
+      request: frb.GitArgsRequest(root: _requiredStoreRoot(), args: args),
+    );
+    return _gitResultFromBridge(response);
+  }
+
+  @override
+  Future<List<GitRemote>> listRemotes() async {
+    final result = await runArgs(const <String>['remote', '-v']);
+    return _parseRemotes(result.stdout);
+  }
+
+  @override
+  Future<GitOperationResult> addRemote({
+    required String name,
+    required String url,
+  }) {
+    return runArgs(<String>['remote', 'add', name.trim(), url.trim()]);
+  }
+
+  @override
+  Future<GitOperationResult> editRemote({
+    required String name,
+    required String url,
+  }) {
+    return runArgs(<String>['remote', 'set-url', name.trim(), url.trim()]);
+  }
+
+  @override
+  Future<GitOperationResult> removeRemote(String name) {
+    return runArgs(<String>['remote', 'remove', name.trim()]);
+  }
+
+  @override
+  Future<GitOperationResult> autoPullOnOpen() async {
+    final store = _lifecycle.selectedStore;
+    if (store == null || !store.hasGitRemote) {
+      return const GitOperationResult(
+        command: 'git pull',
+        stdout: 'Skipped: no selected git remote.',
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      );
+    }
+    return pull();
+  }
+
+  @override
+  Future<GitOperationResult> recoverByPull() {
+    return pull();
+  }
+
+  @override
+  Future<GitOperationResult> deleteLocalRepo({
+    required String confirmation,
+  }) async {
+    final root = _requiredStoreRoot();
+    await deleteLocalStore(root: root, confirmation: confirmation);
+    return const GitOperationResult(
+      command: 'delete local repo',
+      stdout: 'Deleted local repository.',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
   static String defaultConfigPath() {
     final explicit = Platform.environment['PARS_CONFIG'];
     if (explicit != null && explicit.trim().isNotEmpty) {
@@ -412,6 +830,77 @@ class BridgeBackedRepository
       return '$home/.config/pars/pars_config.toml';
     }
     return 'pars_config.toml';
+  }
+
+  Future<BatchOperationResult> _runBatch(
+    String action,
+    List<PasswordEntry> entries,
+    Future<EntryOperationResult> Function(PasswordEntry entry) operation,
+  ) async {
+    final affected = <String>[];
+    final failures = <BatchOperationFailure>[];
+    for (final entry in entries) {
+      try {
+        final result = await operation(entry);
+        affected.add(result.path);
+      } catch (error) {
+        failures.add(
+          BatchOperationFailure(path: entry.path, message: error.toString()),
+        );
+      }
+    }
+    return BatchOperationResult(
+      action: action,
+      affectedPaths: affected,
+      failures: failures,
+    );
+  }
+
+  String _entryContent(
+    String password,
+    List<ParsedSecretField> fields,
+    String rawNotes,
+  ) {
+    final lines = <String>[password];
+    for (final field in fields) {
+      lines.add('${field.key}: ${field.value}');
+    }
+    final notes = rawNotes.trim();
+    if (notes.isNotEmpty) {
+      lines.add(notes);
+    }
+    return lines.join('\n');
+  }
+
+  String _generatePassword({required int length, required bool noSymbols}) {
+    const letters = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+    const numbers = '23456789';
+    const symbols = '!@#%^*-_=+?';
+    final alphabet = '$letters$numbers${noSymbols ? '' : symbols}';
+    final random = Random.secure();
+    return List<String>.generate(
+      length,
+      (_) => alphabet[random.nextInt(alphabet.length)],
+    ).join();
+  }
+
+  String _basename(String path) {
+    final index = path.lastIndexOf('/');
+    return index == -1 ? path : path.substring(index + 1);
+  }
+
+  String _dirname(String path) {
+    final index = path.lastIndexOf('/');
+    return index == -1 ? '' : path.substring(0, index);
+  }
+
+  String _joinEntryPath(String parent, String child) {
+    final trimmedParent = parent.trim();
+    final trimmedChild = child.trim();
+    if (trimmedParent.isEmpty) {
+      return trimmedChild;
+    }
+    return '$trimmedParent/$trimmedChild';
   }
 
   PasswordEntry _passwordEntryFromBridge(
@@ -426,6 +915,8 @@ class BridgeBackedRepository
       encryptedContent: '',
       isDirectory: isDirectory,
       childCount: entry.childCount,
+      isFavorite: _metadata.favoritePaths.contains(entry.path),
+      lastUsedLabel: _lastUsedLabel(entry.path),
     );
   }
 
@@ -436,6 +927,96 @@ class BridgeBackedRepository
       fingerprint: key.fingerprint,
       source: key.source,
       hasPrivateKey: key.hasPrivateKey,
+    );
+  }
+
+  SecretContent _secretFromBridge(frb.EntrySecretDto secret) {
+    return SecretContent(
+      password: secret.password,
+      fields: secret.fields
+          .map(
+            (field) => ParsedSecretField(
+              key: field.key,
+              label: field.label,
+              value: field.value,
+            ),
+          )
+          .toList(growable: false),
+      rawNotes: secret.rawNotes,
+    );
+  }
+
+  frb.EntryRequest _entryRequest(PasswordEntry entry) {
+    return frb.EntryRequest(
+      root: _requiredStoreRoot(),
+      path: entry.path,
+      pgpExecutable: pgpExecutable,
+    );
+  }
+
+  String _requiredStoreRoot() {
+    final root = _lifecycle.selectedStoreRoot;
+    if (root == null) {
+      throw const BridgeRepositoryException('No selected password store.');
+    }
+    return root;
+  }
+
+  String _pgpExecutable() => pgpExecutable ?? 'gpg';
+
+  String _normalizedBrowseParent(String? directoryPath) {
+    final path = directoryPath?.trim();
+    if (path == null || path.isEmpty) {
+      return currentRepoName;
+    }
+    return path;
+  }
+
+  List<PasswordEntry> _sortBrowseEntries(List<PasswordEntry> entries) {
+    final sorted = entries.toList();
+    sorted.sort((left, right) {
+      if (left.isDirectory != right.isDirectory) {
+        return left.isDirectory ? -1 : 1;
+      }
+      return left.displayName.toLowerCase().compareTo(
+        right.displayName.toLowerCase(),
+      );
+    });
+    return sorted;
+  }
+
+  String? _lastUsedLabel(String path) {
+    final index = _metadata.recentPaths.indexOf(path);
+    if (index == -1) {
+      return null;
+    }
+    return index == 0 ? 'Recent' : 'Recent ${index + 1}';
+  }
+
+  Future<void> _rememberEntry(String path) async {
+    final recent = <String>[
+      path,
+      ..._metadata.recentPaths.where((recentPath) => recentPath != path),
+    ].take(20).toList(growable: false);
+    await _saveMetadata(_metadata.copyWith(recentPaths: recent));
+  }
+
+  Future<void> _saveMetadata(VaultMetadata metadata) async {
+    _metadata = metadata;
+    await _metadataStore.save(metadata);
+    _entries = _entries.map(_decorateEntry).toList(growable: false);
+  }
+
+  PasswordEntry _decorateEntry(PasswordEntry entry) {
+    return PasswordEntry(
+      path: entry.path,
+      displayName: entry.displayName,
+      repoName: entry.repoName,
+      encryptedContent: entry.encryptedContent,
+      isDirectory: entry.isDirectory,
+      childCount: entry.childCount,
+      isFavorite: _metadata.favoritePaths.contains(entry.path),
+      lastUsedLabel: _lastUsedLabel(entry.path),
     );
   }
 
@@ -487,6 +1068,57 @@ class BridgeBackedRepository
       return RepoGitStatus.uncommitted;
     }
     return RepoGitStatus.clean;
+  }
+
+  GitOperationResult _gitResultFromBridge(frb.GitCommandResponse response) {
+    _throwIfFailure(response.error);
+    final output = response.output;
+    if (output == null) {
+      throw const BridgeRepositoryException(
+        'Bridge did not return git output.',
+      );
+    }
+    return GitOperationResult(
+      command: output.command,
+      stdout: output.stdout,
+      stderr: output.stderr,
+      exitCode: output.exitCode,
+      success: output.success,
+    );
+  }
+
+  List<GitRemote> _parseRemotes(String stdout) {
+    final byName = <String, ({String fetchUrl, String pushUrl})>{};
+    for (final line in stdout.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) {
+        continue;
+      }
+      final parts = trimmed.split(RegExp(r'\s+'));
+      if (parts.length < 3) {
+        continue;
+      }
+      final name = parts[0];
+      final url = parts[1];
+      final kind = parts[2];
+      final existing = byName[name] ?? (fetchUrl: '', pushUrl: '');
+      byName[name] =
+          kind == '(push)'
+              ? (fetchUrl: existing.fetchUrl, pushUrl: url)
+              : (fetchUrl: url, pushUrl: existing.pushUrl);
+    }
+    return byName.entries
+        .map(
+          (entry) => GitRemote(
+            name: entry.key,
+            fetchUrl: entry.value.fetchUrl,
+            pushUrl:
+                entry.value.pushUrl.isEmpty
+                    ? entry.value.fetchUrl
+                    : entry.value.pushUrl,
+          ),
+        )
+        .toList(growable: false);
   }
 
   void _throwIfFailure(frb.BridgeFailure? failure) {

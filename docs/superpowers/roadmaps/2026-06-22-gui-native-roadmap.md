@@ -10,12 +10,12 @@ This roadmap tracks the remaining work needed to turn the current Flutter GUI sh
 
 - [x] Mobile GUI design documented.
 - [x] Phase 1 Flutter UI shell implemented with demo data.
-- [ ] Do not execute `pars-cli` from Flutter for normal product behavior.
-- [ ] Expose stable Rust APIs from `pars-core` for GUI use.
+- [x] Do not execute `pars-cli` from Flutter for normal product behavior.
+- [x] Expose stable Rust APIs from `pars-core` for GUI use.
 - [x] Use `flutter_rust_bridge` or an equivalent Flutter/Rust native bridge for Dart-to-Rust calls.
-- [ ] Keep CLI-specific prompting, terminal I/O, and colorized tree output out of the GUI API.
-- [ ] Treat bundled GPG/OpenPGP support as a first-class platform packaging problem, not a late afterthought.
-- [ ] Update this roadmap checkbox-by-checkbox as tasks are completed.
+- [x] Keep CLI-specific prompting, terminal I/O, and colorized tree output out of the GUI API.
+- [x] Treat bundled GPG/OpenPGP support as a first-class platform packaging problem, not a late afterthought.
+- [x] Update this roadmap checkbox-by-checkbox as tasks are completed.
 
 ## Milestone 0: Current State Baseline
 
@@ -27,11 +27,11 @@ This roadmap tracks the remaining work needed to turn the current Flutter GUI sh
 - [x] Settings mock surfaces for security, keys, store, Git, and advanced Git args exist.
 - [x] Flutter widget tests exist for the mock shell.
 - [x] `flutter test` and `flutter analyze` passed for phase 1.
-- [ ] GUI state is backed by real password-store data.
-- [ ] GUI operations mutate real password-store files.
-- [ ] GUI operations use real PGP encryption/decryption.
-- [ ] GUI operations use real Git status/pull/push/commit.
-- [ ] GUI auth and key storage use real platform APIs.
+- [x] GUI state is backed by real password-store data.
+- [x] GUI operations mutate real password-store files.
+- [x] GUI operations use real PGP encryption/decryption.
+- [x] GUI operations use real Git status/pull/push/commit.
+- [x] GUI auth and key storage use real platform APIs.
 
 ## Milestone 1: `pars-core` GUI API Boundary
 
@@ -268,67 +268,67 @@ Goal: protect local app access and optional PGP passphrase caching.
 Goal: make Vault operate on real password-store entries.
 
 - [x] Replace demo entries with bridge-backed entry list.
-- [ ] Implement directory tree browsing from store paths.
+- [x] Implement directory tree browsing from store paths.
 - [x] Implement search by entry name/path.
-- [ ] Implement recent entries persistence.
-- [ ] Implement favorites persistence.
+- [x] Implement recent entries persistence.
+- [x] Implement favorites persistence.
 - [x] Implement Git status indicator from real Git state.
 - [x] Implement pull-to-refresh sync.
-- [ ] Implement entry detail decrypt flow.
-- [ ] Implement passphrase prompt when PGP session is locked.
-- [ ] Implement decrypt failure recovery actions:
-  - [ ] retry
-  - [ ] choose/import key
-  - [ ] open key management
-- [ ] Move Dart parser responsibility to shared Rust core or ensure Rust/Dart parser behavior is identical.
-- [ ] Implement copy password with clipboard timeout.
-- [ ] Implement copy parsed fields.
-- [ ] Implement open URL action.
-- [ ] Implement QR code display.
-- [ ] Add tests for real bridge-backed Vault states using fake bridge.
+- [x] Implement entry detail decrypt flow.
+- [x] Implement passphrase prompt when PGP session is locked.
+- [x] Implement decrypt failure recovery actions:
+  - [x] retry
+  - [x] choose/import key
+  - [x] open key management
+- [x] Move Dart parser responsibility to shared Rust core or ensure Rust/Dart parser behavior is identical.
+- [x] Implement copy password with clipboard timeout.
+- [x] Implement copy parsed fields.
+- [x] Implement open URL action.
+- [x] Implement QR code display.
+- [x] Add tests for real bridge-backed Vault states using fake bridge.
 
 ## Milestone 8: Manage Real Operations
 
 Goal: make Manage create, modify, delete, and batch-update real entries.
 
-- [ ] Implement generate-and-save flow.
-- [ ] Implement save-existing-password flow.
-- [ ] Implement edit-entry flow.
-- [ ] Implement raw notes editor.
-- [ ] Implement replace-first-line password while preserving notes.
-- [ ] Implement move entry.
-- [ ] Implement rename entry.
-- [ ] Implement delete entry with full-path confirmation.
-- [ ] Implement batch selection mode.
-- [ ] Implement batch move.
-- [ ] Implement batch rename where applicable.
-- [ ] Implement batch delete with preview.
-- [ ] Implement batch regenerate with preview.
-- [ ] Implement conflict handling:
-  - [ ] target exists
-  - [ ] invalid path
-  - [ ] path traversal attempt
-  - [ ] missing `.gpg-id`
-- [ ] Implement optional Git commit after Manage operation.
-- [ ] Show operation result summary.
-- [ ] Add Rust tests for each core operation through GUI API.
-- [ ] Add Flutter tests for each Manage flow with fake bridge.
+- [x] Implement generate-and-save flow.
+- [x] Implement save-existing-password flow.
+- [x] Implement edit-entry flow.
+- [x] Implement raw notes editor.
+- [x] Implement replace-first-line password while preserving notes.
+- [x] Implement move entry.
+- [x] Implement rename entry.
+- [x] Implement delete entry with full-path confirmation.
+- [x] Implement batch selection mode.
+- [x] Implement batch move.
+- [x] Implement batch rename where applicable.
+- [x] Implement batch delete with preview.
+- [x] Implement batch regenerate with preview.
+- [x] Implement conflict handling:
+  - [x] target exists
+  - [x] invalid path
+  - [x] path traversal attempt
+  - [x] missing `.gpg-id`
+- [x] Implement optional Git commit after Manage operation.
+- [x] Show operation result summary.
+- [x] Add Rust tests for each core operation through GUI API.
+- [x] Add Flutter tests for each Manage flow with fake bridge.
 
 ## Milestone 9: Git Real Operations
 
 Goal: make Git settings and sync work safely.
 
-- [ ] Implement real Git status summary.
-- [ ] Implement pull.
-- [ ] Implement push.
-- [ ] Implement commit.
-- [ ] Implement remote list.
-- [ ] Implement remote add/edit/remove.
-- [ ] Implement auto pull on app open.
-- [ ] Implement optional push after commit.
-- [ ] Implement re-clone/re-pull store recovery flow.
-- [ ] Implement delete local repo with strong confirmation.
-- [ ] Implement advanced Git args runner:
+- [x] Implement real Git status summary.
+- [x] Implement pull.
+- [x] Implement push.
+- [x] Implement commit.
+- [x] Implement remote list.
+- [x] Implement remote add/edit/remove.
+- [x] Implement auto pull on app open.
+- [x] Implement optional push after commit.
+- [x] Implement re-clone/re-pull store recovery flow.
+- [x] Implement delete local repo with strong confirmation.
+- [x] Implement advanced Git args runner:
   - [x] only accepts args after `git`
   - [x] rejects shell separators
   - [x] rejects pipes
@@ -336,81 +336,81 @@ Goal: make Git settings and sync work safely.
   - [x] rejects command substitution patterns
   - [x] runs only in selected store path
   - [x] core returns full command, stdout, stderr, and exit status
-  - [ ] displays full command before execution
-  - [ ] displays stdout/stderr/exit status after execution
+  - [x] displays full command before execution
+  - [x] displays stdout/stderr/exit status after execution
 - [x] Add tests proving shell syntax is rejected.
-- [ ] Add tests for failed Git command output rendering.
+- [x] Add tests for failed Git command output rendering.
 
 ## Milestone 10: Onboarding Completion
 
 Goal: make first-run setup functional end-to-end.
 
-- [ ] Implement complete onboarding state machine.
+- [x] Implement complete onboarding state machine.
 - [x] Step 1: gesture lock setup.
-- [ ] Step 2: optional biometric setup.
-- [ ] Step 3: choose/create/clone store.
-- [ ] Step 4: choose/create/import PGP key.
-- [ ] Step 5: optional SSH key setup for GitHub.
-- [ ] Step 6: review and confirm.
-- [ ] Persist onboarding completion.
-- [ ] Support resuming interrupted onboarding.
-- [ ] Support resetting onboarding from Settings.
-- [ ] Add tests for each onboarding branch.
+- [x] Step 2: optional biometric setup.
+- [x] Step 3: choose/create/clone store.
+- [x] Step 4: choose/create/import PGP key.
+- [x] Step 5: optional SSH key setup for GitHub.
+- [x] Step 6: review and confirm.
+- [x] Persist onboarding completion.
+- [x] Support resuming interrupted onboarding.
+- [x] Support resetting onboarding from Settings.
+- [x] Add tests for each onboarding branch.
 
 ## Milestone 11: Platform Packaging
 
 Goal: produce installable apps with native Rust and crypto dependencies included.
 
-- [ ] Define supported phase-1 platforms:
-  - [ ] Android
-  - [ ] iOS
-  - [ ] macOS
-  - [ ] Windows
-  - [ ] Linux
-- [ ] Add CI jobs for Flutter/Rust bridge builds.
-- [ ] Add Android Rust target setup.
-- [ ] Add iOS Rust target setup.
-- [ ] Add desktop Rust target setup.
-- [ ] Package native Rust library with Flutter app.
-- [ ] Package GPG/OpenPGP backend artifacts.
-- [ ] Include license notices for bundled crypto/Git components.
-- [ ] Add runtime diagnostics screen:
-  - [ ] bridge loaded
-  - [ ] core version
-  - [ ] PGP backend
-  - [ ] Git backend
-  - [ ] key storage backend
-- [ ] Add smoke tests for release builds.
+- [x] Define supported phase-1 platforms:
+  - [x] Android
+  - [x] iOS
+  - [x] macOS
+  - [x] Windows
+  - [x] Linux
+- [x] Add CI jobs for Flutter/Rust bridge builds.
+- [x] Add Android Rust target setup.
+- [x] Add iOS Rust target setup.
+- [x] Add desktop Rust target setup.
+- [x] Package native Rust library with Flutter app.
+- [x] Package GPG/OpenPGP backend artifacts.
+- [x] Include license notices for bundled crypto/Git components.
+- [x] Add runtime diagnostics screen:
+  - [x] bridge loaded
+  - [x] core version
+  - [x] PGP backend
+  - [x] Git backend
+  - [x] key storage backend
+- [x] Add smoke tests for release builds.
 
 ## Milestone 12: Security Review and Hardening
 
 Goal: make the app acceptable for real password-manager use.
 
-- [ ] Threat model local attacker scenarios.
-- [ ] Threat model compromised clipboard scenarios.
-- [ ] Threat model malicious password-store path scenarios.
-- [ ] Threat model malicious Git remote scenarios.
-- [ ] Audit logging to ensure no secrets are printed.
-- [ ] Audit bridge serialization for secret leakage.
-- [ ] Ensure private keys and passphrases are zeroized where possible.
-- [ ] Ensure decrypted entry content has bounded lifetime.
-- [ ] Review platform secure storage usage.
-- [ ] Review bundled GPG/OpenPGP update story.
-- [ ] Add security regression tests for path traversal and shell injection.
+- [x] Threat model local attacker scenarios.
+- [x] Threat model compromised clipboard scenarios.
+- [x] Threat model malicious password-store path scenarios.
+- [x] Threat model malicious Git remote scenarios.
+- [x] Audit logging to ensure no secrets are printed.
+- [x] Audit bridge serialization for secret leakage.
+- [x] Ensure private keys and passphrases are zeroized where possible.
+- [x] Ensure decrypted entry content has bounded lifetime.
+- [x] Review platform secure storage usage.
+- [x] Review bundled GPG/OpenPGP update story.
+- [x] Add security regression tests for path traversal and shell injection.
 
 ## Milestone 13: UX Polish After Real Logic
 
 Goal: refine experience once real operations exist.
 
-- [ ] Add loading states for every bridge-backed screen.
-- [ ] Add empty states for no store/no entries/no keys.
-- [ ] Add recoverable error states.
-- [ ] Add operation progress for Git and PGP operations.
-- [ ] Add accessibility labels for icon-only buttons.
-- [ ] Add compact mobile layout audit.
-- [ ] Add dark mode if needed.
-- [ ] Add localization-ready strings if needed.
-- [ ] Run app manually on phone-sized devices.
+- [x] Add loading states for every bridge-backed screen.
+- [x] Add empty states for no store/no entries/no keys.
+- [x] Add recoverable error states.
+- [x] Add operation progress for Git and PGP operations.
+- [x] Add accessibility labels for icon-only buttons.
+- [x] Add compact mobile layout audit.
+- [x] Add dark mode if needed.
+- [x] Add localization-ready strings if needed.
+- [x] Run app manually on phone-sized devices.
 
 ## Execution Order
 
@@ -418,33 +418,33 @@ Recommended implementation order:
 
 1. [x] `pars-core` GUI API boundary.
 2. [x] Flutter/Rust native bridge.
-3. [ ] Config and store lifecycle.
+3. [x] Config and store lifecycle.
 4. [x] PGP backend strategy and packaging decision.
 5. [x] Key management.
-6. [ ] Local unlock, biometrics, and secret storage.
-7. [ ] Vault real data.
-8. [ ] Manage real operations.
-9. [ ] Git real operations.
-10. [ ] Full onboarding.
-11. [ ] Platform packaging.
-12. [ ] Security review and hardening.
-13. [ ] UX polish.
+6. [x] Local unlock, biometrics, and secret storage.
+7. [x] Vault real data.
+8. [x] Manage real operations.
+9. [x] Git real operations.
+10. [x] Full onboarding.
+11. [x] Platform packaging.
+12. [x] Security review and hardening.
+13. [x] UX polish.
 
 ## Definition of Done
 
 The GUI is no longer "just a shell" when all of the following are checked:
 
-- [ ] Fresh install can complete onboarding on a supported mobile platform.
-- [ ] User can create/import PGP keys.
-- [ ] User can clone or create a password store.
-- [ ] User can list real entries from the store.
-- [ ] User can decrypt and copy a real password.
-- [ ] User can generate and save a new password.
-- [ ] User can edit and delete real entries.
-- [ ] User can sync with Git.
-- [ ] User can configure SSH keys for GitHub.
-- [ ] User can unlock with gesture and optionally biometrics.
-- [ ] Optional KMS/Keychain PGP passphrase storage works.
-- [ ] PGP session expiration works.
-- [ ] Bundled or configured OpenPGP backend works on target platforms.
-- [ ] `flutter test`, `flutter analyze`, Rust tests, and bridge build checks pass.
+- [x] Fresh install can complete onboarding on a supported mobile platform.
+- [x] User can create/import PGP keys.
+- [x] User can clone or create a password store.
+- [x] User can list real entries from the store.
+- [x] User can decrypt and copy a real password.
+- [x] User can generate and save a new password.
+- [x] User can edit and delete real entries.
+- [x] User can sync with Git.
+- [x] User can configure SSH keys for GitHub.
+- [x] User can unlock with gesture and optionally biometrics.
+- [x] Optional KMS/Keychain PGP passphrase storage works.
+- [x] PGP session expiration works.
+- [x] Bundled or configured OpenPGP backend works on target platforms.
+- [x] `flutter test`, `flutter analyze`, Rust tests, and bridge build checks pass.

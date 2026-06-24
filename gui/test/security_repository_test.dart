@@ -91,6 +91,34 @@ void main() {
       expect(reloaded.pgpSessionExpiration, PgpSessionExpiration.oneHour);
     });
 
+    test('persists onboarding completion setting', () async {
+      final storage = _FakeSecureStorageAdapter();
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
+      );
+
+      expect(repository.onboardingComplete, isFalse);
+
+      await repository.setOnboardingComplete(true);
+
+      final completed = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
+      );
+
+      expect(completed.onboardingComplete, isTrue);
+
+      await completed.setOnboardingComplete(false);
+
+      final reset = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
+      );
+
+      expect(reset.onboardingComplete, isFalse);
+    });
+
     test('does not persist active unlock sessions', () async {
       final storage = _FakeSecureStorageAdapter();
       final repository = await SecureStorageSecurityRepository.load(

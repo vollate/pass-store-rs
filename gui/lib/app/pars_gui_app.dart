@@ -95,10 +95,13 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
       title: 'Pars',
       debugShowCheckedModeBanner: false,
       theme: ParsTheme.light(),
+      darkTheme: ParsTheme.dark(),
+      themeMode: ThemeMode.system,
       home:
           !_isOnboardingComplete
               ? OnboardingScreen(
                 settingsRepository: widget.settingsRepository,
+                keyRepository: widget.keyRepository,
                 securityRepository: widget.securityRepository,
                 onComplete: () {
                   setState(() {
@@ -123,6 +126,13 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
                 gitRepository: widget.gitRepository,
                 securityRepository: widget.securityRepository,
                 onSecuritySettingsChanged: _scheduleAutoLock,
+                onOnboardingReset: () {
+                  _lockTimer?.cancel();
+                  setState(() {
+                    _isOnboardingComplete = false;
+                    _isLocked = false;
+                  });
+                },
               ),
     );
   }
@@ -145,6 +155,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   }
 
   bool get _isOnboardingSatisfied =>
+      widget.securityRepository.onboardingComplete &&
       widget.securityRepository.hasGestureVerifier &&
       !widget.settingsRepository.lifecycle.onboardingState.requiresSetup;
 }

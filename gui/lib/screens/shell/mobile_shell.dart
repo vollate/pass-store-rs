@@ -18,6 +18,7 @@ class MobileShell extends StatefulWidget {
     required this.gitRepository,
     required this.securityRepository,
     this.onSecuritySettingsChanged,
+    this.onOnboardingReset,
   });
 
   final VaultRepository vaultRepository;
@@ -26,6 +27,7 @@ class MobileShell extends StatefulWidget {
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
   final VoidCallback? onSecuritySettingsChanged;
+  final VoidCallback? onOnboardingReset;
 
   @override
   State<MobileShell> createState() => _MobileShellState();
@@ -40,6 +42,9 @@ class _MobileShellState extends State<MobileShell> {
       VaultScreen(
         vaultRepository: widget.vaultRepository,
         gitRepository: widget.gitRepository,
+        securityRepository: widget.securityRepository,
+        onChooseKey: _openSettings,
+        onOpenKeyManagement: _openSettings,
       ),
       ManageScreen(repository: widget.vaultRepository),
       SettingsScreen(
@@ -48,6 +53,7 @@ class _MobileShellState extends State<MobileShell> {
         gitRepository: widget.gitRepository,
         securityRepository: widget.securityRepository,
         onSecuritySettingsChanged: widget.onSecuritySettingsChanged,
+        onOnboardingReset: widget.onOnboardingReset,
       ),
     ];
 
@@ -69,5 +75,9 @@ class _MobileShellState extends State<MobileShell> {
         ],
       ),
     );
+  }
+
+  void _openSettings() {
+    setState(() => _index = 2);
   }
 }

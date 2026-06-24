@@ -157,6 +157,8 @@ abstract interface class SecurityRepository {
 
   bool get hasActivePgpSession;
 
+  bool get onboardingComplete;
+
   PgpSessionExpiration get pgpSessionExpiration;
 
   Duration get autoLockTimeout;
@@ -170,6 +172,8 @@ abstract interface class SecurityRepository {
   Future<void> markUnlocked(DateTime at);
 
   Future<void> markLocked();
+
+  Future<void> setOnboardingComplete(bool complete);
 
   Future<void> setLockOnResume(bool enabled);
 
@@ -210,6 +214,7 @@ class InMemorySecurityRepository implements SecurityRepository {
     bool pgpPassphraseStorageEnabled = false,
     String? pgpPassphrase,
     String? activePgpPassphrase,
+    bool onboardingComplete = false,
     PgpSessionExpiration pgpSessionExpiration =
         PgpSessionExpiration.fifteenMinutes,
     Duration autoLockTimeout = const Duration(minutes: 15),
@@ -220,6 +225,7 @@ class InMemorySecurityRepository implements SecurityRepository {
        _pgpPassphraseStorageEnabled = pgpPassphraseStorageEnabled,
        _pgpPassphrase = pgpPassphrase,
        _activePgpPassphrase = activePgpPassphrase,
+       _onboardingComplete = onboardingComplete,
        _pgpSessionExpiration = pgpSessionExpiration,
        _autoLockTimeout = autoLockTimeout,
        _lastUnlockedAt = lastUnlockedAt;
@@ -231,6 +237,7 @@ class InMemorySecurityRepository implements SecurityRepository {
     bool pgpPassphraseStorageEnabled = false,
     String? pgpPassphrase,
     String? activePgpPassphrase,
+    bool onboardingComplete = true,
     PgpSessionExpiration pgpSessionExpiration =
         PgpSessionExpiration.fifteenMinutes,
     Duration autoLockTimeout = const Duration(minutes: 15),
@@ -243,6 +250,7 @@ class InMemorySecurityRepository implements SecurityRepository {
       pgpPassphraseStorageEnabled: pgpPassphraseStorageEnabled,
       pgpPassphrase: pgpPassphrase,
       activePgpPassphrase: activePgpPassphrase,
+      onboardingComplete: onboardingComplete,
       pgpSessionExpiration: pgpSessionExpiration,
       autoLockTimeout: autoLockTimeout,
       lastUnlockedAt: lastUnlockedAt,
@@ -253,6 +261,7 @@ class InMemorySecurityRepository implements SecurityRepository {
   bool _lockOnResume;
   bool _biometricUnlockEnabled;
   bool _pgpPassphraseStorageEnabled;
+  bool _onboardingComplete;
   String? _pgpPassphrase;
   String? _activePgpPassphrase;
   DateTime? _pgpSessionExpiresAt;
@@ -274,6 +283,9 @@ class InMemorySecurityRepository implements SecurityRepository {
 
   @override
   bool get hasStoredPgpPassphrase => _pgpPassphrase != null;
+
+  @override
+  bool get onboardingComplete => _onboardingComplete;
 
   @override
   bool get hasActivePgpSession {
@@ -311,6 +323,11 @@ class InMemorySecurityRepository implements SecurityRepository {
   Future<void> markLocked() async {
     _lastUnlockedAt = null;
     await clearPgpSession();
+  }
+
+  @override
+  Future<void> setOnboardingComplete(bool complete) async {
+    _onboardingComplete = complete;
   }
 
   @override
@@ -451,6 +468,7 @@ class SecureStorageSecurityRepository implements SecurityRepository {
     required bool biometricUnlockEnabled,
     required bool pgpPassphraseStorageEnabled,
     required bool hasStoredPgpPassphrase,
+    required bool onboardingComplete,
     required PgpSessionExpiration pgpSessionExpiration,
     required Duration autoLockTimeout,
   }) : _storage = storage,
@@ -460,6 +478,7 @@ class SecureStorageSecurityRepository implements SecurityRepository {
        _biometricUnlockEnabled = biometricUnlockEnabled,
        _pgpPassphraseStorageEnabled = pgpPassphraseStorageEnabled,
        _hasStoredPgpPassphrase = hasStoredPgpPassphrase,
+       _onboardingComplete = onboardingComplete,
        _pgpSessionExpiration = pgpSessionExpiration,
        _autoLockTimeout = autoLockTimeout;
 
@@ -470,6 +489,7 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   static const _pgpPassphraseStorageEnabledKey =
       'pars.security.pgp_passphrase_storage_enabled.v1';
   static const _pgpPassphraseKey = 'pars.security.pgp_passphrase.v1';
+  static const _onboardingCompleteKey = 'pars.security.onboarding_complete.v1';
   static const _pgpSessionExpirationKey =
       'pars.security.pgp_session_expiration.v1';
   static const _autoLockTimeoutSecondsKey =
@@ -486,6 +506,7 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   bool _biometricUnlockEnabled;
   bool _pgpPassphraseStorageEnabled;
   bool _hasStoredPgpPassphrase;
+  bool _onboardingComplete;
   String? _activePgpPassphrase;
   DateTime? _pgpSessionExpiresAt;
   PgpSessionExpiration _pgpSessionExpiration;
@@ -520,6 +541,7 @@ class SecureStorageSecurityRepository implements SecurityRepository {
         _pgpPassphraseStorageEnabledKey,
       ),
       hasStoredPgpPassphrase: await storage.read(_pgpPassphraseKey) != null,
+      onboardingComplete: await _readBool(storage, _onboardingCompleteKey),
       pgpSessionExpiration: await _readPgpSessionExpiration(storage),
       autoLockTimeout: await _readDuration(
         storage,
@@ -543,6 +565,9 @@ class SecureStorageSecurityRepository implements SecurityRepository {
 
   @override
   bool get hasStoredPgpPassphrase => _hasStoredPgpPassphrase;
+
+  @override
+  bool get onboardingComplete => _onboardingComplete;
 
   @override
   bool get hasActivePgpSession {
@@ -581,6 +606,15 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   Future<void> markLocked() async {
     _lastUnlockedAt = null;
     await clearPgpSession();
+  }
+
+  @override
+  Future<void> setOnboardingComplete(bool complete) async {
+    await _storage.write(
+      key: _onboardingCompleteKey,
+      value: complete ? '1' : '0',
+    );
+    _onboardingComplete = complete;
   }
 
   @override

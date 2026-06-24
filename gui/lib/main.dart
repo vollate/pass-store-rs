@@ -11,6 +11,7 @@ Future<void> main() async {
   final repository = BridgeBackedRepository.defaultInstance();
   try {
     await repository.refresh();
+    await repository.autoPullOnOpen();
   } catch (_) {
     // Keep the empty lifecycle so onboarding can present recovery actions.
   }

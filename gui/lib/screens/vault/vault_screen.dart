@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/password_entry.dart';
 import '../../services/git_repository.dart';
+import '../../services/security_repository.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/entry_tile.dart';
@@ -12,10 +14,16 @@ class VaultScreen extends StatefulWidget {
     super.key,
     required this.vaultRepository,
     required this.gitRepository,
+    this.securityRepository,
+    this.onChooseKey,
+    this.onOpenKeyManagement,
   });
 
   final VaultRepository vaultRepository;
   final GitRepository gitRepository;
+  final SecurityRepository? securityRepository;
+  final VoidCallback? onChooseKey;
+  final VoidCallback? onOpenKeyManagement;
 
   @override
   State<VaultScreen> createState() => _VaultScreenState();
@@ -24,6 +32,7 @@ class VaultScreen extends StatefulWidget {
 class _VaultScreenState extends State<VaultScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  String? _directoryPath;
   bool _isLoading = false;
   String? _loadError;
 
@@ -50,8 +59,14 @@ class _VaultScreenState extends State<VaultScreen> {
   @override
   Widget build(BuildContext context) {
     final entries = widget.vaultRepository.search(_query);
-    final recent = entries.where((entry) => !entry.isDirectory).toList();
-    final directories = entries.where((entry) => entry.isDirectory).toList();
+    final recent =
+        _query.isEmpty
+            ? widget.vaultRepository.recentEntries()
+            : entries.where((entry) => !entry.isDirectory).toList();
+    final browseEntries =
+        _query.isEmpty
+            ? widget.vaultRepository.browseEntries(_directoryPath)
+            : const <PasswordEntry>[];
 
     return RefreshIndicator(
       onRefresh: _refreshVault,
@@ -94,7 +109,13 @@ class _VaultScreenState extends State<VaultScreen> {
                   hintText: 'Search by name or path',
                   prefixIcon: Icon(Icons.search),
                 ),
-                onChanged: (value) => setState(() => _query = value),
+                onChanged:
+                    (value) => setState(() {
+                      _query = value;
+                      if (value.isNotEmpty) {
+                        _directoryPath = null;
+                      }
+                    }),
               ),
             ),
           ),
@@ -104,40 +125,69 @@ class _VaultScreenState extends State<VaultScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Text(
-                  _loadError!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
+                child: Card(
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    title: Text(_loadError!),
+                    trailing: TextButton(
+                      onPressed: _refreshVault,
+                      child: const Text('Retry'),
+                    ),
                   ),
                 ),
               ),
             ),
           AppSection(
             title: _query.isEmpty ? 'Recent' : 'Search results',
+            emptyLabel:
+                _query.isEmpty
+                    ? 'No recent entries yet.'
+                    : 'No entries match this search.',
             children:
                 recent
                     .map(
                       (entry) => EntryTile(
                         entry: entry,
                         onTap: () => _showEntry(entry),
-                        onCopy: () => _showCopied(entry),
+                        onCopy: () => _copyPassword(entry),
                       ),
                     )
                     .toList(),
           ),
           if (_query.isEmpty)
             AppSection(
-              title: 'Browse',
-              children:
-                  directories
-                      .map(
-                        (entry) => EntryTile(
-                          entry: entry,
-                          onTap: () {},
-                          onCopy: () {},
-                        ),
-                      )
-                      .toList(),
+              title:
+                  _directoryPath == null ? 'Browse' : 'Browse: $_directoryPath',
+              emptyLabel:
+                  _directoryPath == null
+                      ? 'No entries in this store.'
+                      : 'No entries in this folder.',
+              children: <Widget>[
+                if (_directoryPath != null)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: ListTile(
+                      onTap: _openParentDirectory,
+                      leading: const Icon(Icons.arrow_upward),
+                      title: const Text('Up'),
+                      subtitle: Text(_directoryPath!),
+                    ),
+                  ),
+                ...browseEntries.map(
+                  (entry) => EntryTile(
+                    entry: entry,
+                    onTap:
+                        entry.isDirectory
+                            ? () => _openDirectory(entry)
+                            : () => _showEntry(entry),
+                    onCopy:
+                        entry.isDirectory ? () {} : () => _copyPassword(entry),
+                  ),
+                ),
+              ],
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
@@ -177,13 +227,50 @@ class _VaultScreenState extends State<VaultScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: false,
-      builder: (context) => EntryDetailSheet(entry: entry),
+      builder:
+          (context) => EntryDetailSheet(
+            entry: entry,
+            repository: widget.vaultRepository,
+            securityRepository: widget.securityRepository,
+            onFavoriteChanged: () => setState(() {}),
+            onChooseKey: widget.onChooseKey,
+            onOpenKeyManagement: widget.onOpenKeyManagement,
+          ),
     );
   }
 
-  void _showCopied(PasswordEntry entry) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Copied ${entry.displayName} password')),
-    );
+  void _openDirectory(PasswordEntry entry) {
+    setState(() => _directoryPath = entry.path);
+  }
+
+  void _openParentDirectory() {
+    final path = _directoryPath;
+    if (path == null) {
+      return;
+    }
+    final index = path.lastIndexOf('/');
+    setState(() {
+      _directoryPath = index == -1 ? null : path.substring(0, index);
+    });
+  }
+
+  Future<void> _copyPassword(PasswordEntry entry) async {
+    try {
+      final password = await widget.vaultRepository.copyEntryPassword(entry);
+      await Clipboard.setData(ClipboardData(text: password));
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Copied ${entry.displayName} password')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not copy password: $error')),
+      );
+    }
   }
 }

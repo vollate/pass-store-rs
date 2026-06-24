@@ -5,6 +5,7 @@ import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/services/bridge_backed_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
+import 'package:pars_gui/services/vault_metadata_store.dart';
 
 void main() {
   test(
@@ -26,6 +27,17 @@ void main() {
         contains('work/github'),
       );
       expect(repository.search('git').single.displayName, 'github');
+      final secret = await repository.readEntry(repository.entries.first);
+      final copiedPassword = await repository.copyEntryPassword(
+        repository.entries.first,
+      );
+
+      expect(secret.password, 'bridge-secret');
+      expect(secret.fieldValue('username'), 'alice');
+      expect(secret.fieldValue('url'), 'https://example.com');
+      expect(copiedPassword, 'bridge-secret');
+      expect(bridge.lastEntryRequest?.root, '/tmp/personal-store');
+      expect(bridge.lastEntryRequest?.path, 'work/github');
       expect(
         bridge.calledMethods,
         containsAll(<String>[
@@ -33,11 +45,164 @@ void main() {
           'list_keys',
           'list_entries',
           'git_status',
+          'read_entry',
+          'copy_entry_password',
         ]),
       );
       expect(repository.keys.single.name, 'github-mobile');
     },
   );
+
+  test('bridge-backed repository persists vault metadata', () async {
+    final metadataStore = InMemoryVaultMetadataStore();
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      metadataStore: metadataStore,
+    );
+
+    await repository.refresh();
+
+    expect(repository.browseEntries(null).map((entry) => entry.path), <String>[
+      'work',
+    ]);
+    expect(
+      repository.browseEntries('work').map((entry) => entry.path),
+      <String>['work/github'],
+    );
+
+    await repository.readEntry(repository.entries.first);
+    await repository.toggleFavorite(repository.entries.first);
+
+    expect(repository.recentEntries().single.path, 'work/github');
+    expect(repository.entries.first.isFavorite, isTrue);
+
+    final nextRepository = BridgeBackedRepository(
+      bridge: _LifecycleBridge(),
+      configPath: '/tmp/pars_config.toml',
+      metadataStore: metadataStore,
+    );
+    await nextRepository.refresh();
+
+    expect(nextRepository.recentEntries().single.path, 'work/github');
+    expect(nextRepository.entries.first.isFavorite, isTrue);
+  });
+
+  test('bridge-backed repository exposes manage operations', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+
+    await repository.refresh();
+
+    final saved = await repository.saveEntry(
+      path: 'work/new',
+      content: 'new-secret',
+      overwrite: false,
+    );
+    final generated = await repository.generateEntry(
+      path: 'work/generated',
+      length: 32,
+      noSymbols: true,
+      overwrite: true,
+    );
+    final edited = await repository.editEntry(
+      path: 'work/new',
+      content: 'edited-secret\nnote',
+    );
+    final replaced = await repository.replaceEntryPassword(
+      entry: repository.entries.first,
+      password: 'rotated-secret',
+    );
+    final moved = await repository.moveEntry(
+      fromPath: 'work/new',
+      toPath: 'archive/new',
+      overwrite: false,
+    );
+    final deleted = await repository.deleteEntry(
+      path: 'archive/new',
+      recursive: false,
+    );
+    final commit = await repository.commitChanges('Update archive/new');
+
+    expect(saved.path, 'work/new');
+    expect(generated.path, 'work/generated');
+    expect(edited.path, 'work/new');
+    expect(replaced.action, 'Replaced password for');
+    expect(moved.path, 'archive/new');
+    expect(deleted.action, 'Deleted');
+    expect(commit.success, isTrue);
+    expect(bridge.lastInsertRequest?.content, 'new-secret');
+    expect(bridge.lastGenerateRequest?.length, 32);
+    expect(bridge.lastGenerateRequest?.noSymbols, isTrue);
+    expect(bridge.lastEditRequest?.content, contains('rotated-secret'));
+    expect(bridge.lastEditRequest?.content, contains('username: alice'));
+    expect(bridge.lastMoveRequest?.fromPath, 'work/new');
+    expect(bridge.lastMoveRequest?.toPath, 'archive/new');
+    expect(bridge.lastDeleteRequest?.path, 'archive/new');
+    expect(bridge.lastGitCommitRequest?.message, 'Update archive/new');
+    expect(
+      bridge.calledMethods,
+      containsAll(<String>[
+        'insert_entry',
+        'generate_entry',
+        'edit_entry',
+        'move_entry',
+        'delete_entry',
+        'git_commit',
+      ]),
+    );
+  });
+
+  test('bridge-backed repository exposes git operations and remotes', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+
+    await repository.refresh();
+
+    final status = await repository.refreshGitStatus();
+    final pull = await repository.pull();
+    final push = await repository.push();
+    final commit = await repository.commit('Sync passwords');
+    final remotes = await repository.listRemotes();
+    final added = await repository.addRemote(
+      name: 'backup',
+      url: 'git@example.com:backup/pass.git',
+    );
+    final edited = await repository.editRemote(
+      name: 'origin',
+      url: 'git@example.com:new/pass.git',
+    );
+    final removed = await repository.removeRemote('backup');
+
+    expect(status.command, 'git status --short --branch');
+    expect(pull.command, 'git pull');
+    expect(push.command, 'git push');
+    expect(commit.command, 'git commit -m "Sync passwords"');
+    expect(remotes.single.name, 'origin');
+    expect(remotes.single.fetchUrl, 'git@example.com:org/pass.git');
+    expect(
+      added.command,
+      'git remote add backup git@example.com:backup/pass.git',
+    );
+    expect(
+      edited.command,
+      'git remote set-url origin git@example.com:new/pass.git',
+    );
+    expect(removed.command, 'git remote remove backup');
+    expect(bridge.lastGitCommitRequest?.message, 'Sync passwords');
+    expect(bridge.lastGitArgsRequest?.args, <String>[
+      'remote',
+      'remove',
+      'backup',
+    ]);
+  });
 
   test('bridge-backed repository exposes store lifecycle operations', () async {
     final bridge = _LifecycleBridge();
@@ -110,6 +275,14 @@ void main() {
 
 class _LifecycleBridge implements ParsBridgeApi {
   final List<String> calledMethods = <String>[];
+  frb.EntryRequest? lastEntryRequest;
+  frb.InsertEntryRequest? lastInsertRequest;
+  frb.GenerateEntryRequest? lastGenerateRequest;
+  frb.EditEntryRequest? lastEditRequest;
+  frb.MoveEntryRequest? lastMoveRequest;
+  frb.DeleteEntryRequest? lastDeleteRequest;
+  frb.GitCommitRequest? lastGitCommitRequest;
+  frb.GitArgsRequest? lastGitArgsRequest;
 
   @override
   Future<frb.AppStateResponse> inspectAppState({
@@ -305,74 +478,177 @@ class _LifecycleBridge implements ParsBridgeApi {
   @override
   Future<frb.EntrySecretResponse> readEntry({
     required frb.EntryRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('read_entry');
+    lastEntryRequest = request;
+    return const frb.EntrySecretResponse(
+      secret: frb.EntrySecretDto(
+        password: 'bridge-secret',
+        fields: <frb.ParsedEntryFieldDto>[
+          frb.ParsedEntryFieldDto(
+            key: 'username',
+            label: 'Username',
+            value: 'alice',
+          ),
+          frb.ParsedEntryFieldDto(
+            key: 'url',
+            label: 'URL',
+            value: 'https://example.com',
+          ),
+        ],
+        rawNotes: 'raw note',
+      ),
+    );
   }
 
   @override
   Future<frb.CopyEntryPasswordResponse> copyEntryPassword({
     required frb.EntryRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('copy_entry_password');
+    lastEntryRequest = request;
+    return const frb.CopyEntryPasswordResponse(
+      result: frb.CopyEntryPasswordResult(
+        path: 'work/github',
+        password: 'bridge-secret',
+      ),
+    );
   }
 
   @override
   Future<frb.InsertEntryResponse> insertEntry({
     required frb.InsertEntryRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('insert_entry');
+    lastInsertRequest = request;
+    return frb.InsertEntryResponse(
+      result: frb.InsertEntryResultDto(
+        entryPath: request.path,
+        overwroteExisting: request.overwrite,
+      ),
+    );
   }
 
   @override
   Future<frb.GenerateEntryResponse> generateEntry({
     required frb.GenerateEntryRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('generate_entry');
+    lastGenerateRequest = request;
+    return frb.GenerateEntryResponse(
+      result: frb.GenerateEntryResultDto(
+        entryPath: request.path,
+        password: 'generated-secret',
+        overwroteExisting: request.overwrite,
+      ),
+    );
   }
 
   @override
   Future<frb.MutationResponse> editEntry({
     required frb.EditEntryRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('edit_entry');
+    lastEditRequest = request;
+    return frb.MutationResponse(
+      result: frb.MutationResultDto(path: request.path),
+    );
   }
 
   @override
   Future<frb.MutationResponse> moveEntry({
     required frb.MoveEntryRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('move_entry');
+    lastMoveRequest = request;
+    return frb.MutationResponse(
+      result: frb.MutationResultDto(path: request.toPath),
+    );
   }
 
   @override
   Future<frb.DeleteEntryResponse> deleteEntry({
     required frb.DeleteEntryRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('delete_entry');
+    lastDeleteRequest = request;
+    return frb.DeleteEntryResponse(
+      result: frb.DeleteEntryResultDto(
+        deletedPath: request.path,
+        deletedType: 'Password',
+      ),
+    );
   }
 
   @override
-  Future<frb.GitCommandResponse> gitPull({required frb.GitRequest request}) {
-    throw UnimplementedError();
+  Future<frb.GitCommandResponse> gitPull({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_pull');
+    return const frb.GitCommandResponse(
+      output: frb.GitCommandOutputDto(
+        command: 'git pull',
+        stdout: 'Already up to date.',
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      ),
+    );
   }
 
   @override
-  Future<frb.GitCommandResponse> gitPush({required frb.GitRequest request}) {
-    throw UnimplementedError();
+  Future<frb.GitCommandResponse> gitPush({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_push');
+    return const frb.GitCommandResponse(
+      output: frb.GitCommandOutputDto(
+        command: 'git push',
+        stdout: 'Pushed.',
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      ),
+    );
   }
 
   @override
   Future<frb.GitCommandResponse> gitCommit({
     required frb.GitCommitRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('git_commit');
+    lastGitCommitRequest = request;
+    return frb.GitCommandResponse(
+      output: frb.GitCommandOutputDto(
+        command: 'git commit -m "${request.message}"',
+        stdout: 'Committed',
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      ),
+    );
   }
 
   @override
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('run_git_args');
+    lastGitArgsRequest = request;
+    final args = request.args.join(' ');
+    final stdout =
+        args == 'remote -v'
+            ? 'origin\tgit@example.com:org/pass.git (fetch)\norigin\tgit@example.com:org/pass.git (push)\n'
+            : '';
+    return frb.GitCommandResponse(
+      output: frb.GitCommandOutputDto(
+        command: 'git $args',
+        stdout: stdout,
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      ),
+    );
   }
 
   @override

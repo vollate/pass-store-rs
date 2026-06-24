@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../models/key_record.dart';
+import '../../services/key_repository.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
@@ -11,30 +13,52 @@ class OnboardingScreen extends StatefulWidget {
     required this.onComplete,
     required this.securityRepository,
     this.settingsRepository,
+    this.keyRepository,
   });
 
   final VoidCallback onComplete;
   final SecurityRepository securityRepository;
   final SettingsRepository? settingsRepository;
+  final KeyRepository? keyRepository;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
+enum _OnboardingStep { gesture, biometrics, store, pgp, ssh, review }
+
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  late bool _gestureConfigured;
+  late _OnboardingStep _step;
+  String? _error;
+
+  StoreLifecycleSnapshot? get _lifecycle =>
+      widget.settingsRepository?.lifecycle;
+
+  KeyRepository? get _keyRepository => widget.keyRepository;
+
+  bool get _needsStoreSetup =>
+      _lifecycle?.onboardingState.requiresSetup ?? false;
+
+  List<KeyRecord> get _pgpKeys =>
+      _keyRepository?.keys
+          .where((key) => key.type == KeyRecordType.pgp)
+          .toList(growable: false) ??
+      const <KeyRecord>[];
+
+  List<KeyRecord> get _sshKeys =>
+      _keyRepository?.keys
+          .where((key) => key.type == KeyRecordType.ssh)
+          .toList(growable: false) ??
+      const <KeyRecord>[];
 
   @override
   void initState() {
     super.initState();
-    _gestureConfigured = widget.securityRepository.hasGestureVerifier;
+    _step = _initialStep();
   }
 
   @override
   Widget build(BuildContext context) {
-    final lifecycle = widget.settingsRepository?.lifecycle;
-    final needsStoreSetup = lifecycle?.onboardingState.requiresSetup ?? false;
-    final needsGestureSetup = !_gestureConfigured;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -44,63 +68,749 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: <Widget>[
               const SizedBox(height: 24),
               Text(
-                needsGestureSetup
-                    ? 'Set gesture lock'
-                    : 'Set up password store',
+                _stepTitle(_step),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                needsGestureSetup
-                    ? 'Use a 9-dot gesture as the local Pars unlock method. Biometrics can be enabled after setup.'
-                    : needsStoreSetup
-                    ? lifecycle!.onboardingState.label
-                    : 'Your local unlock method is configured.',
-              ),
-              const SizedBox(height: 24),
-              Expanded(
-                child:
-                    needsGestureSetup
-                        ? GestureSetupPanel(
-                          securityRepository: widget.securityRepository,
-                          onSaved: () {
-                            if (needsStoreSetup) {
-                              setState(() => _gestureConfigured = true);
-                            } else {
-                              widget.onComplete();
-                            }
-                          },
-                        )
-                        : needsStoreSetup
-                        ? _StoreSetupActions(
-                          repository: widget.settingsRepository!,
-                          lifecycle: lifecycle!,
-                        )
-                        : const SizedBox.shrink(),
-              ),
-              if (!needsGestureSetup && needsStoreSetup)
-                FilledButton(
-                  onPressed: widget.onComplete,
-                  child: const SizedBox(
-                    width: double.infinity,
-                    child: Center(child: Text('Continue')),
-                  ),
+              Text(_stepSubtitle(_step)),
+              const SizedBox(height: 16),
+              _StepRail(currentStep: _step),
+              if (_error != null) ...<Widget>[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
+              ],
+              const SizedBox(height: 16),
+              Expanded(child: _buildStep(context)),
             ],
           ),
         ),
       ),
     );
   }
+
+  _OnboardingStep _initialStep() {
+    if (!widget.securityRepository.hasGestureVerifier) {
+      return _OnboardingStep.gesture;
+    }
+    if (_needsStoreSetup) {
+      return _OnboardingStep.store;
+    }
+    if (!widget.securityRepository.biometricUnlockEnabled) {
+      return _OnboardingStep.biometrics;
+    }
+    return _OnboardingStep.pgp;
+  }
+
+  Widget _buildStep(BuildContext context) {
+    switch (_step) {
+      case _OnboardingStep.gesture:
+        return GestureSetupPanel(
+          securityRepository: widget.securityRepository,
+          onSaved: () => _setStep(_OnboardingStep.biometrics),
+        );
+      case _OnboardingStep.biometrics:
+        return _BiometricSetupStep(
+          securityRepository: widget.securityRepository,
+          onEnable:
+              () => _setStep(
+                _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.pgp,
+              ),
+          onSkip:
+              () => _setStep(
+                _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.pgp,
+              ),
+          onError: _showError,
+        );
+      case _OnboardingStep.store:
+        return _buildStoreStep(context);
+      case _OnboardingStep.pgp:
+        return _buildPgpStep(context);
+      case _OnboardingStep.ssh:
+        return _buildSshStep(context);
+      case _OnboardingStep.review:
+        return _buildReviewStep(context);
+    }
+  }
+
+  Widget _buildStoreStep(BuildContext context) {
+    final repository = widget.settingsRepository;
+    final lifecycle = _lifecycle;
+    if (repository == null || lifecycle == null) {
+      return _EmptyOnboardingStep(
+        icon: Icons.folder_off_outlined,
+        title: 'No store repository available',
+        buttonLabel: 'Continue',
+        onPressed: () => _setStep(_OnboardingStep.pgp),
+      );
+    }
+
+    if (!lifecycle.onboardingState.requiresSetup) {
+      final store = lifecycle.selectedStore;
+      return ListView(
+        children: <Widget>[
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.check_circle_outline),
+              title: Text(store?.name ?? repository.currentRepoName),
+              subtitle: Text(store?.root ?? lifecycle.configPath),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => _setStep(_OnboardingStep.pgp),
+            child: const SizedBox(
+              width: double.infinity,
+              child: Center(child: Text('Continue')),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return _StoreSetupActions(
+      repository: repository,
+      lifecycle: lifecycle,
+      onStoreChanged: () async {
+        await repository.refresh();
+        if (!mounted) {
+          return;
+        }
+        if (!_needsStoreSetup) {
+          _setStep(_OnboardingStep.pgp);
+          return;
+        }
+        setState(() {});
+      },
+    );
+  }
+
+  Widget _buildPgpStep(BuildContext context) {
+    final repository = _keyRepository;
+    if (repository == null) {
+      return _EmptyOnboardingStep(
+        icon: Icons.enhanced_encryption_outlined,
+        title: 'No key repository available',
+        buttonLabel: 'Continue',
+        onPressed: () => _setStep(_OnboardingStep.ssh),
+      );
+    }
+
+    return ListView(
+      children: <Widget>[
+        if (_pgpKeys.isEmpty)
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.key_off_outlined),
+            title: Text('No PGP keys found'),
+            subtitle: Text('Create or import a key to encrypt entries.'),
+          )
+        else
+          for (final key in _pgpKeys)
+            Card(
+              child: ListTile(
+                title: Text(key.name),
+                subtitle: Text('${key.fingerprint}\n${key.source}'),
+                isThreeLine: true,
+                trailing: TextButton(
+                  onPressed: () => _usePgpKey(repository, key),
+                  child: const Text('Use PGP key'),
+                ),
+              ),
+            ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            FilledButton.icon(
+              onPressed: () => _showCreatePgpKeyForm(context, repository),
+              icon: const Icon(Icons.add),
+              label: const Text('Create PGP key'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _showImportPgpKeyForm(context, repository),
+              icon: const Icon(Icons.file_upload_outlined),
+              label: const Text('Import PGP key'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSshStep(BuildContext context) {
+    final repository = _keyRepository;
+    if (repository == null) {
+      return _EmptyOnboardingStep(
+        icon: Icons.vpn_key_off_outlined,
+        title: 'No SSH repository available',
+        buttonLabel: 'Continue',
+        onPressed: () => _setStep(_OnboardingStep.review),
+      );
+    }
+
+    return ListView(
+      children: <Widget>[
+        if (_sshKeys.isEmpty)
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.vpn_key_outlined),
+            title: Text('No SSH keys configured'),
+            subtitle: Text('SSH is optional and can be added later.'),
+          )
+        else
+          for (final key in _sshKeys)
+            Card(
+              child: ListTile(
+                title: Text(key.name),
+                subtitle: Text('${key.fingerprint}\n${key.source}'),
+                isThreeLine: true,
+              ),
+            ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            FilledButton.icon(
+              onPressed: () => _showCreateSshKeyForm(context, repository),
+              icon: const Icon(Icons.add),
+              label: const Text('Generate SSH key'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _showImportSshKeyForm(context, repository),
+              icon: const Icon(Icons.file_upload_outlined),
+              label: const Text('Import SSH key'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _showGithubSettings(context, repository),
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('GitHub settings'),
+            ),
+            TextButton(
+              onPressed: () => _setStep(_OnboardingStep.review),
+              child: const Text('Skip SSH'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewStep(BuildContext context) {
+    final lifecycle = _lifecycle;
+    return ListView(
+      children: <Widget>[
+        _ReviewTile(
+          label: 'Gesture lock',
+          value:
+              widget.securityRepository.hasGestureVerifier
+                  ? 'Configured'
+                  : 'Required',
+          complete: widget.securityRepository.hasGestureVerifier,
+        ),
+        _ReviewTile(
+          label: 'Biometrics',
+          value:
+              widget.securityRepository.biometricUnlockEnabled
+                  ? 'Enabled'
+                  : 'Skipped',
+          complete: true,
+        ),
+        _ReviewTile(
+          label: 'Password store',
+          value: lifecycle?.onboardingState.label ?? 'Unavailable',
+          complete: !_needsStoreSetup,
+        ),
+        _ReviewTile(
+          label: 'PGP key',
+          value: _pgpKeys.isEmpty ? 'Not found' : '${_pgpKeys.length} key(s)',
+          complete: _pgpKeys.isNotEmpty,
+        ),
+        _ReviewTile(
+          label: 'SSH key',
+          value: _sshKeys.isEmpty ? 'Skipped' : '${_sshKeys.length} key(s)',
+          complete: true,
+        ),
+        const SizedBox(height: 12),
+        FilledButton(
+          onPressed: _needsStoreSetup ? null : _finishOnboarding,
+          child: const SizedBox(
+            width: double.infinity,
+            child: Center(child: Text('Finish setup')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _setStep(_OnboardingStep step) {
+    setState(() {
+      _step = step;
+      _error = null;
+    });
+  }
+
+  void _showError(Object error) {
+    setState(() => _error = error.toString());
+  }
+
+  Future<void> _usePgpKey(KeyRepository repository, KeyRecord key) async {
+    await _runOnboardingAction(() async {
+      await repository.addPgpKeyToSelectedStore(key.fingerprint);
+      _setStep(_OnboardingStep.ssh);
+    });
+  }
+
+  void _showCreatePgpKeyForm(BuildContext context, KeyRepository repository) {
+    final name = TextEditingController();
+    final email = TextEditingController();
+    final passphrase = TextEditingController();
+    _showOnboardingForm(
+      context: context,
+      title: 'Create PGP key',
+      fields: <Widget>[
+        TextField(
+          controller: name,
+          decoration: const InputDecoration(labelText: 'Name'),
+        ),
+        TextField(
+          controller: email,
+          decoration: const InputDecoration(labelText: 'Email'),
+        ),
+        TextField(
+          controller: passphrase,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Passphrase'),
+        ),
+      ],
+      submitLabel: 'Create',
+      onSubmit: () async {
+        try {
+          final key = await repository.generatePgpKey(
+            name: name.text,
+            email: email.text,
+            passphrase: passphrase.text.trim().isEmpty ? null : passphrase.text,
+          );
+          await repository.addPgpKeyToSelectedStore(key.fingerprint);
+          _setStep(_OnboardingStep.ssh);
+        } finally {
+          passphrase.clear();
+        }
+      },
+    );
+  }
+
+  void _showImportPgpKeyForm(BuildContext context, KeyRepository repository) {
+    final keyText = TextEditingController();
+    _showOnboardingForm(
+      context: context,
+      title: 'Import PGP key',
+      fields: <Widget>[
+        TextField(
+          controller: keyText,
+          minLines: 4,
+          maxLines: 8,
+          decoration: const InputDecoration(labelText: 'Key text'),
+        ),
+      ],
+      submitLabel: 'Import',
+      onSubmit: () async {
+        try {
+          final key =
+              keyText.text.contains('PGP PRIVATE KEY BLOCK')
+                  ? await repository.importPgpPrivateKeyText(keyText.text)
+                  : await repository.importPgpPublicKeyText(keyText.text);
+          await repository.addPgpKeyToSelectedStore(key.fingerprint);
+          _setStep(_OnboardingStep.ssh);
+        } finally {
+          keyText.clear();
+        }
+      },
+    );
+  }
+
+  void _showCreateSshKeyForm(BuildContext context, KeyRepository repository) {
+    final name = TextEditingController(text: 'github-mobile-ed25519');
+    _showOnboardingForm(
+      context: context,
+      title: 'Generate SSH key',
+      fields: <Widget>[
+        TextField(
+          controller: name,
+          decoration: const InputDecoration(labelText: 'Name'),
+        ),
+      ],
+      submitLabel: 'Generate',
+      onSubmit: () async {
+        await repository.generateSshKey(name.text);
+        _setStep(_OnboardingStep.review);
+      },
+    );
+  }
+
+  void _showImportSshKeyForm(BuildContext context, KeyRepository repository) {
+    final name = TextEditingController();
+    final privateKey = TextEditingController();
+    _showOnboardingForm(
+      context: context,
+      title: 'Import SSH key',
+      fields: <Widget>[
+        TextField(
+          controller: name,
+          decoration: const InputDecoration(labelText: 'Name'),
+        ),
+        TextField(
+          controller: privateKey,
+          minLines: 4,
+          maxLines: 8,
+          decoration: const InputDecoration(labelText: 'Private key'),
+        ),
+      ],
+      submitLabel: 'Import',
+      onSubmit: () async {
+        try {
+          await repository.importSshPrivateKeyText(
+            name: name.text,
+            privateKey: privateKey.text,
+          );
+          _setStep(_OnboardingStep.review);
+        } finally {
+          privateKey.clear();
+        }
+      },
+    );
+  }
+
+  Future<void> _showGithubSettings(
+    BuildContext context,
+    KeyRepository repository,
+  ) async {
+    final url = await repository.githubSshSettingsUri();
+    if (!context.mounted) {
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('GitHub SSH settings'),
+            content: SelectableText(url.toString()),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showOnboardingForm({
+    required BuildContext context,
+    required String title,
+    required List<Widget> fields,
+    required String submitLabel,
+    required Future<void> Function() onSubmit,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...fields,
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () async {
+                        try {
+                          await onSubmit();
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(error.toString())),
+                            );
+                          }
+                        }
+                      },
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Center(child: Text(submitLabel)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+    );
+  }
+
+  Future<void> _runOnboardingAction(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (error) {
+      if (mounted) {
+        _showError(error);
+      }
+    }
+  }
+
+  Future<void> _finishOnboarding() async {
+    await widget.securityRepository.setOnboardingComplete(true);
+    await widget.securityRepository.markUnlocked(DateTime.now());
+    if (!mounted) {
+      return;
+    }
+    widget.onComplete();
+  }
+
+  String _stepTitle(_OnboardingStep step) {
+    switch (step) {
+      case _OnboardingStep.gesture:
+        return 'Set gesture lock';
+      case _OnboardingStep.biometrics:
+        return 'Enable biometric unlock';
+      case _OnboardingStep.store:
+        return 'Set up password store';
+      case _OnboardingStep.pgp:
+        return 'Choose PGP key';
+      case _OnboardingStep.ssh:
+        return 'Set up SSH for GitHub';
+      case _OnboardingStep.review:
+        return 'Review setup';
+    }
+  }
+
+  String _stepSubtitle(_OnboardingStep step) {
+    switch (step) {
+      case _OnboardingStep.gesture:
+        return 'Use a 9-dot gesture as the local Pars unlock method.';
+      case _OnboardingStep.biometrics:
+        return 'Biometrics are optional and keep the gesture as fallback.';
+      case _OnboardingStep.store:
+        return _lifecycle?.onboardingState.label ??
+            'Create, import, or clone a password store.';
+      case _OnboardingStep.pgp:
+        return 'Select, create, or import the key used by pass entries.';
+      case _OnboardingStep.ssh:
+        return 'SSH is optional and helps Git sync with GitHub.';
+      case _OnboardingStep.review:
+        return 'Confirm the setup before entering Pars.';
+    }
+  }
+}
+
+class _StepRail extends StatelessWidget {
+  const _StepRail({required this.currentStep});
+
+  final _OnboardingStep currentStep;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: <Widget>[
+        for (final step in _OnboardingStep.values)
+          ChoiceChip(
+            label: Text(_shortLabel(step)),
+            selected: step == currentStep,
+            onSelected: null,
+          ),
+      ],
+    );
+  }
+
+  String _shortLabel(_OnboardingStep step) {
+    switch (step) {
+      case _OnboardingStep.gesture:
+        return 'Gesture';
+      case _OnboardingStep.biometrics:
+        return 'Biometrics';
+      case _OnboardingStep.store:
+        return 'Store';
+      case _OnboardingStep.pgp:
+        return 'PGP';
+      case _OnboardingStep.ssh:
+        return 'SSH';
+      case _OnboardingStep.review:
+        return 'Review';
+    }
+  }
+}
+
+class _BiometricSetupStep extends StatelessWidget {
+  const _BiometricSetupStep({
+    required this.securityRepository,
+    required this.onEnable,
+    required this.onSkip,
+    required this.onError,
+  });
+
+  final SecurityRepository securityRepository;
+  final VoidCallback onEnable;
+  final VoidCallback onSkip;
+  final void Function(Object error) onError;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<BiometricUnlockStatus>(
+      future: securityRepository.biometricUnlockStatus(),
+      builder: (context, snapshot) {
+        final status = snapshot.data ?? BiometricUnlockStatus.unavailable;
+        return ListView(
+          children: <Widget>[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                status == BiometricUnlockStatus.unavailable
+                    ? Icons.fingerprint_outlined
+                    : Icons.fingerprint,
+              ),
+              title: const Text('Biometric unlock'),
+              subtitle: Text(_biometricSubtitle(status)),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed:
+                  status == BiometricUnlockStatus.unavailable
+                      ? null
+                      : () async {
+                        try {
+                          await securityRepository.setBiometricUnlockEnabled(
+                            true,
+                          );
+                          onEnable();
+                        } catch (error) {
+                          onError(error);
+                        }
+                      },
+              icon: const Icon(Icons.fingerprint),
+              label: const Text('Enable biometric unlock'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: onSkip,
+              child: const SizedBox(
+                width: double.infinity,
+                child: Center(child: Text('Skip biometrics')),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _biometricSubtitle(BiometricUnlockStatus status) {
+    switch (status) {
+      case BiometricUnlockStatus.available:
+        return 'Enabled on this device';
+      case BiometricUnlockStatus.disabled:
+        return 'Available on this device';
+      case BiometricUnlockStatus.unavailable:
+        return 'Unavailable on this device';
+    }
+  }
+}
+
+class _EmptyOnboardingStep extends StatelessWidget {
+  const _EmptyOnboardingStep({
+    required this.icon,
+    required this.title,
+    required this.buttonLabel,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title;
+  final String buttonLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: <Widget>[
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(icon),
+          title: Text(title),
+        ),
+        const SizedBox(height: 12),
+        FilledButton(
+          onPressed: onPressed,
+          child: SizedBox(
+            width: double.infinity,
+            child: Center(child: Text(buttonLabel)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewTile extends StatelessWidget {
+  const _ReviewTile({
+    required this.label,
+    required this.value,
+    required this.complete,
+  });
+
+  final String label;
+  final String value;
+  final bool complete;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        complete ? Icons.check_circle_outline : Icons.error_outline,
+        color: complete ? null : Theme.of(context).colorScheme.error,
+      ),
+      title: Text(label),
+      subtitle: Text(value),
+    );
+  }
 }
 
 class _StoreSetupActions extends StatelessWidget {
-  const _StoreSetupActions({required this.repository, required this.lifecycle});
+  const _StoreSetupActions({
+    required this.repository,
+    required this.lifecycle,
+    required this.onStoreChanged,
+  });
 
   final SettingsRepository repository;
   final StoreLifecycleSnapshot lifecycle;
+  final Future<void> Function() onStoreChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -237,40 +947,43 @@ class _StoreSetupActions extends StatelessWidget {
                 top: 20,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  ...fields,
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: () async {
-                      try {
-                        await onSubmit();
-                        if (context.mounted) {
-                          Navigator.of(context).pop();
+                    const SizedBox(height: 12),
+                    ...fields,
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () async {
+                        try {
+                          await onSubmit();
+                          await onStoreChanged();
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(error.toString())),
+                            );
+                          }
                         }
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text('$error')));
-                        }
-                      }
-                    },
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: Center(child: Text(submitLabel)),
+                      },
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Center(child: Text(submitLabel)),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

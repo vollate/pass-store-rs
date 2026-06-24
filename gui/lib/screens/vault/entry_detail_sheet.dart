@@ -1,53 +1,200 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/password_entry.dart';
-import '../../services/pass_entry_parser.dart';
+import '../../services/security_repository.dart';
+import '../../services/vault_repository.dart';
 
 class EntryDetailSheet extends StatefulWidget {
   const EntryDetailSheet({
     super.key,
     required this.entry,
+    required this.repository,
+    this.securityRepository,
     this.onSecretCleared,
+    this.copyText,
+    this.onOpenUri,
+    this.onFavoriteChanged,
+    this.onChooseKey,
+    this.onOpenKeyManagement,
+    this.clipboardClearDelay = const Duration(seconds: 45),
   });
 
   final PasswordEntry entry;
+  final VaultRepository repository;
+  final SecurityRepository? securityRepository;
   final VoidCallback? onSecretCleared;
+  final Future<void> Function(String text)? copyText;
+  final Future<void> Function(Uri uri)? onOpenUri;
+  final VoidCallback? onFavoriteChanged;
+  final VoidCallback? onChooseKey;
+  final VoidCallback? onOpenKeyManagement;
+  final Duration clipboardClearDelay;
 
   @override
   State<EntryDetailSheet> createState() => _EntryDetailSheetState();
 }
 
 class _EntryDetailSheetState extends State<EntryDetailSheet> {
+  final TextEditingController _passphraseController = TextEditingController();
   bool _isRevealed = false;
+  late bool _isFavorite;
+  bool _needsPassphrase = false;
+  bool _isLoading = true;
   SecretContent? _content;
+  String? _loadError;
+  String? _passphraseError;
+  Timer? _clipboardClearTimer;
 
   @override
   void initState() {
     super.initState();
-    _content = PassEntryParser.parse(widget.entry.encryptedContent);
+    _isFavorite = widget.entry.isFavorite;
+    _prepareSecretLoad();
   }
 
   @override
   void didUpdateWidget(covariant EntryDetailSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.entry.encryptedContent != widget.entry.encryptedContent) {
+    if (oldWidget.entry.path != widget.entry.path ||
+        oldWidget.repository != widget.repository) {
       _clearSecret();
-      _content = PassEntryParser.parse(widget.entry.encryptedContent);
+      _isFavorite = widget.entry.isFavorite;
+      _prepareSecretLoad();
     }
   }
 
   @override
   void dispose() {
+    _clipboardClearTimer?.cancel();
     _clearSecret();
+    _passphraseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_needsPassphrase) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Center(child: _SheetHandle()),
+              const SizedBox(height: 18),
+              Text(
+                'PGP passphrase required',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(widget.entry.path),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passphraseController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'PGP passphrase',
+                  errorText: _passphraseError,
+                ),
+                onSubmitted: (_) => _startPgpSession(),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _startPgpSession,
+                icon: const Icon(Icons.lock_open),
+                label: const Text('Unlock entry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_isLoading) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const <Widget>[
+              _SheetHandle(),
+              SizedBox(height: 24),
+              CircularProgressIndicator(),
+              SizedBox(height: 18),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_loadError != null) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Center(child: _SheetHandle()),
+              const SizedBox(height: 18),
+              Text(
+                'Could not decrypt entry',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _loadError!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  FilledButton.icon(
+                    onPressed: _loadSecret,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed:
+                        widget.onChooseKey ??
+                        () => _showMessage('Open key import from Settings'),
+                    icon: const Icon(Icons.key_outlined),
+                    label: const Text('Choose/import key'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed:
+                        widget.onOpenKeyManagement ??
+                        () => _showMessage('Open Settings > PGP keys'),
+                    icon: const Icon(Icons.settings_outlined),
+                    label: const Text('Open key management'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final content = _content;
     if (content == null) {
       return const SafeArea(child: SizedBox.shrink());
     }
+    final url = _entryUrl(content);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -56,16 +203,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
+              const Center(child: _SheetHandle()),
               const SizedBox(height: 18),
               Row(
                 children: <Widget>[
@@ -130,7 +268,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                 runSpacing: 8,
                 children: <Widget>[
                   FilledButton.icon(
-                    onPressed: () {},
+                    onPressed: _copyPassword,
                     icon: const Icon(Icons.copy),
                     label: const Text('Copy password'),
                   ),
@@ -140,12 +278,25 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                     label: const Text('Reveal'),
                   ),
                   OutlinedButton.icon(
+                    onPressed: _toggleFavorite,
+                    icon: Icon(
+                      _isFavorite ? Icons.star : Icons.star_border_outlined,
+                    ),
+                    label: Text(_isFavorite ? 'Unfavorite' : 'Favorite'),
+                  ),
+                  OutlinedButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Edit'),
                   ),
+                  if (url != null)
+                    OutlinedButton.icon(
+                      onPressed: () => _openUrl(url),
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('Open URL'),
+                    ),
                   OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => _showQrCode(content.password),
                     icon: const Icon(Icons.qr_code_2),
                     label: const Text('QR code'),
                   ),
@@ -177,7 +328,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                     title: Text(field.label),
                     subtitle: Text(field.value),
                     trailing: TextButton(
-                      onPressed: () {},
+                      onPressed: () => _copyField(field),
                       child: const Text('Copy'),
                     ),
                   ),
@@ -200,9 +351,211 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     );
   }
 
+  Future<void> _loadSecret() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      final content = await widget.repository.readEntry(widget.entry);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _content = content;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _clearSecret();
+      setState(() {
+        _isLoading = false;
+        _loadError = error.toString();
+      });
+    }
+  }
+
+  void _prepareSecretLoad() {
+    if (_shouldPromptForPassphrase) {
+      _needsPassphrase = true;
+      _isLoading = false;
+      _loadError = null;
+      return;
+    }
+    _needsPassphrase = false;
+    _loadSecret();
+  }
+
+  bool get _shouldPromptForPassphrase {
+    final securityRepository = widget.securityRepository;
+    return securityRepository != null &&
+        !securityRepository.hasActivePgpSession;
+  }
+
+  Future<void> _startPgpSession() async {
+    final passphrase = _passphraseController.text;
+    if (passphrase.isEmpty) {
+      setState(() => _passphraseError = 'Enter a passphrase.');
+      return;
+    }
+    final securityRepository = widget.securityRepository;
+    if (securityRepository == null) {
+      return;
+    }
+    await securityRepository.startPgpSession(passphrase);
+    _passphraseController.clear();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _needsPassphrase = false;
+      _passphraseError = null;
+    });
+    await _loadSecret();
+  }
+
+  Future<void> _copyPassword() async {
+    try {
+      final password = await widget.repository.copyEntryPassword(widget.entry);
+      await _copyText(password);
+      _showMessage('Copied ${widget.entry.displayName} password');
+    } catch (error) {
+      _showMessage('Could not copy password: $error');
+    }
+  }
+
+  Future<void> _copyField(ParsedSecretField field) async {
+    await _copyText(field.value);
+    _showMessage('Copied ${field.label}');
+  }
+
+  Future<void> _toggleFavorite() async {
+    await widget.repository.toggleFavorite(widget.entry);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _isFavorite = !_isFavorite);
+    widget.onFavoriteChanged?.call();
+  }
+
+  void _showQrCode(String password) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: false,
+      builder:
+          (context) => SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const _SheetHandle(),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            'Password QR code',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close QR code',
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    QrImageView(
+                      data: password,
+                      version: QrVersions.auto,
+                      size: 200,
+                      backgroundColor: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+    );
+  }
+
+  Future<void> _copyText(String text) async {
+    final writer = widget.copyText ?? _copyToSystemClipboard;
+    await writer(text);
+    _clipboardClearTimer?.cancel();
+    if (widget.clipboardClearDelay <= Duration.zero) {
+      return;
+    }
+    _clipboardClearTimer = Timer(widget.clipboardClearDelay, () {
+      writer('');
+    });
+  }
+
+  Future<void> _openUrl(Uri uri) async {
+    final opener = widget.onOpenUri;
+    if (opener != null) {
+      await opener(uri);
+      return;
+    }
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) {
+      _showMessage('Could not open ${uri.toString()}');
+    }
+  }
+
+  Uri? _entryUrl(SecretContent content) {
+    final raw = content.fieldValue('url') ?? content.fieldValue('website');
+    if (raw == null) {
+      return null;
+    }
+    final uri = Uri.tryParse(raw);
+    if (uri == null || !uri.hasScheme) {
+      return null;
+    }
+    return uri;
+  }
+
+  Future<void> _copyToSystemClipboard(String text) {
+    return Clipboard.setData(ClipboardData(text: text));
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   void _clearSecret() {
     _isRevealed = false;
     _content = null;
     widget.onSecretCleared?.call();
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 4,
+      decoration: BoxDecoration(
+        color: const Color(0xFFCBD5E1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+    );
   }
 }

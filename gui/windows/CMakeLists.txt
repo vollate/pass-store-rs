@@ -57,6 +57,19 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# Build and stage the Rust bridge DLL next to the Windows executable so the
+# flutter_rust_bridge loader can resolve pars_bridge at runtime.
+set(PARS_BRIDGE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/../bridge/build_windows.ps1")
+add_custom_target(pars_bridge_windows ALL
+  COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+    -File "${PARS_BRIDGE_SCRIPT}"
+    -Profile "$<CONFIG>"
+    -OutputDir "$<TARGET_FILE_DIR:${BINARY_NAME}>"
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.."
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} pars_bridge_windows)
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can

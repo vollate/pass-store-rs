@@ -42,5 +42,16 @@ void main() {
       expect(content.fieldValue('website'), 'https://example.com');
       expect(content.rawNotes, 'created by hand');
     });
+
+    test('matches Rust core parser edge cases', () {
+      final content = PassEntryParser.parse(
+        'hunter2\r\n USERNAME :  alice  \r\nusername:\r\nunknown: value\r\n\r\nnote: keep',
+      );
+
+      expect(content.password, 'hunter2');
+      expect(content.fieldValue('username'), 'alice');
+      expect(content.fieldValue('note'), 'keep');
+      expect(content.rawNotes, 'username:\nunknown: value');
+    });
   });
 }
