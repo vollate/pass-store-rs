@@ -1023,7 +1023,7 @@ class _StoreSetupActions extends StatelessWidget {
                     ? const <String>[]
                     : <String>[selectedPgpFingerprint!],
             setDefault: true,
-            initializeGit: true,
+            initializeGit: managedPaths == null,
           ),
     );
   }

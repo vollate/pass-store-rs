@@ -1125,7 +1125,8 @@ fn inspect_store(
     let exists = root_path.is_dir();
     let gpg_id_path = root_path.join(".gpg-id");
     let has_gpg_id = gpg_id_path.is_file();
-    let has_git_remote = exists && git_remote_exists(&root_path);
+    let has_git_repo = root_path.join(".git").is_dir();
+    let has_git_remote = exists && has_git_repo && git_remote_exists(&root_path);
     let pgp_key_missing = has_gpg_id && pgp_key_missing(&gpg_id_path, pgp_executable);
     let mut issues = Vec::new();
 
@@ -1135,7 +1136,7 @@ fn inspect_store(
     if exists && !has_gpg_id {
         issues.push("missing_gpg_id".to_string());
     }
-    if exists && !has_git_remote {
+    if exists && has_git_repo && !has_git_remote {
         issues.push("git_remote_missing".to_string());
     }
     if exists && pgp_key_missing {

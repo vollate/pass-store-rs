@@ -2,9 +2,19 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+
+use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
+use base64::Engine as _;
+use ed25519_dalek::SigningKey;
+use rand08::rngs::OsRng;
+use rand08::RngCore;
+use sha2::{Digest, Sha256};
+use zeroize::Zeroize;
 
 use crate::gui::{CoreError, GuiResult, KeyExportResult, SshKeySummary};
+
+const SSH_ED25519_ALGORITHM: &[u8] = b"ssh-ed25519";
+const OPENSSH_AUTH_MAGIC: &[u8] = b"openssh-key-v1\0";
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ImportedKeyKind {
@@ -108,19 +118,16 @@ pub fn generate_ssh_ed25519_key(ssh_dir: &Path, name: &str) -> GuiResult<SshKeyS
         return Err(CoreError::Conflict(crate::gui::EntryConflict::already_exists(name)));
     }
 
-    let output = Command::new("ssh-keygen")
-        .args(["-t", "ed25519", "-N", "", "-C", name, "-f"])
-        .arg(&private_path)
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|err| CoreError::ValidationError(err.to_string()))?;
-    if !output.status.success() {
-        return Err(CoreError::ValidationError(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        ));
-    }
+    let mut seed = [0u8; 32];
+    OsRng.fill_bytes(&mut seed);
+    let signing_key = SigningKey::from_bytes(&seed);
+    let public_key = signing_key.verifying_key().to_bytes();
+    let private_key = openssh_ed25519_private_key(&seed, &public_key, name);
+    let public_key_text = ssh_ed25519_public_key_text(&public_key, name);
+    seed.zeroize();
 
-    set_private_key_permissions(&private_path)?;
+    write_private_key(&private_path, &private_key)?;
+    fs::write(private_path.with_extension("pub"), public_key_text)?;
     ssh_key_summary(ssh_dir, name)
 }
 
@@ -208,40 +215,212 @@ fn ssh_key_summary(ssh_dir: &Path, name: &str) -> GuiResult<SshKeySummary> {
 }
 
 fn ssh_public_key_fingerprint(public_path: &Path) -> GuiResult<String> {
-    let output = Command::new("ssh-keygen")
-        .args(["-lf"])
-        .arg(public_path)
-        .output()
-        .map_err(|err| CoreError::ValidationError(err.to_string()))?;
-    if !output.status.success() {
-        return Err(CoreError::ValidationError(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        ));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    stdout
+    let public_key = fs::read_to_string(public_path).map_err(|err| {
+        CoreError::StoreError(format!(
+            "failed to read SSH public key {}: {err}",
+            public_path.display()
+        ))
+    })?;
+    let blob = public_key
         .split_whitespace()
         .nth(1)
-        .map(str::to_string)
-        .ok_or_else(|| CoreError::ValidationError("failed to parse SSH fingerprint".to_string()))
+        .ok_or_else(|| CoreError::ValidationError("failed to parse SSH public key".to_string()))
+        .and_then(|encoded| {
+            STANDARD.decode(encoded).map_err(|_| {
+                CoreError::ValidationError("failed to decode SSH public key".to_string())
+            })
+        })?;
+    Ok(ssh_fingerprint_for_blob(&blob))
 }
 
 fn derive_ssh_public_key(private_path: &Path, public_path: &Path) -> GuiResult<()> {
-    let output = Command::new("ssh-keygen")
-        .args(["-y", "-f"])
-        .arg(private_path)
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|err| CoreError::ValidationError(err.to_string()))?;
-    if !output.status.success() {
-        return Err(CoreError::ValidationError(
-            "failed to derive SSH public key from private key".to_string(),
-        ));
+    let private_key = fs::read_to_string(private_path).map_err(|err| {
+        CoreError::StoreError(format!(
+            "failed to read SSH private key {}: {err}",
+            private_path.display()
+        ))
+    })?;
+    let public_key = openssh_ed25519_public_key_from_private(&private_key)?;
+    let comment = private_path.file_name().and_then(|name| name.to_str()).unwrap_or("imported-key");
+    fs::write(public_path, ssh_ed25519_public_key_text(&public_key, comment))?;
+    Ok(())
+}
+
+fn ssh_ed25519_public_blob(public_key: &[u8; 32]) -> Vec<u8> {
+    let mut blob = Vec::new();
+    push_ssh_string(&mut blob, SSH_ED25519_ALGORITHM);
+    push_ssh_string(&mut blob, public_key);
+    blob
+}
+
+fn ssh_ed25519_public_key_text(public_key: &[u8; 32], comment: &str) -> String {
+    let blob = ssh_ed25519_public_blob(public_key);
+    format!("ssh-ed25519 {} {}\n", STANDARD.encode(blob), comment.trim())
+}
+
+fn openssh_ed25519_private_key(seed: &[u8; 32], public_key: &[u8; 32], comment: &str) -> String {
+    let public_blob = ssh_ed25519_public_blob(public_key);
+    let mut rng = OsRng;
+    let check = rng.next_u32();
+
+    let mut private_key = Vec::with_capacity(64);
+    private_key.extend_from_slice(seed);
+    private_key.extend_from_slice(public_key);
+
+    let mut private_section = Vec::new();
+    push_ssh_u32(&mut private_section, check);
+    push_ssh_u32(&mut private_section, check);
+    push_ssh_string(&mut private_section, SSH_ED25519_ALGORITHM);
+    push_ssh_string(&mut private_section, public_key);
+    push_ssh_string(&mut private_section, &private_key);
+    push_ssh_string(&mut private_section, comment.trim().as_bytes());
+    private_key.zeroize();
+    let padding = (8 - private_section.len() % 8) % 8;
+    for byte in 1..=padding {
+        private_section.push(byte as u8);
     }
 
-    fs::write(public_path, output.stdout)?;
-    Ok(())
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(OPENSSH_AUTH_MAGIC);
+    push_ssh_string(&mut encoded, b"none");
+    push_ssh_string(&mut encoded, b"none");
+    push_ssh_string(&mut encoded, b"");
+    push_ssh_u32(&mut encoded, 1);
+    push_ssh_string(&mut encoded, &public_blob);
+    push_ssh_string(&mut encoded, &private_section);
+
+    let base64 = STANDARD.encode(encoded);
+    format!(
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n{}-----END OPENSSH PRIVATE KEY-----\n",
+        wrap_base64(&base64)
+    )
+}
+
+fn openssh_ed25519_public_key_from_private(private_key: &str) -> GuiResult<[u8; 32]> {
+    let body = private_key
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("-----"))
+        .collect::<String>();
+    let decoded = STANDARD.decode(body).map_err(|_| {
+        CoreError::ValidationError("failed to decode OpenSSH private key".to_string())
+    })?;
+
+    let mut reader = SshReader::new(&decoded);
+    reader.read_magic(OPENSSH_AUTH_MAGIC)?;
+    let cipher = reader.read_string()?;
+    let kdf = reader.read_string()?;
+    let _kdf_options = reader.read_string()?;
+    if cipher != b"none" || kdf != b"none" {
+        return Err(CoreError::ValidationError(
+            "only unencrypted OpenSSH ed25519 private keys are supported".to_string(),
+        ));
+    }
+    if reader.read_u32()? != 1 {
+        return Err(CoreError::ValidationError(
+            "OpenSSH private key must contain exactly one key".to_string(),
+        ));
+    }
+    let public_blob = reader.read_string()?.to_vec();
+    let private_section = reader.read_string()?;
+
+    let mut private_reader = SshReader::new(private_section);
+    let check = private_reader.read_u32()?;
+    if private_reader.read_u32()? != check {
+        return Err(CoreError::ValidationError(
+            "OpenSSH private key checkints do not match".to_string(),
+        ));
+    }
+    if private_reader.read_string()? != SSH_ED25519_ALGORITHM {
+        return Err(CoreError::ValidationError(
+            "only OpenSSH ed25519 private keys are supported".to_string(),
+        ));
+    }
+    let public_key = public_key_array(private_reader.read_string()?)?;
+    let private_key = private_reader.read_string()?;
+    if private_key.len() != 64 || private_key[32..] != public_key {
+        return Err(CoreError::ValidationError(
+            "OpenSSH ed25519 private key payload is invalid".to_string(),
+        ));
+    }
+    if public_blob != ssh_ed25519_public_blob(&public_key) {
+        return Err(CoreError::ValidationError(
+            "OpenSSH private key public blob is invalid".to_string(),
+        ));
+    }
+    Ok(public_key)
+}
+
+fn public_key_array(bytes: &[u8]) -> GuiResult<[u8; 32]> {
+    bytes
+        .try_into()
+        .map_err(|_| CoreError::ValidationError("SSH ed25519 public key is invalid".to_string()))
+}
+
+fn ssh_fingerprint_for_blob(blob: &[u8]) -> String {
+    let digest = Sha256::digest(blob);
+    format!("SHA256:{}", STANDARD_NO_PAD.encode(digest))
+}
+
+fn push_ssh_u32(output: &mut Vec<u8>, value: u32) {
+    output.extend_from_slice(&value.to_be_bytes());
+}
+
+fn push_ssh_string(output: &mut Vec<u8>, value: &[u8]) {
+    push_ssh_u32(output, value.len() as u32);
+    output.extend_from_slice(value);
+}
+
+fn wrap_base64(encoded: &str) -> String {
+    let mut wrapped = String::new();
+    for chunk in encoded.as_bytes().chunks(70) {
+        wrapped.push_str(std::str::from_utf8(chunk).expect("base64 is ascii"));
+        wrapped.push('\n');
+    }
+    wrapped
+}
+
+struct SshReader<'a> {
+    input: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> SshReader<'a> {
+    fn new(input: &'a [u8]) -> Self {
+        Self { input, offset: 0 }
+    }
+
+    fn read_magic(&mut self, magic: &[u8]) -> GuiResult<()> {
+        let bytes = self.read_exact(magic.len())?;
+        if bytes == magic {
+            Ok(())
+        } else {
+            Err(CoreError::ValidationError("invalid OpenSSH private key".to_string()))
+        }
+    }
+
+    fn read_u32(&mut self) -> GuiResult<u32> {
+        let bytes = self.read_exact(4)?;
+        Ok(u32::from_be_bytes(bytes.try_into().expect("length checked")))
+    }
+
+    fn read_string(&mut self) -> GuiResult<&'a [u8]> {
+        let length = self.read_u32()? as usize;
+        self.read_exact(length)
+    }
+
+    fn read_exact(&mut self, length: usize) -> GuiResult<&'a [u8]> {
+        let end = self
+            .offset
+            .checked_add(length)
+            .ok_or_else(|| CoreError::ValidationError("invalid SSH key length".to_string()))?;
+        if end > self.input.len() {
+            return Err(CoreError::ValidationError("truncated SSH key".to_string()));
+        }
+        let bytes = &self.input[self.offset..end];
+        self.offset = end;
+        Ok(bytes)
+    }
 }
 
 fn write_private_key(path: &Path, private_key: &str) -> GuiResult<()> {

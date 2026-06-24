@@ -291,6 +291,31 @@ fn inspect_app_state_reports_first_run_recovery_branches() {
     assert!(missing_store_state.stores[0].issues.contains(&"store_missing".to_string()));
 }
 
+#[test]
+fn inspect_app_state_treats_non_git_local_store_as_ready() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let store_root = temp.path().join("local-store");
+
+    let created = block_on(api::create_local_store(CreateLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        name: "Local".to_string(),
+        root: store_root.display().to_string(),
+        pgp_keys: vec!["local@example.com".to_string()],
+        set_default: true,
+        initialize_git: false,
+    }));
+    assert!(created.error.is_none(), "{:?}", created.error);
+
+    let inspected = block_on(api::inspect_app_state(InspectAppStateRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+    }));
+    let state = inspected.state.expect("state response");
+    assert_eq!(state.onboarding_state, "ready");
+    assert!(!state.issues.contains(&"git_remote_missing".to_string()));
+}
+
 fn block_on<T>(future: impl Future<Output = T>) -> T {
     let waker = noop_waker();
     let mut context = Context::from_waker(&waker);

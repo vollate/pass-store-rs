@@ -5,6 +5,7 @@ use pars_core::key_management::{
     export_ssh_public_key, generate_ssh_ed25519_key, import_ssh_private_key_text, list_ssh_keys,
     ImportedKeyKind, PrivateKeyConfirmation,
 };
+use serial_test::serial;
 
 const PGP_PUBLIC: &str =
     "-----BEGIN PGP PUBLIC KEY BLOCK-----\nabc\n-----END PGP PUBLIC KEY BLOCK-----";
@@ -47,6 +48,29 @@ fn generates_lists_and_exports_ssh_ed25519_keys() {
     )
     .unwrap();
     assert!(private.armored_text.contains("BEGIN OPENSSH PRIVATE KEY"));
+}
+
+#[test]
+#[serial]
+fn generates_ssh_ed25519_keys_without_external_ssh_keygen() {
+    let ssh_dir = tempfile::tempdir().unwrap();
+    let empty_path = tempfile::tempdir().unwrap();
+    let original_path = std::env::var_os("PATH");
+    std::env::set_var("PATH", empty_path.path());
+
+    let generated = generate_ssh_ed25519_key(ssh_dir.path(), "mobile-key");
+
+    if let Some(path) = original_path {
+        std::env::set_var("PATH", path);
+    } else {
+        std::env::remove_var("PATH");
+    }
+
+    let key = generated.unwrap();
+    assert_eq!(key.name, "mobile-key");
+    assert!(key.fingerprint.starts_with("SHA256:"));
+    assert!(ssh_dir.path().join("mobile-key").is_file());
+    assert!(ssh_dir.path().join("mobile-key.pub").is_file());
 }
 
 #[test]

@@ -509,7 +509,7 @@ class BridgeBackedRepository
         root: root,
         pgpKeys: pgpKeys,
         setDefault: setDefault,
-        initializeGit: initializeGit,
+        initializeGit: initializeGit && !usesAppManagedPaths,
       ),
     );
     _throwIfFailure(response.error);

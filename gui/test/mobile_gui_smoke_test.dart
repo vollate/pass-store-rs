@@ -265,7 +265,7 @@ void main() {
       if (branch == _StoreBranch.create) {
         expect(
           repository.storeActions.single,
-          'create:Personal:/tmp/pass:ABCD 1234',
+          'create:Personal:/tmp/pass:ABCD 1234:git:true',
         );
       }
       expect(find.text('Review setup'), findsOneWidget);
@@ -304,7 +304,7 @@ void main() {
 
     expect(
       repository.storeActions.single,
-      'create:Work Store:/app/support/stores/work-store:ABCD 1234',
+      'create:Work Store:/app/support/stores/work-store:ABCD 1234:git:false',
     );
   });
 
@@ -2096,7 +2096,9 @@ class _OnboardingBranchRepository extends _InjectedRepository {
     required bool setDefault,
     required bool initializeGit,
   }) async {
-    storeActions.add('create:$name:$root:${pgpKeys.join(',')}');
+    storeActions.add(
+      'create:$name:$root:${pgpKeys.join(',')}:git:$initializeGit',
+    );
     storeReady = true;
   }
 

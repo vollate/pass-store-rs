@@ -336,6 +336,25 @@ void main() {
     );
   });
 
+  test('app-managed repository skips local git initialization', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      managedStoreBaseDir: '/app/support/stores',
+    );
+
+    await repository.createLocalStore(
+      name: 'Work',
+      root: '/app/support/stores/work',
+      pgpKeys: const <String>['alice@example.com'],
+      setDefault: true,
+      initializeGit: true,
+    );
+
+    expect(bridge.lastCreateLocalStoreRequest?.initializeGit, isFalse);
+  });
+
   test('bridge-backed repository exposes key management operations', () async {
     final bridge = _LifecycleBridge();
     final repository = BridgeBackedRepository(
@@ -394,6 +413,7 @@ class _LifecycleBridge implements ParsBridgeApi {
   frb.EditEntryRequest? lastEditRequest;
   frb.MoveEntryRequest? lastMoveRequest;
   frb.DeleteEntryRequest? lastDeleteRequest;
+  frb.CreateLocalStoreRequest? lastCreateLocalStoreRequest;
   frb.GitCommitRequest? lastGitCommitRequest;
   frb.GitArgsRequest? lastGitArgsRequest;
 
@@ -490,6 +510,7 @@ class _LifecycleBridge implements ParsBridgeApi {
     required frb.CreateLocalStoreRequest request,
   }) async {
     calledMethods.add('create_local_store');
+    lastCreateLocalStoreRequest = request;
     return const frb.UnitResponse();
   }
 
