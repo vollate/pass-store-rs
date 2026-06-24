@@ -100,6 +100,8 @@ void main() {
     );
 
     expect(runtime.configPath, '${supportDir.path}/pars_config.toml');
+    expect(runtime.sshDir, '${supportDir.path}/ssh');
+    expect(runtime.storeBaseDir, '${supportDir.path}/stores');
     expect(runtime.pgpExecutable, isNull);
     expect(runtime.diagnosticsLabel, 'Pure Rust OpenPGP (rPGP)');
     expect(
@@ -112,6 +114,26 @@ void main() {
       '${supportDir.path}/pgp',
     );
     expect(await Directory('${supportDir.path}/pgp').exists(), isTrue);
+    expect(await Directory('${supportDir.path}/ssh').exists(), isTrue);
+    expect(await Directory('${supportDir.path}/stores').exists(), isTrue);
+  });
+
+  test('bridge-backed repository derives app-managed mobile store roots', () {
+    final repository = BridgeBackedRepository(
+      bridge: _LifecycleBridge(),
+      configPath: '/tmp/pars_config.toml',
+      managedStoreBaseDir: '/app/support/stores',
+    );
+
+    expect(repository.usesAppManagedPaths, isTrue);
+    expect(
+      repository.storeRootForName('Personal Store'),
+      '/app/support/stores/personal-store',
+    );
+    expect(
+      repository.storeRootForRemote('git@example.com:org/passwords.git'),
+      '/app/support/stores/passwords',
+    );
   });
 
   test('bridge-backed repository persists vault metadata', () async {
@@ -338,6 +360,27 @@ void main() {
       ]),
     );
   });
+
+  test(
+    'bridge-backed repository exposes generated PGP keys immediately',
+    () async {
+      final bridge = _LifecycleBridge();
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+      );
+
+      await repository.generatePgpKey(
+        name: 'Alice',
+        email: 'alice@example.com',
+      );
+
+      expect(
+        repository.keys.map((key) => key.fingerprint),
+        contains('GENERATED PGP'),
+      );
+    },
+  );
 }
 
 class _LifecycleBridge implements ParsBridgeApi {
@@ -742,8 +785,17 @@ class _LifecycleBridge implements ParsBridgeApi {
   @override
   Future<frb.KeyMutationResponse> generatePgpKey({
     required frb.GeneratePgpKeyRequest request,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    calledMethods.add('generate_pgp_key');
+    return const frb.KeyMutationResponse(
+      key: frb.KeyRecordDto(
+        keyType: 'pgp',
+        name: 'Alice <alice@example.com>',
+        fingerprint: 'GENERATED PGP',
+        source: 'Generated key',
+        hasPrivateKey: true,
+      ),
+    );
   }
 
   @override

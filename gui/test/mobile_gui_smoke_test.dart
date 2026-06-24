@@ -272,6 +272,42 @@ void main() {
     });
   }
 
+  testWidgets('mobile onboarding uses app-managed store paths', (tester) async {
+    final repository = _ManagedPathOnboardingRepository(storeReady: false);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          biometricUnlockEnabled: true,
+          onboardingComplete: false,
+          lastUnlockedAt: DateTime.now(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Use PGP key'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Skip SSH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create local store'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Local path'), findsNothing);
+    await tester.enterText(find.byType(TextField).first, 'Work Store');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await tester.pumpAndSettle();
+
+    expect(
+      repository.storeActions.single,
+      'create:Work Store:/app/support/stores/work-store:ABCD 1234',
+    );
+  });
+
   for (final branch in <_PgpBranch>[
     _PgpBranch.create,
     _PgpBranch.importPrivate,
@@ -2163,6 +2199,35 @@ class _OnboardingBranchRepository extends _InjectedRepository {
     );
     _keys.add(key);
     return key;
+  }
+}
+
+class _ManagedPathOnboardingRepository extends _OnboardingBranchRepository
+    implements AppManagedPathRepository {
+  _ManagedPathOnboardingRepository({super.storeReady});
+
+  @override
+  bool get usesAppManagedPaths => true;
+
+  @override
+  String storeRootForName(String name) {
+    return '/app/support/stores/${_slug(name)}';
+  }
+
+  @override
+  String storeRootForRemote(String remoteUrl) {
+    final withoutQuery = remoteUrl.split('?').first;
+    final last = withoutQuery.split(RegExp(r'[:/]')).last;
+    return '/app/support/stores/${_slug(last.replaceFirst(RegExp(r'\.git$'), ''))}';
+  }
+
+  String _slug(String value) {
+    final slug = value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    return slug.isEmpty ? 'password-store' : slug;
   }
 }
 

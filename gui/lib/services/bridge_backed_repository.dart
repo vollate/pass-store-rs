@@ -29,13 +29,15 @@ class BridgeBackedRepository
         SettingsRepository,
         KeyRepository,
         RuntimeDiagnosticsRepository,
-        GitOperationsRepository {
+        GitOperationsRepository,
+        AppManagedPathRepository {
   BridgeBackedRepository({
     required this.bridge,
     required this.configPath,
     this.pgpExecutable,
     this.pgpBackendLabel,
     this.sshDir,
+    this.managedStoreBaseDir,
     VaultMetadataStore? metadataStore,
   }) : _metadataStore =
            metadataStore ?? FileVaultMetadataStore.forConfigPath(configPath),
@@ -44,12 +46,16 @@ class BridgeBackedRepository
   factory BridgeBackedRepository.defaultInstance({
     String? pgpExecutable,
     String? pgpBackendLabel,
+    String? sshDir,
+    String? managedStoreBaseDir,
   }) {
     return BridgeBackedRepository(
       bridge: const FrbParsBridgeApi(),
       configPath: defaultConfigPath(),
       pgpExecutable: pgpExecutable,
       pgpBackendLabel: pgpBackendLabel,
+      sshDir: sshDir,
+      managedStoreBaseDir: managedStoreBaseDir,
     );
   }
 
@@ -58,6 +64,7 @@ class BridgeBackedRepository
   final String? pgpExecutable;
   final String? pgpBackendLabel;
   final String? sshDir;
+  final String? managedStoreBaseDir;
   final VaultMetadataStore _metadataStore;
 
   StoreLifecycleSnapshot _lifecycle;
@@ -89,6 +96,33 @@ class BridgeBackedRepository
 
   @override
   List<KeyRecord> get keys => _keys;
+
+  @override
+  bool get usesAppManagedPaths =>
+      managedStoreBaseDir != null && managedStoreBaseDir!.trim().isNotEmpty;
+
+  @override
+  String storeRootForName(String name) {
+    return _joinFilesystemPath(
+      _requiredManagedStoreBaseDir(),
+      _slugPathSegment(name),
+    );
+  }
+
+  @override
+  String storeRootForRemote(String remoteUrl) {
+    final withoutQuery = remoteUrl.trim().split('?').first.split('#').first;
+    final normalized = withoutQuery.replaceAll(RegExp(r'/+$'), '');
+    final lastSegment = normalized.split(RegExp(r'[:/\\]')).last;
+    final withoutGitSuffix = lastSegment.replaceFirst(
+      RegExp(r'\.git$', caseSensitive: false),
+      '',
+    );
+    return _joinFilesystemPath(
+      _requiredManagedStoreBaseDir(),
+      _slugPathSegment(withoutGitSuffix),
+    );
+  }
 
   @override
   RuntimeDiagnostics runtimeDiagnostics(SecurityRepository securityRepository) {
@@ -556,7 +590,7 @@ class BridgeBackedRepository
         passphrase: passphrase,
       ),
     );
-    return _keyFromMutation(response);
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -569,7 +603,7 @@ class BridgeBackedRepository
         armoredText: armoredText,
       ),
     );
-    return _keyFromMutation(response);
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -582,7 +616,7 @@ class BridgeBackedRepository
         armoredText: armoredText,
       ),
     );
-    return _keyFromMutation(response);
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -595,7 +629,7 @@ class BridgeBackedRepository
         path: path,
       ),
     );
-    return _keyFromMutation(response);
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -646,7 +680,7 @@ class BridgeBackedRepository
     final response = await bridge.generateSshKey(
       request: frb.GenerateSshKeyRequest(sshDir: _requiredSshDir(), name: name),
     );
-    return _keyFromMutation(response);
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -662,7 +696,7 @@ class BridgeBackedRepository
         armoredText: privateKey,
       ),
     );
-    return _keyFromMutation(response);
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -678,7 +712,7 @@ class BridgeBackedRepository
         path: path,
       ),
     );
-    return _keyFromMutation(response);
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -913,6 +947,25 @@ class BridgeBackedRepository
     return '$trimmedParent/$trimmedChild';
   }
 
+  String _joinFilesystemPath(String parent, String child) {
+    final trimmedParent = parent.trim();
+    final trimmedChild = child.trim();
+    final separator = Platform.pathSeparator;
+    if (trimmedParent.endsWith(separator)) {
+      return '$trimmedParent$trimmedChild';
+    }
+    return '$trimmedParent$separator$trimmedChild';
+  }
+
+  String _slugPathSegment(String value) {
+    final slug = value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    return slug.isEmpty ? 'password-store' : slug;
+  }
+
   PasswordEntry _passwordEntryFromBridge(
     frb.EntrySummaryDto entry,
     StoreStatus store,
@@ -938,6 +991,30 @@ class BridgeBackedRepository
       source: key.source,
       hasPrivateKey: key.hasPrivateKey,
     );
+  }
+
+  KeyRecord _recordKeyMutation(frb.KeyMutationResponse response) {
+    final key = _keyFromMutation(response);
+    _upsertKey(key);
+    return key;
+  }
+
+  void _upsertKey(KeyRecord key) {
+    _keys = <KeyRecord>[
+      for (final existing in _keys)
+        if (!_matchesKeyIdentity(existing, key)) existing,
+      key,
+    ];
+  }
+
+  bool _matchesKeyIdentity(KeyRecord existing, KeyRecord key) {
+    if (existing.type != key.type) {
+      return false;
+    }
+    if (existing.fingerprint == key.fingerprint) {
+      return true;
+    }
+    return key.type == KeyRecordType.ssh && existing.name == key.name;
   }
 
   SecretContent _secretFromBridge(frb.EntrySecretDto secret) {
@@ -1070,6 +1147,16 @@ class BridgeBackedRepository
     if (dir == null || dir.trim().isEmpty) {
       throw const BridgeRepositoryException(
         'SSH key directory is not configured.',
+      );
+    }
+    return dir;
+  }
+
+  String _requiredManagedStoreBaseDir() {
+    final dir = managedStoreBaseDir;
+    if (dir == null || dir.trim().isEmpty) {
+      throw const BridgeRepositoryException(
+        'Managed store directory is not configured.',
       );
     }
     return dir;

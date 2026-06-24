@@ -37,3 +37,11 @@ abstract interface class SettingsRepository {
     required String confirmation,
   });
 }
+
+abstract interface class AppManagedPathRepository {
+  bool get usesAppManagedPaths;
+
+  String storeRootForName(String name);
+
+  String storeRootForRemote(String remoteUrl);
+}

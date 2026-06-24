@@ -19,11 +19,15 @@ class PgpRuntimeConfig {
     required this.configPath,
     required this.diagnosticsLabel,
     this.pgpExecutable,
+    this.sshDir,
+    this.storeBaseDir,
   });
 
   final String configPath;
   final String diagnosticsLabel;
   final String? pgpExecutable;
+  final String? sshDir;
+  final String? storeBaseDir;
 }
 
 class PgpRuntimeEnvironment {
@@ -59,7 +63,11 @@ Future<PgpRuntimeConfig> configureDefaultPgpRuntime({
   final supportDir = await runtime.supportDirectory();
   final configPath = _joinPath(supportDir.path, 'pars_config.toml');
   final keyringHome = _joinPath(supportDir.path, 'pgp');
+  final sshDir = _joinPath(supportDir.path, 'ssh');
+  final storeBaseDir = _joinPath(supportDir.path, 'stores');
   await Directory(keyringHome).create(recursive: true);
+  await Directory(sshDir).create(recursive: true);
+  await Directory(storeBaseDir).create(recursive: true);
   final response = await bridge.configurePgpBackend(
     request: frb.ConfigurePgpBackendRequest(
       configPath: configPath,
@@ -75,6 +83,8 @@ Future<PgpRuntimeConfig> configureDefaultPgpRuntime({
   return PgpRuntimeConfig(
     configPath: configPath,
     diagnosticsLabel: 'Pure Rust OpenPGP (rPGP)',
+    sshDir: sshDir,
+    storeBaseDir: storeBaseDir,
   );
 }
 

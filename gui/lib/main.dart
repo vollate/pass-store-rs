@@ -20,6 +20,8 @@ Future<void> main() async {
     configPath: pgpRuntime.configPath,
     pgpExecutable: pgpRuntime.pgpExecutable,
     pgpBackendLabel: pgpRuntime.diagnosticsLabel,
+    sshDir: pgpRuntime.sshDir,
+    managedStoreBaseDir: pgpRuntime.storeBaseDir,
   );
   try {
     await repository.refresh();

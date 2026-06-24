@@ -945,6 +945,14 @@ class _StoreSetupActions extends StatelessWidget {
   final bool hasSshKey;
   final Future<void> Function() onStoreChanged;
 
+  AppManagedPathRepository? get _managedPaths {
+    if (repository is AppManagedPathRepository) {
+      final managedPaths = repository as AppManagedPathRepository;
+      return managedPaths.usesAppManagedPaths ? managedPaths : null;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -990,6 +998,7 @@ class _StoreSetupActions extends StatelessWidget {
   void _showCreateLocalStore(BuildContext context) {
     final name = TextEditingController(text: 'Personal');
     final root = TextEditingController();
+    final managedPaths = _managedPaths;
     _showStoreForm(
       context: context,
       title: 'Create local store',
@@ -998,16 +1007,17 @@ class _StoreSetupActions extends StatelessWidget {
           controller: name,
           decoration: const InputDecoration(labelText: 'Name'),
         ),
-        TextField(
-          controller: root,
-          decoration: const InputDecoration(labelText: 'Local path'),
-        ),
+        if (managedPaths == null)
+          TextField(
+            controller: root,
+            decoration: const InputDecoration(labelText: 'Local path'),
+          ),
       ],
       submitLabel: 'Create',
       onSubmit:
           () => repository.createLocalStore(
             name: name.text,
-            root: root.text,
+            root: managedPaths?.storeRootForName(name.text) ?? root.text,
             pgpKeys:
                 selectedPgpFingerprint == null
                     ? const <String>[]
@@ -1038,6 +1048,7 @@ class _StoreSetupActions extends StatelessWidget {
   void _showCloneStore(BuildContext context) {
     final remote = TextEditingController();
     final root = TextEditingController();
+    final managedPaths = _managedPaths;
     _showStoreForm(
       context: context,
       title: 'Clone Git store',
@@ -1046,17 +1057,19 @@ class _StoreSetupActions extends StatelessWidget {
           controller: remote,
           decoration: const InputDecoration(labelText: 'Remote URL'),
         ),
-        TextField(
-          controller: root,
-          decoration: const InputDecoration(labelText: 'Local path'),
-        ),
+        if (managedPaths == null)
+          TextField(
+            controller: root,
+            decoration: const InputDecoration(labelText: 'Local path'),
+          ),
       ],
       submitLabel: 'Clone',
       onSubmit:
           hasSshKey
               ? () => repository.cloneStore(
                 remoteUrl: remote.text,
-                root: root.text,
+                root:
+                    managedPaths?.storeRootForRemote(remote.text) ?? root.text,
                 setDefault: true,
               )
               : null,
