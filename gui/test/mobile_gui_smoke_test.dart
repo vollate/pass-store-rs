@@ -163,6 +163,38 @@ void main() {
     expect(find.text('Choose PGP key'), findsOneWidget);
   });
 
+  testWidgets('onboarding system back returns to the previous setup step', (
+    tester,
+  ) async {
+    final repository = _OnboardingBranchRepository(storeReady: false);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          biometricUnlockEnabled: true,
+          onboardingComplete: false,
+          lastUnlockedAt: DateTime.now(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Use PGP key'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+
+    expect(await WidgetsBinding.instance.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose PGP key'), findsOneWidget);
+    expect(find.text('Set up SSH for GitHub'), findsNothing);
+  });
+
   for (final branch in <_StoreBranch>[
     _StoreBranch.create,
     _StoreBranch.import,

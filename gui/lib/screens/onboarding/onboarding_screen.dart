@@ -65,45 +65,55 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const SizedBox(height: 24),
-              Row(
-                children: <Widget>[
-                  if (_stepHistory.isNotEmpty)
-                    IconButton(
-                      tooltip: 'Back',
-                      onPressed: _goBack,
-                      icon: const Icon(Icons.arrow_back),
+    return PopScope<void>(
+      canPop: _stepHistory.isEmpty,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _goBack();
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const SizedBox(height: 24),
+                Row(
+                  children: <Widget>[
+                    if (_stepHistory.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Back',
+                        onPressed: _goBack,
+                        icon: const Icon(Icons.arrow_back),
+                      ),
+                    Expanded(
+                      child: Text(
+                        _stepTitle(_step),
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
                     ),
-                  Expanded(
-                    child: Text(
-                      _stepTitle(_step),
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w800),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(_stepSubtitle(_step)),
+                const SizedBox(height: 16),
+                _StepRail(currentStep: _step),
+                if (_error != null) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 8),
-              Text(_stepSubtitle(_step)),
-              const SizedBox(height: 16),
-              _StepRail(currentStep: _step),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+                const SizedBox(height: 16),
+                Expanded(child: _buildStep(context)),
               ],
-              const SizedBox(height: 16),
-              Expanded(child: _buildStep(context)),
-            ],
+            ),
           ),
         ),
       ),
