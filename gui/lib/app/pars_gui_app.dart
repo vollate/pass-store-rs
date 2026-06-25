@@ -22,6 +22,7 @@ class ParsGuiApp extends StatefulWidget {
     required this.keyRepository,
     required this.gitRepository,
     required this.securityRepository,
+    this.now = DateTime.now,
   });
 
   factory ParsGuiApp.fake({Key? key}) {
@@ -41,15 +42,21 @@ class ParsGuiApp extends StatefulWidget {
   final KeyRepository keyRepository;
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
+  final DateTime Function() now;
 
   @override
   State<ParsGuiApp> createState() => _ParsGuiAppState();
 }
 
 class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
+  static const _systemAuthLifecycleGracePeriod = Duration(seconds: 2);
+
   late bool _isOnboardingComplete;
   late bool _isLocked;
   Timer? _lockTimer;
+  DateTime? _backgroundedAt;
+  DateTime? _suppressLifecycleLocksUntil;
+  int _systemAuthDepth = 0;
 
   @override
   void initState() {
@@ -58,7 +65,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     _isOnboardingComplete = _isOnboardingSatisfied;
     _isLocked =
         _isOnboardingComplete &&
-        widget.securityRepository.shouldLock(DateTime.now());
+        widget.securityRepository.shouldLock(widget.now());
     if (_isOnboardingComplete && !_isLocked) {
       _scheduleAutoLock();
     }
@@ -76,17 +83,37 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     if (!_isOnboardingComplete) {
       return;
     }
+    final now = widget.now();
     final isBackgrounded =
         state == AppLifecycleState.paused || state == AppLifecycleState.hidden;
-    if (isBackgrounded && widget.securityRepository.lockOnResume) {
+    if (isBackgrounded) {
+      _backgroundedAt ??= now;
+      _lockTimer?.cancel();
+      return;
+    }
+
+    if (state != AppLifecycleState.resumed) {
+      return;
+    }
+
+    final backgroundedAt = _backgroundedAt;
+    _backgroundedAt = null;
+    if (_shouldIgnoreLifecycleLock(now)) {
+      if (!_isLocked) {
+        _scheduleAutoLock();
+      }
+      return;
+    }
+    if (_isLocked) {
+      return;
+    }
+    if (widget.securityRepository.lockOnResume ||
+        _backgroundAutoLockExpired(backgroundedAt, now) ||
+        widget.securityRepository.shouldLock(now)) {
       _lock();
       return;
     }
-    if (state == AppLifecycleState.resumed &&
-        (widget.securityRepository.lockOnResume ||
-            widget.securityRepository.shouldLock(DateTime.now()))) {
-      _lock();
-    }
+    _scheduleAutoLock();
   }
 
   @override
@@ -114,6 +141,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
               : _isLocked
               ? LockScreen(
                 securityRepository: widget.securityRepository,
+                unlockWithBiometrics: _unlockWithBiometrics,
                 onUnlocked: () {
                   setState(() => _isLocked = false);
                   _scheduleAutoLock();
@@ -126,6 +154,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
                 gitRepository: widget.gitRepository,
                 securityRepository: widget.securityRepository,
                 onSecuritySettingsChanged: _scheduleAutoLock,
+                runDuringSystemAuthentication: _runDuringSystemAuthentication,
                 onOnboardingReset: () {
                   _lockTimer?.cancel();
                   setState(() {
@@ -139,11 +168,23 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
 
   void _scheduleAutoLock() {
     _lockTimer?.cancel();
+    if (_isLocked) {
+      return;
+    }
     final timeout = widget.securityRepository.autoLockTimeout;
     if (timeout <= Duration.zero) {
       return;
     }
-    _lockTimer = Timer(timeout, _lock);
+    final unlockedAt = widget.securityRepository.lastUnlockedAt;
+    if (unlockedAt == null) {
+      return;
+    }
+    final remaining = timeout - widget.now().difference(unlockedAt);
+    if (remaining <= Duration.zero) {
+      _lock();
+      return;
+    }
+    _lockTimer = Timer(remaining, _lock);
   }
 
   void _lock() {
@@ -158,4 +199,50 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
       widget.securityRepository.onboardingComplete &&
       widget.securityRepository.hasGestureVerifier &&
       !widget.settingsRepository.lifecycle.onboardingState.requiresSetup;
+
+  Future<bool> _unlockWithBiometrics() async {
+    return _runDuringSystemAuthentication(
+      widget.securityRepository.unlockWithBiometrics,
+    );
+  }
+
+  Future<T> _runDuringSystemAuthentication<T>(
+    Future<T> Function() action,
+  ) async {
+    _systemAuthDepth += 1;
+    try {
+      return await action();
+    } finally {
+      _systemAuthDepth -= 1;
+      _suppressLifecycleLocksUntil = widget.now().add(
+        _systemAuthLifecycleGracePeriod,
+      );
+    }
+  }
+
+  bool _shouldIgnoreLifecycleLock(DateTime now) {
+    if (_systemAuthDepth > 0) {
+      return true;
+    }
+    final suppressUntil = _suppressLifecycleLocksUntil;
+    if (suppressUntil == null) {
+      return false;
+    }
+    if (now.isBefore(suppressUntil)) {
+      return true;
+    }
+    _suppressLifecycleLocksUntil = null;
+    return false;
+  }
+
+  bool _backgroundAutoLockExpired(DateTime? backgroundedAt, DateTime now) {
+    if (backgroundedAt == null) {
+      return false;
+    }
+    final timeout = widget.securityRepository.autoLockTimeout;
+    if (timeout <= Duration.zero) {
+      return false;
+    }
+    return now.difference(backgroundedAt) >= timeout;
+  }
 }

@@ -18,6 +18,7 @@ class SettingsScreen extends StatelessWidget {
     required this.gitRepository,
     required this.securityRepository,
     this.onSecuritySettingsChanged,
+    this.runDuringSystemAuthentication,
     this.onOnboardingReset,
   });
 
@@ -26,6 +27,8 @@ class SettingsScreen extends StatelessWidget {
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
   final VoidCallback? onSecuritySettingsChanged;
+  final Future<T> Function<T>(Future<T> Function() action)?
+  runDuringSystemAuthentication;
   final VoidCallback? onOnboardingReset;
 
   @override
@@ -236,6 +239,7 @@ class SettingsScreen extends StatelessWidget {
     final rootContext = context;
     var isChangingGesture = false;
     final timeoutOptions = <Duration>[
+      Duration.zero,
       const Duration(minutes: 1),
       const Duration(minutes: 5),
       const Duration(minutes: 15),
@@ -340,8 +344,10 @@ class SettingsScreen extends StatelessWidget {
                                     ? null
                                     : (value) async {
                                       try {
-                                        await securityRepository
-                                            .setBiometricUnlockEnabled(value);
+                                        await _runDuringSystemAuthentication(
+                                          () => securityRepository
+                                              .setBiometricUnlockEnabled(value),
+                                        );
                                         onSecuritySettingsChanged?.call();
                                       } catch (error) {
                                         if (rootContext.mounted) {
@@ -409,10 +415,23 @@ class SettingsScreen extends StatelessWidget {
   }
 
   String _timeoutLabel(Duration timeout) {
+    if (timeout <= Duration.zero) {
+      return 'Never';
+    }
     if (timeout.inMinutes < 60) {
       return '${timeout.inMinutes} min';
     }
     return '${timeout.inHours} hour';
+  }
+
+  Future<T> _runDuringSystemAuthentication<T>(
+    Future<T> Function() action,
+  ) async {
+    final runner = runDuringSystemAuthentication;
+    if (runner == null) {
+      return action();
+    }
+    return runner(action);
   }
 
   String _biometricSubtitle(BiometricUnlockStatus status) {

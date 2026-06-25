@@ -18,6 +18,7 @@ class MobileShell extends StatefulWidget {
     required this.gitRepository,
     required this.securityRepository,
     this.onSecuritySettingsChanged,
+    this.runDuringSystemAuthentication,
     this.onOnboardingReset,
   });
 
@@ -27,6 +28,8 @@ class MobileShell extends StatefulWidget {
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
   final VoidCallback? onSecuritySettingsChanged;
+  final Future<T> Function<T>(Future<T> Function() action)?
+  runDuringSystemAuthentication;
   final VoidCallback? onOnboardingReset;
 
   @override
@@ -53,6 +56,7 @@ class _MobileShellState extends State<MobileShell> {
         gitRepository: widget.gitRepository,
         securityRepository: widget.securityRepository,
         onSecuritySettingsChanged: widget.onSecuritySettingsChanged,
+        runDuringSystemAuthentication: widget.runDuringSystemAuthentication,
         onOnboardingReset: widget.onOnboardingReset,
       ),
     ];

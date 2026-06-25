@@ -1337,11 +1337,44 @@ void main() {
     expect(find.text('Vault'), findsWidgets);
     expect(securityRepository.hasActivePgpSession, isTrue);
 
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await _backgroundApp(tester);
+    await tester.pumpAndSettle();
+    await _resumeApp(tester);
     await tester.pumpAndSettle();
 
     expect(find.text('Unlock Pars'), findsOneWidget);
     expect(securityRepository.hasActivePgpSession, isFalse);
+  });
+
+  testWidgets('locks after auto-lock timeout while backgrounded', (
+    tester,
+  ) async {
+    var now = DateTime(2026);
+    final securityRepository = InMemorySecurityRepository.withPattern(
+      const <int>[0, 1, 2, 5],
+      autoLockTimeout: const Duration(seconds: 1),
+      lastUnlockedAt: now,
+    );
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+        now: () => now,
+      ),
+    );
+
+    expect(find.text('Vault'), findsWidgets);
+
+    await _backgroundApp(tester);
+    now = now.add(const Duration(milliseconds: 1100));
+    await _resumeApp(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock Pars'), findsOneWidget);
   });
 
   testWidgets('entry detail clears parsed secret when closed', (tester) async {
@@ -1404,9 +1437,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('5 min'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Never'));
+    await tester.pumpAndSettle();
 
     expect(securityRepository.lockOnResume, isTrue);
-    expect(securityRepository.autoLockTimeout, const Duration(minutes: 5));
+    expect(securityRepository.autoLockTimeout, Duration.zero);
   });
 
   testWidgets('settings changes gesture lock pattern', (tester) async {
@@ -1483,7 +1518,9 @@ void main() {
     );
   });
 
-  testWidgets('unlocks with biometrics when enabled', (tester) async {
+  testWidgets('automatically unlocks with biometrics when enabled', (
+    tester,
+  ) async {
     final biometrics = _FakeBiometricAuthAdapter(available: true);
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
@@ -1507,18 +1544,46 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Unlock Pars'), findsOneWidget);
-    expect(find.text('Unlock with biometrics'), findsOneWidget);
-
-    await tester.tap(find.text('Unlock with biometrics'));
-    await tester.pumpAndSettle();
-
     expect(find.text('Vault'), findsWidgets);
     expect(securityRepository.hasActivePgpSession, isTrue);
     expect(
       await securityRepository.readActivePgpPassphrase(),
       'pgp-passphrase',
     );
+    expect(biometrics.authenticateCount, 2);
+  });
+
+  testWidgets('biometric unlock ignores auth lifecycle resume', (tester) async {
+    final biometrics = _FakeBiometricAuthAdapter(available: true);
+    final securityRepository = await SecureStorageSecurityRepository.load(
+      storage: _FakeSecureStorageAdapter(),
+      biometricAuth: biometrics,
+    );
+    await securityRepository.saveGestureVerifier(
+      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+    );
+    await securityRepository.setBiometricUnlockEnabled(true);
+    await securityRepository.setLockOnResume(true);
+    await securityRepository.setOnboardingComplete(true);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vault'), findsWidgets);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vault'), findsWidgets);
+    expect(find.text('Unlock Pars'), findsNothing);
     expect(biometrics.authenticateCount, 2);
   });
 
@@ -1712,6 +1777,22 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
   await tester.tap(finder, warnIfMissed: false);
   await tester.pumpAndSettle();
+}
+
+Future<void> _backgroundApp(WidgetTester tester) async {
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+  await tester.pump();
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+  await tester.pump();
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+}
+
+Future<void> _resumeApp(WidgetTester tester) async {
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+  await tester.pump();
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+  await tester.pump();
+  tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
 }
 
 Future<void> _drawGesture(

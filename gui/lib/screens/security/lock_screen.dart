@@ -7,10 +7,12 @@ class LockScreen extends StatefulWidget {
   const LockScreen({
     super.key,
     required this.securityRepository,
+    required this.unlockWithBiometrics,
     required this.onUnlocked,
   });
 
   final SecurityRepository securityRepository;
+  final Future<bool> Function() unlockWithBiometrics;
   final VoidCallback onUnlocked;
 
   @override
@@ -20,11 +22,16 @@ class LockScreen extends StatefulWidget {
 class _LockScreenState extends State<LockScreen> {
   String? _error;
   late Future<BiometricUnlockStatus> _biometricStatus;
+  bool _autoBiometricAttempted = false;
+  bool _biometricUnlockInProgress = false;
 
   @override
   void initState() {
     super.initState();
     _biometricStatus = widget.securityRepository.biometricUnlockStatus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryAutomaticBiometricUnlock();
+    });
   }
 
   @override
@@ -56,7 +63,10 @@ class _LockScreenState extends State<LockScreen> {
                     padding: const EdgeInsets.only(bottom: 20),
                     child: Center(
                       child: FilledButton.icon(
-                        onPressed: () => _unlockWithBiometrics(context),
+                        onPressed:
+                            _biometricUnlockInProgress
+                                ? null
+                                : _unlockWithBiometrics,
                         icon: const Icon(Icons.fingerprint),
                         label: const Text('Unlock with biometrics'),
                       ),
@@ -104,13 +114,35 @@ class _LockScreenState extends State<LockScreen> {
     }
   }
 
-  Future<void> _unlockWithBiometrics(BuildContext context) async {
-    final unlocked = await widget.securityRepository.unlockWithBiometrics();
-    if (!context.mounted) {
+  Future<void> _tryAutomaticBiometricUnlock() async {
+    if (_autoBiometricAttempted || _biometricUnlockInProgress) {
+      return;
+    }
+    _autoBiometricAttempted = true;
+    final status = await _biometricStatus;
+    if (!mounted || status != BiometricUnlockStatus.available) {
+      return;
+    }
+    await _unlockWithBiometrics();
+  }
+
+  Future<void> _unlockWithBiometrics() async {
+    if (_biometricUnlockInProgress) {
+      return;
+    }
+    setState(() {
+      _error = null;
+      _biometricUnlockInProgress = true;
+    });
+    final unlocked = await widget.unlockWithBiometrics();
+    if (!mounted) {
       return;
     }
     if (!unlocked) {
-      setState(() => _error = 'Biometric unlock failed');
+      setState(() {
+        _error = 'Biometric unlock failed';
+        _biometricUnlockInProgress = false;
+      });
       return;
     }
     widget.onUnlocked();

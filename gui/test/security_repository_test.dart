@@ -53,6 +53,18 @@ void main() {
       expect(repository.shouldLock(DateTime(2026, 1, 1, 0, 4)), isFalse);
       expect(repository.shouldLock(DateTime(2026, 1, 1, 0, 5)), isTrue);
     });
+
+    test('never auto-locks when timeout is disabled', () async {
+      final repository = InMemorySecurityRepository.withPattern(const <int>[
+        0,
+        1,
+        2,
+        5,
+      ], autoLockTimeout: Duration.zero);
+      await repository.markUnlocked(DateTime(2026));
+
+      expect(repository.shouldLock(DateTime(2026, 1, 2)), isFalse);
+    });
   });
 
   group('SecureStorageSecurityRepository', () {
@@ -67,7 +79,7 @@ void main() {
         GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
       );
       await repository.setLockOnResume(true);
-      await repository.setAutoLockTimeout(const Duration(minutes: 5));
+      await repository.setAutoLockTimeout(Duration.zero);
 
       final reloaded = await SecureStorageSecurityRepository.load(
         storage: storage,
@@ -78,7 +90,9 @@ void main() {
       expect(await reloaded.verifyGesture(const <int>[0, 1, 2, 5]), isTrue);
       expect(await reloaded.verifyGesture(const <int>[0, 1, 5, 2]), isFalse);
       expect(reloaded.lockOnResume, isTrue);
-      expect(reloaded.autoLockTimeout, const Duration(minutes: 5));
+      expect(reloaded.autoLockTimeout, Duration.zero);
+      await reloaded.markUnlocked(DateTime(2026));
+      expect(reloaded.shouldLock(DateTime(2026, 1, 2)), isFalse);
     });
 
     test('persists PGP session expiration setting', () async {
