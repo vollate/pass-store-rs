@@ -105,6 +105,31 @@ Sources: `bridge/src/api.rs`, `core/src/pgp/backend.rs`,
 - WHEN the requested import kind does not match the detected material
 - THEN the bridge returns a validation error
 
+### Requirement: GUI-facing PGP key management SHALL delete local PGP keys
+
+The GUI-facing key-management API SHALL support deleting a local PGP key by
+fingerprint through the configured PGP backend. Deletion SHALL remove local
+public key material and local private key material for that fingerprint when
+present, and SHALL report an error when the key cannot be found or cannot be
+deleted.
+
+Sources: `core/src/pgp/backend.rs`, `core/src/pgp/rpgp_backend.rs`,
+`bridge/src/api.rs`, `bridge/tests/bridge_smoke_test.rs`,
+`gui/lib/services/key_repository.dart`
+
+#### Scenario: Delete PGP key by fingerprint
+
+- GIVEN a PGP key exists in the configured backend
+- WHEN the GUI-facing delete PGP key API is called with that fingerprint
+- THEN the key is removed from subsequent key listings
+- AND local private key material for that fingerprint is removed when it exists
+
+#### Scenario: Missing PGP key deletion reports an error
+
+- GIVEN no local PGP key matches fingerprint `ABC`
+- WHEN the GUI-facing delete PGP key API is called with fingerprint `ABC`
+- THEN the API returns a key-management error
+
 ### Requirement: SSH key management SHALL operate without external ssh-keygen for generated ed25519 keys
 
 The core key management layer SHALL generate OpenSSH ed25519 keys directly,
@@ -127,6 +152,31 @@ Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
 - GIVEN key name `github-mobile`
 - WHEN private SSH export is requested
 - THEN confirmation must equal `EXPORT PRIVATE KEY github-mobile`
+
+### Requirement: GUI-facing SSH key management SHALL delete local SSH keys
+
+The GUI-facing key-management API SHALL support deleting a local SSH key by key
+name from the configured SSH directory. Deletion SHALL remove both the private
+key file and matching `.pub` public key file when present, and SHALL report an
+error when neither file exists.
+
+Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
+`bridge/src/api.rs`, `bridge/tests/bridge_smoke_test.rs`,
+`gui/lib/services/key_repository.dart`
+
+#### Scenario: Delete SSH key by name
+
+- GIVEN SSH key files `mobile-key` and `mobile-key.pub` exist in the configured
+  SSH directory
+- WHEN the GUI-facing delete SSH key API is called with name `mobile-key`
+- THEN both files are removed
+- AND subsequent SSH key listings do not include `mobile-key`
+
+#### Scenario: Missing SSH key deletion reports an error
+
+- GIVEN no SSH key files exist for name `missing-key`
+- WHEN the GUI-facing delete SSH key API is called with name `missing-key`
+- THEN the API returns a key-management error
 
 ### Requirement: Key material detection SHALL classify supported pasted keys
 

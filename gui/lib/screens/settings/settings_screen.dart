@@ -8,6 +8,7 @@ import '../../services/runtime_diagnostics.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
+import '../../widgets/app_notification.dart';
 import '../../widgets/gesture_setup_panel.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -277,10 +278,9 @@ class SettingsScreen extends StatelessWidget {
                               onSaved: () {
                                 onSecuritySettingsChanged?.call();
                                 setSheetState(() => isChangingGesture = false);
-                                ScaffoldMessenger.of(rootContext).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Gesture updated'),
-                                  ),
+                                AppNotification.show(
+                                  rootContext,
+                                  'Gesture updated',
                                 );
                               },
                             ),
@@ -355,10 +355,9 @@ class SettingsScreen extends StatelessWidget {
                                               error is StateError
                                                   ? error.message
                                                   : '$error';
-                                          ScaffoldMessenger.of(
+                                          AppNotification.show(
                                             rootContext,
-                                          ).showSnackBar(
-                                            SnackBar(content: Text(message)),
+                                            message,
                                           );
                                         }
                                       }
@@ -494,6 +493,11 @@ class SettingsScreen extends StatelessWidget {
 
   void _showPgpPassphraseStorageSheet(BuildContext context) {
     final passphrase = TextEditingController();
+    final privatePgpKeys = keyRepository.keys
+        .where((key) => key.type == KeyRecordType.pgp && key.hasPrivateKey)
+        .toList(growable: false);
+    String? selectedFingerprint =
+        privatePgpKeys.isEmpty ? null : privatePgpKeys.first.fingerprint;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -533,6 +537,40 @@ class SettingsScreen extends StatelessWidget {
                           },
                         ),
                         const SizedBox(height: 8),
+                        if (privatePgpKeys.isEmpty)
+                          const ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.key_off_outlined),
+                            title: Text('No private PGP keys'),
+                            subtitle: Text(
+                              'Import or create a private PGP key before saving a passphrase.',
+                            ),
+                          )
+                        else
+                          DropdownButtonFormField<String>(
+                            key: const Key('pgp-passphrase-key-dropdown'),
+                            initialValue: selectedFingerprint,
+                            decoration: const InputDecoration(
+                              labelText: 'PGP key',
+                            ),
+                            items: privatePgpKeys
+                                .map(
+                                  (key) => DropdownMenuItem<String>(
+                                    value: key.fingerprint,
+                                    child: Text(key.name),
+                                  ),
+                                )
+                                .toList(growable: false),
+                            onChanged:
+                                securityRepository.pgpPassphraseStorageEnabled
+                                    ? (value) {
+                                      setSheetState(() {
+                                        selectedFingerprint = value;
+                                      });
+                                    }
+                                    : null,
+                          ),
+                        const SizedBox(height: 8),
                         TextField(
                           controller: passphrase,
                           enabled:
@@ -552,24 +590,25 @@ class SettingsScreen extends StatelessWidget {
                           children: <Widget>[
                             FilledButton.icon(
                               onPressed:
-                                  securityRepository.pgpPassphraseStorageEnabled
+                                  securityRepository
+                                              .pgpPassphraseStorageEnabled &&
+                                          selectedFingerprint != null
                                       ? () async {
                                         try {
                                           await securityRepository
                                               .savePgpPassphrase(
-                                                passphrase.text,
+                                                fingerprint:
+                                                    selectedFingerprint!,
+                                                passphrase: passphrase.text,
                                               );
                                           passphrase.clear();
                                           onSecuritySettingsChanged?.call();
                                           setSheetState(() {});
                                         } catch (error) {
                                           if (!context.mounted) return;
-                                          ScaffoldMessenger.of(
+                                          AppNotification.show(
                                             context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(error.toString()),
-                                            ),
+                                            error.toString(),
                                           );
                                         }
                                       }
@@ -593,11 +632,24 @@ class SettingsScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          securityRepository.hasStoredPgpPassphrase
-                              ? 'A PGP passphrase is currently cached.'
-                              : 'No PGP passphrase is cached.',
-                          style: Theme.of(context).textTheme.bodySmall,
+                        FutureBuilder<PgpPassphraseCache?>(
+                          future: securityRepository.readPgpPassphrase(),
+                          builder: (context, snapshot) {
+                            final cached = snapshot.data;
+                            final cachedKey =
+                                cached == null
+                                    ? null
+                                    : _keyForFingerprint(
+                                      privatePgpKeys,
+                                      cached.fingerprint,
+                                    );
+                            return Text(
+                              cached == null
+                                  ? 'No PGP passphrase is cached.'
+                                  : 'Cached for ${cachedKey?.name ?? cached.fingerprint}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -608,102 +660,225 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showKeys(BuildContext context, KeyRecordType type) {
-    final keys = keyRepository.keys.where((key) => key.type == type).toList();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder:
-          (context) => SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      type == KeyRecordType.pgp ? 'PGP keys' : 'SSH keys',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (keys.isEmpty)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.key_off_outlined),
-                        title: Text(
-                          type == KeyRecordType.pgp
-                              ? 'No PGP keys'
-                              : 'No SSH keys',
-                        ),
-                        subtitle: const Text('Create or import a key.'),
-                      ),
-                    for (final key in keys)
-                      Card(
-                        child: ListTile(
-                          title: Text(key.name),
-                          subtitle: Text('${key.fingerprint}\n${key.source}'),
-                          isThreeLine: true,
-                          trailing: Text(
-                            key.hasPrivateKey ? 'Private' : 'Public',
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+          (context) => StatefulBuilder(
+            builder: (context, setSheetState) {
+              final keys = keyRepository.keys
+                  .where((key) => key.type == type)
+                  .toList(growable: false);
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        FilledButton(
-                          onPressed: () => _showCreateKeyForm(context, type),
-                          child: const Text('Create'),
+                        Text(
+                          type == KeyRecordType.pgp ? 'PGP keys' : 'SSH keys',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                        OutlinedButton(
-                          onPressed: () => _showImportKeyForm(context, type),
-                          child: const Text('Import'),
-                        ),
-                        OutlinedButton(
-                          onPressed:
-                              () => _showImportKeyFileForm(context, type),
-                          child: const Text('Import file'),
-                        ),
-                        OutlinedButton(
-                          onPressed:
-                              keys.isEmpty
-                                  ? null
-                                  : () => _exportPublicKey(context, keys.first),
-                          child: const Text('Export public'),
-                        ),
-                        OutlinedButton(
-                          onPressed:
-                              keys.isEmpty
-                                  ? null
-                                  : () => _showPrivateExportForm(
-                                    context,
-                                    keys.first,
-                                  ),
-                          child: const Text('Export private'),
-                        ),
-                        if (type == KeyRecordType.pgp && keys.isNotEmpty)
-                          OutlinedButton(
-                            onPressed:
-                                () => _addPgpKeyToStore(context, keys.first),
-                            child: const Text('Add to .gpg-id'),
+                        const SizedBox(height: 12),
+                        if (keys.isEmpty)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.key_off_outlined),
+                            title: Text(
+                              type == KeyRecordType.pgp
+                                  ? 'No PGP keys'
+                                  : 'No SSH keys',
+                            ),
+                            subtitle: const Text('Create or import a key.'),
                           ),
-                        if (type == KeyRecordType.ssh)
-                          OutlinedButton(
-                            onPressed: () => _showGithubSettingsUrl(context),
-                            child: const Text('GitHub settings'),
+                        for (final key in keys)
+                          Card(
+                            child: ListTile(
+                              title: Text(key.name),
+                              subtitle: Text(
+                                '${key.fingerprint}\n${key.source}\n${key.hasPrivateKey ? 'Private' : 'Public'}',
+                              ),
+                              isThreeLine: true,
+                              trailing: PopupMenuButton<String>(
+                                tooltip:
+                                    'Actions for ${key.typeLabel} key ${key.name}',
+                                onSelected: (value) {
+                                  if (value == 'delete') {
+                                    _showDeleteKeyDialog(
+                                      context,
+                                      key,
+                                      setSheetState,
+                                    );
+                                  }
+                                },
+                                itemBuilder:
+                                    (context) => const <PopupMenuEntry<String>>[
+                                      PopupMenuItem<String>(
+                                        value: 'delete',
+                                        child: Text('Delete key'),
+                                      ),
+                                    ],
+                              ),
+                            ),
                           ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            FilledButton(
+                              onPressed:
+                                  () => _showCreateKeyForm(context, type),
+                              child: const Text('Create'),
+                            ),
+                            OutlinedButton(
+                              onPressed:
+                                  () => _showImportKeyForm(context, type),
+                              child: const Text('Import'),
+                            ),
+                            OutlinedButton(
+                              onPressed:
+                                  () => _showImportKeyFileForm(context, type),
+                              child: const Text('Import file'),
+                            ),
+                            OutlinedButton(
+                              onPressed:
+                                  keys.isEmpty
+                                      ? null
+                                      : () =>
+                                          _exportPublicKey(context, keys.first),
+                              child: const Text('Export public'),
+                            ),
+                            OutlinedButton(
+                              onPressed:
+                                  keys.isEmpty
+                                      ? null
+                                      : () => _showPrivateExportForm(
+                                        context,
+                                        keys.first,
+                                      ),
+                              child: const Text('Export private'),
+                            ),
+                            if (type == KeyRecordType.pgp && keys.isNotEmpty)
+                              OutlinedButton(
+                                onPressed:
+                                    () =>
+                                        _addPgpKeyToStore(context, keys.first),
+                                child: const Text('Add to .gpg-id'),
+                              ),
+                            if (type == KeyRecordType.ssh)
+                              OutlinedButton(
+                                onPressed:
+                                    () => _showGithubSettingsUrl(context),
+                                child: const Text('GitHub settings'),
+                              ),
+                          ],
+                        ),
                       ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+    );
+  }
+
+  void _showDeleteKeyDialog(
+    BuildContext sheetContext,
+    KeyRecord key,
+    StateSetter setSheetState,
+  ) {
+    final confirmation = TextEditingController();
+    final requiredText =
+        key.type == KeyRecordType.pgp ? key.fingerprint : key.name;
+    showDialog<void>(
+      context: sheetContext,
+      builder:
+          (dialogContext) => StatefulBuilder(
+            builder:
+                (dialogContext, setDialogState) => AlertDialog(
+                  title: Text('Delete ${key.typeLabel} key'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(key.name),
+                      const SizedBox(height: 8),
+                      Text(
+                        'This removes local key material from this device. Type $requiredText to delete this key.',
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: confirmation,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirmation',
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                    ],
+                  ),
+                  actions: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed:
+                          confirmation.text == requiredText
+                              ? () async {
+                                try {
+                                  if (key.type == KeyRecordType.pgp) {
+                                    await keyRepository.deletePgpKey(
+                                      key.fingerprint,
+                                    );
+                                    await securityRepository
+                                        .clearPgpPassphraseForFingerprint(
+                                          key.fingerprint,
+                                        );
+                                  } else {
+                                    await keyRepository.deleteSshKey(key.name);
+                                  }
+                                  if (dialogContext.mounted) {
+                                    Navigator.of(dialogContext).pop();
+                                  }
+                                  setSheetState(() {});
+                                  if (!sheetContext.mounted) return;
+                                  AppNotification.show(
+                                    sheetContext,
+                                    'Deleted ${key.name}',
+                                  );
+                                } catch (error) {
+                                  if (dialogContext.mounted) {
+                                    Navigator.of(dialogContext).pop();
+                                  }
+                                  setSheetState(() {});
+                                  if (!sheetContext.mounted) return;
+                                  AppNotification.show(
+                                    sheetContext,
+                                    error.toString(),
+                                  );
+                                }
+                              }
+                              : null,
+                      child: const Text('Delete'),
                     ),
                   ],
                 ),
-              ),
-            ),
           ),
     );
+  }
+
+  KeyRecord? _keyForFingerprint(List<KeyRecord> keys, String fingerprint) {
+    for (final key in keys) {
+      if (key.fingerprint == fingerprint) {
+        return key;
+      }
+    }
+    return null;
   }
 
   void _showCreateKeyForm(BuildContext context, KeyRecordType type) {
@@ -923,14 +1098,10 @@ class SettingsScreen extends StatelessWidget {
       final key = await action();
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(key.name)));
+      AppNotification.show(context, key.name);
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      AppNotification.show(context, error.toString());
     }
   }
 
@@ -967,9 +1138,7 @@ class SettingsScreen extends StatelessWidget {
       );
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      AppNotification.show(context, error.toString());
     }
   }
 
@@ -977,14 +1146,10 @@ class SettingsScreen extends StatelessWidget {
     try {
       await keyRepository.addPgpKeyToSelectedStore(key.fingerprint);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(key.fingerprint)));
+      AppNotification.show(context, key.fingerprint);
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      AppNotification.show(context, error.toString());
     }
   }
 
@@ -1290,9 +1455,7 @@ class SettingsScreen extends StatelessWidget {
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$error')));
+        AppNotification.show(context, '$error');
       }
     }
   }

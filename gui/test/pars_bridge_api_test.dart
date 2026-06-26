@@ -308,6 +308,14 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.UnitResponse> deletePgpKey({
+    required frb.DeletePgpKeyRequest request,
+  }) async {
+    calledMethods.add('delete_pgp_key');
+    return const frb.UnitResponse();
+  }
+
+  @override
   Future<frb.UnitResponse> addPgpKeyToGpgId({
     required frb.AddPgpKeyToGpgIdRequest request,
   }) async {
@@ -353,6 +361,14 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }) async {
     calledMethods.add('export_ssh_private_key');
     return const frb.KeyExportResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> deleteSshKey({
+    required frb.DeleteSshKeyRequest request,
+  }) async {
+    calledMethods.add('delete_ssh_key');
+    return const frb.UnitResponse();
   }
 
   @override

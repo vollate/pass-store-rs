@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/password_entry.dart';
 import '../../services/vault_repository.dart';
+import '../../widgets/app_notification.dart';
 
 class ManageScreen extends StatefulWidget {
   const ManageScreen({
@@ -995,15 +996,11 @@ class _ManageScreenState extends State<ManageScreen> {
   }
 
   void _setSummary(String summary) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(summary)));
+    AppNotification.show(context, summary);
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppNotification.show(context, message);
   }
 
   void _showManageUnavailable() {

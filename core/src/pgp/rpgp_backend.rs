@@ -311,6 +311,35 @@ impl PgpBackend for RpgpBackend {
         Ok(KeyExportResult { armored_text })
     }
 
+    fn delete_key(&self, fingerprint: &str) -> PgpBackendResult<()> {
+        let normalized = normalize_key_ref(fingerprint);
+        if normalized.is_empty() {
+            return Err(PgpBackendError::CommandFailed(
+                "PGP key fingerprint is required".to_string(),
+            ));
+        }
+
+        let public_path = self.public_key_path(&normalized);
+        let private_path = self.private_key_path(&normalized);
+        let mut removed = false;
+
+        if public_path.exists() {
+            fs::remove_file(&public_path).map_err(pgp_command_error)?;
+            removed = true;
+        }
+        if private_path.exists() {
+            fs::remove_file(&private_path).map_err(pgp_command_error)?;
+            removed = true;
+        }
+        if removed {
+            Ok(())
+        } else {
+            Err(PgpBackendError::CommandFailed(format!(
+                "no PGP key found for fingerprint: {fingerprint}"
+            )))
+        }
+    }
+
     fn list_keys(&self) -> PgpBackendResult<Vec<PgpKeySummary>> {
         Ok(self
             .read_public_records()?
@@ -454,6 +483,35 @@ mod tests {
         let private =
             backend.export_private_key(&generated.fingerprint, None).expect("private export");
         assert!(private.armored_text.contains("BEGIN PGP PRIVATE KEY BLOCK"));
+    }
+
+    #[test]
+    fn deletes_generated_key_from_keyring() {
+        let temp = tempdir().expect("tempdir");
+        let backend = RpgpBackend::from_config(&pure_rust_config(temp.path())).expect("backend");
+        let generated = backend
+            .generate_key(KeyGenerationRequest {
+                name: "Delete Me".to_string(),
+                email: "delete@example.com".to_string(),
+                passphrase: None,
+            })
+            .expect("generate key");
+
+        backend.delete_key(&generated.fingerprint).expect("delete key");
+
+        assert!(backend.list_keys().expect("list keys").is_empty());
+        assert!(backend.export_public_key(&generated.fingerprint).is_err());
+        assert!(backend.export_private_key(&generated.fingerprint, None).is_err());
+    }
+
+    #[test]
+    fn deleting_missing_key_reports_error() {
+        let temp = tempdir().expect("tempdir");
+        let backend = RpgpBackend::from_config(&pure_rust_config(temp.path())).expect("backend");
+
+        let err = backend.delete_key("ABC").expect_err("missing key should fail");
+
+        assert!(err.to_string().contains("ABC"));
     }
 
     #[test]

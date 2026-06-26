@@ -75,6 +75,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  DeletePgpKeyRequest dco_decode_box_autoadd_delete_pgp_key_request(
+    dynamic raw,
+  );
+
+  @protected
+  DeleteSshKeyRequest dco_decode_box_autoadd_delete_ssh_key_request(
+    dynamic raw,
+  );
+
+  @protected
   EditEntryRequest dco_decode_box_autoadd_edit_entry_request(dynamic raw);
 
   @protected
@@ -234,6 +244,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeleteLocalStoreRequest dco_decode_delete_local_store_request(dynamic raw);
+
+  @protected
+  DeletePgpKeyRequest dco_decode_delete_pgp_key_request(dynamic raw);
+
+  @protected
+  DeleteSshKeyRequest dco_decode_delete_ssh_key_request(dynamic raw);
 
   @protected
   EditEntryRequest dco_decode_edit_entry_request(dynamic raw);
@@ -533,6 +549,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  DeletePgpKeyRequest sse_decode_box_autoadd_delete_pgp_key_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DeleteSshKeyRequest sse_decode_box_autoadd_delete_ssh_key_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   EditEntryRequest sse_decode_box_autoadd_edit_entry_request(
     SseDeserializer deserializer,
   );
@@ -742,6 +768,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeleteLocalStoreRequest sse_decode_delete_local_store_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DeletePgpKeyRequest sse_decode_delete_pgp_key_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DeleteSshKeyRequest sse_decode_delete_ssh_key_request(
     SseDeserializer deserializer,
   );
 
@@ -1140,6 +1176,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_delete_pgp_key_request(
+    DeletePgpKeyRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_delete_ssh_key_request(
+    DeleteSshKeyRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_edit_entry_request(
     EditEntryRequest self,
     SseSerializer serializer,
@@ -1394,6 +1442,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_delete_local_store_request(
     DeleteLocalStoreRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_delete_pgp_key_request(
+    DeletePgpKeyRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_delete_ssh_key_request(
+    DeleteSshKeyRequest self,
     SseSerializer serializer,
   );
 

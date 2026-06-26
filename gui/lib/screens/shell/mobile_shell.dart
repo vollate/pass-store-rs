@@ -46,6 +46,7 @@ class _MobileShellState extends State<MobileShell> {
         vaultRepository: widget.vaultRepository,
         gitRepository: widget.gitRepository,
         securityRepository: widget.securityRepository,
+        keys: widget.keyRepository.keys,
         onChooseKey: _openSettings,
         onOpenKeyManagement: _openSettings,
       ),

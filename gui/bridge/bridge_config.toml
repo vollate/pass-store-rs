@@ -46,12 +46,14 @@ methods = [
   "import_pgp_private_key_text",
   "export_pgp_public_key",
   "export_pgp_private_key",
+  "delete_pgp_key",
   "add_pgp_key_to_gpg_id",
   "generate_ssh_key",
   "import_ssh_private_key_file",
   "import_ssh_private_key_text",
   "export_ssh_public_key",
   "export_ssh_private_key",
+  "delete_ssh_key",
   "open_github_ssh_settings",
 ]
 

@@ -365,16 +365,24 @@ void main() {
 
     final key = await repository.generateSshKey('github-mobile');
     final publicKey = await repository.exportSshPublicKey('github-mobile');
+    await repository.deleteSshKey('github-mobile');
+    await repository.deletePgpKey('ABCD 1234');
     final github = await repository.githubSshSettingsUri();
 
     expect(key.type, KeyRecordType.ssh);
     expect(publicKey, startsWith('ssh-ed25519 '));
+    expect(bridge.lastDeleteSshKeyRequest?.name, 'github-mobile');
+    expect(bridge.lastDeleteSshKeyRequest?.sshDir, '/tmp/pars-ssh');
+    expect(bridge.lastDeletePgpKeyRequest?.fingerprint, 'ABCD 1234');
+    expect(bridge.lastDeletePgpKeyRequest?.configPath, '/tmp/pars_config.toml');
     expect(github.toString(), 'https://github.com/settings/keys');
     expect(
       bridge.calledMethods,
       containsAll(<String>[
         'generate_ssh_key',
         'export_ssh_public_key',
+        'delete_ssh_key',
+        'delete_pgp_key',
         'open_github_ssh_settings',
       ]),
     );
@@ -413,6 +421,8 @@ class _LifecycleBridge implements ParsBridgeApi {
   frb.EditEntryRequest? lastEditRequest;
   frb.MoveEntryRequest? lastMoveRequest;
   frb.DeleteEntryRequest? lastDeleteRequest;
+  frb.DeletePgpKeyRequest? lastDeletePgpKeyRequest;
+  frb.DeleteSshKeyRequest? lastDeleteSshKeyRequest;
   frb.CreateLocalStoreRequest? lastCreateLocalStoreRequest;
   frb.GitCommitRequest? lastGitCommitRequest;
   frb.GitArgsRequest? lastGitArgsRequest;
@@ -578,6 +588,24 @@ class _LifecycleBridge implements ParsBridgeApi {
     return const frb.KeyExportResponse(
       export_: frb.KeyExportDto(armoredText: 'ssh-ed25519 AAAAtest'),
     );
+  }
+
+  @override
+  Future<frb.UnitResponse> deleteSshKey({
+    required frb.DeleteSshKeyRequest request,
+  }) async {
+    calledMethods.add('delete_ssh_key');
+    lastDeleteSshKeyRequest = request;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> deletePgpKey({
+    required frb.DeletePgpKeyRequest request,
+  }) async {
+    calledMethods.add('delete_pgp_key');
+    lastDeletePgpKeyRequest = request;
+    return const frb.UnitResponse();
   }
 
   @override

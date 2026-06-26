@@ -661,6 +661,19 @@ class BridgeBackedRepository
   }
 
   @override
+  Future<void> deletePgpKey(String fingerprint) async {
+    final response = await bridge.deletePgpKey(
+      request: frb.DeletePgpKeyRequest(
+        configPath: configPath,
+        pgpExecutable: _optionalPgpExecutable(),
+        fingerprint: fingerprint,
+      ),
+    );
+    _throwIfFailure(response.error);
+    await refresh();
+  }
+
+  @override
   Future<void> addPgpKeyToSelectedStore(String fingerprint) async {
     final root = _lifecycle.selectedStoreRoot;
     if (root == null) {
@@ -736,6 +749,15 @@ class BridgeBackedRepository
       ),
     );
     return _exportText(response);
+  }
+
+  @override
+  Future<void> deleteSshKey(String name) async {
+    final response = await bridge.deleteSshKey(
+      request: frb.DeleteSshKeyRequest(sshDir: _requiredSshDir(), name: name),
+    );
+    _throwIfFailure(response.error);
+    await refresh();
   }
 
   @override

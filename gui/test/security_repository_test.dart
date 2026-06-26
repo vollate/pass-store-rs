@@ -245,11 +245,20 @@ void main() {
           GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
         );
         await repository.setBiometricUnlockEnabled(true);
-        await repository.savePgpPassphrase('pgp-passphrase');
+        await repository.savePgpPassphrase(
+          fingerprint: 'ABC123',
+          passphrase: 'pgp-passphrase',
+        );
 
         expect(await repository.unlockWithBiometrics(), isTrue);
         expect(repository.hasActivePgpSession, isTrue);
-        expect(await repository.readActivePgpPassphrase(), 'pgp-passphrase');
+        expect(
+          await repository.readActivePgpPassphrase(),
+          const PgpPassphraseCache(
+            fingerprint: 'ABC123',
+            passphrase: 'pgp-passphrase',
+          ),
+        );
 
         await repository.markLocked();
 
@@ -267,7 +276,10 @@ void main() {
       await repository.setPgpSessionExpiration(
         PgpSessionExpiration.fiveMinutes,
       );
-      await repository.startPgpSession('pgp-passphrase');
+      await repository.startPgpSession(
+        fingerprint: 'ABC123',
+        passphrase: 'pgp-passphrase',
+      );
 
       expect(repository.hasActivePgpSession, isTrue);
 
@@ -294,7 +306,10 @@ void main() {
       await repository.setPgpSessionExpiration(
         PgpSessionExpiration.immediately,
       );
-      await repository.startPgpSession('pgp-passphrase');
+      await repository.startPgpSession(
+        fingerprint: 'ABC123',
+        passphrase: 'pgp-passphrase',
+      );
 
       expect(repository.hasActivePgpSession, isFalse);
       expect(await repository.readActivePgpPassphrase(), isNull);
@@ -309,13 +324,22 @@ void main() {
       await repository.setPgpSessionExpiration(
         PgpSessionExpiration.untilAppExit,
       );
-      await repository.startPgpSession('pgp-passphrase');
+      await repository.startPgpSession(
+        fingerprint: 'ABC123',
+        passphrase: 'pgp-passphrase',
+      );
       await repository.expirePgpSessionIfNeeded(
         DateTime.now().add(const Duration(days: 1)),
       );
 
       expect(repository.hasActivePgpSession, isTrue);
-      expect(await repository.readActivePgpPassphrase(), 'pgp-passphrase');
+      expect(
+        await repository.readActivePgpPassphrase(),
+        const PgpPassphraseCache(
+          fingerprint: 'ABC123',
+          passphrase: 'pgp-passphrase',
+        ),
+      );
     });
 
     test('keeps session locked when biometric authentication fails', () async {
@@ -366,11 +390,20 @@ void main() {
         biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
-      await repository.savePgpPassphrase('pgp-passphrase');
+      await repository.savePgpPassphrase(
+        fingerprint: 'ABC123',
+        passphrase: 'pgp-passphrase',
+      );
 
       expect(repository.pgpPassphraseStorageEnabled, isTrue);
       expect(repository.hasStoredPgpPassphrase, isTrue);
-      expect(await repository.readPgpPassphrase(), 'pgp-passphrase');
+      expect(
+        await repository.readPgpPassphrase(),
+        const PgpPassphraseCache(
+          fingerprint: 'ABC123',
+          passphrase: 'pgp-passphrase',
+        ),
+      );
 
       final reloaded = await SecureStorageSecurityRepository.load(
         storage: storage,
@@ -379,7 +412,13 @@ void main() {
 
       expect(reloaded.pgpPassphraseStorageEnabled, isTrue);
       expect(reloaded.hasStoredPgpPassphrase, isTrue);
-      expect(await reloaded.readPgpPassphrase(), 'pgp-passphrase');
+      expect(
+        await reloaded.readPgpPassphrase(),
+        const PgpPassphraseCache(
+          fingerprint: 'ABC123',
+          passphrase: 'pgp-passphrase',
+        ),
+      );
 
       await reloaded.clearPgpPassphrase();
 
@@ -393,13 +432,67 @@ void main() {
         biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
-      await repository.savePgpPassphrase('pgp-passphrase');
+      await repository.savePgpPassphrase(
+        fingerprint: 'ABC123',
+        passphrase: 'pgp-passphrase',
+      );
       await repository.setPgpPassphraseStorageEnabled(false);
 
       expect(repository.pgpPassphraseStorageEnabled, isFalse);
       expect(repository.hasStoredPgpPassphrase, isFalse);
       expect(await repository.readPgpPassphrase(), isNull);
     });
+
+    test('legacy unbound PGP passphrase cache is cleared on load', () async {
+      final storage = _FakeSecureStorageAdapter();
+      await storage.write(
+        key: 'pars.security.pgp_passphrase_storage_enabled.v1',
+        value: '1',
+      );
+      await storage.write(
+        key: 'pars.security.pgp_passphrase.v1',
+        value: 'legacy-passphrase',
+      );
+
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
+      );
+
+      expect(repository.hasStoredPgpPassphrase, isFalse);
+      expect(await repository.readPgpPassphrase(), isNull);
+    });
+
+    test(
+      'clears matching PGP passphrase cache and active session only',
+      () async {
+        final repository = await SecureStorageSecurityRepository.load(
+          storage: _FakeSecureStorageAdapter(),
+          biometricAuth: _FakeBiometricAuthAdapter(),
+        );
+
+        await repository.savePgpPassphrase(
+          fingerprint: 'ABC123',
+          passphrase: 'pgp-passphrase',
+        );
+        await repository.startPgpSession(
+          fingerprint: 'ABC123',
+          passphrase: 'pgp-passphrase',
+        );
+
+        await repository.clearPgpPassphraseForFingerprint('DEF456');
+
+        expect(repository.hasStoredPgpPassphrase, isTrue);
+        expect(repository.hasActivePgpSession, isTrue);
+
+        await repository.clearPgpPassphraseForFingerprint('ABC123');
+
+        expect(repository.hasStoredPgpPassphrase, isFalse);
+        expect(repository.hasActivePgpSession, isFalse);
+        expect(await repository.readPgpPassphrase(), isNull);
+        expect(await repository.readActivePgpPassphrase(), isNull);
+      },
+    );
   });
 }
 

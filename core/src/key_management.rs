@@ -183,6 +183,27 @@ pub fn export_ssh_private_key(
     Ok(KeyExportResult { armored_text })
 }
 
+pub fn delete_ssh_key(ssh_dir: &Path, name: &str) -> GuiResult<()> {
+    validate_key_file_name(name)?;
+    let private_path = ssh_dir.join(name);
+    let public_path = ssh_dir.join(format!("{name}.pub"));
+    let mut removed = false;
+
+    if private_path.exists() {
+        fs::remove_file(&private_path)?;
+        removed = true;
+    }
+    if public_path.exists() {
+        fs::remove_file(&public_path)?;
+        removed = true;
+    }
+    if removed {
+        Ok(())
+    } else {
+        Err(CoreError::StoreError(format!("SSH key not found: {name}")))
+    }
+}
+
 pub fn add_pgp_key_to_gpg_id(store_root: &Path, fingerprint: &str) -> GuiResult<()> {
     let normalized = fingerprint.trim();
     if normalized.is_empty() || normalized.contains('\n') || normalized.contains('\r') {

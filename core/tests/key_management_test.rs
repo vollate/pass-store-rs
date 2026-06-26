@@ -1,7 +1,7 @@
 use std::fs;
 
 use pars_core::key_management::{
-    add_pgp_key_to_gpg_id, detect_imported_key_material, export_ssh_private_key,
+    add_pgp_key_to_gpg_id, delete_ssh_key, detect_imported_key_material, export_ssh_private_key,
     export_ssh_public_key, generate_ssh_ed25519_key, import_ssh_private_key_text, list_ssh_keys,
     ImportedKeyKind, PrivateKeyConfirmation,
 };
@@ -71,6 +71,27 @@ fn generates_ssh_ed25519_keys_without_external_ssh_keygen() {
     assert!(key.fingerprint.starts_with("SHA256:"));
     assert!(ssh_dir.path().join("mobile-key").is_file());
     assert!(ssh_dir.path().join("mobile-key.pub").is_file());
+}
+
+#[test]
+fn deletes_ssh_private_and_public_key_files() {
+    let temp = tempfile::tempdir().unwrap();
+    generate_ssh_ed25519_key(temp.path(), "github-mobile").unwrap();
+
+    delete_ssh_key(temp.path(), "github-mobile").unwrap();
+
+    assert!(!temp.path().join("github-mobile").exists());
+    assert!(!temp.path().join("github-mobile.pub").exists());
+    assert!(list_ssh_keys(temp.path()).unwrap().is_empty());
+}
+
+#[test]
+fn deleting_missing_ssh_key_reports_error() {
+    let temp = tempfile::tempdir().unwrap();
+
+    let err = delete_ssh_key(temp.path(), "missing-key").unwrap_err();
+
+    assert!(err.to_string().contains("missing-key"));
 }
 
 #[test]

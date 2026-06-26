@@ -22,6 +22,8 @@ abstract interface class KeyRepository {
     required String confirmation,
   });
 
+  Future<void> deletePgpKey(String fingerprint);
+
   Future<void> addPgpKeyToSelectedStore(String fingerprint);
 
   Future<KeyRecord> generateSshKey(String name);
@@ -42,6 +44,8 @@ abstract interface class KeyRepository {
     required String name,
     required String confirmation,
   });
+
+  Future<void> deleteSshKey(String name);
 
   Future<Uri> githubSshSettingsUri();
 }

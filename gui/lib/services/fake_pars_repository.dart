@@ -491,6 +491,9 @@ class FakeParsRepository
       '-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----';
 
   @override
+  Future<void> deletePgpKey(String fingerprint) async {}
+
+  @override
   Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}
 
   @override
@@ -519,6 +522,9 @@ class FakeParsRepository
     required String confirmation,
   }) async =>
       '-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----';
+
+  @override
+  Future<void> deleteSshKey(String name) async {}
 
   @override
   Future<Uri> githubSshSettingsUri() async =>

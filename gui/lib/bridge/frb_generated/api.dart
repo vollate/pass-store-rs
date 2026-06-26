@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `add_store_to_config`, `clone_store_inner`, `configure_pgp_backend_inner`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `entry_ref`, `git_remote_exists`, `import_local_store_inner`, `import_pgp_key_text`, `imported_key_kind`, `inspect_app_state_inner`, `inspect_store`, `list_keys_inner`, `list_stores_inner`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `onboarding_state`, `pgp_backend`, `pgp_key_missing`, `read_entry_inner`, `remove_store_inner`, `run_git_command_response`, `run_git`, `save_config_for_mutation`, `select_store_inner`, `simple`, `store_failure`, `store_name`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 
 Future<ConfigResponse> loadConfig({required LoadConfigRequest request}) =>
     RustLib.instance.api.crateApiLoadConfig(request: request);
@@ -122,6 +122,9 @@ Future<KeyExportResponse> exportPgpPrivateKey({
   required ExportPgpKeyRequest request,
 }) => RustLib.instance.api.crateApiExportPgpPrivateKey(request: request);
 
+Future<UnitResponse> deletePgpKey({required DeletePgpKeyRequest request}) =>
+    RustLib.instance.api.crateApiDeletePgpKey(request: request);
+
 Future<UnitResponse> addPgpKeyToGpgId({
   required AddPgpKeyToGpgIdRequest request,
 }) => RustLib.instance.api.crateApiAddPgpKeyToGpgId(request: request);
@@ -145,6 +148,9 @@ Future<KeyExportResponse> exportSshPublicKey({
 Future<KeyExportResponse> exportSshPrivateKey({
   required ExportSshKeyRequest request,
 }) => RustLib.instance.api.crateApiExportSshPrivateKey(request: request);
+
+Future<UnitResponse> deleteSshKey({required DeleteSshKeyRequest request}) =>
+    RustLib.instance.api.crateApiDeleteSshKey(request: request);
 
 Future<OpenExternalUrlResponse> openGithubSshSettings({
   required OpenGithubSshSettingsRequest request,
@@ -515,6 +521,49 @@ class DeleteLocalStoreRequest {
           configPath == other.configPath &&
           root == other.root &&
           confirmation == other.confirmation;
+}
+
+class DeletePgpKeyRequest {
+  final String configPath;
+  final String? pgpExecutable;
+  final String fingerprint;
+
+  const DeletePgpKeyRequest({
+    required this.configPath,
+    this.pgpExecutable,
+    required this.fingerprint,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^ pgpExecutable.hashCode ^ fingerprint.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DeletePgpKeyRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          pgpExecutable == other.pgpExecutable &&
+          fingerprint == other.fingerprint;
+}
+
+class DeleteSshKeyRequest {
+  final String sshDir;
+  final String name;
+
+  const DeleteSshKeyRequest({required this.sshDir, required this.name});
+
+  @override
+  int get hashCode => sshDir.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DeleteSshKeyRequest &&
+          runtimeType == other.runtimeType &&
+          sshDir == other.sshDir &&
+          name == other.name;
 }
 
 class EditEntryRequest {

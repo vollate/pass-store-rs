@@ -20,6 +20,36 @@ import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/screens/vault/vault_screen.dart';
 import 'package:pars_gui/widgets/gesture_lock_input.dart';
 
+const _testPgpFingerprint = '3A8E 9C12 77FA 22D1 90BD 48AA A991 D3B4 A702 91EF';
+const _testPgpKey = KeyRecord(
+  type: KeyRecordType.pgp,
+  name: 'Vollate <me@example.com>',
+  fingerprint: _testPgpFingerprint,
+  source: 'Generated on device',
+  hasPrivateKey: true,
+);
+const _settingsPrimaryPgpKey = KeyRecord(
+  type: KeyRecordType.pgp,
+  name: 'Primary User <primary@example.com>',
+  fingerprint: 'PGP-PRIMARY',
+  source: 'Generated on device',
+  hasPrivateKey: true,
+);
+const _settingsBackupPgpKey = KeyRecord(
+  type: KeyRecordType.pgp,
+  name: 'Backup User <backup@example.com>',
+  fingerprint: 'PGP-BACKUP',
+  source: 'Imported from text',
+  hasPrivateKey: true,
+);
+const _settingsSshKey = KeyRecord(
+  type: KeyRecordType.ssh,
+  name: 'github-mobile',
+  fingerprint: 'SHA256:github-mobile',
+  source: 'Generated on device',
+  hasPrivateKey: true,
+);
+
 void main() {
   testWidgets('shows onboarding before entering the vault', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
@@ -690,6 +720,7 @@ void main() {
               entry: repository.entries.single,
               repository: repository,
               securityRepository: securityRepository,
+              keys: const <KeyRecord>[_testPgpKey],
             ),
           ),
         ),
@@ -706,7 +737,10 @@ void main() {
       expect(securityRepository.hasActivePgpSession, isTrue);
       expect(
         await securityRepository.readActivePgpPassphrase(),
-        'session-passphrase',
+        const PgpPassphraseCache(
+          fingerprint: _testPgpFingerprint,
+          passphrase: 'session-passphrase',
+        ),
       );
       expect(repository.readCount, 1);
       expect(find.text('session-passphrase'), findsNothing);
@@ -1154,6 +1188,190 @@ void main() {
     expect(find.text('No password stores'), findsOneWidget);
   });
 
+  testWidgets(
+    'settings deletes PGP key after exact confirmation and clears cache',
+    (tester) async {
+      final repository = _KeyManagementSettingsRepository();
+      final securityRepository = InMemorySecurityRepository();
+      await securityRepository.savePgpPassphrase(
+        fingerprint: _settingsPrimaryPgpKey.fingerprint,
+        passphrase: 'stored-passphrase',
+      );
+      await securityRepository.startPgpSession(
+        fingerprint: _settingsPrimaryPgpKey.fingerprint,
+        passphrase: 'active-passphrase',
+      );
+
+      await _pumpSettingsScreen(
+        tester,
+        repository: repository,
+        securityRepository: securityRepository,
+      );
+
+      await tester.tap(find.text('PGP keys'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete key'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete PGP key'), findsOneWidget);
+      expect(
+        find.textContaining(_settingsPrimaryPgpKey.fingerprint),
+        findsWidgets,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Delete'))
+            .onPressed,
+        isNull,
+      );
+
+      await tester.enterText(
+        find.byType(TextField).last,
+        _settingsPrimaryPgpKey.fingerprint,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Delete'))
+            .onPressed,
+        isNotNull,
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(repository.deleteActions, <String>['pgp:PGP-PRIMARY']);
+      expect(find.text(_settingsPrimaryPgpKey.name), findsNothing);
+      expect(await securityRepository.readPgpPassphrase(), isNull);
+      expect(await securityRepository.readActivePgpPassphrase(), isNull);
+    },
+  );
+
+  testWidgets('settings deletes SSH key after exact confirmation', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository();
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+    );
+
+    await tester.tap(find.text('SSH keys'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byTooltip('Actions for SSH key ${_settingsSshKey.name}'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete key'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, _settingsSshKey.name);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deleteActions, <String>['ssh:github-mobile']);
+    expect(find.text(_settingsSshKey.name), findsNothing);
+  });
+
+  testWidgets('settings key deletion can be canceled', (tester) async {
+    final repository = _KeyManagementSettingsRepository();
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+    );
+
+    await tester.tap(find.text('PGP keys'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete key'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deleteActions, isEmpty);
+    expect(find.text(_settingsPrimaryPgpKey.name), findsOneWidget);
+  });
+
+  testWidgets('settings key deletion failure keeps key visible', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository(failPgpDelete: true);
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+    );
+
+    await tester.tap(find.text('PGP keys'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete key'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField).last,
+      _settingsPrimaryPgpKey.fingerprint,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.deleteActions, <String>['pgp:PGP-PRIMARY']);
+    expect(find.textContaining('delete failed visibly'), findsOneWidget);
+    expect(find.text(_settingsPrimaryPgpKey.name), findsOneWidget);
+  });
+
+  testWidgets('settings saves PGP passphrase for selected private key', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository();
+    final securityRepository = InMemorySecurityRepository();
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: securityRepository,
+    );
+
+    await tester.tap(find.text('KMS / Keychain passphrase'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Store PGP passphrase'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pgp-passphrase-key-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_settingsBackupPgpKey.name).last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'pgp-passphrase');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(
+      await securityRepository.readPgpPassphrase(),
+      const PgpPassphraseCache(
+        fingerprint: 'PGP-BACKUP',
+        passphrase: 'pgp-passphrase',
+      ),
+    );
+    expect(
+      find.text('Cached for ${_settingsBackupPgpKey.name}'),
+      findsOneWidget,
+    );
+    expect(find.text('pgp-passphrase'), findsNothing);
+  });
+
   testWidgets('settings runs git sync and remote operations', (tester) async {
     final repository = _GitSettingsRepository();
 
@@ -1320,7 +1538,10 @@ void main() {
     final securityRepository = InMemorySecurityRepository.withPattern(
       const <int>[0, 1, 2, 5],
       lockOnResume: true,
-      activePgpPassphrase: 'pgp-passphrase',
+      activePgpPassphrase: const PgpPassphraseCache(
+        fingerprint: _testPgpFingerprint,
+        passphrase: 'pgp-passphrase',
+      ),
       lastUnlockedAt: DateTime.now(),
     );
 
@@ -1530,7 +1751,10 @@ void main() {
       GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
     );
     await securityRepository.setBiometricUnlockEnabled(true);
-    await securityRepository.savePgpPassphrase('pgp-passphrase');
+    await securityRepository.savePgpPassphrase(
+      fingerprint: _testPgpFingerprint,
+      passphrase: 'pgp-passphrase',
+    );
     await securityRepository.setOnboardingComplete(true);
 
     await tester.pumpWidget(
@@ -1548,7 +1772,10 @@ void main() {
     expect(securityRepository.hasActivePgpSession, isTrue);
     expect(
       await securityRepository.readActivePgpPassphrase(),
-      'pgp-passphrase',
+      const PgpPassphraseCache(
+        fingerprint: _testPgpFingerprint,
+        passphrase: 'pgp-passphrase',
+      ),
     );
     expect(biometrics.authenticateCount, 2);
   });
@@ -1699,7 +1926,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(securityRepository.hasStoredPgpPassphrase, isTrue);
-    expect(await securityRepository.readPgpPassphrase(), 'pgp-passphrase');
+    expect(
+      await securityRepository.readPgpPassphrase(),
+      const PgpPassphraseCache(
+        fingerprint: _testPgpFingerprint,
+        passphrase: 'pgp-passphrase',
+      ),
+    );
     expect(find.text('pgp-passphrase'), findsNothing);
 
     await tester.tap(find.text('Clear'));
@@ -1777,6 +2010,25 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
   await tester.tap(finder, warnIfMissed: false);
   await tester.pumpAndSettle();
+}
+
+Future<void> _pumpSettingsScreen(
+  WidgetTester tester, {
+  required _InjectedRepository repository,
+  required SecurityRepository securityRepository,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Scaffold(
+        body: SettingsScreen(
+          settingsRepository: repository,
+          keyRepository: repository,
+          gitRepository: repository,
+          securityRepository: securityRepository,
+        ),
+      ),
+    ),
+  );
 }
 
 Future<void> _backgroundApp(WidgetTester tester) async {
@@ -1981,6 +2233,9 @@ class _InjectedRepository
   }) async => 'private';
 
   @override
+  Future<void> deletePgpKey(String fingerprint) async {}
+
+  @override
   Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}
 
   @override
@@ -2013,6 +2268,9 @@ class _InjectedRepository
     required String name,
     required String confirmation,
   }) async => 'private';
+
+  @override
+  Future<void> deleteSshKey(String name) async {}
 
   @override
   Future<Uri> githubSshSettingsUri() async =>
@@ -2071,6 +2329,41 @@ class _InjectedRepository
     required String content,
     required bool overwrite,
   }) async => EntryOperationResult(path: path, overwroteExisting: false);
+}
+
+class _KeyManagementSettingsRepository extends _InjectedRepository {
+  _KeyManagementSettingsRepository({this.failPgpDelete = false})
+    : _keys = <KeyRecord>[
+        _settingsPrimaryPgpKey,
+        _settingsBackupPgpKey,
+        _settingsSshKey,
+      ];
+
+  final bool failPgpDelete;
+  final List<KeyRecord> _keys;
+  final List<String> deleteActions = <String>[];
+
+  @override
+  List<KeyRecord> get keys => List<KeyRecord>.unmodifiable(_keys);
+
+  @override
+  Future<void> deletePgpKey(String fingerprint) async {
+    deleteActions.add('pgp:$fingerprint');
+    if (failPgpDelete) {
+      throw Exception('delete failed visibly');
+    }
+    _keys.removeWhere(
+      (key) => key.type == KeyRecordType.pgp && key.fingerprint == fingerprint,
+    );
+  }
+
+  @override
+  Future<void> deleteSshKey(String name) async {
+    deleteActions.add('ssh:$name');
+    _keys.removeWhere(
+      (key) => key.type == KeyRecordType.ssh && key.name == name,
+    );
+  }
 }
 
 enum _StoreBranch {
@@ -3202,6 +3495,10 @@ class _StoreSetupRepository
   }) async => throw UnimplementedError();
 
   @override
+  Future<void> deletePgpKey(String fingerprint) async =>
+      throw UnimplementedError();
+
+  @override
   Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}
 
   @override
@@ -3229,6 +3526,9 @@ class _StoreSetupRepository
     required String name,
     required String confirmation,
   }) async => throw UnimplementedError();
+
+  @override
+  Future<void> deleteSshKey(String name) async => throw UnimplementedError();
 
   @override
   Future<Uri> githubSshSettingsUri() async => throw UnimplementedError();

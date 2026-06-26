@@ -90,6 +90,26 @@ enum PgpSessionExpiration {
   untilAppExit,
 }
 
+class PgpPassphraseCache {
+  const PgpPassphraseCache({
+    required this.fingerprint,
+    required this.passphrase,
+  });
+
+  final String fingerprint;
+  final String passphrase;
+
+  @override
+  bool operator ==(Object other) {
+    return other is PgpPassphraseCache &&
+        other.fingerprint == fingerprint &&
+        other.passphrase == passphrase;
+  }
+
+  @override
+  int get hashCode => Object.hash(fingerprint, passphrase);
+}
+
 extension PgpSessionExpirationLabel on PgpSessionExpiration {
   String get label {
     switch (this) {
@@ -198,17 +218,25 @@ abstract interface class SecurityRepository {
 
   Future<void> setPgpPassphraseStorageEnabled(bool enabled);
 
-  Future<void> savePgpPassphrase(String passphrase);
+  Future<void> savePgpPassphrase({
+    required String fingerprint,
+    required String passphrase,
+  });
 
-  Future<String?> readPgpPassphrase();
+  Future<PgpPassphraseCache?> readPgpPassphrase();
 
   Future<void> clearPgpPassphrase();
 
-  Future<void> startPgpSession(String passphrase);
+  Future<void> startPgpSession({
+    required String fingerprint,
+    required String passphrase,
+  });
 
-  Future<String?> readActivePgpPassphrase();
+  Future<PgpPassphraseCache?> readActivePgpPassphrase();
 
   Future<void> clearPgpSession();
+
+  Future<void> clearPgpPassphraseForFingerprint(String fingerprint);
 
   Future<void> setPgpSessionExpiration(PgpSessionExpiration expiration);
 
@@ -225,8 +253,8 @@ class InMemorySecurityRepository implements SecurityRepository {
     bool lockOnResume = false,
     bool biometricUnlockEnabled = false,
     bool pgpPassphraseStorageEnabled = false,
-    String? pgpPassphrase,
-    String? activePgpPassphrase,
+    PgpPassphraseCache? pgpPassphrase,
+    PgpPassphraseCache? activePgpPassphrase,
     bool onboardingComplete = false,
     PgpSessionExpiration pgpSessionExpiration =
         PgpSessionExpiration.fifteenMinutes,
@@ -248,8 +276,8 @@ class InMemorySecurityRepository implements SecurityRepository {
     bool lockOnResume = false,
     bool biometricUnlockEnabled = false,
     bool pgpPassphraseStorageEnabled = false,
-    String? pgpPassphrase,
-    String? activePgpPassphrase,
+    PgpPassphraseCache? pgpPassphrase,
+    PgpPassphraseCache? activePgpPassphrase,
     bool onboardingComplete = true,
     PgpSessionExpiration pgpSessionExpiration =
         PgpSessionExpiration.fifteenMinutes,
@@ -275,8 +303,8 @@ class InMemorySecurityRepository implements SecurityRepository {
   bool _biometricUnlockEnabled;
   bool _pgpPassphraseStorageEnabled;
   bool _onboardingComplete;
-  String? _pgpPassphrase;
-  String? _activePgpPassphrase;
+  PgpPassphraseCache? _pgpPassphrase;
+  PgpPassphraseCache? _activePgpPassphrase;
   DateTime? _pgpSessionExpiresAt;
   PgpSessionExpiration _pgpSessionExpiration;
   Duration _autoLockTimeout;
@@ -373,20 +401,20 @@ class InMemorySecurityRepository implements SecurityRepository {
   }
 
   @override
-  Future<void> savePgpPassphrase(String passphrase) async {
-    if (passphrase.isEmpty) {
-      throw ArgumentError.value(
-        passphrase,
-        'passphrase',
-        'Passphrase cannot be empty.',
-      );
-    }
+  Future<void> savePgpPassphrase({
+    required String fingerprint,
+    required String passphrase,
+  }) async {
+    final cache = _validatedPgpPassphraseCache(
+      fingerprint: fingerprint,
+      passphrase: passphrase,
+    );
     _pgpPassphraseStorageEnabled = true;
-    _pgpPassphrase = passphrase;
+    _pgpPassphrase = cache;
   }
 
   @override
-  Future<String?> readPgpPassphrase() async {
+  Future<PgpPassphraseCache?> readPgpPassphrase() async {
     if (!_pgpPassphraseStorageEnabled) {
       return null;
     }
@@ -399,20 +427,19 @@ class InMemorySecurityRepository implements SecurityRepository {
   }
 
   @override
-  Future<void> startPgpSession(String passphrase) async {
-    if (passphrase.isEmpty) {
-      throw ArgumentError.value(
-        passphrase,
-        'passphrase',
-        'Passphrase cannot be empty.',
-      );
-    }
-    _activePgpPassphrase = passphrase;
+  Future<void> startPgpSession({
+    required String fingerprint,
+    required String passphrase,
+  }) async {
+    _activePgpPassphrase = _validatedPgpPassphraseCache(
+      fingerprint: fingerprint,
+      passphrase: passphrase,
+    );
     _pgpSessionExpiresAt = _sessionExpiresAt(DateTime.now());
   }
 
   @override
-  Future<String?> readActivePgpPassphrase() async {
+  Future<PgpPassphraseCache?> readActivePgpPassphrase() async {
     await expirePgpSessionIfNeeded(DateTime.now());
     return _activePgpPassphrase;
   }
@@ -421,6 +448,17 @@ class InMemorySecurityRepository implements SecurityRepository {
   Future<void> clearPgpSession() async {
     _activePgpPassphrase = null;
     _pgpSessionExpiresAt = null;
+  }
+
+  @override
+  Future<void> clearPgpPassphraseForFingerprint(String fingerprint) async {
+    final target = fingerprint.trim();
+    if (_pgpPassphrase?.fingerprint == target) {
+      await clearPgpPassphrase();
+    }
+    if (_activePgpPassphrase?.fingerprint == target) {
+      await clearPgpSession();
+    }
   }
 
   @override
@@ -472,6 +510,31 @@ class InMemorySecurityRepository implements SecurityRepository {
   }
 }
 
+PgpPassphraseCache _validatedPgpPassphraseCache({
+  required String fingerprint,
+  required String passphrase,
+}) {
+  final trimmedFingerprint = fingerprint.trim();
+  if (trimmedFingerprint.isEmpty) {
+    throw ArgumentError.value(
+      fingerprint,
+      'fingerprint',
+      'Fingerprint cannot be empty.',
+    );
+  }
+  if (passphrase.isEmpty) {
+    throw ArgumentError.value(
+      passphrase,
+      'passphrase',
+      'Passphrase cannot be empty.',
+    );
+  }
+  return PgpPassphraseCache(
+    fingerprint: trimmedFingerprint,
+    passphrase: passphrase,
+  );
+}
+
 class SecureStorageSecurityRepository implements SecurityRepository {
   SecureStorageSecurityRepository._({
     required SecureStorageAdapter storage,
@@ -502,6 +565,8 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   static const _pgpPassphraseStorageEnabledKey =
       'pars.security.pgp_passphrase_storage_enabled.v1';
   static const _pgpPassphraseKey = 'pars.security.pgp_passphrase.v1';
+  static const _pgpPassphraseFingerprintKey =
+      'pars.security.pgp_passphrase_fingerprint.v1';
   static const _onboardingCompleteKey = 'pars.security.onboarding_complete.v1';
   static const _pgpSessionExpirationKey =
       'pars.security.pgp_session_expiration.v1';
@@ -520,7 +585,7 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   bool _pgpPassphraseStorageEnabled;
   bool _hasStoredPgpPassphrase;
   bool _onboardingComplete;
-  String? _activePgpPassphrase;
+  PgpPassphraseCache? _activePgpPassphrase;
   DateTime? _pgpSessionExpiresAt;
   PgpSessionExpiration _pgpSessionExpiration;
   Duration _autoLockTimeout;
@@ -540,6 +605,22 @@ class SecureStorageSecurityRepository implements SecurityRepository {
       }
     }
 
+    final pgpStorageEnabled = await _readBool(
+      storage,
+      _pgpPassphraseStorageEnabledKey,
+    );
+    var hasStoredPgpPassphrase = false;
+    final storedPassphrase = await storage.read(_pgpPassphraseKey);
+    final storedFingerprint = await storage.read(_pgpPassphraseFingerprintKey);
+    if (storedPassphrase != null) {
+      if ((storedFingerprint ?? '').trim().isEmpty) {
+        await storage.delete(_pgpPassphraseKey);
+        await storage.delete(_pgpPassphraseFingerprintKey);
+      } else {
+        hasStoredPgpPassphrase = pgpStorageEnabled;
+      }
+    }
+
     return SecureStorageSecurityRepository._(
       storage: storage,
       biometricAuth: biometricAuth ?? LocalAuthBiometricAdapter(),
@@ -549,11 +630,8 @@ class SecureStorageSecurityRepository implements SecurityRepository {
         storage,
         _biometricUnlockEnabledKey,
       ),
-      pgpPassphraseStorageEnabled: await _readBool(
-        storage,
-        _pgpPassphraseStorageEnabledKey,
-      ),
-      hasStoredPgpPassphrase: await storage.read(_pgpPassphraseKey) != null,
+      pgpPassphraseStorageEnabled: pgpStorageEnabled,
+      hasStoredPgpPassphrase: hasStoredPgpPassphrase,
       onboardingComplete: await _readBool(storage, _onboardingCompleteKey),
       pgpSessionExpiration: await _readPgpSessionExpiration(storage),
       autoLockTimeout: await _readDuration(
@@ -674,7 +752,10 @@ class SecureStorageSecurityRepository implements SecurityRepository {
       await markUnlocked(DateTime.now());
       final cachedPassphrase = await readPgpPassphrase();
       if (cachedPassphrase != null) {
-        await startPgpSession(cachedPassphrase);
+        await startPgpSession(
+          fingerprint: cachedPassphrase.fingerprint,
+          passphrase: cachedPassphrase.passphrase,
+        );
       }
     }
     return unlocked;
@@ -693,50 +774,62 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   }
 
   @override
-  Future<void> savePgpPassphrase(String passphrase) async {
-    if (passphrase.isEmpty) {
-      throw ArgumentError.value(
-        passphrase,
-        'passphrase',
-        'Passphrase cannot be empty.',
-      );
-    }
-    await _storage.write(key: _pgpPassphraseKey, value: passphrase);
+  Future<void> savePgpPassphrase({
+    required String fingerprint,
+    required String passphrase,
+  }) async {
+    final cache = _validatedPgpPassphraseCache(
+      fingerprint: fingerprint,
+      passphrase: passphrase,
+    );
+    await _storage.write(key: _pgpPassphraseKey, value: cache.passphrase);
+    await _storage.write(
+      key: _pgpPassphraseFingerprintKey,
+      value: cache.fingerprint,
+    );
     await _storage.write(key: _pgpPassphraseStorageEnabledKey, value: '1');
     _pgpPassphraseStorageEnabled = true;
     _hasStoredPgpPassphrase = true;
   }
 
   @override
-  Future<String?> readPgpPassphrase() async {
+  Future<PgpPassphraseCache?> readPgpPassphrase() async {
     if (!_pgpPassphraseStorageEnabled) {
       return null;
     }
-    return _storage.read(_pgpPassphraseKey);
+    final passphrase = await _storage.read(_pgpPassphraseKey);
+    final fingerprint = await _storage.read(_pgpPassphraseFingerprintKey);
+    if (passphrase == null || (fingerprint ?? '').trim().isEmpty) {
+      return null;
+    }
+    return PgpPassphraseCache(
+      fingerprint: fingerprint!.trim(),
+      passphrase: passphrase,
+    );
   }
 
   @override
   Future<void> clearPgpPassphrase() async {
     await _storage.delete(_pgpPassphraseKey);
+    await _storage.delete(_pgpPassphraseFingerprintKey);
     _hasStoredPgpPassphrase = false;
     await clearPgpSession();
   }
 
   @override
-  Future<void> startPgpSession(String passphrase) async {
-    if (passphrase.isEmpty) {
-      throw ArgumentError.value(
-        passphrase,
-        'passphrase',
-        'Passphrase cannot be empty.',
-      );
-    }
-    _activePgpPassphrase = passphrase;
+  Future<void> startPgpSession({
+    required String fingerprint,
+    required String passphrase,
+  }) async {
+    _activePgpPassphrase = _validatedPgpPassphraseCache(
+      fingerprint: fingerprint,
+      passphrase: passphrase,
+    );
     _pgpSessionExpiresAt = _sessionExpiresAt(DateTime.now());
   }
 
   @override
-  Future<String?> readActivePgpPassphrase() async {
+  Future<PgpPassphraseCache?> readActivePgpPassphrase() async {
     await expirePgpSessionIfNeeded(DateTime.now());
     return _activePgpPassphrase;
   }
@@ -745,6 +838,20 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   Future<void> clearPgpSession() async {
     _activePgpPassphrase = null;
     _pgpSessionExpiresAt = null;
+  }
+
+  @override
+  Future<void> clearPgpPassphraseForFingerprint(String fingerprint) async {
+    final target = fingerprint.trim();
+    final stored = await readPgpPassphrase();
+    if (stored?.fingerprint == target) {
+      await _storage.delete(_pgpPassphraseKey);
+      await _storage.delete(_pgpPassphraseFingerprintKey);
+      _hasStoredPgpPassphrase = false;
+    }
+    if (_activePgpPassphrase?.fingerprint == target) {
+      await clearPgpSession();
+    }
   }
 
   @override

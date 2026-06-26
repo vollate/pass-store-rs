@@ -10,8 +10,8 @@ use pars_core::gui::{
     StoreId, StoreInfo,
 };
 use pars_core::key_management::{
-    add_pgp_key_to_gpg_id as add_pgp_key_to_gpg_id_core, detect_imported_key_material,
-    export_ssh_private_key as export_ssh_private_key_core,
+    add_pgp_key_to_gpg_id as add_pgp_key_to_gpg_id_core, delete_ssh_key as delete_ssh_key_core,
+    detect_imported_key_material, export_ssh_private_key as export_ssh_private_key_core,
     export_ssh_public_key as export_ssh_public_key_core, generate_ssh_ed25519_key,
     import_ssh_private_key_text as import_ssh_private_key_text_core, list_ssh_keys,
     ImportedKeyKind, PrivateKeyConfirmation,
@@ -53,12 +53,14 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "import_pgp_private_key_text",
     "export_pgp_public_key",
     "export_pgp_private_key",
+    "delete_pgp_key",
     "add_pgp_key_to_gpg_id",
     "generate_ssh_key",
     "import_ssh_private_key_file",
     "import_ssh_private_key_text",
     "export_ssh_public_key",
     "export_ssh_private_key",
+    "delete_ssh_key",
     "open_github_ssh_settings",
 ];
 
@@ -413,6 +415,13 @@ pub struct ExportPgpKeyRequest {
 }
 
 #[derive(Debug, Clone)]
+pub struct DeletePgpKeyRequest {
+    pub config_path: String,
+    pub pgp_executable: Option<String>,
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct AddPgpKeyToGpgIdRequest {
     pub root: String,
     pub fingerprint: String,
@@ -429,6 +438,12 @@ pub struct ExportSshKeyRequest {
     pub ssh_dir: String,
     pub name: String,
     pub confirmation: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeleteSshKeyRequest {
+    pub ssh_dir: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -860,6 +875,18 @@ pub async fn export_pgp_private_key(request: ExportPgpKeyRequest) -> KeyExportRe
     }
 }
 
+pub async fn delete_pgp_key(request: DeletePgpKeyRequest) -> UnitResponse {
+    UnitResponse {
+        error: pgp_backend(&request.config_path, request.pgp_executable.as_deref())
+            .and_then(|backend| {
+                backend
+                    .delete_key(&request.fingerprint)
+                    .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+            })
+            .err(),
+    }
+}
+
 pub async fn add_pgp_key_to_gpg_id(request: AddPgpKeyToGpgIdRequest) -> UnitResponse {
     UnitResponse {
         error: add_pgp_key_to_gpg_id_core(Path::new(&request.root), &request.fingerprint)
@@ -927,6 +954,14 @@ pub async fn export_ssh_private_key(request: ExportSshKeyRequest) -> KeyExportRe
     match export_ssh_private_key_core(Path::new(&request.ssh_dir), &request.name, confirmation) {
         Ok(export) => KeyExportResponse { export: Some(export.into()), error: None },
         Err(error) => KeyExportResponse { export: None, error: Some(BridgeFailure::from(error)) },
+    }
+}
+
+pub async fn delete_ssh_key(request: DeleteSshKeyRequest) -> UnitResponse {
+    UnitResponse {
+        error: delete_ssh_key_core(Path::new(&request.ssh_dir), &request.name)
+            .err()
+            .map(BridgeFailure::from),
     }
 }
 

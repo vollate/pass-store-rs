@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../services/security_repository.dart';
 import '../../services/vault_repository.dart';
+import '../../widgets/app_notification.dart';
 
 class EntryDetailSheet extends StatefulWidget {
   const EntryDetailSheet({
@@ -21,6 +23,7 @@ class EntryDetailSheet extends StatefulWidget {
     this.onFavoriteChanged,
     this.onChooseKey,
     this.onOpenKeyManagement,
+    this.keys = const <KeyRecord>[],
     this.clipboardClearDelay = const Duration(seconds: 45),
   });
 
@@ -33,6 +36,7 @@ class EntryDetailSheet extends StatefulWidget {
   final VoidCallback? onFavoriteChanged;
   final VoidCallback? onChooseKey;
   final VoidCallback? onOpenKeyManagement;
+  final List<KeyRecord> keys;
   final Duration clipboardClearDelay;
 
   @override
@@ -406,7 +410,15 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     if (securityRepository == null) {
       return;
     }
-    await securityRepository.startPgpSession(passphrase);
+    final fingerprint = _primaryPrivatePgpFingerprint;
+    if (fingerprint == null) {
+      setState(() => _passphraseError = 'Select or import a private PGP key.');
+      return;
+    }
+    await securityRepository.startPgpSession(
+      fingerprint: fingerprint,
+      passphrase: passphrase,
+    );
     _passphraseController.clear();
     if (!mounted) {
       return;
@@ -416,6 +428,15 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
       _passphraseError = null;
     });
     await _loadSecret();
+  }
+
+  String? get _primaryPrivatePgpFingerprint {
+    for (final key in widget.keys) {
+      if (key.type == KeyRecordType.pgp && key.hasPrivateKey) {
+        return key.fingerprint;
+      }
+    }
+    return null;
   }
 
   Future<void> _copyPassword() async {
@@ -532,9 +553,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppNotification.show(context, message);
   }
 
   void _clearSecret() {

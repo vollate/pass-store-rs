@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../services/git_repository.dart';
 import '../../services/security_repository.dart';
 import '../../services/vault_repository.dart';
+import '../../widgets/app_notification.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/entry_tile.dart';
 import 'entry_detail_sheet.dart';
@@ -15,6 +17,7 @@ class VaultScreen extends StatefulWidget {
     required this.vaultRepository,
     required this.gitRepository,
     this.securityRepository,
+    this.keys = const <KeyRecord>[],
     this.onChooseKey,
     this.onOpenKeyManagement,
   });
@@ -22,6 +25,7 @@ class VaultScreen extends StatefulWidget {
   final VaultRepository vaultRepository;
   final GitRepository gitRepository;
   final SecurityRepository? securityRepository;
+  final List<KeyRecord> keys;
   final VoidCallback? onChooseKey;
   final VoidCallback? onOpenKeyManagement;
 
@@ -232,6 +236,7 @@ class _VaultScreenState extends State<VaultScreen> {
             entry: entry,
             repository: widget.vaultRepository,
             securityRepository: widget.securityRepository,
+            keys: widget.keys,
             onFavoriteChanged: () => setState(() {}),
             onChooseKey: widget.onChooseKey,
             onOpenKeyManagement: widget.onOpenKeyManagement,
@@ -261,16 +266,12 @@ class _VaultScreenState extends State<VaultScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Copied ${entry.displayName} password')),
-      );
+      AppNotification.show(context, 'Copied ${entry.displayName} password');
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not copy password: $error')),
-      );
+      AppNotification.show(context, 'Could not copy password: $error');
     }
   }
 }

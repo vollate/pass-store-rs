@@ -99,6 +99,8 @@ pub trait PgpBackend {
         passphrase: Option<&SecretString>,
     ) -> PgpBackendResult<KeyExportResult>;
 
+    fn delete_key(&self, fingerprint: &str) -> PgpBackendResult<()>;
+
     fn list_keys(&self) -> PgpBackendResult<Vec<PgpKeySummary>>;
 
     fn inspect_fingerprint(&self, identity: &str) -> PgpBackendResult<PgpKeyDetails>;
@@ -285,6 +287,21 @@ impl PgpBackend for SystemGpgBackend {
             }
         };
         Ok(KeyExportResult { armored_text })
+    }
+
+    fn delete_key(&self, fingerprint: &str) -> PgpBackendResult<()> {
+        let normalized = fingerprint.trim();
+        if normalized.is_empty() {
+            return Err(PgpBackendError::CommandFailed(
+                "PGP key fingerprint is required".to_string(),
+            ));
+        }
+        let details = self.inspect_fingerprint(normalized)?;
+        if details.has_private_key {
+            self.run_capture(&["--batch", "--yes", "--delete-secret-keys", &details.fingerprint])?;
+        }
+        self.run_capture(&["--batch", "--yes", "--delete-keys", &details.fingerprint])?;
+        Ok(())
     }
 
     fn list_keys(&self) -> PgpBackendResult<Vec<PgpKeySummary>> {

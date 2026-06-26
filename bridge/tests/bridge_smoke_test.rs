@@ -4,9 +4,10 @@ use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use pars_bridge::api::{
     self, AddPgpKeyToGpgIdRequest, ConfigurePgpBackendRequest, CreateLocalStoreRequest,
-    EntryRequest, ExportPgpKeyRequest, ExportSshKeyRequest, GeneratePgpKeyRequest,
-    GenerateSshKeyRequest, ImportKeyTextRequest, InsertEntryRequest, InspectAppStateRequest,
-    ListEntriesRequest, ListKeysRequest, OpenGithubSshSettingsRequest, SUPPORTED_METHODS,
+    DeletePgpKeyRequest, DeleteSshKeyRequest, EntryRequest, ExportPgpKeyRequest,
+    ExportSshKeyRequest, GeneratePgpKeyRequest, GenerateSshKeyRequest, ImportKeyTextRequest,
+    InsertEntryRequest, InspectAppStateRequest, ListEntriesRequest, ListKeysRequest,
+    OpenGithubSshSettingsRequest, SUPPORTED_METHODS,
 };
 
 #[test]
@@ -56,12 +57,14 @@ fn bridge_method_table_matches_generated_api_surface() {
         "import_pgp_private_key_text",
         "export_pgp_public_key",
         "export_pgp_private_key",
+        "delete_pgp_key",
         "add_pgp_key_to_gpg_id",
         "generate_ssh_key",
         "import_ssh_private_key_file",
         "import_ssh_private_key_text",
         "export_ssh_public_key",
         "export_ssh_private_key",
+        "delete_ssh_key",
         "open_github_ssh_settings",
     ];
 
@@ -125,6 +128,23 @@ fn key_management_bridge_lists_generates_exports_and_detects_keys() {
     }));
     assert!(private_denied.error.unwrap().message.contains("confirmation"));
 
+    let deleted = block_on(api::delete_ssh_key(DeleteSshKeyRequest {
+        ssh_dir: ssh_dir.display().to_string(),
+        name: "github-mobile".to_string(),
+    }));
+    assert!(deleted.error.is_none(), "{:?}", deleted.error);
+
+    let keys_after_delete = block_on(api::list_keys(ListKeysRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: Some("/bin/false".to_string()),
+        ssh_dir: Some(ssh_dir.display().to_string()),
+    }));
+    assert!(keys_after_delete.error.is_none(), "{:?}", keys_after_delete.error);
+    assert!(!keys_after_delete
+        .keys
+        .iter()
+        .any(|key| key.key_type == "ssh" && key.name == "github-mobile"));
+
     let detected = block_on(api::detect_imported_key(ImportKeyTextRequest {
         config_path: config_path.display().to_string(),
         pgp_executable: Some("/bin/false".to_string()),
@@ -184,11 +204,26 @@ fn pure_rust_pgp_bridge_generates_lists_and_exports_keys() {
     let exported = block_on(api::export_pgp_public_key(ExportPgpKeyRequest {
         config_path: config_path.display().to_string(),
         pgp_executable: None,
-        fingerprint: generated_key.fingerprint,
+        fingerprint: generated_key.fingerprint.clone(),
         confirmation: None,
     }));
     assert!(exported.error.is_none(), "{:?}", exported.error);
     assert!(exported.export.unwrap().armored_text.contains("BEGIN PGP PUBLIC KEY BLOCK"));
+
+    let deleted = block_on(api::delete_pgp_key(DeletePgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        fingerprint: generated_key.fingerprint.clone(),
+    }));
+    assert!(deleted.error.is_none(), "{:?}", deleted.error);
+
+    let keys_after_delete = block_on(api::list_keys(ListKeysRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        ssh_dir: Some(temp.path().join("ssh").display().to_string()),
+    }));
+    assert!(keys_after_delete.error.is_none(), "{:?}", keys_after_delete.error);
+    assert!(!keys_after_delete.keys.iter().any(|key| key.fingerprint == generated_key.fingerprint));
 }
 
 #[test]

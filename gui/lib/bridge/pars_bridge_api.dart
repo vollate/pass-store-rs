@@ -117,6 +117,10 @@ abstract interface class ParsBridgeApi {
     required frb.ExportPgpKeyRequest request,
   });
 
+  Future<frb.UnitResponse> deletePgpKey({
+    required frb.DeletePgpKeyRequest request,
+  });
+
   Future<frb.UnitResponse> addPgpKeyToGpgId({
     required frb.AddPgpKeyToGpgIdRequest request,
   });
@@ -139,6 +143,10 @@ abstract interface class ParsBridgeApi {
 
   Future<frb.KeyExportResponse> exportSshPrivateKey({
     required frb.ExportSshKeyRequest request,
+  });
+
+  Future<frb.UnitResponse> deleteSshKey({
+    required frb.DeleteSshKeyRequest request,
   });
 
   Future<frb.OpenExternalUrlResponse> openGithubSshSettings({
@@ -307,6 +315,11 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   }) => frb.exportPgpPrivateKey(request: request);
 
   @override
+  Future<frb.UnitResponse> deletePgpKey({
+    required frb.DeletePgpKeyRequest request,
+  }) => frb.deletePgpKey(request: request);
+
+  @override
   Future<frb.UnitResponse> addPgpKeyToGpgId({
     required frb.AddPgpKeyToGpgIdRequest request,
   }) => frb.addPgpKeyToGpgId(request: request);
@@ -335,6 +348,11 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   Future<frb.KeyExportResponse> exportSshPrivateKey({
     required frb.ExportSshKeyRequest request,
   }) => frb.exportSshPrivateKey(request: request);
+
+  @override
+  Future<frb.UnitResponse> deleteSshKey({
+    required frb.DeleteSshKeyRequest request,
+  }) => frb.deleteSshKey(request: request);
 
   @override
   Future<frb.OpenExternalUrlResponse> openGithubSshSettings({

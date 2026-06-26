@@ -108,6 +108,7 @@ fn pgp_backend_trait_covers_milestone_four_operations() {
     let _ = backend.import_private_key(&SecretString::new("private".into()));
     let _ = backend.export_public_key("ABC123");
     let _ = backend.export_private_key("ABC123", None);
+    let _ = backend.delete_key("ABC123");
     let _ = backend.list_keys();
     let _ = backend.inspect_fingerprint("alice@example.com");
     let _ = backend.validate_gpg_id(Path::new("/store"), Path::new("/store/entry.gpg"));
@@ -155,6 +156,10 @@ impl PgpBackend for RecordingBackend {
         _passphrase: Option<&SecretString>,
     ) -> PgpBackendResult<KeyExportResult> {
         Ok(KeyExportResult { armored_text: "private".to_string() })
+    }
+
+    fn delete_key(&self, _fingerprint: &str) -> PgpBackendResult<()> {
+        Ok(())
     }
 
     fn list_keys(&self) -> PgpBackendResult<Vec<PgpKeySummary>> {
