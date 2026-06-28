@@ -10,6 +10,7 @@ import 'package:pars_gui/services/fake_pars_repository.dart';
 import 'package:pars_gui/services/git_repository.dart';
 import 'package:pars_gui/services/key_repository.dart';
 import 'package:pars_gui/services/pass_entry_parser.dart';
+import 'package:pars_gui/services/path_picker_service.dart';
 import 'package:pars_gui/services/security_repository.dart';
 import 'package:pars_gui/services/settings_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
@@ -234,6 +235,15 @@ void main() {
       tester,
     ) async {
       final repository = _OnboardingBranchRepository(storeReady: false);
+      final pathPicker = _FakePathPickerService(
+        folderResults: <String?>[
+          switch (branch) {
+            _StoreBranch.create => '/tmp',
+            _StoreBranch.import => '/tmp/imported',
+            _StoreBranch.clone => '/tmp',
+          },
+        ],
+      );
 
       await tester.pumpWidget(
         ParsGuiApp(
@@ -246,6 +256,7 @@ void main() {
             onboardingComplete: false,
             lastUnlockedAt: DateTime.now(),
           ),
+          pathPickerService: pathPicker,
         ),
       );
 
@@ -268,15 +279,17 @@ void main() {
         case _StoreBranch.create:
           await tester.tap(find.text('Create local store'));
           await tester.pumpAndSettle();
-          await tester.enterText(find.byType(TextField).at(1), '/tmp/pass');
+          await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+          await tester.pumpAndSettle();
           expect(find.text('PGP keys'), findsNothing);
-          await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+          await tester.tap(find.widgetWithText(FilledButton, 'Create').last);
           break;
         case _StoreBranch.import:
           await tester.tap(find.text('Import local store'));
           await tester.pumpAndSettle();
-          await tester.enterText(find.byType(TextField).last, '/tmp/imported');
-          await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+          await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
           break;
         case _StoreBranch.clone:
           await tester.tap(find.text('Clone Git store'));
@@ -285,8 +298,9 @@ void main() {
             find.byType(TextField).at(0),
             'git@example.com:org/pass.git',
           );
-          await tester.enterText(find.byType(TextField).at(1), '/tmp/cloned');
-          await tester.tap(find.widgetWithText(FilledButton, 'Clone'));
+          await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Clone').last);
           break;
       }
       await tester.pumpAndSettle();
@@ -295,7 +309,7 @@ void main() {
       if (branch == _StoreBranch.create) {
         expect(
           repository.storeActions.single,
-          'create:Personal:/tmp/pass:ABCD 1234:git:true',
+          'create:Personal:/tmp/personal:ABCD 1234:git:true',
         );
       }
       expect(find.text('Review setup'), findsOneWidget);
@@ -329,12 +343,87 @@ void main() {
 
     expect(find.text('Local path'), findsNothing);
     await tester.enterText(find.byType(TextField).first, 'Work Store');
-    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Create').last);
     await tester.pumpAndSettle();
 
     expect(
       repository.storeActions.single,
       'create:Work Store:/app/support/stores/work-store:ABCD 1234:git:false',
+    );
+  });
+
+  testWidgets('onboarding store forms use native folder picker rows', (
+    tester,
+  ) async {
+    final repository = _OnboardingBranchRepository(storeReady: false);
+    final pathPicker = _FakePathPickerService(
+      folderResults: <String?>[
+        '/Users/alice/Stores',
+        '/Users/alice/Imported Store',
+        '/Users/alice/Clones',
+      ],
+    );
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          onboardingComplete: false,
+          lastUnlockedAt: DateTime.now(),
+        ),
+        pathPickerService: pathPicker,
+      ),
+    );
+
+    await tester.tap(find.text('Use PGP key'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Skip SSH'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Create local store'));
+    await tester.pumpAndSettle();
+    expect(find.text('Store folder'), findsOneWidget);
+    expect(find.text('Default: /tmp/personal'), findsOneWidget);
+    expect(find.text('Local path'), findsNothing);
+    expect(
+      tester
+          .widgetList<FilledButton>(find.widgetWithText(FilledButton, 'Create'))
+          .last
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Selected: /Users/alice/Stores/personal'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Create').last);
+    await tester.pumpAndSettle();
+    expect(
+      repository.storeActions.single,
+      'create:Personal:/Users/alice/Stores/personal:ABCD 1234:git:true',
+    );
+    expect(pathPicker.folderInitialDirectories.first, '/tmp');
+
+    repository.storeReady = false;
+    repository.storeActions.clear();
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('Set up password store'), findsOneWidget);
+    await tester.tap(find.text('Import local store'));
+    await tester.pumpAndSettle();
+    expect(find.text('Store folder'), findsOneWidget);
+    expect(find.text('Local path'), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Selected: /Users/alice/Imported Store'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
+    await tester.pumpAndSettle();
+    expect(
+      repository.storeActions.single,
+      'import:/Users/alice/Imported Store',
     );
   });
 
@@ -1188,6 +1277,364 @@ void main() {
     expect(find.text('No password stores'), findsOneWidget);
   });
 
+  testWidgets('settings keeps PGP and SSH key sheets separate', (tester) async {
+    final repository = _KeyManagementSettingsRepository();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+    );
+    expect(find.text('PGP keys'), findsWidgets);
+    expect(find.text(_settingsPrimaryPgpKey.name), findsOneWidget);
+    expect(find.text(_settingsSshKey.name), findsNothing);
+    Navigator.of(tester.element(find.text('PGP keys').last)).pop();
+    await tester.pumpAndSettle();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.ssh,
+    );
+    expect(find.text('SSH keys'), findsWidgets);
+    expect(find.text(_settingsSshKey.name), findsOneWidget);
+    expect(find.text(_settingsPrimaryPgpKey.name), findsNothing);
+  });
+
+  testWidgets('settings key sheets expose only create and import globally', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+    );
+    expect(find.widgetWithText(FilledButton, 'Create'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Import'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Import file'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Export public'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Export private'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Add to .gpg-id'), findsNothing);
+    Navigator.of(tester.element(find.text('PGP keys').last)).pop();
+    await tester.pumpAndSettle();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.ssh,
+    );
+    expect(find.widgetWithText(FilledButton, 'Create'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Import'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Import file'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Export public'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Export private'), findsNothing);
+    expect(
+      find.widgetWithText(OutlinedButton, 'GitHub settings'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('settings import action handles text and file imports', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository();
+    final pathPicker = _FakePathPickerService(
+      fileResults: <String?>['/tmp/deploy.key'],
+    );
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+      pathPickerService: pathPicker,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, 'Text'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'File'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Text'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'PGP PUBLIC KEY');
+    await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.text('PGP keys').last)).pop();
+    await tester.pumpAndSettle();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.ssh,
+      pathPickerService: pathPicker,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, 'Text'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'File'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'File'));
+    await tester.pumpAndSettle();
+    expect(find.text('Key file'), findsOneWidget);
+    expect(find.text('Path'), findsNothing);
+    expect(find.text('Default: /tmp'), findsOneWidget);
+    expect(
+      tester
+          .widgetList<FilledButton>(find.widgetWithText(FilledButton, 'Import'))
+          .last
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(find.byType(TextField).at(0), 'deploy-key');
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Selected: /tmp/deploy.key'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+    await tester.pumpAndSettle();
+
+    expect(repository.keyActions, <String>[
+      'import-pgp-public:PGP PUBLIC KEY',
+      'import-ssh-file:deploy-key:/tmp/deploy.key',
+    ]);
+    expect(pathPicker.fileInitialDirectories.single, '/tmp');
+  });
+
+  testWidgets('settings store forms use native folder picker rows', (
+    tester,
+  ) async {
+    final repository = _StorePathSettingsRepository();
+    final pathPicker = _FakePathPickerService(
+      folderResults: <String?>[
+        '/Users/alice/Stores',
+        '/Users/alice/Existing Store',
+        '/Users/alice/Clones',
+      ],
+    );
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      pathPickerService: pathPicker,
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('Password stores'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('Password stores'));
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await tester.pumpAndSettle();
+    expect(find.text('Store folder'), findsOneWidget);
+    expect(
+      find.text('Default: /Users/alice/Password Stores/personal'),
+      findsOneWidget,
+    );
+    expect(find.text('Local path'), findsNothing);
+    expect(
+      tester
+          .widgetList<FilledButton>(find.widgetWithText(FilledButton, 'Create'))
+          .last
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Selected: /Users/alice/Stores/personal'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Create').last);
+    await tester.pumpAndSettle();
+    expect(
+      repository.storeActions.single,
+      'create:Personal:/Users/alice/Stores/personal::git:true',
+    );
+    expect(
+      pathPicker.folderInitialDirectories.first,
+      '/Users/alice/Password Stores',
+    );
+
+    repository.storeActions.clear();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    expect(find.text('Store folder'), findsOneWidget);
+    expect(find.text('Local path'), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Selected: /Users/alice/Existing Store'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
+    await tester.pumpAndSettle();
+    expect(
+      repository.storeActions.single,
+      'import:/Users/alice/Existing Store',
+    );
+
+    repository.storeActions.clear();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Clone'));
+    await tester.pumpAndSettle();
+    expect(find.text('Store folder'), findsOneWidget);
+    expect(find.text('Local path'), findsNothing);
+    await tester.enterText(
+      find.byType(TextField).first,
+      'git@example.com:org/pass.git',
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Selected: /Users/alice/Clones/pass'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Clone').last);
+    await tester.pumpAndSettle();
+    expect(
+      repository.storeActions.single,
+      'clone:git@example.com:org/pass.git:/Users/alice/Clones/pass',
+    );
+  });
+
+  testWidgets('settings picker rows handle cancellation and errors', (
+    tester,
+  ) async {
+    final repository = _StorePathSettingsRepository();
+    final pathPicker = _FakePathPickerService(
+      folderResults: <Object?>[
+        null,
+        const PathPickerException('Picker unavailable'),
+      ],
+    );
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      pathPickerService: pathPicker,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Password stores'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('Password stores'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Default: /Users/alice/Password Stores'), findsOneWidget);
+    expect(find.textContaining('Selected:'), findsNothing);
+    expect(
+      tester
+          .widgetList<FilledButton>(find.widgetWithText(FilledButton, 'Import'))
+          .last
+          .onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Picker unavailable'), findsOneWidget);
+    expect(repository.storeActions, isEmpty);
+  });
+
+  testWidgets('settings keeps store and key path pickers separate', (
+    tester,
+  ) async {
+    final repository = _StorePathSettingsRepository();
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      pathPickerService: _FakePathPickerService(),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Password stores'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('Password stores'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    expect(find.text('Import local store'), findsOneWidget);
+    expect(find.text('Store folder'), findsOneWidget);
+    expect(find.text('Key file'), findsNothing);
+    Navigator.of(tester.element(find.text('Import local store'))).pop();
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.text('Password stores').last)).pop();
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('PGP keys'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('PGP keys'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'File'));
+    await tester.pumpAndSettle();
+    expect(find.text('Import PGP key file'), findsOneWidget);
+    expect(find.text('Key file'), findsOneWidget);
+    expect(find.text('Store folder'), findsNothing);
+  });
+
+  testWidgets('settings PGP row menu targets the selected key', (tester) async {
+    final repository = _KeyManagementSettingsRepository();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+    );
+    await tester.tap(
+      find.byTooltip('Actions for PGP key ${_settingsBackupPgpKey.name}'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Export public'), findsOneWidget);
+    expect(find.text('Export private'), findsOneWidget);
+    expect(find.text('Add to .gpg-id'), findsOneWidget);
+    expect(find.text('Delete key'), findsOneWidget);
+
+    await tester.tap(find.text('Export public'));
+    await tester.pumpAndSettle();
+    expect(repository.keyActions, <String>['export-pgp-public:PGP-BACKUP']);
+    Navigator.of(tester.element(find.text('Exported key'))).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byTooltip('Actions for PGP key ${_settingsBackupPgpKey.name}'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add to .gpg-id'));
+    await tester.pumpAndSettle();
+    expect(repository.keyActions, <String>[
+      'export-pgp-public:PGP-BACKUP',
+      'add-pgp:PGP-BACKUP',
+    ]);
+  });
+
+  testWidgets('settings SSH row menu targets the selected key', (tester) async {
+    final repository = _KeyManagementSettingsRepository();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.ssh,
+    );
+    await tester.tap(
+      find.byTooltip('Actions for SSH key ${_settingsSshKey.name}'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Export public'), findsOneWidget);
+    expect(find.text('Export private'), findsOneWidget);
+    expect(find.text('Delete key'), findsOneWidget);
+    expect(find.text('Add to .gpg-id'), findsNothing);
+
+    await tester.tap(find.text('Export public'));
+    await tester.pumpAndSettle();
+    expect(repository.keyActions, <String>['export-ssh-public:github-mobile']);
+  });
+
   testWidgets(
     'settings deletes PGP key after exact confirmation and clears cache',
     (tester) async {
@@ -1443,30 +1890,8 @@ void main() {
   testWidgets('settings advanced git args show failed output', (tester) async {
     final repository = _GitSettingsRepository(failAdvancedArgs: true);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SettingsScreen(
-            settingsRepository: repository,
-            keyRepository: repository,
-            gitRepository: repository,
-            securityRepository: InMemorySecurityRepository(),
-          ),
-        ),
-      ),
-    );
+    await _pumpAdvancedGitArgsSheet(tester, repository);
 
-    await tester.scrollUntilVisible(
-      find.text('Advanced git args'),
-      300,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.drag(find.byType(Scrollable).last, const Offset(0, -260));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Advanced git args'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('git status'), findsOneWidget);
     await tester.enterText(find.byType(TextField).first, 'status --bad');
     await tester.pumpAndSettle();
     expect(find.text('git status --bad'), findsOneWidget);
@@ -1477,6 +1902,33 @@ void main() {
     expect(find.text('Failed'), findsOneWidget);
     expect(find.text('Exit: 128'), findsOneWidget);
     expect(find.text('fatal: bad revision'), findsOneWidget);
+  });
+
+  testWidgets('settings advanced git args opens with hint only', (
+    tester,
+  ) async {
+    final repository = _GitSettingsRepository();
+
+    await _pumpAdvancedGitArgsSheet(tester, repository);
+
+    final field = tester.widget<TextField>(find.byType(TextField).first);
+    expect(field.controller?.text, isEmpty);
+    expect(field.decoration?.hintText, 'status, log');
+    expect(find.text('git status'), findsNothing);
+    expect(repository.gitCalls, isEmpty);
+  });
+
+  testWidgets('settings advanced git args does not execute untouched hint', (
+    tester,
+  ) async {
+    final repository = _GitSettingsRepository();
+
+    await _pumpAdvancedGitArgsSheet(tester, repository);
+    await tester.tap(find.text('Run selected command'));
+    await tester.pumpAndSettle();
+
+    expect(repository.gitCalls, isEmpty);
+    expect(find.text('Enter at least one Git argument.'), findsOneWidget);
   });
 
   testWidgets('accepts repository interfaces for app state', (tester) async {
@@ -2016,6 +2468,7 @@ Future<void> _pumpSettingsScreen(
   WidgetTester tester, {
   required _InjectedRepository repository,
   required SecurityRepository securityRepository,
+  PathPickerService? pathPickerService,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -2025,10 +2478,49 @@ Future<void> _pumpSettingsScreen(
           keyRepository: repository,
           gitRepository: repository,
           securityRepository: securityRepository,
+          pathPickerService: pathPickerService ?? _FakePathPickerService(),
         ),
       ),
     ),
   );
+}
+
+Future<void> _pumpKeyManagementSheet(
+  WidgetTester tester, {
+  required _InjectedRepository repository,
+  required KeyRecordType type,
+  PathPickerService? pathPickerService,
+}) async {
+  await _pumpSettingsScreen(
+    tester,
+    repository: repository,
+    securityRepository: InMemorySecurityRepository(),
+    pathPickerService: pathPickerService,
+  );
+  await tester.tap(
+    find.text(type == KeyRecordType.pgp ? 'PGP keys' : 'SSH keys'),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpAdvancedGitArgsSheet(
+  WidgetTester tester,
+  _GitSettingsRepository repository,
+) async {
+  await _pumpSettingsScreen(
+    tester,
+    repository: repository,
+    securityRepository: InMemorySecurityRepository(),
+  );
+  await tester.scrollUntilVisible(
+    find.text('Advanced git args'),
+    300,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.drag(find.byType(Scrollable).last, const Offset(0, -260));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Advanced git args'));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _backgroundApp(WidgetTester tester) async {
@@ -2342,9 +2834,81 @@ class _KeyManagementSettingsRepository extends _InjectedRepository {
   final bool failPgpDelete;
   final List<KeyRecord> _keys;
   final List<String> deleteActions = <String>[];
+  final List<String> keyActions = <String>[];
 
   @override
   List<KeyRecord> get keys => List<KeyRecord>.unmodifiable(_keys);
+
+  @override
+  Future<KeyRecord> importPgpPublicKeyText(String armoredText) async {
+    keyActions.add('import-pgp-public:$armoredText');
+    return _settingsBackupPgpKey;
+  }
+
+  @override
+  Future<KeyRecord> importPgpPrivateKeyText(String armoredText) async {
+    keyActions.add('import-pgp-private:$armoredText');
+    return _settingsBackupPgpKey;
+  }
+
+  @override
+  Future<KeyRecord> importPgpPrivateKeyFile(String path) async {
+    keyActions.add('import-pgp-file:$path');
+    return _settingsBackupPgpKey;
+  }
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyText({
+    required String name,
+    required String privateKey,
+  }) async {
+    keyActions.add('import-ssh-text:$name:$privateKey');
+    return _settingsSshKey;
+  }
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyFile({
+    required String name,
+    required String path,
+  }) async {
+    keyActions.add('import-ssh-file:$name:$path');
+    return _settingsSshKey;
+  }
+
+  @override
+  Future<String> exportPgpPublicKey(String fingerprint) async {
+    keyActions.add('export-pgp-public:$fingerprint');
+    return 'pgp public $fingerprint';
+  }
+
+  @override
+  Future<String> exportPgpPrivateKey({
+    required String fingerprint,
+    required String confirmation,
+  }) async {
+    keyActions.add('export-pgp-private:$fingerprint:$confirmation');
+    return 'pgp private $fingerprint';
+  }
+
+  @override
+  Future<void> addPgpKeyToSelectedStore(String fingerprint) async {
+    keyActions.add('add-pgp:$fingerprint');
+  }
+
+  @override
+  Future<String> exportSshPublicKey(String name) async {
+    keyActions.add('export-ssh-public:$name');
+    return 'ssh public $name';
+  }
+
+  @override
+  Future<String> exportSshPrivateKey({
+    required String name,
+    required String confirmation,
+  }) async {
+    keyActions.add('export-ssh-private:$name:$confirmation');
+    return 'ssh private $name';
+  }
 
   @override
   Future<void> deletePgpKey(String fingerprint) async {
@@ -2363,6 +2927,102 @@ class _KeyManagementSettingsRepository extends _InjectedRepository {
     _keys.removeWhere(
       (key) => key.type == KeyRecordType.ssh && key.name == name,
     );
+  }
+}
+
+class _StorePathSettingsRepository extends _KeyManagementSettingsRepository {
+  final List<String> storeActions = <String>[];
+
+  @override
+  StoreLifecycleSnapshot get lifecycle => const StoreLifecycleSnapshot(
+    configPath: '/Users/alice/.config/pars/config.toml',
+    configExists: true,
+    selectedStoreId: 'personal',
+    selectedStoreRoot: '/Users/alice/Password Stores/personal',
+    onboardingState: StoreOnboardingState.ready,
+    issues: <String>[],
+    stores: <StoreStatus>[
+      StoreStatus(
+        id: 'personal',
+        name: 'Personal',
+        root: '/Users/alice/Password Stores/personal',
+        isDefault: true,
+        exists: true,
+        hasGpgId: true,
+        hasGitRemote: true,
+        pgpKeyMissing: false,
+        issues: <String>[],
+      ),
+    ],
+  );
+
+  @override
+  List<StoreStatus> get stores => lifecycle.stores;
+
+  @override
+  Future<void> createLocalStore({
+    required String name,
+    required String root,
+    required List<String> pgpKeys,
+    required bool setDefault,
+    required bool initializeGit,
+  }) async {
+    storeActions.add(
+      'create:$name:$root:${pgpKeys.join(',')}:git:$initializeGit',
+    );
+  }
+
+  @override
+  Future<void> importLocalStore({
+    required String root,
+    required bool setDefault,
+  }) async {
+    storeActions.add('import:$root');
+  }
+
+  @override
+  Future<void> cloneStore({
+    required String remoteUrl,
+    required String root,
+    required bool setDefault,
+  }) async {
+    storeActions.add('clone:$remoteUrl:$root');
+  }
+}
+
+class _FakePathPickerService implements PathPickerService {
+  _FakePathPickerService({
+    List<Object?>? folderResults,
+    List<Object?>? fileResults,
+  }) : _folderResults = List<Object?>.of(folderResults ?? const <Object?>[]),
+       _fileResults = List<Object?>.of(fileResults ?? const <Object?>[]);
+
+  final List<Object?> _folderResults;
+  final List<Object?> _fileResults;
+  final List<String> folderInitialDirectories = <String>[];
+  final List<String> fileInitialDirectories = <String>[];
+
+  @override
+  Future<String?> pickFolder({required String initialDirectory}) async {
+    folderInitialDirectories.add(initialDirectory);
+    return _next(_folderResults);
+  }
+
+  @override
+  Future<String?> pickFile({required String initialDirectory}) async {
+    fileInitialDirectories.add(initialDirectory);
+    return _next(_fileResults);
+  }
+
+  String? _next(List<Object?> results) {
+    if (results.isEmpty) {
+      return null;
+    }
+    final result = results.removeAt(0);
+    if (result is Exception) {
+      throw result;
+    }
+    return result as String?;
   }
 }
 

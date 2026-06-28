@@ -4,12 +4,14 @@ import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../services/git_repository.dart';
 import '../../services/key_repository.dart';
+import '../../services/path_picker_service.dart';
 import '../../services/runtime_diagnostics.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/gesture_setup_panel.dart';
+import '../../widgets/path_picker_row.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
@@ -18,6 +20,7 @@ class SettingsScreen extends StatelessWidget {
     required this.keyRepository,
     required this.gitRepository,
     required this.securityRepository,
+    this.pathPickerService = const SystemPathPickerService(),
     this.onSecuritySettingsChanged,
     this.runDuringSystemAuthentication,
     this.onOnboardingReset,
@@ -27,6 +30,7 @@ class SettingsScreen extends StatelessWidget {
   final KeyRepository keyRepository;
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
+  final PathPickerService pathPickerService;
   final VoidCallback? onSecuritySettingsChanged;
   final Future<T> Function<T>(Future<T> Function() action)?
   runDuringSystemAuthentication;
@@ -706,21 +710,27 @@ class SettingsScreen extends StatelessWidget {
                                 tooltip:
                                     'Actions for ${key.typeLabel} key ${key.name}',
                                 onSelected: (value) {
-                                  if (value == 'delete') {
-                                    _showDeleteKeyDialog(
-                                      context,
-                                      key,
-                                      setSheetState,
-                                    );
+                                  switch (value) {
+                                    case 'export_public':
+                                      _exportPublicKey(context, key);
+                                      break;
+                                    case 'export_private':
+                                      _showPrivateExportForm(context, key);
+                                      break;
+                                    case 'add_to_store':
+                                      _addPgpKeyToStore(context, key);
+                                      break;
+                                    case 'delete':
+                                      _showDeleteKeyDialog(
+                                        context,
+                                        key,
+                                        setSheetState,
+                                      );
+                                      break;
                                   }
                                 },
                                 itemBuilder:
-                                    (context) => const <PopupMenuEntry<String>>[
-                                      PopupMenuItem<String>(
-                                        value: 'delete',
-                                        child: Text('Delete key'),
-                                      ),
-                                    ],
+                                    (context) => _keyActionMenuItems(key.type),
                               ),
                             ),
                           ),
@@ -736,45 +746,9 @@ class SettingsScreen extends StatelessWidget {
                             ),
                             OutlinedButton(
                               onPressed:
-                                  () => _showImportKeyForm(context, type),
+                                  () => _showImportKeyOptions(context, type),
                               child: const Text('Import'),
                             ),
-                            OutlinedButton(
-                              onPressed:
-                                  () => _showImportKeyFileForm(context, type),
-                              child: const Text('Import file'),
-                            ),
-                            OutlinedButton(
-                              onPressed:
-                                  keys.isEmpty
-                                      ? null
-                                      : () =>
-                                          _exportPublicKey(context, keys.first),
-                              child: const Text('Export public'),
-                            ),
-                            OutlinedButton(
-                              onPressed:
-                                  keys.isEmpty
-                                      ? null
-                                      : () => _showPrivateExportForm(
-                                        context,
-                                        keys.first,
-                                      ),
-                              child: const Text('Export private'),
-                            ),
-                            if (type == KeyRecordType.pgp && keys.isNotEmpty)
-                              OutlinedButton(
-                                onPressed:
-                                    () =>
-                                        _addPgpKeyToStore(context, keys.first),
-                                child: const Text('Add to .gpg-id'),
-                              ),
-                            if (type == KeyRecordType.ssh)
-                              OutlinedButton(
-                                onPressed:
-                                    () => _showGithubSettingsUrl(context),
-                                child: const Text('GitHub settings'),
-                              ),
                           ],
                         ),
                       ],
@@ -785,6 +759,26 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
     );
+  }
+
+  List<PopupMenuEntry<String>> _keyActionMenuItems(KeyRecordType type) {
+    return <PopupMenuEntry<String>>[
+      const PopupMenuItem<String>(
+        value: 'export_public',
+        child: Text('Export public'),
+      ),
+      const PopupMenuItem<String>(
+        value: 'export_private',
+        child: Text('Export private'),
+      ),
+      if (type == KeyRecordType.pgp)
+        const PopupMenuItem<String>(
+          value: 'add_to_store',
+          child: Text('Add to .gpg-id'),
+        ),
+      const PopupMenuDivider(),
+      const PopupMenuItem<String>(value: 'delete', child: Text('Delete key')),
+    ];
   }
 
   void _showDeleteKeyDialog(
@@ -942,6 +936,35 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showImportKeyOptions(BuildContext context, KeyRecordType type) {
+    final sheetContext = context;
+    showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(
+              type == KeyRecordType.pgp ? 'Import PGP key' : 'Import SSH key',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  _showImportKeyForm(sheetContext, type);
+                },
+                child: const Text('Text'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  _showImportKeyFileForm(sheetContext, type);
+                },
+                child: const Text('File'),
+              ),
+            ],
+          ),
+    );
+  }
+
   void _showImportKeyForm(BuildContext context, KeyRecordType type) {
     final name = TextEditingController();
     final keyText = TextEditingController();
@@ -1002,52 +1025,128 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _chooseFolder(
+    BuildContext context, {
+    required String initialDirectory,
+    required ValueChanged<String> onSelected,
+  }) async {
+    try {
+      final path = await pathPickerService.pickFolder(
+        initialDirectory: initialDirectory,
+      );
+      if (path == null) {
+        return;
+      }
+      onSelected(path);
+    } catch (error) {
+      if (!context.mounted) return;
+      AppNotification.show(context, '$error');
+    }
+  }
+
+  Future<void> _chooseFile(
+    BuildContext context, {
+    required String initialDirectory,
+    required ValueChanged<String> onSelected,
+  }) async {
+    try {
+      final path = await pathPickerService.pickFile(
+        initialDirectory: initialDirectory,
+      );
+      if (path == null) {
+        return;
+      }
+      onSelected(path);
+    } catch (error) {
+      if (!context.mounted) return;
+      AppNotification.show(context, '$error');
+    }
+  }
+
+  String _defaultStoreBasePath() {
+    final selectedRoot = settingsRepository.lifecycle.selectedStoreRoot;
+    if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
+      return parentDirectory(selectedRoot);
+    }
+    if (settingsRepository.stores.isNotEmpty) {
+      return parentDirectory(settingsRepository.stores.first.root);
+    }
+    return parentDirectory(settingsRepository.lifecycle.configPath);
+  }
+
+  String _defaultKeyFileBasePath() {
+    final selectedRoot = settingsRepository.lifecycle.selectedStoreRoot;
+    if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
+      return parentDirectory(selectedRoot);
+    }
+    return parentDirectory(settingsRepository.lifecycle.configPath);
+  }
+
   void _showImportKeyFileForm(BuildContext context, KeyRecordType type) {
     final name = TextEditingController();
-    final path = TextEditingController();
+    final defaultPath = _defaultKeyFileBasePath();
+    String? selectedPath;
     showDialog<void>(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: Text(
-              type == KeyRecordType.pgp
-                  ? 'Import PGP key file'
-                  : 'Import SSH key file',
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (type == KeyRecordType.ssh)
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'Name'),
+          (context) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  title: Text(
+                    type == KeyRecordType.pgp
+                        ? 'Import PGP key file'
+                        : 'Import SSH key file',
                   ),
-                TextField(
-                  controller: path,
-                  decoration: const InputDecoration(labelText: 'Path'),
-                ),
-              ],
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed:
-                    () => _runKeyAction(
-                      context,
-                      () =>
-                          type == KeyRecordType.pgp
-                              ? keyRepository.importPgpPrivateKeyFile(path.text)
-                              : keyRepository.importSshPrivateKeyFile(
-                                name: name.text,
-                                path: path.text,
-                              ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      if (type == KeyRecordType.ssh)
+                        TextField(
+                          controller: name,
+                          decoration: const InputDecoration(labelText: 'Name'),
+                        ),
+                      if (type == KeyRecordType.ssh) const SizedBox(height: 12),
+                      PathPickerRow(
+                        title: 'Key file',
+                        path: selectedPath ?? defaultPath,
+                        isSelected: selectedPath != null,
+                        onPressed:
+                            () => _chooseFile(
+                              context,
+                              initialDirectory: defaultPath,
+                              onSelected:
+                                  (path) => setDialogState(() {
+                                    selectedPath = path;
+                                  }),
+                            ),
+                      ),
+                    ],
+                  ),
+                  actions: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
                     ),
-                child: const Text('Import'),
-              ),
-            ],
+                    FilledButton(
+                      onPressed:
+                          selectedPath == null
+                              ? null
+                              : () => _runKeyAction(
+                                context,
+                                () =>
+                                    type == KeyRecordType.pgp
+                                        ? keyRepository.importPgpPrivateKeyFile(
+                                          selectedPath!,
+                                        )
+                                        : keyRepository.importSshPrivateKeyFile(
+                                          name: name.text,
+                                          path: selectedPath!,
+                                        ),
+                              ),
+                      child: const Text('Import'),
+                    ),
+                  ],
+                ),
           ),
     );
   }
@@ -1151,25 +1250,6 @@ class SettingsScreen extends StatelessWidget {
       if (!context.mounted) return;
       AppNotification.show(context, error.toString());
     }
-  }
-
-  Future<void> _showGithubSettingsUrl(BuildContext context) async {
-    final url = await keyRepository.githubSshSettingsUri();
-    if (!context.mounted) return;
-    showDialog<void>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('GitHub SSH settings'),
-            content: SelectableText(url.toString()),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-    );
   }
 
   void _showPasswordStores(BuildContext context) {
@@ -1292,30 +1372,18 @@ class SettingsScreen extends StatelessWidget {
 
   void _showCreateStoreForm(BuildContext context) {
     final name = TextEditingController(text: 'Personal');
-    final root = TextEditingController();
     final keys = TextEditingController();
-    _showStoreForm(
+    final defaultBase = _defaultStoreBasePath();
+    String? selectedBase;
+    _showPickerStoreForm(
       context: context,
       title: 'Create local store',
-      fields: <Widget>[
-        TextField(
-          controller: name,
-          decoration: const InputDecoration(labelText: 'Name'),
-        ),
-        TextField(
-          controller: root,
-          decoration: const InputDecoration(labelText: 'Local path'),
-        ),
-        TextField(
-          controller: keys,
-          decoration: const InputDecoration(labelText: 'PGP keys'),
-        ),
-      ],
       submitLabel: 'Create',
+      canSubmit: () => selectedBase != null,
       onSubmit:
           () => settingsRepository.createLocalStore(
             name: name.text,
-            root: root.text,
+            root: joinFilesystemPath(selectedBase!, slugPathSegment(name.text)),
             pgpKeys: keys.text
                 .split(',')
                 .map((key) => key.trim())
@@ -1324,51 +1392,170 @@ class SettingsScreen extends StatelessWidget {
             setDefault: true,
             initializeGit: true,
           ),
+      builder:
+          (sheetContext, setSheetState) => <Widget>[
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Name'),
+              onChanged: (_) => setSheetState(() {}),
+            ),
+            const SizedBox(height: 12),
+            PathPickerRow(
+              title: 'Store folder',
+              path: joinFilesystemPath(
+                selectedBase ?? defaultBase,
+                slugPathSegment(name.text),
+              ),
+              isSelected: selectedBase != null,
+              onPressed:
+                  () => _chooseFolder(
+                    sheetContext,
+                    initialDirectory: defaultBase,
+                    onSelected:
+                        (path) => setSheetState(() {
+                          selectedBase = path;
+                        }),
+                  ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: keys,
+              decoration: const InputDecoration(labelText: 'PGP keys'),
+            ),
+          ],
     );
   }
 
   void _showImportStoreForm(BuildContext context) {
-    final root = TextEditingController();
-    _showStoreForm(
+    final defaultBase = _defaultStoreBasePath();
+    String? selectedRoot;
+    _showPickerStoreForm(
       context: context,
       title: 'Import local store',
-      fields: <Widget>[
-        TextField(
-          controller: root,
-          decoration: const InputDecoration(labelText: 'Local path'),
-        ),
-      ],
       submitLabel: 'Import',
+      canSubmit: () => selectedRoot != null,
       onSubmit:
           () => settingsRepository.importLocalStore(
-            root: root.text,
+            root: selectedRoot!,
             setDefault: true,
           ),
+      builder:
+          (sheetContext, setSheetState) => <Widget>[
+            PathPickerRow(
+              title: 'Store folder',
+              path: selectedRoot ?? defaultBase,
+              isSelected: selectedRoot != null,
+              onPressed:
+                  () => _chooseFolder(
+                    sheetContext,
+                    initialDirectory: defaultBase,
+                    onSelected:
+                        (path) => setSheetState(() {
+                          selectedRoot = path;
+                        }),
+                  ),
+            ),
+          ],
     );
   }
 
   void _showCloneStoreForm(BuildContext context) {
     final remote = TextEditingController();
-    final root = TextEditingController();
-    _showStoreForm(
+    final defaultBase = _defaultStoreBasePath();
+    String? selectedBase;
+    _showPickerStoreForm(
       context: context,
       title: 'Clone Git store',
-      fields: <Widget>[
-        TextField(
-          controller: remote,
-          decoration: const InputDecoration(labelText: 'Remote URL'),
-        ),
-        TextField(
-          controller: root,
-          decoration: const InputDecoration(labelText: 'Local path'),
-        ),
-      ],
       submitLabel: 'Clone',
+      canSubmit: () => selectedBase != null,
       onSubmit:
           () => settingsRepository.cloneStore(
             remoteUrl: remote.text,
-            root: root.text,
+            root: joinFilesystemPath(
+              selectedBase!,
+              slugFromRemoteUrl(remote.text),
+            ),
             setDefault: true,
+          ),
+      builder:
+          (sheetContext, setSheetState) => <Widget>[
+            TextField(
+              controller: remote,
+              decoration: const InputDecoration(labelText: 'Remote URL'),
+              onChanged: (_) => setSheetState(() {}),
+            ),
+            const SizedBox(height: 12),
+            PathPickerRow(
+              title: 'Store folder',
+              path: joinFilesystemPath(
+                selectedBase ?? defaultBase,
+                slugFromRemoteUrl(remote.text),
+              ),
+              isSelected: selectedBase != null,
+              onPressed:
+                  () => _chooseFolder(
+                    sheetContext,
+                    initialDirectory: defaultBase,
+                    onSelected:
+                        (path) => setSheetState(() {
+                          selectedBase = path;
+                        }),
+                  ),
+            ),
+          ],
+    );
+  }
+
+  void _showPickerStoreForm({
+    required BuildContext context,
+    required String title,
+    required String submitLabel,
+    required bool Function() canSubmit,
+    required List<Widget> Function(BuildContext, StateSetter) builder,
+    required Future<void> Function() onSubmit,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setSheetState) => SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 20,
+                      bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 12),
+                        ...builder(context, setSheetState),
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed:
+                              canSubmit()
+                                  ? () async {
+                                    await _runStoreAction(context, onSubmit);
+                                  }
+                                  : null,
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Center(child: Text(submitLabel)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
           ),
     );
   }
@@ -1722,7 +1909,7 @@ class SettingsScreen extends StatelessWidget {
 
   void _showGitArgs(BuildContext context) {
     final git = _gitOperations;
-    var argsText = 'status';
+    var argsText = '';
     var running = false;
     GitOperationResult? output;
     String? errorText;
@@ -1737,6 +1924,12 @@ class SettingsScreen extends StatelessWidget {
                 if (git == null) {
                   setSheetState(
                     () => errorText = 'Git operations are not available.',
+                  );
+                  return;
+                }
+                if (argsText.trim().isEmpty) {
+                  setSheetState(
+                    () => errorText = 'Enter at least one Git argument.',
                   );
                   return;
                 }
@@ -1796,7 +1989,7 @@ class SettingsScreen extends StatelessWidget {
                               child: TextFormField(
                                 initialValue: argsText,
                                 decoration: const InputDecoration(
-                                  hintText: 'status',
+                                  hintText: 'status, log',
                                 ),
                                 onChanged: (value) {
                                   argsText = value;

@@ -8,6 +8,7 @@ import '../screens/shell/mobile_shell.dart';
 import '../services/fake_pars_repository.dart';
 import '../services/git_repository.dart';
 import '../services/key_repository.dart';
+import '../services/path_picker_service.dart';
 import '../services/security_repository.dart';
 import '../services/settings_repository.dart';
 import '../services/store_lifecycle.dart';
@@ -22,6 +23,7 @@ class ParsGuiApp extends StatefulWidget {
     required this.keyRepository,
     required this.gitRepository,
     required this.securityRepository,
+    this.pathPickerService = const SystemPathPickerService(),
     this.now = DateTime.now,
   });
 
@@ -42,6 +44,7 @@ class ParsGuiApp extends StatefulWidget {
   final KeyRepository keyRepository;
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
+  final PathPickerService pathPickerService;
   final DateTime Function() now;
 
   @override
@@ -130,6 +133,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
                 settingsRepository: widget.settingsRepository,
                 keyRepository: widget.keyRepository,
                 securityRepository: widget.securityRepository,
+                pathPickerService: widget.pathPickerService,
                 onComplete: () {
                   setState(() {
                     _isOnboardingComplete = true;
@@ -153,6 +157,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
                 keyRepository: widget.keyRepository,
                 gitRepository: widget.gitRepository,
                 securityRepository: widget.securityRepository,
+                pathPickerService: widget.pathPickerService,
                 onSecuritySettingsChanged: _scheduleAutoLock,
                 runDuringSystemAuthentication: _runDuringSystemAuthentication,
                 onOnboardingReset: () {

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../models/key_record.dart';
 import '../../services/key_repository.dart';
+import '../../services/path_picker_service.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
 import '../../widgets/gesture_setup_panel.dart';
+import '../../widgets/path_picker_row.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
@@ -14,12 +16,14 @@ class OnboardingScreen extends StatefulWidget {
     required this.securityRepository,
     this.settingsRepository,
     this.keyRepository,
+    this.pathPickerService = const SystemPathPickerService(),
   });
 
   final VoidCallback onComplete;
   final SecurityRepository securityRepository;
   final SettingsRepository? settingsRepository;
   final KeyRepository? keyRepository;
+  final PathPickerService pathPickerService;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -198,6 +202,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       lifecycle: lifecycle,
       selectedPgpFingerprint: _effectivePgpFingerprint,
       hasSshKey: _sshKeys.isNotEmpty,
+      pathPickerService: widget.pathPickerService,
       onStoreChanged: () async {
         await repository.refresh();
         await _attachSelectedPgpKeyToCurrentStore();
@@ -936,6 +941,7 @@ class _StoreSetupActions extends StatelessWidget {
     required this.lifecycle,
     required this.selectedPgpFingerprint,
     required this.hasSshKey,
+    required this.pathPickerService,
     required this.onStoreChanged,
   });
 
@@ -943,6 +949,7 @@ class _StoreSetupActions extends StatelessWidget {
   final StoreLifecycleSnapshot lifecycle;
   final String? selectedPgpFingerprint;
   final bool hasSshKey;
+  final PathPickerService pathPickerService;
   final Future<void> Function() onStoreChanged;
 
   AppManagedPathRepository? get _managedPaths {
@@ -997,27 +1004,20 @@ class _StoreSetupActions extends StatelessWidget {
 
   void _showCreateLocalStore(BuildContext context) {
     final name = TextEditingController(text: 'Personal');
-    final root = TextEditingController();
     final managedPaths = _managedPaths;
-    _showStoreForm(
+    final defaultBase = _defaultStoreBasePath();
+    String? selectedBase;
+    _showPickerStoreForm(
       context: context,
       title: 'Create local store',
-      fields: <Widget>[
-        TextField(
-          controller: name,
-          decoration: const InputDecoration(labelText: 'Name'),
-        ),
-        if (managedPaths == null)
-          TextField(
-            controller: root,
-            decoration: const InputDecoration(labelText: 'Local path'),
-          ),
-      ],
       submitLabel: 'Create',
+      canSubmit: () => managedPaths != null || selectedBase != null,
       onSubmit:
           () => repository.createLocalStore(
             name: name.text,
-            root: managedPaths?.storeRootForName(name.text) ?? root.text,
+            root:
+                managedPaths?.storeRootForName(name.text) ??
+                joinFilesystemPath(selectedBase!, slugPathSegment(name.text)),
             pgpKeys:
                 selectedPgpFingerprint == null
                     ? const <String>[]
@@ -1025,79 +1025,248 @@ class _StoreSetupActions extends StatelessWidget {
             setDefault: true,
             initializeGit: managedPaths == null,
           ),
+      builder:
+          (sheetContext, setSheetState) => <Widget>[
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Name'),
+              onChanged: (_) => setSheetState(() {}),
+            ),
+            const SizedBox(height: 12),
+            PathPickerRow(
+              title: 'Store folder',
+              path:
+                  managedPaths?.storeRootForName(name.text) ??
+                  joinFilesystemPath(
+                    selectedBase ?? defaultBase,
+                    slugPathSegment(name.text),
+                  ),
+              isSelected: selectedBase != null,
+              onPressed:
+                  managedPaths == null
+                      ? () => _chooseFolder(
+                        sheetContext,
+                        initialDirectory: defaultBase,
+                        onSelected:
+                            (path) => setSheetState(() {
+                              selectedBase = path;
+                            }),
+                      )
+                      : null,
+            ),
+          ],
     );
   }
 
   void _showImportLocalStore(BuildContext context) {
-    final root = TextEditingController();
-    _showStoreForm(
+    final defaultBase = _defaultStoreBasePath();
+    String? selectedRoot;
+    _showPickerStoreForm(
       context: context,
       title: 'Import local store',
-      fields: <Widget>[
-        TextField(
-          controller: root,
-          decoration: const InputDecoration(labelText: 'Local path'),
-        ),
-      ],
       submitLabel: 'Import',
+      canSubmit: () => selectedRoot != null,
       onSubmit:
-          () => repository.importLocalStore(root: root.text, setDefault: true),
+          () => repository.importLocalStore(
+            root: selectedRoot!,
+            setDefault: true,
+          ),
+      builder:
+          (sheetContext, setSheetState) => <Widget>[
+            PathPickerRow(
+              title: 'Store folder',
+              path: selectedRoot ?? defaultBase,
+              isSelected: selectedRoot != null,
+              onPressed:
+                  () => _chooseFolder(
+                    sheetContext,
+                    initialDirectory: defaultBase,
+                    onSelected:
+                        (path) => setSheetState(() {
+                          selectedRoot = path;
+                        }),
+                  ),
+            ),
+          ],
     );
   }
 
   void _showCloneStore(BuildContext context) {
     final remote = TextEditingController();
-    final root = TextEditingController();
     final managedPaths = _managedPaths;
-    _showStoreForm(
+    final defaultBase = _defaultStoreBasePath();
+    String? selectedBase;
+    _showPickerStoreForm(
       context: context,
       title: 'Clone Git store',
-      fields: <Widget>[
-        TextField(
-          controller: remote,
-          decoration: const InputDecoration(labelText: 'Remote URL'),
-        ),
-        if (managedPaths == null)
-          TextField(
-            controller: root,
-            decoration: const InputDecoration(labelText: 'Local path'),
-          ),
-      ],
       submitLabel: 'Clone',
+      canSubmit:
+          () => hasSshKey && (managedPaths != null || selectedBase != null),
       onSubmit:
           hasSshKey
               ? () => repository.cloneStore(
                 remoteUrl: remote.text,
                 root:
-                    managedPaths?.storeRootForRemote(remote.text) ?? root.text,
+                    managedPaths?.storeRootForRemote(remote.text) ??
+                    joinFilesystemPath(
+                      selectedBase!,
+                      slugFromRemoteUrl(remote.text),
+                    ),
                 setDefault: true,
               )
               : null,
+      builder:
+          (sheetContext, setSheetState) => <Widget>[
+            TextField(
+              controller: remote,
+              decoration: const InputDecoration(labelText: 'Remote URL'),
+              onChanged: (_) => setSheetState(() {}),
+            ),
+            const SizedBox(height: 12),
+            PathPickerRow(
+              title: 'Store folder',
+              path:
+                  managedPaths?.storeRootForRemote(remote.text) ??
+                  joinFilesystemPath(
+                    selectedBase ?? defaultBase,
+                    slugFromRemoteUrl(remote.text),
+                  ),
+              isSelected: selectedBase != null,
+              onPressed:
+                  managedPaths == null
+                      ? () => _chooseFolder(
+                        sheetContext,
+                        initialDirectory: defaultBase,
+                        onSelected:
+                            (path) => setSheetState(() {
+                              selectedBase = path;
+                            }),
+                      )
+                      : null,
+            ),
+          ],
     );
   }
 
-  void _showStoreForm({
+  Future<void> _chooseFolder(
+    BuildContext context, {
+    required String initialDirectory,
+    required ValueChanged<String> onSelected,
+  }) async {
+    try {
+      final path = await pathPickerService.pickFolder(
+        initialDirectory: initialDirectory,
+      );
+      if (path == null) {
+        return;
+      }
+      onSelected(path);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(SnackBar(content: Text('$error')));
+    }
+  }
+
+  String _defaultStoreBasePath() {
+    final selectedRoot = lifecycle.selectedStoreRoot;
+    if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
+      return parentDirectory(selectedRoot);
+    }
+    if (lifecycle.stores.isNotEmpty) {
+      return parentDirectory(lifecycle.stores.first.root);
+    }
+    return parentDirectory(lifecycle.configPath);
+  }
+
+  void _showPickerStoreForm({
     required BuildContext context,
     required String title,
-    required List<Widget> fields,
     required String submitLabel,
+    required bool Function() canSubmit,
+    required List<Widget> Function(BuildContext, StateSetter) builder,
     required Future<void> Function()? onSubmit,
   }) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder:
-          (context) => _OnboardingFormSheet(
-            title: title,
-            fields: fields,
-            submitLabel: submitLabel,
-            onSubmit:
-                onSubmit == null
-                    ? () async {}
-                    : () async {
-                      await onSubmit();
-                      await onStoreChanged();
-                    },
+          (context) => StatefulBuilder(
+            builder: (context, setSheetState) {
+              var isSubmitting = false;
+              String? error;
+              return StatefulBuilder(
+                builder:
+                    (context, setSubmitState) => SafeArea(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          left: 20,
+                          right: 20,
+                          top: 20,
+                          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                title,
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 12),
+                              ...builder(context, (callback) {
+                                setSheetState(callback);
+                              }),
+                              if (error != null) ...<Widget>[
+                                const SizedBox(height: 12),
+                                Text(
+                                  error!,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 16),
+                              FilledButton(
+                                onPressed:
+                                    isSubmitting ||
+                                            !canSubmit() ||
+                                            onSubmit == null
+                                        ? null
+                                        : () async {
+                                          setSubmitState(() {
+                                            isSubmitting = true;
+                                            error = null;
+                                          });
+                                          try {
+                                            await onSubmit();
+                                            await onStoreChanged();
+                                            if (context.mounted) {
+                                              Navigator.of(context).pop();
+                                            }
+                                          } catch (caught) {
+                                            if (!context.mounted) return;
+                                            setSubmitState(() {
+                                              error = caught.toString();
+                                              isSubmitting = false;
+                                            });
+                                          }
+                                        },
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: Center(child: Text(submitLabel)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+              );
+            },
           ),
     );
   }
