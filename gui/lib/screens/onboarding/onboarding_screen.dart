@@ -9,6 +9,10 @@ import '../../services/store_lifecycle.dart';
 import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
 
+part 'widgets/onboarding_key_setup_widgets.dart';
+part 'widgets/onboarding_step_widgets.dart';
+part 'widgets/onboarding_store_setup_widgets.dart';
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
     super.key,
@@ -197,12 +201,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
 
+    final appManagedPaths =
+        repository is AppManagedPathRepository
+            ? repository as AppManagedPathRepository
+            : null;
+    final managedPaths =
+        appManagedPaths != null && appManagedPaths.usesAppManagedPaths
+            ? appManagedPaths
+            : null;
+
     return _StoreSetupActions(
-      repository: repository,
       lifecycle: lifecycle,
+      managedPaths: managedPaths,
       selectedPgpFingerprint: _effectivePgpFingerprint,
       hasSshKey: _sshKeys.isNotEmpty,
       pathPickerService: widget.pathPickerService,
+      onCreateLocalStore: ({
+        required String name,
+        required String root,
+        required List<String> pgpKeys,
+        required bool initializeGit,
+      }) {
+        return repository.createLocalStore(
+          name: name,
+          root: root,
+          pgpKeys: pgpKeys,
+          setDefault: true,
+          initializeGit: initializeGit,
+        );
+      },
+      onImportLocalStore: (String root) {
+        return repository.importLocalStore(root: root, setDefault: true);
+      },
+      onCloneStore: ({required String remoteUrl, required String root}) {
+        return repository.cloneStore(
+          remoteUrl: remoteUrl,
+          root: root,
+          setDefault: true,
+        );
+      },
       onStoreChanged: () async {
         await repository.refresh();
         await _attachSelectedPgpKeyToCurrentStore();
@@ -230,46 +267,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
 
-    return ListView(
-      children: <Widget>[
-        if (_pgpKeys.isEmpty)
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.key_off_outlined),
-            title: Text('No PGP keys found'),
-            subtitle: Text('Create or import a key to encrypt entries.'),
-          )
-        else
-          for (final key in _pgpKeys)
-            Card(
-              child: ListTile(
-                title: Text(key.name),
-                subtitle: Text('${key.fingerprint}\n${key.source}'),
-                isThreeLine: true,
-                trailing: TextButton(
-                  onPressed: () => _usePgpKey(repository, key),
-                  child: const Text('Use PGP key'),
-                ),
-              ),
-            ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            FilledButton.icon(
-              onPressed: () => _showCreatePgpKeyForm(context, repository),
-              icon: const Icon(Icons.add),
-              label: const Text('Create PGP key'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _showImportPgpKeyForm(context, repository),
-              icon: const Icon(Icons.file_upload_outlined),
-              label: const Text('Import PGP key'),
-            ),
-          ],
-        ),
-      ],
+    return _PgpSetupStep(
+      keys: _pgpKeys,
+      onUseKey: (key) => _usePgpKey(repository, key),
+      onCreateKey: () => _showCreatePgpKeyForm(context, repository),
+      onImportKey: () => _showImportPgpKeyForm(context, repository),
     );
   }
 
@@ -284,103 +286,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
 
-    return ListView(
-      children: <Widget>[
-        if (_sshKeys.isEmpty)
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.vpn_key_outlined),
-            title: Text('No SSH keys configured'),
-            subtitle: Text('SSH is optional and can be added later.'),
-          )
-        else
-          for (final key in _sshKeys)
-            Card(
-              child: ListTile(
-                title: Text(key.name),
-                subtitle: Text('${key.fingerprint}\n${key.source}'),
-                isThreeLine: true,
-              ),
-            ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            FilledButton.icon(
-              onPressed: () => _showCreateSshKeyForm(context, repository),
-              icon: const Icon(Icons.add),
-              label: const Text('Generate SSH key'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _showImportSshKeyForm(context, repository),
-              icon: const Icon(Icons.file_upload_outlined),
-              label: const Text('Import SSH key'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _showGithubSettings(context, repository),
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('GitHub settings'),
-            ),
-            TextButton(
-              onPressed:
-                  () => _setStep(
-                    _needsStoreSetup
-                        ? _OnboardingStep.store
-                        : _OnboardingStep.review,
-                  ),
-              child: const Text('Skip SSH'),
-            ),
-          ],
-        ),
-      ],
+    return _SshSetupStep(
+      keys: _sshKeys,
+      onCreateKey: () => _showCreateSshKeyForm(context, repository),
+      onImportKey: () => _showImportSshKeyForm(context, repository),
+      onOpenGithubSettings: () => _showGithubSettings(context, repository),
+      onSkip:
+          () => _setStep(
+            _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.review,
+          ),
     );
   }
 
   Widget _buildReviewStep(BuildContext context) {
-    final lifecycle = _lifecycle;
-    return ListView(
-      children: <Widget>[
-        _ReviewTile(
-          label: 'Gesture lock',
-          value:
-              widget.securityRepository.hasGestureVerifier
-                  ? 'Configured'
-                  : 'Required',
-          complete: widget.securityRepository.hasGestureVerifier,
-        ),
-        _ReviewTile(
-          label: 'Biometrics',
-          value:
-              widget.securityRepository.biometricUnlockEnabled
-                  ? 'Enabled'
-                  : 'Skipped',
-          complete: true,
-        ),
-        _ReviewTile(
-          label: 'Password store',
-          value: lifecycle?.onboardingState.label ?? 'Unavailable',
-          complete: !_needsStoreSetup,
-        ),
-        _ReviewTile(
-          label: 'PGP key',
-          value: _pgpKeys.isEmpty ? 'Not found' : '${_pgpKeys.length} key(s)',
-          complete: _pgpKeys.isNotEmpty,
-        ),
-        _ReviewTile(
-          label: 'SSH key',
-          value: _sshKeys.isEmpty ? 'Skipped' : '${_sshKeys.length} key(s)',
-          complete: true,
-        ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _needsStoreSetup ? null : _finishOnboarding,
-          child: const SizedBox(
-            width: double.infinity,
-            child: Center(child: Text('Finish setup')),
-          ),
-        ),
-      ],
+    return _ReviewStep(
+      hasGestureVerifier: widget.securityRepository.hasGestureVerifier,
+      biometricUnlockEnabled: widget.securityRepository.biometricUnlockEnabled,
+      storeStatusLabel: _lifecycle?.onboardingState.label ?? 'Unavailable',
+      storeSetupComplete: !_needsStoreSetup,
+      pgpKeyCount: _pgpKeys.length,
+      sshKeyCount: _sshKeys.length,
+      onFinish: _finishOnboarding,
     );
   }
 
@@ -441,19 +367,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       context: context,
       title: 'Create PGP key',
       fields: <Widget>[
-        TextField(
-          controller: name,
-          decoration: const InputDecoration(labelText: 'Name'),
-        ),
-        TextField(
-          controller: email,
-          decoration: const InputDecoration(labelText: 'Email'),
-        ),
-        TextField(
-          controller: passphrase,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: 'Passphrase'),
-        ),
+        _CreatePgpKeyFields(name: name, email: email, passphrase: passphrase),
       ],
       submitLabel: 'Create',
       onSubmit: () async {
@@ -476,14 +390,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _showOnboardingForm(
       context: context,
       title: 'Import PGP key',
-      fields: <Widget>[
-        TextField(
-          controller: keyText,
-          minLines: 4,
-          maxLines: 8,
-          decoration: const InputDecoration(labelText: 'Key text'),
-        ),
-      ],
+      fields: <Widget>[_ImportPgpKeyFields(keyText: keyText)],
       submitLabel: 'Import',
       onSubmit: () async {
         try {
@@ -504,12 +411,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _showOnboardingForm(
       context: context,
       title: 'Generate SSH key',
-      fields: <Widget>[
-        TextField(
-          controller: name,
-          decoration: const InputDecoration(labelText: 'Name'),
-        ),
-      ],
+      fields: <Widget>[_CreateSshKeyFields(name: name)],
       submitLabel: 'Generate',
       onSubmit: () async {
         await repository.generateSshKey(name.text);
@@ -526,18 +428,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _showOnboardingForm(
       context: context,
       title: 'Import SSH key',
-      fields: <Widget>[
-        TextField(
-          controller: name,
-          decoration: const InputDecoration(labelText: 'Name'),
-        ),
-        TextField(
-          controller: privateKey,
-          minLines: 4,
-          maxLines: 8,
-          decoration: const InputDecoration(labelText: 'Private key'),
-        ),
-      ],
+      fields: <Widget>[_ImportSshKeyFields(name: name, privateKey: privateKey)],
       submitLabel: 'Import',
       onSubmit: () async {
         try {
@@ -651,623 +542,5 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       case _OnboardingStep.review:
         return 'Confirm the setup before entering Pars.';
     }
-  }
-}
-
-class _StepRail extends StatelessWidget {
-  const _StepRail({required this.currentStep});
-
-  final _OnboardingStep currentStep;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: <Widget>[
-        for (final step in _OnboardingStep.values)
-          ChoiceChip(
-            label: Text(_shortLabel(step)),
-            selected: step == currentStep,
-            onSelected: null,
-          ),
-      ],
-    );
-  }
-
-  String _shortLabel(_OnboardingStep step) {
-    switch (step) {
-      case _OnboardingStep.gesture:
-        return 'Gesture';
-      case _OnboardingStep.biometrics:
-        return 'Biometrics';
-      case _OnboardingStep.pgp:
-        return 'PGP';
-      case _OnboardingStep.ssh:
-        return 'SSH';
-      case _OnboardingStep.store:
-        return 'Store';
-      case _OnboardingStep.review:
-        return 'Review';
-    }
-  }
-}
-
-class _BiometricSetupStep extends StatelessWidget {
-  const _BiometricSetupStep({
-    required this.securityRepository,
-    required this.onEnable,
-    required this.onSkip,
-    required this.onError,
-  });
-
-  final SecurityRepository securityRepository;
-  final VoidCallback onEnable;
-  final VoidCallback onSkip;
-  final void Function(Object error) onError;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<BiometricUnlockStatus>(
-      future: securityRepository.biometricUnlockStatus(),
-      builder: (context, snapshot) {
-        final status = snapshot.data ?? BiometricUnlockStatus.unavailable;
-        return ListView(
-          children: <Widget>[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                status == BiometricUnlockStatus.unavailable
-                    ? Icons.fingerprint_outlined
-                    : Icons.fingerprint,
-              ),
-              title: const Text('Biometric unlock'),
-              subtitle: Text(_biometricSubtitle(status)),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed:
-                  status == BiometricUnlockStatus.unavailable
-                      ? null
-                      : () async {
-                        try {
-                          await securityRepository.setBiometricUnlockEnabled(
-                            true,
-                          );
-                          onEnable();
-                        } catch (error) {
-                          onError(error);
-                        }
-                      },
-              icon: const Icon(Icons.fingerprint),
-              label: const Text('Enable biometric unlock'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: onSkip,
-              child: const SizedBox(
-                width: double.infinity,
-                child: Center(child: Text('Skip biometrics')),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  String _biometricSubtitle(BiometricUnlockStatus status) {
-    switch (status) {
-      case BiometricUnlockStatus.available:
-        return 'Enabled on this device';
-      case BiometricUnlockStatus.disabled:
-        return 'Available on this device';
-      case BiometricUnlockStatus.unavailable:
-        return 'Unavailable on this device';
-    }
-  }
-}
-
-class _OnboardingFormSheet extends StatefulWidget {
-  const _OnboardingFormSheet({
-    required this.title,
-    required this.fields,
-    required this.submitLabel,
-    required this.onSubmit,
-  });
-
-  final String title;
-  final List<Widget> fields;
-  final String submitLabel;
-  final Future<void> Function() onSubmit;
-
-  @override
-  State<_OnboardingFormSheet> createState() => _OnboardingFormSheetState();
-}
-
-class _OnboardingFormSheetState extends State<_OnboardingFormSheet> {
-  bool _isSubmitting = false;
-  String? _error;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                widget.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 12),
-              ...widget.fields,
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ],
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Center(
-                    child:
-                        _isSubmitting
-                            ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: <Widget>[
-                                SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color:
-                                        Theme.of(context).colorScheme.onPrimary,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(widget.submitLabel),
-                              ],
-                            )
-                            : Text(widget.submitLabel),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _submit() async {
-    setState(() {
-      _isSubmitting = true;
-      _error = null;
-    });
-    try {
-      await widget.onSubmit();
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _error = error.toString();
-          _isSubmitting = false;
-        });
-      }
-    }
-  }
-}
-
-class _EmptyOnboardingStep extends StatelessWidget {
-  const _EmptyOnboardingStep({
-    required this.icon,
-    required this.title,
-    required this.buttonLabel,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String title;
-  final String buttonLabel;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      children: <Widget>[
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(icon),
-          title: Text(title),
-        ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: onPressed,
-          child: SizedBox(
-            width: double.infinity,
-            child: Center(child: Text(buttonLabel)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReviewTile extends StatelessWidget {
-  const _ReviewTile({
-    required this.label,
-    required this.value,
-    required this.complete,
-  });
-
-  final String label;
-  final String value;
-  final bool complete;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        complete ? Icons.check_circle_outline : Icons.error_outline,
-        color: complete ? null : Theme.of(context).colorScheme.error,
-      ),
-      title: Text(label),
-      subtitle: Text(value),
-    );
-  }
-}
-
-class _StoreSetupActions extends StatelessWidget {
-  const _StoreSetupActions({
-    required this.repository,
-    required this.lifecycle,
-    required this.selectedPgpFingerprint,
-    required this.hasSshKey,
-    required this.pathPickerService,
-    required this.onStoreChanged,
-  });
-
-  final SettingsRepository repository;
-  final StoreLifecycleSnapshot lifecycle;
-  final String? selectedPgpFingerprint;
-  final bool hasSshKey;
-  final PathPickerService pathPickerService;
-  final Future<void> Function() onStoreChanged;
-
-  AppManagedPathRepository? get _managedPaths {
-    if (repository is AppManagedPathRepository) {
-      final managedPaths = repository as AppManagedPathRepository;
-      return managedPaths.usesAppManagedPaths ? managedPaths : null;
-    }
-    return null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      children: <Widget>[
-        for (final issue in lifecycle.issues)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              Icons.warning_amber_rounded,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            title: Text(issue.replaceAll('_', ' ')),
-            subtitle: Text(lifecycle.configPath),
-          ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: () => _showCreateLocalStore(context),
-          icon: const Icon(Icons.create_new_folder_outlined),
-          label: const Text('Create local store'),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: () => _showImportLocalStore(context),
-          icon: const Icon(Icons.folder_open_outlined),
-          label: const Text('Import local store'),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: hasSshKey ? () => _showCloneStore(context) : null,
-          icon: const Icon(Icons.cloud_download_outlined),
-          label: const Text('Clone Git store'),
-        ),
-        if (!hasSshKey)
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.info_outline),
-            title: Text('Add an SSH key before cloning a Git store.'),
-          ),
-      ],
-    );
-  }
-
-  void _showCreateLocalStore(BuildContext context) {
-    final name = TextEditingController(text: 'Personal');
-    final managedPaths = _managedPaths;
-    final defaultBase = _defaultStoreBasePath();
-    String? selectedBase;
-    _showPickerStoreForm(
-      context: context,
-      title: 'Create local store',
-      submitLabel: 'Create',
-      canSubmit: () => managedPaths != null || selectedBase != null,
-      onSubmit:
-          () => repository.createLocalStore(
-            name: name.text,
-            root:
-                managedPaths?.storeRootForName(name.text) ??
-                joinFilesystemPath(selectedBase!, slugPathSegment(name.text)),
-            pgpKeys:
-                selectedPgpFingerprint == null
-                    ? const <String>[]
-                    : <String>[selectedPgpFingerprint!],
-            setDefault: true,
-            initializeGit: managedPaths == null,
-          ),
-      builder:
-          (sheetContext, setSheetState) => <Widget>[
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'Name'),
-              onChanged: (_) => setSheetState(() {}),
-            ),
-            const SizedBox(height: 12),
-            PathPickerRow(
-              title: 'Store folder',
-              path:
-                  managedPaths?.storeRootForName(name.text) ??
-                  joinFilesystemPath(
-                    selectedBase ?? defaultBase,
-                    slugPathSegment(name.text),
-                  ),
-              isSelected: selectedBase != null,
-              onPressed:
-                  managedPaths == null
-                      ? () => _chooseFolder(
-                        sheetContext,
-                        initialDirectory: defaultBase,
-                        onSelected:
-                            (path) => setSheetState(() {
-                              selectedBase = path;
-                            }),
-                      )
-                      : null,
-            ),
-          ],
-    );
-  }
-
-  void _showImportLocalStore(BuildContext context) {
-    final defaultBase = _defaultStoreBasePath();
-    String? selectedRoot;
-    _showPickerStoreForm(
-      context: context,
-      title: 'Import local store',
-      submitLabel: 'Import',
-      canSubmit: () => selectedRoot != null,
-      onSubmit:
-          () => repository.importLocalStore(
-            root: selectedRoot!,
-            setDefault: true,
-          ),
-      builder:
-          (sheetContext, setSheetState) => <Widget>[
-            PathPickerRow(
-              title: 'Store folder',
-              path: selectedRoot ?? defaultBase,
-              isSelected: selectedRoot != null,
-              onPressed:
-                  () => _chooseFolder(
-                    sheetContext,
-                    initialDirectory: defaultBase,
-                    onSelected:
-                        (path) => setSheetState(() {
-                          selectedRoot = path;
-                        }),
-                  ),
-            ),
-          ],
-    );
-  }
-
-  void _showCloneStore(BuildContext context) {
-    final remote = TextEditingController();
-    final managedPaths = _managedPaths;
-    final defaultBase = _defaultStoreBasePath();
-    String? selectedBase;
-    _showPickerStoreForm(
-      context: context,
-      title: 'Clone Git store',
-      submitLabel: 'Clone',
-      canSubmit:
-          () => hasSshKey && (managedPaths != null || selectedBase != null),
-      onSubmit:
-          hasSshKey
-              ? () => repository.cloneStore(
-                remoteUrl: remote.text,
-                root:
-                    managedPaths?.storeRootForRemote(remote.text) ??
-                    joinFilesystemPath(
-                      selectedBase!,
-                      slugFromRemoteUrl(remote.text),
-                    ),
-                setDefault: true,
-              )
-              : null,
-      builder:
-          (sheetContext, setSheetState) => <Widget>[
-            TextField(
-              controller: remote,
-              decoration: const InputDecoration(labelText: 'Remote URL'),
-              onChanged: (_) => setSheetState(() {}),
-            ),
-            const SizedBox(height: 12),
-            PathPickerRow(
-              title: 'Store folder',
-              path:
-                  managedPaths?.storeRootForRemote(remote.text) ??
-                  joinFilesystemPath(
-                    selectedBase ?? defaultBase,
-                    slugFromRemoteUrl(remote.text),
-                  ),
-              isSelected: selectedBase != null,
-              onPressed:
-                  managedPaths == null
-                      ? () => _chooseFolder(
-                        sheetContext,
-                        initialDirectory: defaultBase,
-                        onSelected:
-                            (path) => setSheetState(() {
-                              selectedBase = path;
-                            }),
-                      )
-                      : null,
-            ),
-          ],
-    );
-  }
-
-  Future<void> _chooseFolder(
-    BuildContext context, {
-    required String initialDirectory,
-    required ValueChanged<String> onSelected,
-  }) async {
-    try {
-      final path = await pathPickerService.pickFolder(
-        initialDirectory: initialDirectory,
-      );
-      if (path == null) {
-        return;
-      }
-      onSelected(path);
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text('$error')));
-    }
-  }
-
-  String _defaultStoreBasePath() {
-    final selectedRoot = lifecycle.selectedStoreRoot;
-    if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
-      return parentDirectory(selectedRoot);
-    }
-    if (lifecycle.stores.isNotEmpty) {
-      return parentDirectory(lifecycle.stores.first.root);
-    }
-    return parentDirectory(lifecycle.configPath);
-  }
-
-  void _showPickerStoreForm({
-    required BuildContext context,
-    required String title,
-    required String submitLabel,
-    required bool Function() canSubmit,
-    required List<Widget> Function(BuildContext, StateSetter) builder,
-    required Future<void> Function()? onSubmit,
-  }) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => StatefulBuilder(
-            builder: (context, setSheetState) {
-              var isSubmitting = false;
-              String? error;
-              return StatefulBuilder(
-                builder:
-                    (context, setSubmitState) => SafeArea(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          left: 20,
-                          right: 20,
-                          top: 20,
-                          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                        ),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                title,
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(height: 12),
-                              ...builder(context, (callback) {
-                                setSheetState(callback);
-                              }),
-                              if (error != null) ...<Widget>[
-                                const SizedBox(height: 12),
-                                Text(
-                                  error!,
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 16),
-                              FilledButton(
-                                onPressed:
-                                    isSubmitting ||
-                                            !canSubmit() ||
-                                            onSubmit == null
-                                        ? null
-                                        : () async {
-                                          setSubmitState(() {
-                                            isSubmitting = true;
-                                            error = null;
-                                          });
-                                          try {
-                                            await onSubmit();
-                                            await onStoreChanged();
-                                            if (context.mounted) {
-                                              Navigator.of(context).pop();
-                                            }
-                                          } catch (caught) {
-                                            if (!context.mounted) return;
-                                            setSubmitState(() {
-                                              error = caught.toString();
-                                              isSubmitting = false;
-                                            });
-                                          }
-                                        },
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  child: Center(child: Text(submitLabel)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-              );
-            },
-          ),
-    );
   }
 }
