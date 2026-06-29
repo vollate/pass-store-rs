@@ -125,8 +125,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     StateSetter setSheetState,
   ) {
     final confirmation = TextEditingController();
-    final requiredText =
-        key.type == KeyRecordType.pgp ? key.fingerprint : key.name;
+    final requiredText = _keyConfirmationLabel(key);
     showDialog<void>(
       context: sheetContext,
       builder:
@@ -138,16 +137,21 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(key.name),
+                      Text(
+                        key.name,
+                        style: Theme.of(dialogContext).textTheme.titleMedium,
+                      ),
                       const SizedBox(height: 8),
+                      Text('Fingerprint: ${key.fingerprint}'),
+                      const SizedBox(height: 12),
                       Text(
                         'This removes local key material from this device. Type $requiredText to delete this key.',
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: confirmation,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirmation',
+                        decoration: InputDecoration(
+                          labelText: 'Type $requiredText to confirm',
                         ),
                         onChanged: (_) => setDialogState(() {}),
                       ),
@@ -480,40 +484,69 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     );
   }
 
-  void _showPrivateExportForm(BuildContext context, KeyRecord key) {
+  void _showPrivateExportForm(BuildContext sheetContext, KeyRecord key) {
     final confirmation = TextEditingController();
+    final requiredText = _privateKeyExportPhrase(key);
     showDialog<void>(
-      context: context,
+      context: sheetContext,
       builder:
-          (context) => AlertDialog(
-            title: const Text('Export private key'),
-            content: TextField(
-              controller: confirmation,
-              decoration: const InputDecoration(labelText: 'Confirmation'),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed:
-                    () => _showExportedText(
-                      context,
-                      () =>
-                          key.type == KeyRecordType.pgp
-                              ? keyRepository.exportPgpPrivateKey(
-                                fingerprint: key.fingerprint,
-                                confirmation: confirmation.text,
-                              )
-                              : keyRepository.exportSshPrivateKey(
-                                name: key.name,
-                                confirmation: confirmation.text,
-                              ),
+          (dialogContext) => StatefulBuilder(
+            builder:
+                (dialogContext, setDialogState) => AlertDialog(
+                  title: const Text('Export private key'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        key.name,
+                        style: Theme.of(dialogContext).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Fingerprint: ${key.fingerprint}'),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Private key export is sensitive. Type $requiredText to export.',
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: confirmation,
+                        decoration: InputDecoration(
+                          labelText: 'Type $requiredText to confirm',
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                    ],
+                  ),
+                  actions: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Cancel'),
                     ),
-                child: const Text('Export'),
-              ),
-            ],
+                    FilledButton(
+                      onPressed:
+                          confirmation.text == requiredText
+                              ? () {
+                                Navigator.of(dialogContext).pop();
+                                _showExportedText(
+                                  sheetContext,
+                                  () =>
+                                      key.type == KeyRecordType.pgp
+                                          ? keyRepository.exportPgpPrivateKey(
+                                            fingerprint: key.fingerprint,
+                                            confirmation: confirmation.text,
+                                          )
+                                          : keyRepository.exportSshPrivateKey(
+                                            name: key.name,
+                                            confirmation: confirmation.text,
+                                          ),
+                                );
+                              }
+                              : null,
+                      child: const Text('Export'),
+                    ),
+                  ],
+                ),
           ),
     );
   }
@@ -580,4 +613,13 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       AppNotification.show(context, error.toString());
     }
   }
+}
+
+String _keyConfirmationLabel(KeyRecord key) {
+  final name = key.name.trim();
+  return name.isEmpty ? key.fingerprint : name;
+}
+
+String _privateKeyExportPhrase(KeyRecord key) {
+  return 'EXPORT PRIVATE KEY ${_keyConfirmationLabel(key)}';
 }

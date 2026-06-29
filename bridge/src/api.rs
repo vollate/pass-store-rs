@@ -855,21 +855,7 @@ pub async fn export_pgp_public_key(request: ExportPgpKeyRequest) -> KeyExportRes
 }
 
 pub async fn export_pgp_private_key(request: ExportPgpKeyRequest) -> KeyExportResponse {
-    let expected = format!("EXPORT PRIVATE KEY {}", request.fingerprint);
-    if request.confirmation.as_deref() != Some(expected.as_str()) {
-        return KeyExportResponse {
-            export: None,
-            error: Some(BridgeFailure::from(CoreError::ValidationError(format!(
-                "private key export requires confirmation phrase: {expected}"
-            )))),
-        };
-    }
-
-    match pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
-        backend
-            .export_private_key(&request.fingerprint, None)
-            .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
-    }) {
+    match export_pgp_private_key_inner(request) {
         Ok(export) => KeyExportResponse { export: Some(export.into()), error: None },
         Err(error) => KeyExportResponse { export: None, error: Some(error) },
     }
@@ -1060,6 +1046,47 @@ fn import_pgp_key_text(request: ImportKeyTextRequest, private_key: bool) -> KeyM
         },
         Err(error) => KeyMutationResponse { key: None, error: Some(error) },
     }
+}
+
+fn export_pgp_private_key_inner(
+    request: ExportPgpKeyRequest,
+) -> Result<KeyExportResult, BridgeFailure> {
+    let backend = pgp_backend(&request.config_path, request.pgp_executable.as_deref())?;
+    let identity = pgp_key_identity_for_confirmation(backend.as_ref(), &request.fingerprint)?;
+    let expected = format!("EXPORT PRIVATE KEY {identity}");
+    if request.confirmation.as_deref() != Some(expected.as_str()) {
+        return Err(BridgeFailure::from(CoreError::ValidationError(format!(
+            "private key export requires confirmation phrase: {expected}"
+        ))));
+    }
+
+    backend
+        .export_private_key(&request.fingerprint, None)
+        .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+}
+
+fn pgp_key_identity_for_confirmation(
+    backend: &dyn PgpBackend,
+    fingerprint: &str,
+) -> Result<String, BridgeFailure> {
+    let normalized = fingerprint.trim();
+    let key = backend
+        .list_keys()
+        .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))?
+        .into_iter()
+        .find(|key| key.fingerprint == normalized)
+        .ok_or_else(|| {
+            BridgeFailure::from(CoreError::ValidationError(format!(
+                "PGP key is not listed for fingerprint: {normalized}"
+            )))
+        })?;
+    let identity = key.identity.trim();
+    if identity.is_empty() {
+        return Err(BridgeFailure::from(CoreError::ValidationError(format!(
+            "PGP key identity is empty for fingerprint: {normalized}"
+        ))));
+    }
+    Ok(identity.to_string())
 }
 
 fn pgp_backend(
@@ -1280,10 +1307,17 @@ fn remove_store_inner(request: RemoveStoreRequest) -> Result<(), BridgeFailure> 
 
 fn delete_local_store_inner(request: DeleteLocalStoreRequest) -> Result<(), BridgeFailure> {
     let root = normalize_store_root(&request.root)?;
-    if request.confirmation != root {
-        return Err(BridgeFailure::from(CoreError::ValidationError(
-            "delete confirmation must match the full store root".to_string(),
-        )));
+    let root_path = PathBuf::from(&root);
+    let expected_confirmation =
+        root_path.file_name().and_then(|name| name.to_str()).ok_or_else(|| {
+            BridgeFailure::from(CoreError::ValidationError(
+                "delete confirmation could not derive a store name from the root".to_string(),
+            ))
+        })?;
+    if request.confirmation != expected_confirmation {
+        return Err(BridgeFailure::from(CoreError::ValidationError(format!(
+            "delete confirmation must match the store name: {expected_confirmation}"
+        ))));
     }
     let mut config = load_config_for_mutation(&request.config_path)?;
     if !config.path_config.repos.iter().any(|repo| repo == &root) {
@@ -1291,7 +1325,6 @@ fn delete_local_store_inner(request: DeleteLocalStoreRequest) -> Result<(), Brid
             "refusing to delete unconfigured store: {root}"
         ))));
     }
-    let root_path = PathBuf::from(&root);
     if !root_path.is_dir() {
         return Err(BridgeFailure::from(CoreError::StoreError(format!(
             "password store root does not exist: {root}"

@@ -15,6 +15,7 @@ extension _SettingsScreenGitSheets on SettingsScreen {
           (context) => _GitSyncSheetBody(
             git: git,
             gitRepository: gitRepository,
+            deleteConfirmationLabel: _gitDeleteConfirmationLabel(),
             combineGitOutput: _combineGitOutput,
           ),
     );
@@ -31,17 +32,27 @@ extension _SettingsScreenGitSheets on SettingsScreen {
           ),
     );
   }
+
+  String _gitDeleteConfirmationLabel() {
+    final selectedRoot = settingsRepository.lifecycle.selectedStoreRoot;
+    if (selectedRoot == null || selectedRoot.trim().isEmpty) {
+      return '';
+    }
+    return _storeNameFromRoot(selectedRoot);
+  }
 }
 
 class _GitSyncSheetBody extends StatefulWidget {
   const _GitSyncSheetBody({
     required this.git,
     required this.gitRepository,
+    required this.deleteConfirmationLabel,
     required this.combineGitOutput,
   });
 
   final GitOperationsRepository git;
   final GitRepository gitRepository;
+  final String deleteConfirmationLabel;
   final GitOperationResult Function(GitOperationResult, GitOperationResult)
   combineGitOutput;
 
@@ -209,16 +220,29 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                 ],
               ),
               const Divider(height: 28),
+              Text(
+                widget.deleteConfirmationLabel.isEmpty
+                    ? 'Select a store before deleting the local repo.'
+                    : 'Type ${widget.deleteConfirmationLabel} to delete the local repo.',
+              ),
+              const SizedBox(height: 8),
               TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Delete confirmation',
+                decoration: InputDecoration(
+                  labelText:
+                      widget.deleteConfirmationLabel.isEmpty
+                          ? 'Delete confirmation'
+                          : 'Type ${widget.deleteConfirmationLabel} to confirm',
                 ),
-                onChanged: (value) => _deleteConfirmation = value,
+                onChanged:
+                    (value) => setState(() => _deleteConfirmation = value),
               ),
               const SizedBox(height: 8),
               FilledButton.tonalIcon(
                 onPressed:
-                    _running
+                    _running ||
+                            widget.deleteConfirmationLabel.isEmpty ||
+                            _deleteConfirmation !=
+                                widget.deleteConfirmationLabel
                         ? null
                         : () => _run(
                           () => widget.git.deleteLocalRepo(

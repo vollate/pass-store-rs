@@ -203,6 +203,7 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
 
   void _showDeleteStoreForm(BuildContext context, String root) {
     final confirmation = TextEditingController();
+    final storeName = _storeNameFromRoot(root);
     _showStoreForm(
       context: context,
       title: 'Delete local store',
@@ -210,9 +211,7 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
         Text(root),
         TextField(
           controller: confirmation,
-          decoration: const InputDecoration(
-            labelText: 'Type full path to confirm',
-          ),
+          decoration: InputDecoration(labelText: 'Type $storeName to confirm'),
         ),
       ],
       submitLabel: 'Delete',
@@ -259,6 +258,14 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
       }
     }
   }
+}
+
+String _storeNameFromRoot(String root) {
+  final normalized = root.trim().replaceAll(RegExp(r'[/\\]+$'), '');
+  if (normalized.isEmpty) {
+    return root.trim();
+  }
+  return normalized.split(RegExp(r'[/\\]')).last;
 }
 
 class _PasswordStoresSheetBody extends StatelessWidget {

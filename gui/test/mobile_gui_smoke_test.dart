@@ -1068,12 +1068,19 @@ void main() {
     );
     await tester.tap(find.text('Delete entry'));
     await tester.pumpAndSettle();
+    expect(find.text('Path: work/first'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Delete entry'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Type full path to confirm.'), findsOneWidget);
+    expect(find.text('Type First Entry to confirm.'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).first, 'work/first');
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete entry'));
+    await tester.pumpAndSettle();
+    expect(repository.deletedPaths, isEmpty);
+    expect(find.text('Type First Entry to confirm.'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, 'First Entry');
     await tester.tap(find.widgetWithText(FilledButton, 'Delete entry'));
     await tester.pumpAndSettle();
 
@@ -1490,6 +1497,42 @@ void main() {
     );
   });
 
+  testWidgets('settings deletes local store with store-name confirmation', (
+    tester,
+  ) async {
+    final repository = _StorePathSettingsRepository();
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      pathPickerService: _FakePathPickerService(),
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('Password stores'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('Password stores'));
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete local store'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('/Users/alice/Password Stores/personal'), findsOneWidget);
+    expect(find.text('Type personal to confirm'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).last, 'personal');
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(
+      repository.storeActions.single,
+      'delete:/Users/alice/Password Stores/personal:personal',
+    );
+  });
+
   testWidgets('settings picker rows handle cancellation and errors', (
     tester,
   ) async {
@@ -1670,6 +1713,12 @@ void main() {
         findsWidgets,
       );
       expect(
+        find.textContaining(
+          'Type ${_settingsPrimaryPgpKey.name} to delete this key.',
+        ),
+        findsOneWidget,
+      );
+      expect(
         tester
             .widget<FilledButton>(find.widgetWithText(FilledButton, 'Delete'))
             .onPressed,
@@ -1679,6 +1728,18 @@ void main() {
       await tester.enterText(
         find.byType(TextField).last,
         _settingsPrimaryPgpKey.fingerprint,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Delete'))
+            .onPressed,
+        isNull,
+      );
+
+      await tester.enterText(
+        find.byType(TextField).last,
+        _settingsPrimaryPgpKey.name,
       );
       await tester.pumpAndSettle();
       expect(
@@ -1716,6 +1777,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete key'));
     await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Type github-mobile to delete this key.'),
+      findsOneWidget,
+    );
     await tester.enterText(find.byType(TextField).last, _settingsSshKey.name);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
@@ -1770,7 +1835,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byType(TextField).last,
-      _settingsPrimaryPgpKey.fingerprint,
+      _settingsPrimaryPgpKey.name,
     );
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
@@ -1779,6 +1844,98 @@ void main() {
     expect(repository.deleteActions, <String>['pgp:PGP-PRIMARY']);
     expect(find.textContaining('delete failed visibly'), findsOneWidget);
     expect(find.text(_settingsPrimaryPgpKey.name), findsOneWidget);
+  });
+
+  testWidgets('settings PGP private export confirms with key name phrase', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+    );
+    await tester.tap(
+      find.byTooltip('Actions for PGP key ${_settingsBackupPgpKey.name}'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Export private'));
+    await tester.pumpAndSettle();
+
+    final phrase = 'EXPORT PRIVATE KEY ${_settingsBackupPgpKey.name}';
+    expect(find.text('Export private key'), findsOneWidget);
+    expect(
+      find.textContaining(_settingsBackupPgpKey.fingerprint),
+      findsWidgets,
+    );
+    expect(find.textContaining(phrase), findsWidgets);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Export'))
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(
+      find.byType(TextField).last,
+      'EXPORT PRIVATE KEY ${_settingsBackupPgpKey.fingerprint}',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Export'))
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(find.byType(TextField).last, phrase);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Export'));
+    await tester.pumpAndSettle();
+
+    expect(repository.keyActions, <String>[
+      'export-pgp-private:PGP-BACKUP:$phrase',
+    ]);
+    expect(find.text('pgp private PGP-BACKUP'), findsOneWidget);
+  });
+
+  testWidgets('settings SSH private export confirms with key name phrase', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.ssh,
+    );
+    await tester.tap(
+      find.byTooltip('Actions for SSH key ${_settingsSshKey.name}'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Export private'));
+    await tester.pumpAndSettle();
+
+    const phrase = 'EXPORT PRIVATE KEY github-mobile';
+    expect(find.textContaining(_settingsSshKey.fingerprint), findsWidgets);
+    expect(find.textContaining(phrase), findsWidgets);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Export'))
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(find.byType(TextField).last, phrase);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Export'));
+    await tester.pumpAndSettle();
+
+    expect(repository.keyActions, <String>[
+      'export-ssh-private:github-mobile:$phrase',
+    ]);
+    expect(find.text('ssh private github-mobile'), findsOneWidget);
   });
 
   testWidgets('settings saves PGP passphrase for selected private key', (
@@ -1885,6 +2042,42 @@ void main() {
       find.text('git remote add backup git@example.com:backup/pass.git'),
       findsOneWidget,
     );
+
+    await tester.scrollUntilVisible(
+      find.text('Delete local repo'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(
+      find.text('Type example-store to delete the local repo.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Delete local repo'),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(find.byType(TextField).last, 'wrong-store');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Delete local repo'),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(find.byType(TextField).last, 'example-store');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete local repo'));
+    await tester.pumpAndSettle();
+
+    expect(repository.gitCalls, contains('delete local repo'));
   });
 
   testWidgets('settings advanced git args show failed output', (tester) async {
@@ -2987,6 +3180,14 @@ class _StorePathSettingsRepository extends _KeyManagementSettingsRepository {
     required bool setDefault,
   }) async {
     storeActions.add('clone:$remoteUrl:$root');
+  }
+
+  @override
+  Future<void> deleteLocalStore({
+    required String root,
+    required String confirmation,
+  }) async {
+    storeActions.add('delete:$root:$confirmation');
   }
 }
 

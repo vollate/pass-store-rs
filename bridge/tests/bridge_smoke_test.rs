@@ -4,10 +4,10 @@ use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use pars_bridge::api::{
     self, AddPgpKeyToGpgIdRequest, ConfigurePgpBackendRequest, CreateLocalStoreRequest,
-    DeletePgpKeyRequest, DeleteSshKeyRequest, EntryRequest, ExportPgpKeyRequest,
-    ExportSshKeyRequest, GeneratePgpKeyRequest, GenerateSshKeyRequest, ImportKeyTextRequest,
-    InsertEntryRequest, InspectAppStateRequest, ListEntriesRequest, ListKeysRequest,
-    OpenGithubSshSettingsRequest, SUPPORTED_METHODS,
+    DeleteLocalStoreRequest, DeletePgpKeyRequest, DeleteSshKeyRequest, EntryRequest,
+    ExportPgpKeyRequest, ExportSshKeyRequest, GeneratePgpKeyRequest, GenerateSshKeyRequest,
+    ImportKeyTextRequest, InsertEntryRequest, InspectAppStateRequest, ListEntriesRequest,
+    ListKeysRequest, OpenGithubSshSettingsRequest, SUPPORTED_METHODS,
 };
 
 #[test]
@@ -200,6 +200,12 @@ fn pure_rust_pgp_bridge_generates_lists_and_exports_keys() {
     }));
     assert!(keys.error.is_none(), "{:?}", keys.error);
     assert!(keys.keys.iter().any(|key| key.fingerprint == generated_key.fingerprint));
+    let listed_key = keys
+        .keys
+        .iter()
+        .find(|key| key.fingerprint == generated_key.fingerprint)
+        .expect("generated key should be listed");
+    assert_ne!(listed_key.name, generated_key.fingerprint);
 
     let exported = block_on(api::export_pgp_public_key(ExportPgpKeyRequest {
         config_path: config_path.display().to_string(),
@@ -209,6 +215,30 @@ fn pure_rust_pgp_bridge_generates_lists_and_exports_keys() {
     }));
     assert!(exported.error.is_none(), "{:?}", exported.error);
     assert!(exported.export.unwrap().armored_text.contains("BEGIN PGP PUBLIC KEY BLOCK"));
+
+    let fingerprint_phrase_denied = block_on(api::export_pgp_private_key(ExportPgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        fingerprint: generated_key.fingerprint.clone(),
+        confirmation: Some(format!("EXPORT PRIVATE KEY {}", generated_key.fingerprint)),
+    }));
+    let fingerprint_phrase_error =
+        fingerprint_phrase_denied.error.expect("fingerprint export phrase should be rejected");
+    assert!(
+        fingerprint_phrase_error
+            .message
+            .contains(&format!("EXPORT PRIVATE KEY {}", listed_key.name)),
+        "{fingerprint_phrase_error:?}"
+    );
+
+    let private_exported = block_on(api::export_pgp_private_key(ExportPgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        fingerprint: generated_key.fingerprint.clone(),
+        confirmation: Some(format!("EXPORT PRIVATE KEY {}", listed_key.name)),
+    }));
+    assert!(private_exported.error.is_none(), "{:?}", private_exported.error);
+    assert!(private_exported.export.unwrap().armored_text.contains("BEGIN PGP PRIVATE KEY BLOCK"));
 
     let deleted = block_on(api::delete_pgp_key(DeletePgpKeyRequest {
         config_path: config_path.display().to_string(),
@@ -349,6 +379,40 @@ fn inspect_app_state_treats_non_git_local_store_as_ready() {
     let state = inspected.state.expect("state response");
     assert_eq!(state.onboarding_state, "ready");
     assert!(!state.issues.contains(&"git_remote_missing".to_string()));
+}
+
+#[test]
+fn delete_local_store_confirms_with_store_name_and_rejects_mismatch() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let store_root = temp.path().join("local-store");
+
+    let created = block_on(api::create_local_store(CreateLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        name: "Local".to_string(),
+        root: store_root.display().to_string(),
+        pgp_keys: vec!["local@example.com".to_string()],
+        set_default: true,
+        initialize_git: false,
+    }));
+    assert!(created.error.is_none(), "{:?}", created.error);
+
+    let mismatch = block_on(api::delete_local_store(DeleteLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        root: store_root.display().to_string(),
+        confirmation: store_root.display().to_string(),
+    }));
+    let mismatch_error = mismatch.error.expect("mismatched confirmation should fail");
+    assert!(mismatch_error.message.contains("store name"), "{mismatch_error:?}");
+    assert!(store_root.is_dir(), "mismatched confirmation must not delete the store");
+
+    let deleted = block_on(api::delete_local_store(DeleteLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        root: store_root.display().to_string(),
+        confirmation: "local-store".to_string(),
+    }));
+    assert!(deleted.error.is_none(), "{:?}", deleted.error);
+    assert!(!store_root.exists(), "store-name confirmation should delete the store");
 }
 
 fn block_on<T>(future: impl Future<Output = T>) -> T {

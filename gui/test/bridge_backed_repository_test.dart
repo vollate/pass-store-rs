@@ -320,7 +320,7 @@ void main() {
     await repository.removeStore(root: '/tmp/old-store');
     await repository.deleteLocalStore(
       root: '/tmp/old-store',
-      confirmation: '/tmp/old-store',
+      confirmation: 'old-store',
     );
 
     expect(

@@ -130,7 +130,7 @@ class _ManageScreenState extends State<ManageScreen> {
               ),
               _ManageActionCard(
                 title: 'Delete entry',
-                subtitle: 'Remove one entry after full-path confirmation.',
+                subtitle: 'Remove one entry after name confirmation.',
                 icon: Icons.delete_forever_outlined,
                 isDanger: true,
                 onTap:

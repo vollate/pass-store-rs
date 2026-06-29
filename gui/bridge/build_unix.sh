@@ -9,6 +9,7 @@ Environment:
   PARS_BRIDGE_PROFILE       debug or release (default: debug)
   PARS_LINUX_OUTPUT_DIR     destination for libpars_bridge.so
   PARS_ANDROID_OUTPUT_DIR   destination jniLibs directory
+  PARS_ANDROID_TARGETS      comma-separated cargo-ndk targets
   PARS_ANDROID_PROFILE      android-specific profile override
   PARS_IOS_OUTPUT_DIR       destination for pars_bridge.xcframework
   PARS_IOS_PROFILE          ios-specific profile override
@@ -71,6 +72,7 @@ build_linux() {
 build_android() {
   local profile="${PARS_ANDROID_PROFILE:-$PROFILE}"
   local output_dir="${PARS_ANDROID_OUTPUT_DIR:-${GUI_DIR}/android/app/build/rustJniLibs}"
+  local targets_csv="${PARS_ANDROID_TARGETS:-arm64-v8a}"
 
   if ! command -v cargo-ndk >/dev/null 2>&1; then
     echo "error: cargo-ndk is required for Android bridge builds" >&2
@@ -78,21 +80,31 @@ build_android() {
     exit 1
   fi
 
+  IFS=',' read -r -a android_targets <<<"$targets_csv"
+  local cargo_ndk_targets=()
+  for target in "${android_targets[@]}"; do
+    target="${target//[[:space:]]/}"
+    if [ -z "$target" ]; then
+      continue
+    fi
+    cargo_ndk_targets+=("-t" "$target")
+  done
+  if [ "${#cargo_ndk_targets[@]}" -eq 0 ]; then
+    echo "error: PARS_ANDROID_TARGETS did not contain any Android targets" >&2
+    exit 1
+  fi
+
+  rm -rf "$output_dir"
+
   cd "$REPO_ROOT"
   if is_release_profile "$profile"; then
     cargo ndk \
-      -t armeabi-v7a \
-      -t arm64-v8a \
-      -t x86 \
-      -t x86_64 \
+      "${cargo_ndk_targets[@]}" \
       -o "$output_dir" \
       build -p pars-bridge --release
   else
     cargo ndk \
-      -t armeabi-v7a \
-      -t arm64-v8a \
-      -t x86 \
-      -t x86_64 \
+      "${cargo_ndk_targets[@]}" \
       -o "$output_dir" \
       build -p pars-bridge
   fi

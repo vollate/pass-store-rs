@@ -335,8 +335,9 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
   }
 
   Future<void> _submit() async {
-    if (_confirmation.trim() != _entry.path) {
-      setState(() => _errorText = 'Type full path to confirm.');
+    final requiredText = _deleteConfirmationLabel(_entry);
+    if (_confirmation.trim() != requiredText) {
+      setState(() => _errorText = 'Type $requiredText to confirm.');
       return;
     }
     setState(() {
@@ -376,9 +377,13 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
                   }),
         ),
         const SizedBox(height: 12),
+        Text('Path: ${_entry.path}'),
+        const SizedBox(height: 12),
         TextFormField(
           key: ValueKey('delete-${_entry.path}'),
-          decoration: const InputDecoration(labelText: 'Full path'),
+          decoration: InputDecoration(
+            labelText: 'Type ${_deleteConfirmationLabel(_entry)} to confirm',
+          ),
           onChanged: (value) => _confirmation = value,
         ),
         _CommitCheckbox(
@@ -396,4 +401,9 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
       ],
     );
   }
+}
+
+String _deleteConfirmationLabel(PasswordEntry entry) {
+  final displayName = entry.displayName.trim();
+  return displayName.isEmpty ? entry.path : displayName;
 }
