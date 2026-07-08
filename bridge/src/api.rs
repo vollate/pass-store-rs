@@ -251,6 +251,7 @@ pub struct EntryRequest {
     pub root: String,
     pub path: String,
     pub pgp_executable: Option<String>,
+    pub passphrase: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1498,6 +1499,7 @@ fn read_entry_inner(request: EntryRequest) -> Result<EntrySecretDto, BridgeFailu
         gui::ReadEntryRequest {
             entry: entry_ref(&request.root, &request.path)?,
             pgp_executable: executable,
+            passphrase: request.passphrase,
         },
         backend.as_ref(),
     )

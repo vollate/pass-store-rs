@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::path::Path;
 use std::pin::pin;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
@@ -176,7 +177,7 @@ fn pure_rust_pgp_bridge_generates_lists_and_exports_keys() {
         &config_path,
         format!(
             "[pgp_config]\nbackend = \"pure_rust\"\nkeyring_home = \"{}\"\n",
-            keyring_home.display()
+            toml_path(&keyring_home)
         ),
     )
     .unwrap();
@@ -267,7 +268,7 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
         &config_path,
         format!(
             "[pgp_config]\nbackend = \"pure_rust\"\nkeyring_home = \"{}\"\n",
-            keyring_home.display()
+            toml_path(&keyring_home)
         ),
     )
     .unwrap();
@@ -298,6 +299,7 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
         root: store_root.display().to_string(),
         path: "work/example".to_string(),
         pgp_executable: None,
+        passphrase: None,
     }));
     assert!(read.error.is_none(), "{:?}", read.error);
     let secret = read.secret.expect("secret");
@@ -423,6 +425,10 @@ fn block_on<T>(future: impl Future<Output = T>) -> T {
         Poll::Ready(value) => value,
         Poll::Pending => panic!("bridge future unexpectedly pending"),
     }
+}
+
+fn toml_path(path: &Path) -> String {
+    path.display().to_string().replace('\\', "/")
 }
 
 fn noop_waker() -> Waker {

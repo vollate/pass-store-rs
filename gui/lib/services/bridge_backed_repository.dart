@@ -38,6 +38,7 @@ class BridgeBackedRepository
     this.pgpBackendLabel,
     this.sshDir,
     this.managedStoreBaseDir,
+    this.securityRepository,
     VaultMetadataStore? metadataStore,
   }) : _metadataStore =
            metadataStore ?? FileVaultMetadataStore.forConfigPath(configPath),
@@ -48,6 +49,7 @@ class BridgeBackedRepository
     String? pgpBackendLabel,
     String? sshDir,
     String? managedStoreBaseDir,
+    SecurityRepository? securityRepository,
   }) {
     return BridgeBackedRepository(
       bridge: const FrbParsBridgeApi(),
@@ -56,6 +58,7 @@ class BridgeBackedRepository
       pgpBackendLabel: pgpBackendLabel,
       sshDir: sshDir,
       managedStoreBaseDir: managedStoreBaseDir,
+      securityRepository: securityRepository,
     );
   }
 
@@ -65,6 +68,7 @@ class BridgeBackedRepository
   final String? pgpBackendLabel;
   final String? sshDir;
   final String? managedStoreBaseDir;
+  final SecurityRepository? securityRepository;
   final VaultMetadataStore _metadataStore;
 
   StoreLifecycleSnapshot _lifecycle;
@@ -229,7 +233,9 @@ class BridgeBackedRepository
 
   @override
   Future<SecretContent> readEntry(PasswordEntry entry) async {
-    final response = await bridge.readEntry(request: _entryRequest(entry));
+    final response = await bridge.readEntry(
+      request: await _entryRequest(entry),
+    );
     _throwIfFailure(response.error);
     final secret = response.secret;
     if (secret == null) {
@@ -242,7 +248,7 @@ class BridgeBackedRepository
   @override
   Future<String> copyEntryPassword(PasswordEntry entry) async {
     final response = await bridge.copyEntryPassword(
-      request: _entryRequest(entry),
+      request: await _entryRequest(entry),
     );
     _throwIfFailure(response.error);
     final result = response.result;
@@ -1055,12 +1061,15 @@ class BridgeBackedRepository
     );
   }
 
-  frb.EntryRequest _entryRequest(PasswordEntry entry) {
+  Future<frb.EntryRequest> _entryRequest(PasswordEntry entry) async {
+    final activePassphrase =
+        await securityRepository?.readActivePgpPassphrase();
     return frb.EntryRequest(
       configPath: configPath,
       root: _requiredStoreRoot(),
       path: entry.path,
       pgpExecutable: pgpExecutable,
+      passphrase: activePassphrase?.passphrase,
     );
   }
 

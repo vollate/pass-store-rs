@@ -15,6 +15,7 @@ Future<void> main() async {
     bridge: bridge,
     desktopConfigPath: BridgeBackedRepository.defaultConfigPath(),
   );
+  final securityRepository = await SecureStorageSecurityRepository.load();
   final repository = BridgeBackedRepository(
     bridge: bridge,
     configPath: pgpRuntime.configPath,
@@ -22,6 +23,7 @@ Future<void> main() async {
     pgpBackendLabel: pgpRuntime.diagnosticsLabel,
     sshDir: pgpRuntime.sshDir,
     managedStoreBaseDir: pgpRuntime.storeBaseDir,
+    securityRepository: securityRepository,
   );
   try {
     await repository.refresh();
@@ -29,7 +31,6 @@ Future<void> main() async {
   } catch (_) {
     // Keep the empty lifecycle so onboarding can present recovery actions.
   }
-  final securityRepository = await SecureStorageSecurityRepository.load();
   runApp(
     ParsGuiApp(
       vaultRepository: repository,

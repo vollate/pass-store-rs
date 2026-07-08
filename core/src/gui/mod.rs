@@ -232,6 +232,7 @@ pub struct ListEntriesRequest {
 pub struct ReadEntryRequest {
     pub entry: EntryRef,
     pub pgp_executable: String,
+    pub passphrase: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -605,8 +606,9 @@ pub fn read_entry_with_backend(
         return Err(CoreError::StoreError(format!("entry does not exist: {}", request.entry.path)));
     }
 
+    let passphrase = request.passphrase.as_ref().map(|value| SecretString::from(value.clone()));
     let plain_text = backend
-        .decrypt_file(&encrypted_path)
+        .decrypt_file(&encrypted_path, passphrase.as_ref())
         .map_err(|err| CoreError::PgpError(err.to_string()))?;
 
     Ok(parse_entry_secret(plain_text.expose_secret()))
@@ -750,9 +752,15 @@ fn child_counts(paths: &BTreeSet<String>) -> BTreeMap<String, usize> {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::path::Path;
+
     use super::*;
     use crate::config::cli::PgpBackendKind;
-    use crate::pgp::backend::{KeyGenerationRequest, PgpBackend, PgpBackendConfig};
+    use crate::gui::{KeyExportResult, KeyImportResult, PgpKeySummary};
+    use crate::pgp::backend::{
+        KeyGenerationRequest, PgpBackend, PgpBackendConfig, PgpBackendResult,
+    };
     use crate::pgp::rpgp_backend::RpgpBackend;
 
     #[test]
@@ -790,12 +798,113 @@ mod tests {
         .expect("insert");
 
         let secret = read_entry_with_backend(
-            ReadEntryRequest { entry, pgp_executable: String::new() },
+            ReadEntryRequest { entry, pgp_executable: String::new(), passphrase: None },
             &backend,
         )
         .expect("read");
 
         assert_eq!(secret.password, "secret");
         assert_eq!(secret.field_value("username"), Some("gui"));
+    }
+
+    #[test]
+    fn read_entry_with_backend_passes_optional_passphrase_to_backend() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path().join("store");
+        fs::create_dir_all(&root).expect("store");
+        fs::write(root.join("github.gpg"), "encrypted").expect("entry");
+
+        let backend = RecordingDecryptBackend::default();
+        let secret = read_entry_with_backend(
+            ReadEntryRequest {
+                entry: EntryRef::new(root, "github").expect("entry ref"),
+                pgp_executable: String::new(),
+                passphrase: Some("session-passphrase".to_string()),
+            },
+            &backend,
+        )
+        .expect("read");
+
+        assert_eq!(secret.password, "hunter2");
+        assert_eq!(backend.seen_passphrase.borrow().as_deref(), Some("session-passphrase"));
+    }
+
+    #[derive(Default)]
+    struct RecordingDecryptBackend {
+        seen_passphrase: RefCell<Option<String>>,
+    }
+
+    impl PgpBackend for RecordingDecryptBackend {
+        fn decrypt_file(
+            &self,
+            _encrypted_path: &Path,
+            passphrase: Option<&SecretString>,
+        ) -> PgpBackendResult<SecretString> {
+            *self.seen_passphrase.borrow_mut() =
+                passphrase.map(|value| value.expose_secret().to_string());
+            Ok(SecretString::from("hunter2\nusername: alice".to_string()))
+        }
+
+        fn encrypt_content(
+            &self,
+            _plaintext: &SecretString,
+            _output_path: &Path,
+            _recipients: &[String],
+        ) -> PgpBackendResult<()> {
+            Ok(())
+        }
+
+        fn generate_key(
+            &self,
+            _request: KeyGenerationRequest,
+        ) -> PgpBackendResult<KeyImportResult> {
+            unreachable!("not used by read-entry passphrase test")
+        }
+
+        fn import_public_key(&self, _armored_text: &str) -> PgpBackendResult<KeyImportResult> {
+            unreachable!("not used by read-entry passphrase test")
+        }
+
+        fn import_private_key(
+            &self,
+            _armored_text: &SecretString,
+        ) -> PgpBackendResult<KeyImportResult> {
+            unreachable!("not used by read-entry passphrase test")
+        }
+
+        fn export_public_key(&self, _fingerprint: &str) -> PgpBackendResult<KeyExportResult> {
+            unreachable!("not used by read-entry passphrase test")
+        }
+
+        fn export_private_key(
+            &self,
+            _fingerprint: &str,
+            _passphrase: Option<&SecretString>,
+        ) -> PgpBackendResult<KeyExportResult> {
+            unreachable!("not used by read-entry passphrase test")
+        }
+
+        fn delete_key(&self, _fingerprint: &str) -> PgpBackendResult<()> {
+            unreachable!("not used by read-entry passphrase test")
+        }
+
+        fn list_keys(&self) -> PgpBackendResult<Vec<PgpKeySummary>> {
+            unreachable!("not used by read-entry passphrase test")
+        }
+
+        fn inspect_fingerprint(
+            &self,
+            _identity: &str,
+        ) -> PgpBackendResult<crate::pgp::backend::PgpKeyDetails> {
+            unreachable!("not used by read-entry passphrase test")
+        }
+
+        fn validate_gpg_id(
+            &self,
+            _store_root: &Path,
+            _target_path: &Path,
+        ) -> PgpBackendResult<Vec<String>> {
+            unreachable!("not used by read-entry passphrase test")
+        }
     }
 }

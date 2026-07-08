@@ -43,6 +43,7 @@ void main() {
       expect(bridge.lastEntryRequest?.root, '/tmp/personal-store');
       expect(bridge.lastEntryRequest?.path, 'work/github');
       expect(bridge.lastEntryRequest?.configPath, '/tmp/pars_config.toml');
+      expect(bridge.lastEntryRequest?.passphrase, isNull);
       expect(
         bridge.calledMethods,
         containsAll(<String>[
@@ -55,6 +56,28 @@ void main() {
         ]),
       );
       expect(repository.keys.single.name, 'github-mobile');
+    },
+  );
+
+  test(
+    'bridge-backed repository passes active pgp session passphrase to entry reads',
+    () async {
+      final bridge = _LifecycleBridge();
+      final securityRepository = InMemorySecurityRepository();
+      await securityRepository.startPgpSession(
+        fingerprint: 'ABC123',
+        passphrase: 'session-passphrase',
+      );
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        securityRepository: securityRepository,
+      );
+
+      await repository.refresh();
+      await repository.readEntry(repository.entries.first);
+
+      expect(bridge.lastEntryRequest?.passphrase, 'session-passphrase');
     },
   );
 

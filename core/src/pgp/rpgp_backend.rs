@@ -214,9 +214,16 @@ impl PublicKeyRecord {
 }
 
 impl PgpBackend for RpgpBackend {
-    fn decrypt_file(&self, encrypted_path: &Path) -> PgpBackendResult<SecretString> {
+    fn decrypt_file(
+        &self,
+        encrypted_path: &Path,
+        passphrase: Option<&SecretString>,
+    ) -> PgpBackendResult<SecretString> {
         let encrypted = fs::read(encrypted_path).map_err(pgp_command_error)?;
         let mut last_error = None::<String>;
+        let password = passphrase
+            .map(|value| Password::from(value.expose_secret().to_string()))
+            .unwrap_or_else(Password::empty);
 
         for key in self.read_private_keys()? {
             let Ok(message) = Message::from_bytes(encrypted.as_slice()) else {
@@ -225,7 +232,7 @@ impl PgpBackend for RpgpBackend {
                     encrypted_path.display()
                 )));
             };
-            match message.decrypt(&Password::empty(), &key) {
+            match message.decrypt(&password, &key) {
                 Ok(mut decrypted) => {
                     if decrypted.is_compressed() {
                         decrypted = decrypted.decompress().map_err(pgp_command_error)?;
@@ -541,7 +548,7 @@ mod tests {
             .encrypt_content(&SecretString::from("hunter2\nusername: bob"), &output, &recipients)
             .expect("encrypt");
 
-        let decrypted = backend.decrypt_file(&output).expect("decrypt");
+        let decrypted = backend.decrypt_file(&output, None).expect("decrypt");
         assert_eq!(decrypted.expose_secret(), "hunter2\nusername: bob");
     }
 }

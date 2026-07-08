@@ -93,7 +93,7 @@ fn validate_gpg_id_reads_nearest_store_identity_and_rejects_empty_files() {
 fn pgp_backend_trait_covers_milestone_four_operations() {
     let backend = RecordingBackend::default();
 
-    let _ = backend.decrypt_file(Path::new("entry.gpg"));
+    let _ = backend.decrypt_file(Path::new("entry.gpg"), None);
     let _ = backend.encrypt_content(
         &SecretString::new("secret".into()),
         Path::new("entry.gpg"),
@@ -118,7 +118,11 @@ fn pgp_backend_trait_covers_milestone_four_operations() {
 struct RecordingBackend;
 
 impl PgpBackend for RecordingBackend {
-    fn decrypt_file(&self, _encrypted_path: &Path) -> PgpBackendResult<SecretString> {
+    fn decrypt_file(
+        &self,
+        _encrypted_path: &Path,
+        _passphrase: Option<&SecretString>,
+    ) -> PgpBackendResult<SecretString> {
         Ok(SecretString::new("secret".into()))
     }
 

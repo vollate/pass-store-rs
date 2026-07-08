@@ -5,12 +5,12 @@
 
 ## 2. Core and Bridge Foundations
 
-- [ ] 2.1 Add Rust tests for passphrase-aware read-entry decryption.
-- [ ] 2.2 Extend `PgpBackend::decrypt_file` to accept an optional passphrase and
+- [x] 2.1 Add Rust tests for passphrase-aware read-entry decryption.
+- [x] 2.2 Extend `PgpBackend::decrypt_file` to accept an optional passphrase and
   implement it for system/bundled GPG and pure Rust OpenPGP.
-- [ ] 2.3 Add optional passphrase fields to core and bridge read-entry
+- [x] 2.3 Add optional passphrase fields to core and bridge read-entry
   requests, update copy-password behavior, and regenerate FRB bindings.
-- [ ] 2.4 Update Flutter repository reads and copy-password calls to pass the
+- [x] 2.4 Update Flutter repository reads and copy-password calls to pass the
   active PGP session passphrase when security state is available.
 
 ## 3. Autofill Data Model

@@ -2080,13 +2080,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EntryRequest dco_decode_entry_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return EntryRequest(
       configPath: dco_decode_String(arr[0]),
       root: dco_decode_String(arr[1]),
       path: dco_decode_String(arr[2]),
       pgpExecutable: dco_decode_opt_String(arr[3]),
+      passphrase: dco_decode_opt_String(arr[4]),
     );
   }
 
@@ -3459,11 +3460,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_root = sse_decode_String(deserializer);
     var var_path = sse_decode_String(deserializer);
     var var_pgpExecutable = sse_decode_opt_String(deserializer);
+    var var_passphrase = sse_decode_opt_String(deserializer);
     return EntryRequest(
       configPath: var_configPath,
       root: var_root,
       path: var_path,
       pgpExecutable: var_pgpExecutable,
+      passphrase: var_passphrase,
     );
   }
 
@@ -4943,6 +4946,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.root, serializer);
     sse_encode_String(self.path, serializer);
     sse_encode_opt_String(self.pgpExecutable, serializer);
+    sse_encode_opt_String(self.passphrase, serializer);
   }
 
   @protected

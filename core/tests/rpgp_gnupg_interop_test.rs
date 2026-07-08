@@ -68,7 +68,7 @@ fn optional_rpgp_decrypts_gnupg_encrypted_entry() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let decrypted = context.rpgp.decrypt_file(&encrypted_path).unwrap();
+    let decrypted = context.rpgp.decrypt_file(&encrypted_path, None).unwrap();
     assert_eq!(decrypted.expose_secret(), "gpg secret");
 }
 

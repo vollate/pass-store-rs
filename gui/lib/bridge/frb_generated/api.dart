@@ -606,12 +606,14 @@ class EntryRequest {
   final String root;
   final String path;
   final String? pgpExecutable;
+  final String? passphrase;
 
   const EntryRequest({
     required this.configPath,
     required this.root,
     required this.path,
     this.pgpExecutable,
+    this.passphrase,
   });
 
   @override
@@ -619,7 +621,8 @@ class EntryRequest {
       configPath.hashCode ^
       root.hashCode ^
       path.hashCode ^
-      pgpExecutable.hashCode;
+      pgpExecutable.hashCode ^
+      passphrase.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -629,7 +632,8 @@ class EntryRequest {
           configPath == other.configPath &&
           root == other.root &&
           path == other.path &&
-          pgpExecutable == other.pgpExecutable;
+          pgpExecutable == other.pgpExecutable &&
+          passphrase == other.passphrase;
 }
 
 class EntrySecretDto {

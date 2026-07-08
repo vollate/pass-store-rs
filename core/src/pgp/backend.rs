@@ -76,7 +76,11 @@ impl Display for PgpBackendError {
 impl std::error::Error for PgpBackendError {}
 
 pub trait PgpBackend {
-    fn decrypt_file(&self, encrypted_path: &Path) -> PgpBackendResult<SecretString>;
+    fn decrypt_file(
+        &self,
+        encrypted_path: &Path,
+        passphrase: Option<&SecretString>,
+    ) -> PgpBackendResult<SecretString>;
 
     fn encrypt_content(
         &self,
@@ -207,11 +211,31 @@ impl SystemGpgBackend {
 }
 
 impl PgpBackend for SystemGpgBackend {
-    fn decrypt_file(&self, encrypted_path: &Path) -> PgpBackendResult<SecretString> {
+    fn decrypt_file(
+        &self,
+        encrypted_path: &Path,
+        passphrase: Option<&SecretString>,
+    ) -> PgpBackendResult<SecretString> {
         let path = encrypted_path
             .to_str()
             .ok_or_else(|| PgpBackendError::CommandFailed("encrypted path must be UTF-8".into()))?;
-        self.run_capture(&["--decrypt", path]).map(SecretString::from)
+        match passphrase {
+            Some(passphrase) if !passphrase.expose_secret().is_empty() => self
+                .run_with_input(
+                    &[
+                        "--batch",
+                        "--pinentry-mode",
+                        "loopback",
+                        "--passphrase-fd",
+                        "0",
+                        "--decrypt",
+                        path,
+                    ],
+                    passphrase.expose_secret().as_bytes(),
+                )
+                .map(SecretString::from),
+            _ => self.run_capture(&["--decrypt", path]).map(SecretString::from),
+        }
     }
 
     fn encrypt_content(

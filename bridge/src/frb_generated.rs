@@ -1851,11 +1851,13 @@ impl SseDecode for crate::api::EntryRequest {
         let mut var_root = <String>::sse_decode(deserializer);
         let mut var_path = <String>::sse_decode(deserializer);
         let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
+        let mut var_passphrase = <Option<String>>::sse_decode(deserializer);
         return crate::api::EntryRequest {
             config_path: var_configPath,
             root: var_root,
             path: var_path,
             pgp_executable: var_pgpExecutable,
+            passphrase: var_passphrase,
         };
     }
 }
@@ -3112,6 +3114,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::EntryRequest {
             self.root.into_into_dart().into_dart(),
             self.path.into_into_dart().into_dart(),
             self.pgp_executable.into_into_dart().into_dart(),
+            self.passphrase.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4178,6 +4181,7 @@ impl SseEncode for crate::api::EntryRequest {
         <String>::sse_encode(self.root, serializer);
         <String>::sse_encode(self.path, serializer);
         <Option<String>>::sse_encode(self.pgp_executable, serializer);
+        <Option<String>>::sse_encode(self.passphrase, serializer);
     }
 }
 

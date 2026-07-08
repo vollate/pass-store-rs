@@ -258,6 +258,7 @@ fn read_entry_decrypts_password_file_and_parses_content() {
     let secret = read_entry(ReadEntryRequest {
         entry: EntryRef::new(root, "github").unwrap(),
         pgp_executable: executable,
+        passphrase: None,
     })
     .unwrap();
 
