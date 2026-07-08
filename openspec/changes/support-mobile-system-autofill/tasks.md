@@ -15,11 +15,11 @@
 
 ## 3. Autofill Data Model
 
-- [ ] 3.1 Add Rust autofill DTOs, index serialization, service identifier
+- [x] 3.1 Add Rust autofill DTOs, index serialization, service identifier
   normalization, matching, ranking, and credential lookup tests.
-- [ ] 3.2 Add bridge methods for refreshing, querying, and clearing autofill
+- [x] 3.2 Add bridge methods for refreshing, querying, and clearing autofill
   index data.
-- [ ] 3.3 Add Dart `AutofillRepository`, fake/bridge implementations, and
+- [x] 3.3 Add Dart `AutofillRepository`, fake/bridge implementations, and
   focused unit tests.
 
 ## 4. Flutter Settings

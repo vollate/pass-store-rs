@@ -156,6 +156,22 @@ Future<OpenExternalUrlResponse> openGithubSshSettings({
   required OpenGithubSshSettingsRequest request,
 }) => RustLib.instance.api.crateApiOpenGithubSshSettings(request: request);
 
+Future<UnitResponse> refreshAutofillIndex({
+  required RefreshAutofillIndexRequest request,
+}) => RustLib.instance.api.crateApiRefreshAutofillIndex(request: request);
+
+Future<AutofillCandidatesResponse> queryAutofillCandidates({
+  required AutofillQueryRequest request,
+}) => RustLib.instance.api.crateApiQueryAutofillCandidates(request: request);
+
+Future<AutofillCredentialResponse> resolveAutofillCredential({
+  required AutofillCredentialRequest request,
+}) => RustLib.instance.api.crateApiResolveAutofillCredential(request: request);
+
+Future<UnitResponse> clearAutofillIndex({
+  required ClearAutofillIndexRequest request,
+}) => RustLib.instance.api.crateApiClearAutofillIndex(request: request);
+
 class AddPgpKeyToGpgIdRequest {
   final String root;
   final String fingerprint;
@@ -238,6 +254,221 @@ class AppStateResponse {
           error == other.error;
 }
 
+class AutofillCandidateDto {
+  final String path;
+  final String displayName;
+  final String? username;
+  final String matchKind;
+  final String matchValue;
+  final int score;
+  final bool isFavorite;
+  final int? recentRank;
+
+  const AutofillCandidateDto({
+    required this.path,
+    required this.displayName,
+    this.username,
+    required this.matchKind,
+    required this.matchValue,
+    required this.score,
+    required this.isFavorite,
+    this.recentRank,
+  });
+
+  @override
+  int get hashCode =>
+      path.hashCode ^
+      displayName.hashCode ^
+      username.hashCode ^
+      matchKind.hashCode ^
+      matchValue.hashCode ^
+      score.hashCode ^
+      isFavorite.hashCode ^
+      recentRank.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutofillCandidateDto &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          displayName == other.displayName &&
+          username == other.username &&
+          matchKind == other.matchKind &&
+          matchValue == other.matchValue &&
+          score == other.score &&
+          isFavorite == other.isFavorite &&
+          recentRank == other.recentRank;
+}
+
+class AutofillCandidatesResponse {
+  final List<AutofillCandidateDto> candidates;
+  final BridgeFailure? error;
+
+  const AutofillCandidatesResponse({
+    this.candidates = const <AutofillCandidateDto>[],
+    this.error,
+  });
+
+  @override
+  int get hashCode => candidates.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutofillCandidatesResponse &&
+          runtimeType == other.runtimeType &&
+          candidates == other.candidates &&
+          error == other.error;
+}
+
+class AutofillCredentialDto {
+  final String path;
+  final String? username;
+  final String password;
+
+  const AutofillCredentialDto({
+    required this.path,
+    this.username,
+    required this.password,
+  });
+
+  @override
+  int get hashCode => path.hashCode ^ username.hashCode ^ password.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutofillCredentialDto &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          username == other.username &&
+          password == other.password;
+}
+
+class AutofillCredentialRequest {
+  final String configPath;
+  final String indexPath;
+  final String root;
+  final String path;
+  final String? pgpExecutable;
+  final String? passphrase;
+
+  const AutofillCredentialRequest({
+    required this.configPath,
+    required this.indexPath,
+    required this.root,
+    required this.path,
+    this.pgpExecutable,
+    this.passphrase,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      indexPath.hashCode ^
+      root.hashCode ^
+      path.hashCode ^
+      pgpExecutable.hashCode ^
+      passphrase.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutofillCredentialRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          indexPath == other.indexPath &&
+          root == other.root &&
+          path == other.path &&
+          pgpExecutable == other.pgpExecutable &&
+          passphrase == other.passphrase;
+}
+
+class AutofillCredentialResponse {
+  final AutofillCredentialDto? credential;
+  final BridgeFailure? error;
+
+  const AutofillCredentialResponse({this.credential, this.error});
+
+  @override
+  int get hashCode => credential.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutofillCredentialResponse &&
+          runtimeType == other.runtimeType &&
+          credential == other.credential &&
+          error == other.error;
+}
+
+class AutofillEntryMetadataDto {
+  final String path;
+  final String? displayName;
+  final bool isFavorite;
+  final int? recentRank;
+
+  const AutofillEntryMetadataDto({
+    required this.path,
+    this.displayName,
+    required this.isFavorite,
+    this.recentRank,
+  });
+
+  @override
+  int get hashCode =>
+      path.hashCode ^
+      displayName.hashCode ^
+      isFavorite.hashCode ^
+      recentRank.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutofillEntryMetadataDto &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          displayName == other.displayName &&
+          isFavorite == other.isFavorite &&
+          recentRank == other.recentRank;
+}
+
+class AutofillQueryRequest {
+  final String indexPath;
+  final String? website;
+  final String? androidPackage;
+  final String? query;
+  final int limit;
+
+  const AutofillQueryRequest({
+    required this.indexPath,
+    this.website,
+    this.androidPackage,
+    this.query,
+    required this.limit,
+  });
+
+  @override
+  int get hashCode =>
+      indexPath.hashCode ^
+      website.hashCode ^
+      androidPackage.hashCode ^
+      query.hashCode ^
+      limit.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AutofillQueryRequest &&
+          runtimeType == other.runtimeType &&
+          indexPath == other.indexPath &&
+          website == other.website &&
+          androidPackage == other.androidPackage &&
+          query == other.query &&
+          limit == other.limit;
+}
+
 class BridgeFailure {
   final BridgeFailureCategory category;
   final String message;
@@ -309,6 +540,22 @@ class CloneStoreRequest {
           remoteUrl == other.remoteUrl &&
           root == other.root &&
           setDefault == other.setDefault;
+}
+
+class ClearAutofillIndexRequest {
+  final String indexPath;
+
+  const ClearAutofillIndexRequest({required this.indexPath});
+
+  @override
+  int get hashCode => indexPath.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClearAutofillIndexRequest &&
+          runtimeType == other.runtimeType &&
+          indexPath == other.indexPath;
 }
 
 class ConfigResponse {
@@ -1574,6 +1821,53 @@ class RemoveStoreRequest {
           runtimeType == other.runtimeType &&
           configPath == other.configPath &&
           root == other.root;
+}
+
+class RefreshAutofillIndexRequest {
+  final String configPath;
+  final String indexPath;
+  final String storeId;
+  final String storeName;
+  final String root;
+  final String? pgpExecutable;
+  final String? passphrase;
+  final List<AutofillEntryMetadataDto> entries;
+
+  const RefreshAutofillIndexRequest({
+    required this.configPath,
+    required this.indexPath,
+    required this.storeId,
+    required this.storeName,
+    required this.root,
+    this.pgpExecutable,
+    this.passphrase,
+    required this.entries,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      indexPath.hashCode ^
+      storeId.hashCode ^
+      storeName.hashCode ^
+      root.hashCode ^
+      pgpExecutable.hashCode ^
+      passphrase.hashCode ^
+      entries.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RefreshAutofillIndexRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          indexPath == other.indexPath &&
+          storeId == other.storeId &&
+          storeName == other.storeName &&
+          root == other.root &&
+          pgpExecutable == other.pgpExecutable &&
+          passphrase == other.passphrase &&
+          entries == other.entries;
 }
 
 class SaveConfigRequest {

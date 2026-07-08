@@ -210,6 +210,22 @@ abstract class RustLibApi extends BaseApi {
     required OpenGithubSshSettingsRequest request,
   });
 
+  Future<UnitResponse> crateApiRefreshAutofillIndex({
+    required RefreshAutofillIndexRequest request,
+  });
+
+  Future<AutofillCandidatesResponse> crateApiQueryAutofillCandidates({
+    required AutofillQueryRequest request,
+  });
+
+  Future<AutofillCredentialResponse> crateApiResolveAutofillCredential({
+    required AutofillCredentialRequest request,
+  });
+
+  Future<UnitResponse> crateApiClearAutofillIndex({
+    required ClearAutofillIndexRequest request,
+  });
+
   Future<EntrySecretResponse> crateApiReadEntry({
     required EntryRequest request,
   });
@@ -1372,6 +1388,146 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         debugName: "open_github_ssh_settings",
         argNames: ["request"],
       );
+
+  @override
+  Future<UnitResponse> crateApiRefreshAutofillIndex({
+    required RefreshAutofillIndexRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_refresh_autofill_index_request(
+            request,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 42,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiRefreshAutofillIndexConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRefreshAutofillIndexConstMeta =>
+      const TaskConstMeta(
+        debugName: "refresh_autofill_index",
+        argNames: ["request"],
+      );
+
+  @override
+  Future<AutofillCandidatesResponse> crateApiQueryAutofillCandidates({
+    required AutofillQueryRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_autofill_query_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 43,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_autofill_candidates_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiQueryAutofillCandidatesConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiQueryAutofillCandidatesConstMeta =>
+      const TaskConstMeta(
+        debugName: "query_autofill_candidates",
+        argNames: ["request"],
+      );
+
+  @override
+  Future<AutofillCredentialResponse> crateApiResolveAutofillCredential({
+    required AutofillCredentialRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_autofill_credential_request(
+            request,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 44,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_autofill_credential_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiResolveAutofillCredentialConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiResolveAutofillCredentialConstMeta =>
+      const TaskConstMeta(
+        debugName: "resolve_autofill_credential",
+        argNames: ["request"],
+      );
+
+  @override
+  Future<UnitResponse> crateApiClearAutofillIndex({
+    required ClearAutofillIndexRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_clear_autofill_index_request(
+            request,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 45,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiClearAutofillIndexConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClearAutofillIndexConstMeta => const TaskConstMeta(
+    debugName: "clear_autofill_index",
+    argNames: ["request"],
+  );
 
   @override
   Future<EntrySecretResponse> crateApiReadEntry({
@@ -2892,6 +3048,73 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AutofillCandidateDto sse_decode_autofill_candidate_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_path = sse_decode_String(deserializer);
+    var var_displayName = sse_decode_String(deserializer);
+    var var_username = sse_decode_opt_String(deserializer);
+    var var_matchKind = sse_decode_String(deserializer);
+    var var_matchValue = sse_decode_String(deserializer);
+    var var_score = sse_decode_i_32(deserializer);
+    var var_isFavorite = sse_decode_bool(deserializer);
+    var var_recentRank = sse_decode_opt_u_32(deserializer);
+    return AutofillCandidateDto(
+      path: var_path,
+      displayName: var_displayName,
+      username: var_username,
+      matchKind: var_matchKind,
+      matchValue: var_matchValue,
+      score: var_score,
+      isFavorite: var_isFavorite,
+      recentRank: var_recentRank,
+    );
+  }
+
+  @protected
+  AutofillCandidatesResponse sse_decode_autofill_candidates_response(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_candidates = sse_decode_list_autofill_candidate_dto(deserializer);
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return AutofillCandidatesResponse(
+      candidates: var_candidates,
+      error: var_error,
+    );
+  }
+
+  @protected
+  AutofillCredentialDto sse_decode_autofill_credential_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_path = sse_decode_String(deserializer);
+    var var_username = sse_decode_opt_String(deserializer);
+    var var_password = sse_decode_String(deserializer);
+    return AutofillCredentialDto(
+      path: var_path,
+      username: var_username,
+      password: var_password,
+    );
+  }
+
+  @protected
+  AutofillCredentialResponse sse_decode_autofill_credential_response(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_credential =
+        sse_decode_opt_box_autoadd_autofill_credential_dto(deserializer);
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return AutofillCredentialResponse(
+      credential: var_credential,
+      error: var_error,
+    );
+  }
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
@@ -2911,6 +3134,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_app_state_dto(deserializer));
+  }
+
+  @protected
+  AutofillCredentialDto sse_decode_box_autoadd_autofill_credential_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_autofill_credential_dto(deserializer));
   }
 
   @protected
@@ -3860,6 +4091,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<AutofillCandidateDto> sse_decode_list_autofill_candidate_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <AutofillCandidateDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_autofill_candidate_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   ListEntriesRequest sse_decode_list_entries_request(
     SseDeserializer deserializer,
   ) {
@@ -4100,6 +4345,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AutofillCredentialDto? sse_decode_opt_box_autoadd_autofill_credential_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_autofill_credential_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   CopyEntryPasswordResult?
   sse_decode_opt_box_autoadd_copy_entry_password_result(
     SseDeserializer deserializer,
@@ -4171,6 +4429,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_i_32(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  int? sse_decode_opt_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_u_32(deserializer));
     } else {
       return null;
     }
@@ -4376,6 +4645,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_autofill_credential_request(
+    AutofillCredentialRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.configPath, serializer);
+    sse_encode_String(self.indexPath, serializer);
+    sse_encode_String(self.root, serializer);
+    sse_encode_String(self.path, serializer);
+    sse_encode_opt_String(self.pgpExecutable, serializer);
+    sse_encode_opt_String(self.passphrase, serializer);
+  }
+
+  @protected
+  void sse_encode_autofill_entry_metadata_dto(
+    AutofillEntryMetadataDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.path, serializer);
+    sse_encode_opt_String(self.displayName, serializer);
+    sse_encode_bool(self.isFavorite, serializer);
+    sse_encode_opt_u_32(self.recentRank, serializer);
+  }
+
+  @protected
+  void sse_encode_autofill_query_request(
+    AutofillQueryRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.indexPath, serializer);
+    sse_encode_opt_String(self.website, serializer);
+    sse_encode_opt_String(self.androidPackage, serializer);
+    sse_encode_opt_String(self.query, serializer);
+    sse_encode_u_32(self.limit, serializer);
+  }
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
@@ -4400,6 +4708,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_autofill_credential_request(
+    AutofillCredentialRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_autofill_credential_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_autofill_query_request(
+    AutofillQueryRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_autofill_query_request(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_bridge_failure(
     BridgeFailure self,
     SseSerializer serializer,
@@ -4415,6 +4741,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_clone_store_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_clear_autofill_index_request(
+    ClearAutofillIndexRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_clear_autofill_index_request(self, serializer);
   }
 
   @protected
@@ -4757,6 +5092,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_refresh_autofill_index_request(
+    RefreshAutofillIndexRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_refresh_autofill_index_request(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_save_config_request(
     SaveConfigRequest self,
     SseSerializer serializer,
@@ -4802,6 +5146,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.remoteUrl, serializer);
     sse_encode_String(self.root, serializer);
     sse_encode_bool(self.setDefault, serializer);
+  }
+
+  @protected
+  void sse_encode_clear_autofill_index_request(
+    ClearAutofillIndexRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.indexPath, serializer);
   }
 
   @protected
@@ -5260,6 +5613,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_autofill_entry_metadata_dto(
+    List<AutofillEntryMetadataDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_autofill_entry_metadata_dto(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_entries_request(
     ListEntriesRequest self,
     SseSerializer serializer,
@@ -5459,6 +5824,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_u_32(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_u_32(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_app_state_dto(
     AppStateDto? self,
     SseSerializer serializer,
@@ -5630,6 +6005,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.configPath, serializer);
     sse_encode_String(self.root, serializer);
+  }
+
+  @protected
+  void sse_encode_refresh_autofill_index_request(
+    RefreshAutofillIndexRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.configPath, serializer);
+    sse_encode_String(self.indexPath, serializer);
+    sse_encode_String(self.storeId, serializer);
+    sse_encode_String(self.storeName, serializer);
+    sse_encode_String(self.root, serializer);
+    sse_encode_opt_String(self.pgpExecutable, serializer);
+    sse_encode_opt_String(self.passphrase, serializer);
+    sse_encode_list_autofill_entry_metadata_dto(self.entries, serializer);
   }
 
   @protected

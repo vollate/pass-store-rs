@@ -2,6 +2,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use pars_core::autofill::{
+    self, AutofillCredential, AutofillCredentialRequest as CoreAutofillCredentialRequest,
+    AutofillEntryMetadata, AutofillIndexEntry, AutofillQueryRequest as CoreAutofillQueryRequest,
+    RefreshAutofillIndexRequest as CoreRefreshAutofillIndexRequest,
+};
 use pars_core::config::cli::{
     load_config as load_core_config, save_config as save_core_config, ParsConfig, PgpBackendKind,
 };
@@ -62,6 +67,10 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "export_ssh_private_key",
     "delete_ssh_key",
     "open_github_ssh_settings",
+    "refresh_autofill_index",
+    "query_autofill_candidates",
+    "resolve_autofill_credential",
+    "clear_autofill_index",
 ];
 
 #[derive(Debug, Clone)]
@@ -176,6 +185,18 @@ pub struct KeyExportResponse {
 #[derive(Debug, Clone)]
 pub struct OpenExternalUrlResponse {
     pub url: Option<String>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AutofillCandidatesResponse {
+    pub candidates: Vec<AutofillCandidateDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AutofillCredentialResponse {
+    pub credential: Option<AutofillCredentialDto>,
     pub error: Option<BridgeFailure>,
 }
 
@@ -451,6 +472,50 @@ pub struct DeleteSshKeyRequest {
 pub struct OpenGithubSshSettingsRequest {}
 
 #[derive(Debug, Clone)]
+pub struct RefreshAutofillIndexRequest {
+    pub config_path: String,
+    pub index_path: String,
+    pub store_id: String,
+    pub store_name: String,
+    pub root: String,
+    pub pgp_executable: Option<String>,
+    pub passphrase: Option<String>,
+    pub entries: Vec<AutofillEntryMetadataDto>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AutofillEntryMetadataDto {
+    pub path: String,
+    pub display_name: Option<String>,
+    pub is_favorite: bool,
+    pub recent_rank: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AutofillQueryRequest {
+    pub index_path: String,
+    pub website: Option<String>,
+    pub android_package: Option<String>,
+    pub query: Option<String>,
+    pub limit: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AutofillCredentialRequest {
+    pub config_path: String,
+    pub index_path: String,
+    pub root: String,
+    pub path: String,
+    pub pgp_executable: Option<String>,
+    pub passphrase: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClearAutofillIndexRequest {
+    pub index_path: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct AppStateDto {
     pub config_path: String,
     pub config_exists: bool,
@@ -558,6 +623,36 @@ pub struct KeyExportDto {
     pub armored_text: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct AutofillCandidateDto {
+    pub path: String,
+    pub display_name: String,
+    pub username: Option<String>,
+    pub match_kind: String,
+    pub match_value: String,
+    pub score: i32,
+    pub is_favorite: bool,
+    pub recent_rank: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AutofillCredentialDto {
+    pub path: String,
+    pub username: Option<String>,
+    pub password: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct AutofillIndexEntryDto {
+    pub path: String,
+    pub display_name: String,
+    pub username: Option<String>,
+    pub websites: Vec<String>,
+    pub android_packages: Vec<String>,
+    pub is_favorite: bool,
+    pub recent_rank: Option<u32>,
+}
+
 pub async fn load_config(request: LoadConfigRequest) -> ConfigResponse {
     match load_core_config(request.path)
         .map_err(|error| CoreError::ConfigError(error.to_string()))
@@ -622,6 +717,84 @@ pub async fn copy_entry_password(request: EntryRequest) -> CopyEntryPasswordResp
             error: None,
         },
         Err(error) => CopyEntryPasswordResponse { result: None, error: Some(error) },
+    }
+}
+
+pub async fn refresh_autofill_index(request: RefreshAutofillIndexRequest) -> UnitResponse {
+    let backend = match pgp_backend(&request.config_path, request.pgp_executable.as_deref()) {
+        Ok(backend) => backend,
+        Err(error) => return UnitResponse { error: Some(error) },
+    };
+    let result = autofill::refresh_autofill_index_with_backend(
+        CoreRefreshAutofillIndexRequest {
+            index_path: PathBuf::from(request.index_path),
+            store_id: request.store_id,
+            store_name: request.store_name,
+            store_root: PathBuf::from(request.root),
+            pgp_executable: request.pgp_executable.unwrap_or_default(),
+            passphrase: request.passphrase,
+            entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
+        },
+        backend.as_ref(),
+    );
+    UnitResponse { error: result.err().map(BridgeFailure::from) }
+}
+
+pub async fn query_autofill_candidates(
+    request: AutofillQueryRequest,
+) -> AutofillCandidatesResponse {
+    match autofill::query_autofill_candidates(CoreAutofillQueryRequest {
+        index_path: PathBuf::from(request.index_path),
+        website: request.website,
+        android_package: request.android_package,
+        query: request.query,
+        limit: request.limit as usize,
+    }) {
+        Ok(candidates) => AutofillCandidatesResponse {
+            candidates: candidates.into_iter().map(AutofillCandidateDto::from).collect(),
+            error: None,
+        },
+        Err(error) => AutofillCandidatesResponse {
+            candidates: Vec::new(),
+            error: Some(BridgeFailure::from(error)),
+        },
+    }
+}
+
+pub async fn resolve_autofill_credential(
+    request: AutofillCredentialRequest,
+) -> AutofillCredentialResponse {
+    let backend = match pgp_backend(&request.config_path, request.pgp_executable.as_deref()) {
+        Ok(backend) => backend,
+        Err(error) => {
+            return AutofillCredentialResponse { credential: None, error: Some(error) };
+        }
+    };
+    match autofill::resolve_autofill_credential_with_backend(
+        CoreAutofillCredentialRequest {
+            index_path: PathBuf::from(request.index_path),
+            store_root: PathBuf::from(request.root),
+            path: request.path,
+            pgp_executable: request.pgp_executable.unwrap_or_default(),
+            passphrase: request.passphrase,
+        },
+        backend.as_ref(),
+    ) {
+        Ok(credential) => AutofillCredentialResponse {
+            credential: Some(AutofillCredentialDto::from(credential)),
+            error: None,
+        },
+        Err(error) => {
+            AutofillCredentialResponse { credential: None, error: Some(BridgeFailure::from(error)) }
+        }
+    }
+}
+
+pub async fn clear_autofill_index(request: ClearAutofillIndexRequest) -> UnitResponse {
+    UnitResponse {
+        error: autofill::clear_autofill_index(Path::new(&request.index_path))
+            .err()
+            .map(BridgeFailure::from),
     }
 }
 
@@ -1625,5 +1798,51 @@ impl From<SshKeySummary> for KeyRecordDto {
 impl From<KeyExportResult> for KeyExportDto {
     fn from(value: KeyExportResult) -> Self {
         Self { armored_text: value.armored_text }
+    }
+}
+
+impl From<AutofillEntryMetadataDto> for AutofillEntryMetadata {
+    fn from(value: AutofillEntryMetadataDto) -> Self {
+        Self {
+            path: value.path,
+            display_name: value.display_name,
+            is_favorite: value.is_favorite,
+            recent_rank: value.recent_rank,
+        }
+    }
+}
+
+impl From<autofill::AutofillCandidate> for AutofillCandidateDto {
+    fn from(value: autofill::AutofillCandidate) -> Self {
+        Self {
+            path: value.path,
+            display_name: value.display_name,
+            username: value.username,
+            match_kind: value.match_kind,
+            match_value: value.match_value,
+            score: value.score,
+            is_favorite: value.is_favorite,
+            recent_rank: value.recent_rank,
+        }
+    }
+}
+
+impl From<AutofillCredential> for AutofillCredentialDto {
+    fn from(value: AutofillCredential) -> Self {
+        Self { path: value.path, username: value.username, password: value.password }
+    }
+}
+
+impl From<AutofillIndexEntry> for AutofillIndexEntryDto {
+    fn from(value: AutofillIndexEntry) -> Self {
+        Self {
+            path: value.path,
+            display_name: value.display_name,
+            username: value.username,
+            websites: value.websites,
+            android_packages: value.android_packages,
+            is_favorite: value.is_favorite,
+            recent_rank: value.recent_rank,
+        }
     }
 }

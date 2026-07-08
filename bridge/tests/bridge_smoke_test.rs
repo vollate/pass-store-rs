@@ -4,11 +4,13 @@ use std::pin::pin;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use pars_bridge::api::{
-    self, AddPgpKeyToGpgIdRequest, ConfigurePgpBackendRequest, CreateLocalStoreRequest,
-    DeleteLocalStoreRequest, DeletePgpKeyRequest, DeleteSshKeyRequest, EntryRequest,
-    ExportPgpKeyRequest, ExportSshKeyRequest, GeneratePgpKeyRequest, GenerateSshKeyRequest,
-    ImportKeyTextRequest, InsertEntryRequest, InspectAppStateRequest, ListEntriesRequest,
-    ListKeysRequest, OpenGithubSshSettingsRequest, SUPPORTED_METHODS,
+    self, AddPgpKeyToGpgIdRequest, AutofillCredentialRequest, AutofillEntryMetadataDto,
+    AutofillQueryRequest, ClearAutofillIndexRequest, ConfigurePgpBackendRequest,
+    CreateLocalStoreRequest, DeleteLocalStoreRequest, DeletePgpKeyRequest, DeleteSshKeyRequest,
+    EntryRequest, ExportPgpKeyRequest, ExportSshKeyRequest, GeneratePgpKeyRequest,
+    GenerateSshKeyRequest, ImportKeyTextRequest, InsertEntryRequest, InspectAppStateRequest,
+    ListEntriesRequest, ListKeysRequest, OpenGithubSshSettingsRequest, RefreshAutofillIndexRequest,
+    SUPPORTED_METHODS,
 };
 
 #[test]
@@ -67,6 +69,10 @@ fn bridge_method_table_matches_generated_api_surface() {
         "export_ssh_private_key",
         "delete_ssh_key",
         "open_github_ssh_settings",
+        "refresh_autofill_index",
+        "query_autofill_candidates",
+        "resolve_autofill_credential",
+        "clear_autofill_index",
     ];
 
     assert_eq!(SUPPORTED_METHODS, expected);
@@ -288,7 +294,8 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
         config_path: config_path.display().to_string(),
         root: store_root.display().to_string(),
         path: "work/example".to_string(),
-        content: "entry-secret\nusername: entry".to_string(),
+        content: "entry-secret\nusername: entry\nurl: https://example.com/login\nandroid-package: com.example.app"
+            .to_string(),
         overwrite: false,
         pgp_executable: String::new(),
     }));
@@ -305,6 +312,65 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
     let secret = read.secret.expect("secret");
     assert_eq!(secret.password, "entry-secret");
     assert_eq!(secret.fields[0].value, "entry");
+
+    let index_path = temp.path().join("autofill.json");
+    let refreshed = block_on(api::refresh_autofill_index(RefreshAutofillIndexRequest {
+        config_path: config_path.display().to_string(),
+        index_path: index_path.display().to_string(),
+        store_id: "personal".to_string(),
+        store_name: "Personal".to_string(),
+        root: store_root.display().to_string(),
+        pgp_executable: None,
+        passphrase: None,
+        entries: vec![AutofillEntryMetadataDto {
+            path: "work/example".to_string(),
+            display_name: Some("Example".to_string()),
+            is_favorite: true,
+            recent_rank: Some(0),
+        }],
+    }));
+    assert!(refreshed.error.is_none(), "{:?}", refreshed.error);
+
+    let website = block_on(api::query_autofill_candidates(AutofillQueryRequest {
+        index_path: index_path.display().to_string(),
+        website: Some("example.com".to_string()),
+        android_package: None,
+        query: None,
+        limit: 10,
+    }));
+    assert!(website.error.is_none(), "{:?}", website.error);
+    assert_eq!(website.candidates[0].path, "work/example");
+    assert_eq!(website.candidates[0].match_kind, "website");
+
+    let package = block_on(api::query_autofill_candidates(AutofillQueryRequest {
+        index_path: index_path.display().to_string(),
+        website: None,
+        android_package: Some("com.example.app".to_string()),
+        query: None,
+        limit: 10,
+    }));
+    assert!(package.error.is_none(), "{:?}", package.error);
+    assert_eq!(package.candidates[0].match_kind, "android_package");
+    assert!(package.candidates[0].score > website.candidates[0].score);
+
+    let credential = block_on(api::resolve_autofill_credential(AutofillCredentialRequest {
+        config_path: config_path.display().to_string(),
+        index_path: index_path.display().to_string(),
+        root: store_root.display().to_string(),
+        path: "work/example".to_string(),
+        pgp_executable: None,
+        passphrase: None,
+    }));
+    assert!(credential.error.is_none(), "{:?}", credential.error);
+    let credential = credential.credential.expect("credential");
+    assert_eq!(credential.username.as_deref(), Some("entry"));
+    assert_eq!(credential.password, "entry-secret");
+
+    let cleared = block_on(api::clear_autofill_index(ClearAutofillIndexRequest {
+        index_path: index_path.display().to_string(),
+    }));
+    assert!(cleared.error.is_none(), "{:?}", cleared.error);
+    assert!(!index_path.exists());
 }
 
 #[test]

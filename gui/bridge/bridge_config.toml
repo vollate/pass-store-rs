@@ -55,6 +55,10 @@ methods = [
   "export_ssh_private_key",
   "delete_ssh_key",
   "open_github_ssh_settings",
+  "refresh_autofill_index",
+  "query_autofill_candidates",
+  "resolve_autofill_credential",
+  "clear_autofill_index",
 ]
 
 [security]
