@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pars</string>
+    <string name="autofill_service_summary">Fill passwords from Pars</string>
+    <string name="credential_provider_summary">Pars passwords</string>
+</resources>

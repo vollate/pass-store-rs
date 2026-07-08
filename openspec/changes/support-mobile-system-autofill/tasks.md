@@ -33,7 +33,7 @@
 
 ## 5. Android System Integration
 
-- [ ] 5.1 Add manifest service declarations, autofill XML metadata, and
+- [x] 5.1 Add manifest service declarations, autofill XML metadata, and
   credential provider XML metadata.
 - [ ] 5.2 Add Kotlin native bootstrap and secure storage helpers for the
   autofill service process.
