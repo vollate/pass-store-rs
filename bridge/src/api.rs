@@ -1263,7 +1263,7 @@ fn pgp_key_identity_for_confirmation(
     Ok(identity.to_string())
 }
 
-fn pgp_backend(
+pub(crate) fn pgp_backend(
     config_path: &str,
     pgp_executable: Option<&str>,
 ) -> Result<Box<dyn PgpBackend>, BridgeFailure> {

@@ -1,6 +1,14 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+
 import '../bridge/frb_generated/api.dart' as frb;
 import '../models/password_entry.dart';
 import 'security_repository.dart';
+
+const MethodChannel _androidAutofillChannel = MethodChannel(
+  'top.vollate.pars_gui/autofill',
+);
 
 class AutofillRepositoryException implements Exception {
   const AutofillRepositoryException(this.message);
@@ -156,19 +164,27 @@ class BridgeAutofillRepository implements AutofillRepository {
 
   @override
   Future<void> refreshIndex(List<PasswordEntry> entries) async {
+    final activeStoreId = currentStoreId?.call() ?? storeId;
+    final activeStoreName = currentStoreName?.call() ?? storeName;
+    final activeStoreRoot = currentStoreRoot?.call() ?? storeRoot;
+    final passphrase = await _activePassphrase();
     final response = await bridge.refreshAutofillIndex(
       request: frb.RefreshAutofillIndexRequest(
         configPath: configPath,
         indexPath: indexPath,
-        storeId: currentStoreId?.call() ?? storeId,
-        storeName: currentStoreName?.call() ?? storeName,
-        root: currentStoreRoot?.call() ?? storeRoot,
+        storeId: activeStoreId,
+        storeName: activeStoreName,
+        root: activeStoreRoot,
         pgpExecutable: pgpExecutable,
-        passphrase: await _activePassphrase(),
+        passphrase: passphrase,
         entries: _entryMetadata(entries),
       ),
     );
     _throwIfFailure(response.error);
+    await _publishAndroidState(
+      storeRoot: activeStoreRoot,
+      passphrase: passphrase,
+    );
     _status = AutofillStatus(
       available: true,
       indexedEntries: entries.where((entry) => !entry.isDirectory).length,
@@ -228,6 +244,7 @@ class BridgeAutofillRepository implements AutofillRepository {
       request: frb.ClearAutofillIndexRequest(indexPath: indexPath),
     );
     _throwIfFailure(response.error);
+    await _clearAndroidState();
     _status = const AutofillStatus.unavailable('Autofill data is cleared');
   }
 
@@ -267,6 +284,36 @@ class BridgeAutofillRepository implements AutofillRepository {
   void _throwIfFailure(frb.BridgeFailure? failure) {
     if (failure != null) {
       throw AutofillRepositoryException(failure.message);
+    }
+  }
+
+  Future<void> _publishAndroidState({
+    required String storeRoot,
+    required String? passphrase,
+  }) async {
+    if (!Platform.isAndroid) {
+      return;
+    }
+    try {
+      await _androidAutofillChannel.invokeMethod<void>('publishState', {
+        'configPath': configPath,
+        'indexPath': indexPath,
+        'storeRoot': storeRoot,
+        'passphrase': passphrase,
+      });
+    } on MissingPluginException {
+      return;
+    }
+  }
+
+  Future<void> _clearAndroidState() async {
+    if (!Platform.isAndroid) {
+      return;
+    }
+    try {
+      await _androidAutofillChannel.invokeMethod<void>('clearState');
+    } on MissingPluginException {
+      return;
     }
   }
 }

@@ -35,13 +35,15 @@
 
 - [x] 5.1 Add manifest service declarations, autofill XML metadata, and
   credential provider XML metadata.
-- [ ] 5.2 Add Kotlin native bootstrap and secure storage helpers for the
+- [x] 5.2 Add Kotlin native bootstrap and secure storage helpers for the
   autofill service process.
-- [ ] 5.3 Implement `AutofillService` matching, authentication, and dataset
+- [x] 5.3 Implement `AutofillService` matching, authentication, and dataset
   response behavior.
-- [ ] 5.4 Implement Android Credential Manager password provider behavior.
-- [ ] 5.5 Add Android unit or instrumentation coverage for request parsing and
+- [x] 5.4 Implement Android Credential Manager password provider behavior.
+- [x] 5.5 Add Android unit or instrumentation coverage for request parsing and
   response construction where host tooling supports it.
+  - Host Android test tooling is unavailable in this workspace; native request
+    parsing and matching are covered by `pars-bridge` JSON ABI tests.
 
 ## 6. iOS System Integration
 

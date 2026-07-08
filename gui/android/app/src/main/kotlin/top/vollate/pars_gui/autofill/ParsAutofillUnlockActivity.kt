@@ -1,0 +1,194 @@
+package top.vollate.pars_gui.autofill
+
+import android.app.Activity
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.credentials.Credential
+import android.credentials.GetCredentialResponse
+import android.hardware.biometrics.BiometricPrompt
+import android.os.Build
+import android.os.Bundle
+import android.os.CancellationSignal
+import android.service.autofill.Dataset
+import android.service.credentials.CredentialProviderService
+import android.view.autofill.AutofillId
+import android.view.autofill.AutofillManager
+import android.view.autofill.AutofillValue
+import android.widget.RemoteViews
+import java.util.concurrent.Executor
+
+class ParsAutofillUnlockActivity : Activity() {
+    private var cancellationSignal: CancellationSignal? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            finishCanceled()
+            return
+        }
+        authenticate()
+    }
+
+    override fun onDestroy() {
+        cancellationSignal?.cancel()
+        super.onDestroy()
+    }
+
+    private fun authenticate() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            finishCanceled()
+            return
+        }
+        val signal = CancellationSignal()
+        cancellationSignal = signal
+        val promptBuilder =
+            BiometricPrompt.Builder(this)
+                .setTitle("Unlock Pars")
+                .setSubtitle("Fill the selected password")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            promptBuilder.setAllowedAuthenticators(
+                android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            )
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            promptBuilder.setDeviceCredentialAllowed(true)
+        } else {
+            promptBuilder.setNegativeButton(
+                "Cancel",
+                directExecutor(),
+            ) { _, _ -> finishCanceled() }
+        }
+
+        promptBuilder.build().authenticate(
+            signal,
+            directExecutor(),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                    resolveAndReturn()
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                    finishCanceled()
+                }
+
+                override fun onAuthenticationFailed() {
+                    // Keep the prompt open for another biometric attempt.
+                }
+            },
+        )
+    }
+
+    private fun resolveAndReturn() {
+        val path = intent.getStringExtra(EXTRA_PATH) ?: return finishCanceled()
+        val credential = ParsAutofillNativeBridge.resolveCredential(this, path) ?: return finishCanceled()
+        when (intent.getStringExtra(EXTRA_MODE)) {
+            MODE_AUTOFILL -> finishAutofill(credential)
+            MODE_CREDENTIAL -> finishCredentialManager(credential)
+            else -> finishCanceled()
+        }
+    }
+
+    private fun finishAutofill(credential: ParsAutofillCredential) {
+        val usernameId = getParcelableExtraCompat<AutofillId>(EXTRA_USERNAME_ID)
+        val passwordId = getParcelableExtraCompat<AutofillId>(EXTRA_PASSWORD_ID)
+        val presentation = presentation(this, credential.username ?: credential.path, "Pars password")
+        val datasetBuilder = Dataset.Builder(presentation).setId(credential.path)
+        if (usernameId != null && credential.username != null) {
+            datasetBuilder.setValue(usernameId, AutofillValue.forText(credential.username), presentation)
+        }
+        if (passwordId != null) {
+            datasetBuilder.setValue(passwordId, AutofillValue.forText(credential.password), presentation)
+        }
+        setResult(
+            RESULT_OK,
+            Intent().putExtra(
+                AutofillManager.EXTRA_AUTHENTICATION_RESULT,
+                datasetBuilder.build(),
+            ),
+        )
+        finish()
+    }
+
+    private fun finishCredentialManager(credential: ParsAutofillCredential) {
+        val data =
+            Bundle().apply {
+                putString("android.credentials.BUNDLE_KEY_ID", credential.username ?: credential.path)
+                putString("android.credentials.BUNDLE_KEY_PASSWORD", credential.password)
+            }
+        setResult(
+            RESULT_OK,
+            Intent().putExtra(
+                CredentialProviderService.EXTRA_GET_CREDENTIAL_RESPONSE,
+                GetCredentialResponse(Credential(Credential.TYPE_PASSWORD_CREDENTIAL, data)),
+            ),
+        )
+        finish()
+    }
+
+    private fun finishCanceled() {
+        setResult(RESULT_CANCELED)
+        finish()
+    }
+
+    private fun directExecutor(): Executor = Executor { command -> command.run() }
+
+    @Suppress("DEPRECATION")
+    private inline fun <reified T> getParcelableExtraCompat(key: String): T? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(key, T::class.java)
+        } else {
+            intent.getParcelableExtra(key) as? T
+        }
+
+    companion object {
+        private const val EXTRA_MODE = "top.vollate.pars_gui.autofill.MODE"
+        private const val EXTRA_PATH = "top.vollate.pars_gui.autofill.PATH"
+        private const val EXTRA_USERNAME_ID = "top.vollate.pars_gui.autofill.USERNAME_ID"
+        private const val EXTRA_PASSWORD_ID = "top.vollate.pars_gui.autofill.PASSWORD_ID"
+        private const val MODE_AUTOFILL = "autofill"
+        private const val MODE_CREDENTIAL = "credential"
+
+        fun autofillIntent(
+            context: Context,
+            path: String,
+            usernameId: AutofillId?,
+            passwordId: AutofillId?,
+        ): Intent =
+            Intent(context, ParsAutofillUnlockActivity::class.java)
+                .putExtra(EXTRA_MODE, MODE_AUTOFILL)
+                .putExtra(EXTRA_PATH, path)
+                .putExtra(EXTRA_USERNAME_ID, usernameId)
+                .putExtra(EXTRA_PASSWORD_ID, passwordId)
+
+        fun credentialIntent(context: Context, path: String): Intent =
+            Intent(context, ParsAutofillUnlockActivity::class.java)
+                .putExtra(EXTRA_MODE, MODE_CREDENTIAL)
+                .putExtra(EXTRA_PATH, path)
+
+        fun pendingIntent(
+            context: Context,
+            requestCode: Int,
+            intent: Intent,
+        ): PendingIntent =
+            PendingIntent.getActivity(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+            )
+
+        fun presentation(
+            context: Context,
+            title: String,
+            subtitle: String,
+        ): RemoteViews =
+            RemoteViews(context.packageName, android.R.layout.simple_list_item_2).apply {
+                setTextViewText(android.R.id.text1, title)
+                setTextViewText(android.R.id.text2, subtitle)
+            }
+
+        private fun immutableFlag(): Int =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+    }
+}
