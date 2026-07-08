@@ -1,3 +1,5 @@
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 use std::path::PathBuf;
 
 use pars_core::autofill::{
@@ -139,6 +141,27 @@ pub fn resolve_credential_json(request_json: &str) -> String {
     serialize_response(&response)
 }
 
+#[no_mangle]
+pub extern "C" fn pars_autofill_query_candidates_json(request_json: *const c_char) -> *mut c_char {
+    ffi_json(request_json, query_candidates_json)
+}
+
+#[no_mangle]
+pub extern "C" fn pars_autofill_resolve_credential_json(
+    request_json: *const c_char,
+) -> *mut c_char {
+    ffi_json(request_json, resolve_credential_json)
+}
+
+#[no_mangle]
+pub extern "C" fn pars_autofill_free_string(value: *mut c_char) {
+    if !value.is_null() {
+        unsafe {
+            drop(CString::from_raw(value));
+        }
+    }
+}
+
 fn serialize_response<T>(response: &T) -> String
 where
     T: Serialize,
@@ -146,6 +169,28 @@ where
     serde_json::to_string(response).unwrap_or_else(|error| {
         format!(r#"{{"error":{{"category":"serialization_error","message":"{}"}}}}"#, error)
     })
+}
+
+fn ffi_json(request_json: *const c_char, handler: fn(&str) -> String) -> *mut c_char {
+    let response = if request_json.is_null() {
+        r#"{"error":{"category":"validation_error","message":"request_json is null"}}"#.to_string()
+    } else {
+        match unsafe { CStr::from_ptr(request_json) }.to_str() {
+            Ok(request) => handler(request),
+            Err(error) => {
+                format!(r#"{{"error":{{"category":"validation_error","message":"{}"}}}}"#, error)
+            }
+        }
+    };
+    CString::new(response)
+        .unwrap_or_else(|error| {
+            CString::new(format!(
+                r#"{{"error":{{"category":"serialization_error","message":"{}"}}}}"#,
+                error
+            ))
+            .expect("fallback JSON does not contain NUL bytes")
+        })
+        .into_raw()
 }
 
 impl NativeAutofillError {

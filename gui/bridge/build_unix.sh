@@ -130,6 +130,7 @@ build_ios() {
 
   local device_lib
   device_lib="$(build_ios_target aarch64-apple-ios "$profile")"
+  cp "$device_lib" "${output_dir}/libpars_bridge_ios_device.a"
 
   local sim_libs=()
   if rustup target add aarch64-apple-ios-sim >/dev/null 2>&1; then

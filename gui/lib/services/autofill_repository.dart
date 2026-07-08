@@ -6,7 +6,7 @@ import '../bridge/frb_generated/api.dart' as frb;
 import '../models/password_entry.dart';
 import 'security_repository.dart';
 
-const MethodChannel _androidAutofillChannel = MethodChannel(
+const MethodChannel _platformAutofillChannel = MethodChannel(
   'top.vollate.pars_gui/autofill',
 );
 
@@ -181,7 +181,7 @@ class BridgeAutofillRepository implements AutofillRepository {
       ),
     );
     _throwIfFailure(response.error);
-    await _publishAndroidState(
+    await _publishPlatformState(
       storeRoot: activeStoreRoot,
       passphrase: passphrase,
     );
@@ -244,7 +244,7 @@ class BridgeAutofillRepository implements AutofillRepository {
       request: frb.ClearAutofillIndexRequest(indexPath: indexPath),
     );
     _throwIfFailure(response.error);
-    await _clearAndroidState();
+    await _clearPlatformState();
     _status = const AutofillStatus.unavailable('Autofill data is cleared');
   }
 
@@ -287,15 +287,15 @@ class BridgeAutofillRepository implements AutofillRepository {
     }
   }
 
-  Future<void> _publishAndroidState({
+  Future<void> _publishPlatformState({
     required String storeRoot,
     required String? passphrase,
   }) async {
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid && !Platform.isIOS) {
       return;
     }
     try {
-      await _androidAutofillChannel.invokeMethod<void>('publishState', {
+      await _platformAutofillChannel.invokeMethod<void>('publishState', {
         'configPath': configPath,
         'indexPath': indexPath,
         'storeRoot': storeRoot,
@@ -306,12 +306,12 @@ class BridgeAutofillRepository implements AutofillRepository {
     }
   }
 
-  Future<void> _clearAndroidState() async {
-    if (!Platform.isAndroid) {
+  Future<void> _clearPlatformState() async {
+    if (!Platform.isAndroid && !Platform.isIOS) {
       return;
     }
     try {
-      await _androidAutofillChannel.invokeMethod<void>('clearState');
+      await _platformAutofillChannel.invokeMethod<void>('clearState');
     } on MissingPluginException {
       return;
     }

@@ -1,9 +1,14 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../bridge/frb_generated/api.dart' as frb;
 import '../bridge/pars_bridge_api.dart';
+
+const MethodChannel _iosRuntimeChannel = MethodChannel(
+  'top.vollate.pars_gui/ios_runtime',
+);
 
 class PgpRuntimeConfigurationException implements Exception {
   const PgpRuntimeConfigurationException(this.message);
@@ -60,7 +65,7 @@ Future<PgpRuntimeConfig> configureDefaultPgpRuntime({
     );
   }
 
-  final supportDir = await runtime.supportDirectory();
+  final supportDir = await _mobileSupportDirectory(runtime);
   final configPath = _joinPath(supportDir.path, 'pars_config.toml');
   final keyringHome = _joinPath(supportDir.path, 'pgp');
   final sshDir = _joinPath(supportDir.path, 'ssh');
@@ -94,4 +99,50 @@ String _joinPath(String parent, String child) {
     return '$parent$child';
   }
   return '$parent$separator$child';
+}
+
+Future<Directory> _mobileSupportDirectory(PgpRuntimeEnvironment runtime) async {
+  final defaultDir = await runtime.supportDirectory();
+  if (!Platform.isIOS) {
+    return defaultDir;
+  }
+  try {
+    final sharedPath = await _iosRuntimeChannel.invokeMethod<String>(
+      'appGroupSupportPath',
+    );
+    if (sharedPath == null || sharedPath.trim().isEmpty) {
+      return defaultDir;
+    }
+    final sharedDir = Directory(sharedPath);
+    await sharedDir.create(recursive: true);
+    await _copyDirectoryIfNeeded(defaultDir, sharedDir);
+    return sharedDir;
+  } on MissingPluginException {
+    return defaultDir;
+  }
+}
+
+Future<void> _copyDirectoryIfNeeded(Directory source, Directory target) async {
+  if (!await source.exists()) {
+    return;
+  }
+  if (source.absolute.path == target.absolute.path) {
+    return;
+  }
+  await for (final entity in source.list(recursive: true)) {
+    final relativePath = entity.path.substring(source.path.length);
+    if (relativePath.isEmpty) {
+      continue;
+    }
+    final destinationPath = '${target.path}$relativePath';
+    if (entity is Directory) {
+      await Directory(destinationPath).create(recursive: true);
+    } else if (entity is File) {
+      final destination = File(destinationPath);
+      if (!await destination.exists()) {
+        await destination.parent.create(recursive: true);
+        await entity.copy(destination.path);
+      }
+    }
+  }
 }

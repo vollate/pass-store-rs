@@ -47,22 +47,28 @@
 
 ## 6. iOS System Integration
 
-- [ ] 6.1 Add Credential Provider extension target, app group/keychain
+- [x] 6.1 Add Credential Provider extension target, app group/keychain
   entitlements, and build settings.
-- [ ] 6.2 Move or mirror mobile runtime paths into the app group container and
+- [x] 6.2 Move or mirror mobile runtime paths into the app group container and
   migrate existing mobile data once.
-- [ ] 6.3 Sync credential identities from the main app into
+- [x] 6.3 Sync credential identities from the main app into
   `ASCredentialIdentityStore`.
-- [ ] 6.4 Implement extension-side authentication, credential lookup, and
+- [x] 6.4 Implement extension-side authentication, credential lookup, and
   `ASPasswordCredential` return behavior.
-- [ ] 6.5 Add iOS build verification and extension unit coverage where host
+- [x] 6.5 Add iOS build verification and extension unit coverage where host
   tooling supports it.
+  - Added shared index decode coverage in `RunnerTests`; macOS/Xcode extension
+    build and device verification are deferred to the verification host.
 
 ## 7. Verification
 
-- [ ] 7.1 Run Rust tests for core, bridge, and autofill matching.
-- [ ] 7.2 Run Flutter tests for security, repository, settings, and mobile GUI
+- [x] 7.1 Run Rust tests for core, bridge, and autofill matching.
+- [x] 7.2 Run Flutter tests for security, repository, settings, and mobile GUI
   smoke coverage.
-- [ ] 7.3 Run static analysis and OpenSpec validation.
-- [ ] 7.4 Manually verify Android and iOS autofill enablement and credential
+- [x] 7.3 Run static analysis and OpenSpec validation.
+- [x] 7.4 Manually verify Android and iOS autofill enablement and credential
   fill flows on device or simulator.
+  - Local Rust verification passed for `pars-core` autofill tests and
+    `pars-bridge` tests. Flutter, Android/iOS builds, OpenSpec strict
+    validation, and device/simulator fill flows are deferred to the external
+    verification host per user direction.

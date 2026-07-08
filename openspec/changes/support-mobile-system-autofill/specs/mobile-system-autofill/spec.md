@@ -1,11 +1,4 @@
-# mobile-system-autofill Specification
-
-## Purpose
-
-Define mobile operating-system password autofill behavior for Pars on iOS and
-Android.
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Mobile apps SHALL register as system password autofill providers
 
