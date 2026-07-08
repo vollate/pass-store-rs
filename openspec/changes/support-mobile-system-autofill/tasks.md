@@ -24,11 +24,11 @@
 
 ## 4. Flutter Settings
 
-- [ ] 4.1 Add Settings system-autofill surface with status, setup shortcuts,
+- [x] 4.1 Add Settings system-autofill surface with status, setup shortcuts,
   refresh, and clear actions.
-- [ ] 4.2 Refresh the autofill index after successful store/key/passphrase
+- [x] 4.2 Refresh the autofill index after successful store/key/passphrase
   setup and when selected-store entries change.
-- [ ] 4.3 Clear autofill data when the selected store is removed, local store
+- [x] 4.3 Clear autofill data when the selected store is removed, local store
   data is deleted, or passphrase cache is disabled.
 
 ## 5. Android System Integration

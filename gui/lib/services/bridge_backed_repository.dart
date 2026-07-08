@@ -5,6 +5,7 @@ import '../bridge/frb_generated/api.dart' as frb;
 import '../bridge/pars_bridge_api.dart';
 import '../models/key_record.dart';
 import '../models/password_entry.dart';
+import 'autofill_repository.dart';
 import 'git_repository.dart';
 import 'key_repository.dart';
 import 'runtime_diagnostics.dart';
@@ -39,6 +40,7 @@ class BridgeBackedRepository
     this.sshDir,
     this.managedStoreBaseDir,
     this.securityRepository,
+    this.autofillRepository,
     VaultMetadataStore? metadataStore,
   }) : _metadataStore =
            metadataStore ?? FileVaultMetadataStore.forConfigPath(configPath),
@@ -50,6 +52,7 @@ class BridgeBackedRepository
     String? sshDir,
     String? managedStoreBaseDir,
     SecurityRepository? securityRepository,
+    AutofillRepository? autofillRepository,
   }) {
     return BridgeBackedRepository(
       bridge: const FrbParsBridgeApi(),
@@ -59,6 +62,7 @@ class BridgeBackedRepository
       sshDir: sshDir,
       managedStoreBaseDir: managedStoreBaseDir,
       securityRepository: securityRepository,
+      autofillRepository: autofillRepository,
     );
   }
 
@@ -69,6 +73,7 @@ class BridgeBackedRepository
   final String? sshDir;
   final String? managedStoreBaseDir;
   final SecurityRepository? securityRepository;
+  final AutofillRepository? autofillRepository;
   final VaultMetadataStore _metadataStore;
 
   StoreLifecycleSnapshot _lifecycle;
@@ -169,6 +174,7 @@ class BridgeBackedRepository
     if (selected == null || !selected.exists) {
       _entries = const <PasswordEntry>[];
       _gitStatus = RepoGitStatus.syncFailed;
+      await _clearAutofillIndex();
       return;
     }
 
@@ -296,6 +302,7 @@ class BridgeBackedRepository
       );
     }
     await refresh();
+    await _refreshAutofillIndex();
     return EntryOperationResult(
       path: result.entryPath,
       overwroteExisting: result.overwroteExisting,
@@ -326,6 +333,7 @@ class BridgeBackedRepository
       );
     }
     await refresh();
+    await _refreshAutofillIndex();
     return EntryOperationResult(
       path: result.entryPath,
       overwroteExisting: result.overwroteExisting,
@@ -354,6 +362,7 @@ class BridgeBackedRepository
       );
     }
     await refresh();
+    await _refreshAutofillIndex();
     return EntryOperationResult(
       path: result.path,
       overwroteExisting: true,
@@ -396,6 +405,7 @@ class BridgeBackedRepository
       );
     }
     await refresh();
+    await _refreshAutofillIndex();
     return EntryOperationResult(
       path: result.path,
       overwroteExisting: overwrite,
@@ -423,6 +433,7 @@ class BridgeBackedRepository
       );
     }
     await refresh();
+    await _refreshAutofillIndex();
     return EntryOperationResult(
       path: result.deletedPath,
       overwroteExisting: false,
@@ -498,6 +509,7 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
+    await _refreshAutofillIndex();
   }
 
   @override
@@ -520,6 +532,7 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
+    await _refreshAutofillIndex();
   }
 
   @override
@@ -536,6 +549,7 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
+    await _refreshAutofillIndex();
   }
 
   @override
@@ -554,15 +568,22 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
+    await _refreshAutofillIndex();
   }
 
   @override
   Future<void> removeStore({required String root}) async {
+    final wasSelected = _isSelectedStoreRoot(root);
     final response = await bridge.removeStore(
       request: frb.RemoveStoreRequest(configPath: configPath, root: root),
     );
     _throwIfFailure(response.error);
     await refresh();
+    if (wasSelected) {
+      await _clearAutofillIndex();
+    } else {
+      await _refreshAutofillIndex();
+    }
   }
 
   @override
@@ -570,6 +591,7 @@ class BridgeBackedRepository
     required String root,
     required String confirmation,
   }) async {
+    final wasSelected = _isSelectedStoreRoot(root);
     final response = await bridge.deleteLocalStore(
       request: frb.DeleteLocalStoreRequest(
         configPath: configPath,
@@ -579,6 +601,11 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
+    if (wasSelected) {
+      await _clearAutofillIndex();
+    } else {
+      await _refreshAutofillIndex();
+    }
   }
 
   @override
@@ -596,7 +623,9 @@ class BridgeBackedRepository
         passphrase: passphrase,
       ),
     );
-    return _recordKeyMutation(response);
+    final key = _recordKeyMutation(response);
+    await _refreshAutofillIndex();
+    return key;
   }
 
   @override
@@ -622,7 +651,9 @@ class BridgeBackedRepository
         armoredText: armoredText,
       ),
     );
-    return _recordKeyMutation(response);
+    final key = _recordKeyMutation(response);
+    await _refreshAutofillIndex();
+    return key;
   }
 
   @override
@@ -635,7 +666,9 @@ class BridgeBackedRepository
         path: path,
       ),
     );
-    return _recordKeyMutation(response);
+    final key = _recordKeyMutation(response);
+    await _refreshAutofillIndex();
+    return key;
   }
 
   @override
@@ -677,6 +710,7 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
+    await _refreshAutofillIndex();
   }
 
   @override
@@ -692,6 +726,7 @@ class BridgeBackedRepository
       ),
     );
     _throwIfFailure(response.error);
+    await _refreshAutofillIndex();
   }
 
   @override
@@ -1140,6 +1175,37 @@ class BridgeBackedRepository
     _metadata = metadata;
     await _metadataStore.save(metadata);
     _entries = _entries.map(_decorateEntry).toList(growable: false);
+    await _refreshAutofillIndex();
+  }
+
+  bool _isSelectedStoreRoot(String root) {
+    return _lifecycle.selectedStoreRoot == root ||
+        _lifecycle.selectedStore?.root == root;
+  }
+
+  Future<void> _refreshAutofillIndex() async {
+    final repository = autofillRepository;
+    if (repository == null) {
+      return;
+    }
+    final selected = _lifecycle.selectedStore;
+    if (selected == null || !selected.exists) {
+      await _clearAutofillIndex();
+      return;
+    }
+    try {
+      await repository.refreshIndex(_entries);
+    } catch (_) {
+      // Autofill must not block normal vault operations when the PGP session is unavailable.
+    }
+  }
+
+  Future<void> _clearAutofillIndex() async {
+    try {
+      await autofillRepository?.clearIndex();
+    } catch (_) {
+      // Clearing is best-effort during lifecycle transitions.
+    }
   }
 
   PasswordEntry _decorateEntry(PasswordEntry entry) {

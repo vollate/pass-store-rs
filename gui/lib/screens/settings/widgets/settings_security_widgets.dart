@@ -80,6 +80,8 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
           (context) => _PgpPassphraseStorageSheetBody(
             securityRepository: securityRepository,
             privatePgpKeys: privatePgpKeys,
+            autofillRepository: autofillRepository,
+            entries: vaultRepository?.entries ?? const <PasswordEntry>[],
             onSecuritySettingsChanged: onSecuritySettingsChanged,
           ),
     );
@@ -456,11 +458,15 @@ class _PgpPassphraseStorageSheetBody extends StatefulWidget {
   const _PgpPassphraseStorageSheetBody({
     required this.securityRepository,
     required this.privatePgpKeys,
+    required this.entries,
+    this.autofillRepository,
     this.onSecuritySettingsChanged,
   });
 
   final SecurityRepository securityRepository;
   final List<KeyRecord> privatePgpKeys;
+  final List<PasswordEntry> entries;
+  final AutofillRepository? autofillRepository;
   final VoidCallback? onSecuritySettingsChanged;
 
   @override
@@ -521,6 +527,9 @@ class _PgpPassphraseStorageSheetBodyState
                 await widget.securityRepository.setPgpPassphraseStorageEnabled(
                   value,
                 );
+                if (!value) {
+                  await widget.autofillRepository?.clearIndex();
+                }
                 widget.onSecuritySettingsChanged?.call();
                 setState(() {});
               },
@@ -584,6 +593,9 @@ class _PgpPassphraseStorageSheetBodyState
                                 fingerprint: _selectedFingerprint!,
                                 passphrase: _passphrase.text,
                               );
+                              await widget.autofillRepository?.refreshIndex(
+                                widget.entries,
+                              );
                               _passphrase.clear();
                               widget.onSecuritySettingsChanged?.call();
                               setState(() {});
@@ -602,6 +614,7 @@ class _PgpPassphraseStorageSheetBodyState
                           ? () async {
                             await widget.securityRepository
                                 .clearPgpPassphrase();
+                            await widget.autofillRepository?.clearIndex();
                             widget.onSecuritySettingsChanged?.call();
                             setState(() {});
                           }

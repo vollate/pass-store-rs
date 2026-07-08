@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/app/pars_gui_app.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
+import 'package:pars_gui/services/autofill_repository.dart';
 import 'package:pars_gui/services/fake_pars_repository.dart';
 import 'package:pars_gui/services/git_repository.dart';
 import 'package:pars_gui/services/key_repository.dart';
@@ -1218,6 +1219,36 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('git'), findsOneWidget);
     expect(find.text('Run selected command'), findsOneWidget);
+  });
+
+  testWidgets('settings system autofill sheet refreshes and clears data', (
+    tester,
+  ) async {
+    final repository = _InjectedRepository();
+    final autofillRepository = FakeAutofillRepository();
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      autofillRepository: autofillRepository,
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('System autofill'),
+      220,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('System autofill'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Refresh'));
+    await tester.pumpAndSettle();
+
+    expect(autofillRepository.lastRefreshedEntries, isNotEmpty);
+    expect(autofillRepository.status.available, isTrue);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Clear'));
+    await tester.pumpAndSettle();
+
+    expect(autofillRepository.cleared, isTrue);
   });
 
   testWidgets('settings shows runtime diagnostics', (tester) async {
@@ -2661,6 +2692,7 @@ Future<void> _pumpSettingsScreen(
   WidgetTester tester, {
   required _InjectedRepository repository,
   required SecurityRepository securityRepository,
+  AutofillRepository? autofillRepository,
   PathPickerService? pathPickerService,
 }) async {
   await tester.pumpWidget(
@@ -2671,6 +2703,8 @@ Future<void> _pumpSettingsScreen(
           keyRepository: repository,
           gitRepository: repository,
           securityRepository: securityRepository,
+          autofillRepository: autofillRepository,
+          vaultRepository: repository,
           pathPickerService: pathPickerService ?? _FakePathPickerService(),
         ),
       ),

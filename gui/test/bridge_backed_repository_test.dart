@@ -5,6 +5,7 @@ import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
 import 'package:pars_gui/bridge/pars_bridge_api.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
+import 'package:pars_gui/services/autofill_repository.dart';
 import 'package:pars_gui/services/bridge_backed_repository.dart';
 import 'package:pars_gui/services/mobile_pgp_backend.dart';
 import 'package:pars_gui/services/security_repository.dart';
@@ -78,6 +79,50 @@ void main() {
       await repository.readEntry(repository.entries.first);
 
       expect(bridge.lastEntryRequest?.passphrase, 'session-passphrase');
+    },
+  );
+
+  test(
+    'bridge-backed repository refreshes autofill index after entry changes',
+    () async {
+      final bridge = _LifecycleBridge();
+      final autofillRepository = FakeAutofillRepository();
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        autofillRepository: autofillRepository,
+      );
+
+      await repository.refresh();
+      await repository.saveEntry(
+        path: 'work/new',
+        content: 'secret',
+        overwrite: false,
+      );
+
+      expect(autofillRepository.lastRefreshedEntries, isNotEmpty);
+      expect(
+        autofillRepository.lastRefreshedEntries.map((entry) => entry.path),
+        contains('work/github'),
+      );
+    },
+  );
+
+  test(
+    'bridge-backed repository clears autofill index when selected store is removed',
+    () async {
+      final bridge = _LifecycleBridge();
+      final autofillRepository = FakeAutofillRepository();
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        autofillRepository: autofillRepository,
+      );
+
+      await repository.refresh();
+      await repository.removeStore(root: '/tmp/personal-store');
+
+      expect(autofillRepository.cleared, isTrue);
     },
   );
 

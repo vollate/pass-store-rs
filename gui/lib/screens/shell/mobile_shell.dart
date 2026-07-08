@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/git_repository.dart';
+import '../../services/autofill_repository.dart';
 import '../../services/key_repository.dart';
 import '../../services/path_picker_service.dart';
 import '../../services/security_repository.dart';
@@ -18,6 +19,7 @@ class MobileShell extends StatefulWidget {
     required this.keyRepository,
     required this.gitRepository,
     required this.securityRepository,
+    required this.autofillRepository,
     required this.pathPickerService,
     this.onSecuritySettingsChanged,
     this.runDuringSystemAuthentication,
@@ -29,6 +31,7 @@ class MobileShell extends StatefulWidget {
   final KeyRepository keyRepository;
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
+  final AutofillRepository autofillRepository;
   final PathPickerService pathPickerService;
   final VoidCallback? onSecuritySettingsChanged;
   final Future<T> Function<T>(Future<T> Function() action)?
@@ -59,6 +62,8 @@ class _MobileShellState extends State<MobileShell> {
         keyRepository: widget.keyRepository,
         gitRepository: widget.gitRepository,
         securityRepository: widget.securityRepository,
+        autofillRepository: widget.autofillRepository,
+        vaultRepository: widget.vaultRepository,
         pathPickerService: widget.pathPickerService,
         onSecuritySettingsChanged: widget.onSecuritySettingsChanged,
         runDuringSystemAuthentication: widget.runDuringSystemAuthentication,

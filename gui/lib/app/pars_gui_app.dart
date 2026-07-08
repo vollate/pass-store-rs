@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/security/lock_screen.dart';
 import '../screens/shell/mobile_shell.dart';
+import '../services/autofill_repository.dart';
 import '../services/fake_pars_repository.dart';
 import '../services/git_repository.dart';
 import '../services/key_repository.dart';
@@ -23,6 +24,7 @@ class ParsGuiApp extends StatefulWidget {
     required this.keyRepository,
     required this.gitRepository,
     required this.securityRepository,
+    this.autofillRepository,
     this.pathPickerService = const SystemPathPickerService(),
     this.now = DateTime.now,
   });
@@ -44,6 +46,7 @@ class ParsGuiApp extends StatefulWidget {
   final KeyRepository keyRepository;
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
+  final AutofillRepository? autofillRepository;
   final PathPickerService pathPickerService;
   final DateTime Function() now;
 
@@ -60,11 +63,13 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   DateTime? _backgroundedAt;
   DateTime? _suppressLifecycleLocksUntil;
   int _systemAuthDepth = 0;
+  late final AutofillRepository _autofillRepository;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _autofillRepository = widget.autofillRepository ?? FakeAutofillRepository();
     _isOnboardingComplete = _isOnboardingSatisfied;
     _isLocked =
         _isOnboardingComplete &&
@@ -157,6 +162,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
                 keyRepository: widget.keyRepository,
                 gitRepository: widget.gitRepository,
                 securityRepository: widget.securityRepository,
+                autofillRepository: _autofillRepository,
                 pathPickerService: widget.pathPickerService,
                 onSecuritySettingsChanged: _scheduleAutoLock,
                 runDuringSystemAuthentication: _runDuringSystemAuthentication,

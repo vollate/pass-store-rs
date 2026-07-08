@@ -45,7 +45,26 @@ class AutofillCredential {
   final String password;
 }
 
+class AutofillStatus {
+  const AutofillStatus({
+    required this.available,
+    required this.indexedEntries,
+    this.message,
+  });
+
+  const AutofillStatus.unavailable(String message)
+    : available = false,
+      indexedEntries = 0,
+      message = message;
+
+  final bool available;
+  final int indexedEntries;
+  final String? message;
+}
+
 abstract interface class AutofillRepository {
+  AutofillStatus get status;
+
   Future<void> refreshIndex(List<PasswordEntry> entries);
 
   Future<List<AutofillCandidate>> queryCandidates({
@@ -103,7 +122,7 @@ final class FrbAutofillBridgeApi implements AutofillBridgeApi {
 }
 
 class BridgeAutofillRepository implements AutofillRepository {
-  const BridgeAutofillRepository({
+  BridgeAutofillRepository({
     required this.bridge,
     required this.configPath,
     required this.indexPath,
@@ -112,6 +131,9 @@ class BridgeAutofillRepository implements AutofillRepository {
     required this.storeRoot,
     this.pgpExecutable,
     this.securityRepository,
+    this.currentStoreId,
+    this.currentStoreName,
+    this.currentStoreRoot,
   });
 
   final AutofillBridgeApi bridge;
@@ -122,6 +144,15 @@ class BridgeAutofillRepository implements AutofillRepository {
   final String storeRoot;
   final String? pgpExecutable;
   final SecurityRepository? securityRepository;
+  final String Function()? currentStoreId;
+  final String Function()? currentStoreName;
+  final String Function()? currentStoreRoot;
+  AutofillStatus _status = const AutofillStatus.unavailable(
+    'Autofill data has not been refreshed',
+  );
+
+  @override
+  AutofillStatus get status => _status;
 
   @override
   Future<void> refreshIndex(List<PasswordEntry> entries) async {
@@ -129,15 +160,20 @@ class BridgeAutofillRepository implements AutofillRepository {
       request: frb.RefreshAutofillIndexRequest(
         configPath: configPath,
         indexPath: indexPath,
-        storeId: storeId,
-        storeName: storeName,
-        root: storeRoot,
+        storeId: currentStoreId?.call() ?? storeId,
+        storeName: currentStoreName?.call() ?? storeName,
+        root: currentStoreRoot?.call() ?? storeRoot,
         pgpExecutable: pgpExecutable,
         passphrase: await _activePassphrase(),
         entries: _entryMetadata(entries),
       ),
     );
     _throwIfFailure(response.error);
+    _status = AutofillStatus(
+      available: true,
+      indexedEntries: entries.where((entry) => !entry.isDirectory).length,
+      message: 'Autofill data is up to date',
+    );
   }
 
   @override
@@ -157,7 +193,9 @@ class BridgeAutofillRepository implements AutofillRepository {
       ),
     );
     _throwIfFailure(response.error);
-    return response.candidates.map(_candidateFromBridge).toList(growable: false);
+    return response.candidates
+        .map(_candidateFromBridge)
+        .toList(growable: false);
   }
 
   @override
@@ -166,7 +204,7 @@ class BridgeAutofillRepository implements AutofillRepository {
       request: frb.AutofillCredentialRequest(
         configPath: configPath,
         indexPath: indexPath,
-        root: storeRoot,
+        root: currentStoreRoot?.call() ?? storeRoot,
         path: path,
         pgpExecutable: pgpExecutable,
         passphrase: await _activePassphrase(),
@@ -190,6 +228,7 @@ class BridgeAutofillRepository implements AutofillRepository {
       request: frb.ClearAutofillIndexRequest(indexPath: indexPath),
     );
     _throwIfFailure(response.error);
+    _status = const AutofillStatus.unavailable('Autofill data is cleared');
   }
 
   Future<String?> _activePassphrase() async {
@@ -197,7 +236,9 @@ class BridgeAutofillRepository implements AutofillRepository {
     return passphrase?.passphrase;
   }
 
-  List<frb.AutofillEntryMetadataDto> _entryMetadata(List<PasswordEntry> entries) {
+  List<frb.AutofillEntryMetadataDto> _entryMetadata(
+    List<PasswordEntry> entries,
+  ) {
     return <frb.AutofillEntryMetadataDto>[
       for (var index = 0; index < entries.length; index++)
         if (!entries[index].isDirectory)
@@ -233,7 +274,8 @@ class BridgeAutofillRepository implements AutofillRepository {
 class FakeAutofillRepository implements AutofillRepository {
   FakeAutofillRepository({
     List<AutofillCandidate> candidates = const <AutofillCandidate>[],
-    Map<String, AutofillCredential> credentials = const <String, AutofillCredential>{},
+    Map<String, AutofillCredential> credentials =
+        const <String, AutofillCredential>{},
   }) : _candidates = List<AutofillCandidate>.of(candidates),
        _credentials = Map<String, AutofillCredential>.of(credentials);
 
@@ -241,11 +283,22 @@ class FakeAutofillRepository implements AutofillRepository {
   final Map<String, AutofillCredential> _credentials;
   List<PasswordEntry> lastRefreshedEntries = const <PasswordEntry>[];
   bool cleared = false;
+  AutofillStatus _status = const AutofillStatus.unavailable(
+    'Autofill data has not been refreshed',
+  );
+
+  @override
+  AutofillStatus get status => _status;
 
   @override
   Future<void> refreshIndex(List<PasswordEntry> entries) async {
     lastRefreshedEntries = List<PasswordEntry>.of(entries);
     cleared = false;
+    _status = AutofillStatus(
+      available: true,
+      indexedEntries: entries.where((entry) => !entry.isDirectory).length,
+      message: 'Autofill data is up to date',
+    );
   }
 
   @override
@@ -268,5 +321,6 @@ class FakeAutofillRepository implements AutofillRepository {
     _candidates.clear();
     _credentials.clear();
     cleared = true;
+    _status = const AutofillStatus.unavailable('Autofill data is cleared');
   }
 }

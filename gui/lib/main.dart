@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app/pars_gui_app.dart';
 import 'bridge/pars_bridge_api.dart';
 import 'bridge/frb_generated/frb_generated.dart';
+import 'services/autofill_repository.dart';
 import 'services/bridge_backed_repository.dart';
 import 'services/mobile_pgp_backend.dart';
 import 'services/security_repository.dart';
@@ -16,7 +17,22 @@ Future<void> main() async {
     desktopConfigPath: BridgeBackedRepository.defaultConfigPath(),
   );
   final securityRepository = await SecureStorageSecurityRepository.load();
-  final repository = BridgeBackedRepository(
+  late final BridgeBackedRepository repository;
+  final autofillRepository = BridgeAutofillRepository(
+    bridge: const FrbAutofillBridgeApi(),
+    configPath: pgpRuntime.configPath,
+    indexPath: '${pgpRuntime.configPath}.autofill.json',
+    storeId: 'selected',
+    storeName: 'Selected store',
+    storeRoot: '',
+    pgpExecutable: pgpRuntime.pgpExecutable,
+    securityRepository: securityRepository,
+    currentStoreId: () => repository.lifecycle.selectedStoreId ?? 'selected',
+    currentStoreName:
+        () => repository.lifecycle.selectedStore?.name ?? 'Selected store',
+    currentStoreRoot: () => repository.lifecycle.selectedStoreRoot ?? '',
+  );
+  repository = BridgeBackedRepository(
     bridge: bridge,
     configPath: pgpRuntime.configPath,
     pgpExecutable: pgpRuntime.pgpExecutable,
@@ -24,6 +40,7 @@ Future<void> main() async {
     sshDir: pgpRuntime.sshDir,
     managedStoreBaseDir: pgpRuntime.storeBaseDir,
     securityRepository: securityRepository,
+    autofillRepository: autofillRepository,
   );
   try {
     await repository.refresh();
@@ -38,6 +55,7 @@ Future<void> main() async {
       keyRepository: repository,
       gitRepository: repository,
       securityRepository: securityRepository,
+      autofillRepository: autofillRepository,
     ),
   );
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
+import '../../services/autofill_repository.dart';
 import '../../services/git_repository.dart';
 import '../../services/key_repository.dart';
 import '../../services/path_picker_service.dart';
@@ -9,6 +10,7 @@ import '../../services/runtime_diagnostics.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
+import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
@@ -17,6 +19,7 @@ part 'widgets/settings_security_widgets.dart';
 part 'widgets/settings_key_management_widgets.dart';
 part 'widgets/settings_store_widgets.dart';
 part 'widgets/settings_git_widgets.dart';
+part 'widgets/settings_autofill_widgets.dart';
 part 'widgets/settings_sections.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -26,6 +29,8 @@ class SettingsScreen extends StatelessWidget {
     required this.keyRepository,
     required this.gitRepository,
     required this.securityRepository,
+    this.autofillRepository,
+    this.vaultRepository,
     this.pathPickerService = const SystemPathPickerService(),
     this.onSecuritySettingsChanged,
     this.runDuringSystemAuthentication,
@@ -36,6 +41,8 @@ class SettingsScreen extends StatelessWidget {
   final KeyRepository keyRepository;
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
+  final AutofillRepository? autofillRepository;
+  final VaultRepository? vaultRepository;
   final PathPickerService pathPickerService;
   final VoidCallback? onSecuritySettingsChanged;
   final Future<T> Function<T>(Future<T> Function() action)?
@@ -132,6 +139,12 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Platform',
                 children: <Widget>[
                   _SettingsTile(
+                    title: 'System autofill',
+                    subtitle: _autofillSubtitle,
+                    icon: Icons.password_outlined,
+                    onTap: () => _showAutofill(context),
+                  ),
+                  _SettingsTile(
                     title: 'Runtime diagnostics',
                     subtitle: 'Bridge, core, crypto, Git, key storage',
                     icon: Icons.health_and_safety_outlined,
@@ -155,6 +168,18 @@ class SettingsScreen extends StatelessWidget {
       settingsRepository is RuntimeDiagnosticsRepository
           ? settingsRepository as RuntimeDiagnosticsRepository
           : null;
+
+  String get _autofillSubtitle {
+    final repository = autofillRepository;
+    if (repository == null) {
+      return 'Unavailable';
+    }
+    final status = repository.status;
+    if (status.available) {
+      return '${status.indexedEntries} entries indexed';
+    }
+    return status.message ?? 'Not refreshed';
+  }
 
   List<String> _parseGitArgs(String value) {
     return value
