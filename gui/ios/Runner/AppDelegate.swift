@@ -3,34 +3,28 @@ import Flutter
 import UIKit
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
-    configureParsPlatformChannels()
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    configureParsPlatformChannels(
+      binaryMessenger: engineBridge.applicationRegistrar.messenger())
   }
 
-  private func configureParsPlatformChannels() {
-    guard let controller = window?.rootViewController as? FlutterViewController else {
-      return
-    }
-
+  private func configureParsPlatformChannels(binaryMessenger: FlutterBinaryMessenger) {
     FlutterMethodChannel(
       name: "top.vollate.pars_gui/ios_runtime",
-      binaryMessenger: controller.binaryMessenger
+      binaryMessenger: binaryMessenger
     ).setMethodCallHandler { call, result in
       switch call.method {
       case "appGroupSupportPath":
         do {
           result(try ParsAutofillSharedState.supportDirectoryURL().path)
         } catch {
-          result(FlutterError(
-            code: "APP_GROUP_UNAVAILABLE",
-            message: error.localizedDescription,
-            details: nil))
+          result(
+            FlutterError(
+              code: "APP_GROUP_UNAVAILABLE",
+              message: error.localizedDescription,
+              details: nil))
         }
       default:
         result(FlutterMethodNotImplemented)
@@ -39,7 +33,7 @@ import UIKit
 
     FlutterMethodChannel(
       name: "top.vollate.pars_gui/autofill",
-      binaryMessenger: controller.binaryMessenger
+      binaryMessenger: binaryMessenger
     ).setMethodCallHandler { call, result in
       switch call.method {
       case "publishState":
@@ -58,10 +52,11 @@ import UIKit
       let configPath = args["configPath"] as? String,
       let indexPath = args["indexPath"] as? String
     else {
-      result(FlutterError(
-        code: "INVALID_AUTOFILL_STATE",
-        message: "Missing configPath or indexPath",
-        details: nil))
+      result(
+        FlutterError(
+          code: "INVALID_AUTOFILL_STATE",
+          message: "Missing configPath or indexPath",
+          details: nil))
       return
     }
 
@@ -75,10 +70,11 @@ import UIKit
         result(nil)
       }
     } catch {
-      result(FlutterError(
-        code: "AUTOFILL_STATE_PUBLISH_FAILED",
-        message: error.localizedDescription,
-        details: nil))
+      result(
+        FlutterError(
+          code: "AUTOFILL_STATE_PUBLISH_FAILED",
+          message: error.localizedDescription,
+          details: nil))
     }
   }
 }

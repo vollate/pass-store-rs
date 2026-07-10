@@ -60,10 +60,9 @@ class AutofillStatus {
     this.message,
   });
 
-  const AutofillStatus.unavailable(String message)
+  const AutofillStatus.unavailable(this.message)
     : available = false,
-      indexedEntries = 0,
-      message = message;
+      indexedEntries = 0;
 
   final bool available;
   final int indexedEntries;

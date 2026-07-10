@@ -20,6 +20,8 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ParsKeychainAccessGroup</key>
+	<string>$(AppIdentifierPrefix)com.example.parsGui.autofill</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

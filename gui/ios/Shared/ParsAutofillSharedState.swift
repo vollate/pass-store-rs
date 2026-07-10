@@ -32,6 +32,7 @@ enum ParsAutofillSharedState {
   private static let indexFileName = "autofill.json"
   private static let keychainService = "top.vollate.pars_gui.autofill"
   private static let keychainAccount = "pgp-passphrase"
+  private static let keychainAccessGroupInfoKey = "ParsKeychainAccessGroup"
 
   static func containerURL() -> URL? {
     FileManager.default.containerURL(
@@ -175,14 +176,13 @@ enum ParsAutofillSharedState {
   }
 
   private static func keychainAccessGroup() -> String? {
-    guard let task = SecTaskCreateFromSelf(nil),
-      let value = SecTaskCopyValueForEntitlement(
-        task,
-        "keychain-access-groups" as CFString,
-        nil) as? [String]
+    guard
+      let value = Bundle.main.object(forInfoDictionaryKey: keychainAccessGroupInfoKey) as? String,
+      !value.isEmpty,
+      !value.contains("$(")
     else {
       return nil
     }
-    return value.first
+    return value
   }
 }

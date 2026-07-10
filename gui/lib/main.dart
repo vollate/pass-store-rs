@@ -1,4 +1,8 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
+    show ExternalLibrary;
 
 import 'app/pars_gui_app.dart';
 import 'bridge/pars_bridge_api.dart';
@@ -10,7 +14,10 @@ import 'services/security_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await RustLib.init();
+  await RustLib.init(
+    externalLibrary:
+        Platform.isIOS ? ExternalLibrary.process(iKnowHowToUseIt: true) : null,
+  );
   const bridge = FrbParsBridgeApi();
   final pgpRuntime = await configureDefaultPgpRuntime(
     bridge: bridge,
