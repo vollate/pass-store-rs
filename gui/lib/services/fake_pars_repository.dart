@@ -1,5 +1,6 @@
 import '../models/key_record.dart';
 import '../models/password_entry.dart';
+import '../models/pgp_key_import.dart';
 import 'git_repository.dart';
 import 'key_repository.dart';
 import 'pass_entry_parser.dart';
@@ -468,6 +469,32 @@ class FakeParsRepository
   }) async => keys.firstWhere((key) => key.type == KeyRecordType.pgp);
 
   @override
+  Future<PgpKeyInspection> inspectPgpKeyText(String armoredText) async =>
+      _fakeInspection;
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyFile(String path) async =>
+      _fakeInspection;
+
+  @override
+  Future<PgpImportResult> importPgpKeyText(
+    String armoredText, {
+    String? passphrase,
+  }) async => PgpImportResult(
+    key: keys.firstWhere((key) => key.type == KeyRecordType.pgp),
+    inspection: _fakeInspection,
+  );
+
+  @override
+  Future<PgpImportResult> importPgpKeyFile(
+    String path, {
+    String? passphrase,
+  }) async => PgpImportResult(
+    key: keys.firstWhere((key) => key.type == KeyRecordType.pgp),
+    inspection: _fakeInspection,
+  );
+
+  @override
   Future<KeyRecord> importPgpPublicKeyText(String armoredText) async =>
       keys.firstWhere((key) => key.type == KeyRecordType.pgp);
 
@@ -530,3 +557,12 @@ class FakeParsRepository
   Future<Uri> githubSshSettingsUri() async =>
       Uri.parse('https://github.com/settings/keys');
 }
+
+const PgpKeyInspection _fakeInspection = PgpKeyInspection(
+  kind: PgpKeyKind.public,
+  fingerprint: '3A8E 9C12 77FA 22D1 90BD 48AA A991 D3B4 A702 91EF',
+  identity: 'Vollate <me@example.com>',
+  hasPrivateKey: false,
+  requiresPassphrase: false,
+  armored: true,
+);

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/app/pars_gui_app.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
+import 'package:pars_gui/models/pgp_key_import.dart';
 import 'package:pars_gui/services/autofill_repository.dart';
 import 'package:pars_gui/services/fake_pars_repository.dart';
 import 'package:pars_gui/services/git_repository.dart';
@@ -21,8 +22,17 @@ import 'package:pars_gui/screens/settings/settings_screen.dart';
 import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/screens/vault/vault_screen.dart';
 import 'package:pars_gui/widgets/gesture_lock_input.dart';
+import 'package:pars_gui/widgets/pgp_key_import_body.dart';
 
 const _testPgpFingerprint = '3A8E 9C12 77FA 22D1 90BD 48AA A991 D3B4 A702 91EF';
+const _publicKeyInspection = PgpKeyInspection(
+  kind: PgpKeyKind.public,
+  fingerprint: _testPgpFingerprint,
+  identity: 'Vollate <me@example.com>',
+  hasPrivateKey: false,
+  requiresPassphrase: false,
+  armored: true,
+);
 const _testPgpKey = KeyRecord(
   type: KeyRecordType.pgp,
   name: 'Vollate <me@example.com>',
@@ -474,7 +484,8 @@ void main() {
             find.byType(TextField).last,
             '-----BEGIN PGP PRIVATE KEY BLOCK-----',
           );
-          await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
           break;
       }
       await tester.pumpAndSettle();
@@ -484,6 +495,80 @@ void main() {
       expect(find.text('Set up SSH for GitHub'), findsOneWidget);
     });
   }
+
+  testWidgets(
+    'onboarding protected PGP import advances only after validation',
+    (tester) async {
+      const passphrase = 'onboarding passphrase';
+      final repository = _OnboardingBranchRepository()
+        ..pgpInspection = const PgpKeyInspection(
+          kind: PgpKeyKind.private,
+          fingerprint: 'PROTECTED ABC',
+          identity: 'Protected <protected@example.com>',
+          hasPrivateKey: true,
+          requiresPassphrase: true,
+          armored: true,
+        )
+        ..pgpImportFailure = const PgpImportException(
+          PgpImportFailureKind.incorrectPassphrase,
+          'the PGP private key passphrase is incorrect',
+        );
+      final security = InMemorySecurityRepository.withPattern(
+        const <int>[0, 1, 2, 5],
+        biometricUnlockEnabled: true,
+        onboardingComplete: false,
+        lastUnlockedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        ParsGuiApp(
+          vaultRepository: repository,
+          settingsRepository: repository,
+          keyRepository: repository,
+          gitRepository: repository,
+          securityRepository: security,
+        ),
+      );
+
+      await tester.tap(find.text('Import PGP key'));
+      await tester.pumpAndSettle();
+      // Onboarding offers the same Text/File choice as Settings.
+      expect(find.byType(PgpKeyImportBody), findsOneWidget);
+      expect(
+        find.widgetWithText(SegmentedButton<PgpImportSource>, 'File'),
+        findsOneWidget,
+      );
+
+      await tester.enterText(
+        find.byType(TextField).last,
+        '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      );
+      await tester.pumpAndSettle();
+      await _tapImportSubmit(tester, 'Import');
+      expect(find.text('PGP passphrase'), findsOneWidget);
+
+      // An incorrect passphrase must not advance to SSH.
+      await tester.enterText(find.byType(TextField).last, 'wrong');
+      await tester.pumpAndSettle();
+      await _tapImportSubmit(tester, 'Unlock and import');
+      expect(find.text('Set up SSH for GitHub'), findsNothing);
+      expect(security.hasActivePgpSession, isFalse);
+      expect(repository.keyActions, isNot(contains(startsWith('add-pgp:'))));
+
+      // The correct passphrase selects the returned fingerprint and advances.
+      repository.pgpImportFailure = null;
+      await tester.enterText(find.byType(TextField).last, passphrase);
+      await tester.pumpAndSettle();
+      await _tapImportSubmit(tester, 'Unlock and import');
+
+      expect(security.hasActivePgpSession, isTrue);
+      final session = await security.readActivePgpPassphrase();
+      expect(session?.fingerprint, 'PROTECTED ABC');
+      expect(repository.keyActions.last, 'add-pgp:PROTECTED ABC');
+      expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+      expect(find.textContaining(passphrase), findsNothing);
+    },
+  );
 
   testWidgets(
     'onboarding key form shows inline errors above the action button',
@@ -1382,6 +1467,8 @@ void main() {
       fileResults: <String?>['/tmp/deploy.key'],
     );
 
+    // PGP goes straight to the shared source-independent body: no Text/File
+    // dialog, and no guessing the kind from the source.
     await _pumpKeyManagementSheet(
       tester,
       repository: repository,
@@ -1390,17 +1477,18 @@ void main() {
     );
     await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(TextButton, 'Text'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'File'), findsOneWidget);
+    expect(find.byType(PgpKeyImportBody), findsOneWidget);
+    expect(find.widgetWithText(SegmentedButton<PgpImportSource>, 'Text'), findsOneWidget);
+    expect(find.widgetWithText(SegmentedButton<PgpImportSource>, 'File'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(TextButton, 'Text'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).last, 'PGP PUBLIC KEY');
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
     await tester.pumpAndSettle();
     Navigator.of(tester.element(find.text('PGP keys').last)).pop();
     await tester.pumpAndSettle();
 
+    // SSH keeps its own Text/File dialog because it needs a key name.
     await _pumpKeyManagementSheet(
       tester,
       repository: repository,
@@ -1432,11 +1520,259 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.keyActions, <String>[
-      'import-pgp-public:PGP PUBLIC KEY',
+      'inspect-pgp-text:PGP PUBLIC KEY',
+      'import-pgp-text:PGP PUBLIC KEY:',
       'import-ssh-file:deploy-key:/tmp/deploy.key',
     ]);
     expect(pathPicker.fileInitialDirectories.single, '/tmp');
   });
+
+  testWidgets('settings PGP import follows detected kind for a picked file', (
+    tester,
+  ) async {
+    // The old flow always called the private-key API for files, so a public key
+    // from a file failed. Source must not decide the kind.
+    final repository = _KeyManagementSettingsRepository();
+    final pathPicker = _FakePathPickerService(
+      fileResults: <String?>['/tmp/alice.gpg'],
+    );
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+      pathPickerService: pathPicker,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('File'));
+    await tester.pumpAndSettle();
+    // Nothing picked yet, so Import stays disabled.
+    expect(
+      tester
+          .widgetList<FilledButton>(find.widgetWithText(FilledButton, 'Import'))
+          .last
+          .onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
+    await tester.pumpAndSettle();
+
+    expect(repository.keyActions, <String>[
+      'inspect-pgp-file:/tmp/alice.gpg',
+      'import-pgp-file:/tmp/alice.gpg:',
+    ]);
+    // A public key, even though it came from a file.
+    expect(find.textContaining('Imported'), findsWidgets);
+  });
+
+  testWidgets('settings PGP import reports a cancelled or failing picker', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository();
+    final pathPicker = _FakePathPickerService(
+      fileResults: <Object?>[
+        null,
+        const PathPickerException('File picker unavailable.'),
+      ],
+    );
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+      pathPickerService: pathPicker,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('File'));
+    await tester.pumpAndSettle();
+
+    // Cancelling leaves the form untouched and inspects nothing.
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(repository.keyActions, isEmpty);
+
+    // A picker error is shown inline.
+    await tester.tap(find.widgetWithText(TextButton, 'Choose'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('File picker unavailable.'), findsOneWidget);
+    expect(repository.keyActions, isEmpty);
+  });
+
+  testWidgets(
+    'settings protected PGP import validates the passphrase before completing',
+    (tester) async {
+      const passphrase = 'correct horse battery staple';
+      final repository = _KeyManagementSettingsRepository()
+        ..pgpInspection = const PgpKeyInspection(
+          kind: PgpKeyKind.private,
+          fingerprint: 'PGP-BACKUP',
+          identity: 'Backup User <backup@example.com>',
+          hasPrivateKey: true,
+          requiresPassphrase: true,
+          armored: true,
+        )
+        ..pgpImportFailure = const PgpImportException(
+          PgpImportFailureKind.incorrectPassphrase,
+          'the PGP private key passphrase is incorrect',
+        );
+      final security = InMemorySecurityRepository();
+
+      await _pumpKeyManagementSheet(
+        tester,
+        repository: repository,
+        type: KeyRecordType.pgp,
+        securityRepository: security,
+      );
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField).last,
+        '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      );
+      await tester.pumpAndSettle();
+
+      // Inspection reveals the key is protected, so the passphrase step appears
+      // instead of the import completing.
+      await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
+      await tester.pumpAndSettle();
+      expect(find.text('PGP passphrase'), findsOneWidget);
+      expect(find.text('Remember in Keychain/KMS'), findsOneWidget);
+      expect(repository.keyActions, <String>[
+        'inspect-pgp-text:-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      ]);
+      // Remember defaults off.
+      expect(
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        isFalse,
+      );
+
+      // A wrong passphrase keeps the user in the flow with a sanitized error.
+      await tester.enterText(find.byType(TextField).last, 'wrong passphrase');
+      await tester.pumpAndSettle();
+      await _tapImportSubmit(tester, 'Unlock and import');
+      expect(find.byType(PgpKeyImportBody), findsOneWidget);
+      expect(
+        find.text('That passphrase did not unlock this key. Try again.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('wrong passphrase'), findsNothing);
+      expect(security.hasActivePgpSession, isFalse);
+      expect(security.hasStoredPgpPassphrase, isFalse);
+
+      // The correct passphrase starts a session bound to the returned key.
+      repository.pgpImportFailure = null;
+      await tester.enterText(find.byType(TextField).last, passphrase);
+      await tester.pumpAndSettle();
+      await _tapImportSubmit(tester, 'Unlock and import');
+
+      expect(
+        repository.keyActions.last,
+        'import-pgp-text:-----BEGIN PGP PRIVATE KEY BLOCK-----:$passphrase',
+      );
+      expect(security.hasActivePgpSession, isTrue);
+      final session = await security.readActivePgpPassphrase();
+      expect(session?.fingerprint, 'PGP-BACKUP');
+      // Remember stayed off, so nothing was written to durable storage.
+      expect(security.hasStoredPgpPassphrase, isFalse);
+      expect(find.textContaining(passphrase), findsNothing);
+    },
+  );
+
+  testWidgets('settings PGP import can remember the passphrase on request', (
+    tester,
+  ) async {
+    const passphrase = 'correct horse battery staple';
+    final repository = _KeyManagementSettingsRepository()
+      ..pgpInspection = const PgpKeyInspection(
+        kind: PgpKeyKind.private,
+        fingerprint: 'PGP-BACKUP',
+        identity: 'Backup User <backup@example.com>',
+        hasPrivateKey: true,
+        requiresPassphrase: true,
+        armored: true,
+      );
+    final security = InMemorySecurityRepository();
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+      securityRepository: security,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField).last,
+      '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).last, passphrase);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+    await _tapImportSubmit(tester, 'Unlock and import');
+
+    expect(security.pgpPassphraseStorageEnabled, isTrue);
+    final stored = await security.readPgpPassphrase();
+    expect(stored?.fingerprint, 'PGP-BACKUP');
+    expect(stored?.passphrase, passphrase);
+    expect(find.textContaining(passphrase), findsNothing);
+  });
+
+  testWidgets(
+    'settings reports a secure-storage failure without losing the key',
+    (tester) async {
+      final repository = _KeyManagementSettingsRepository()
+        ..pgpInspection = const PgpKeyInspection(
+          kind: PgpKeyKind.private,
+          fingerprint: 'PGP-BACKUP',
+          identity: 'Backup User <backup@example.com>',
+          hasPrivateKey: true,
+          requiresPassphrase: true,
+          armored: true,
+        );
+      final security = _FailingStorageSecurityRepository();
+
+      await _pumpKeyManagementSheet(
+        tester,
+        repository: repository,
+        type: KeyRecordType.pgp,
+        securityRepository: security,
+      );
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField).last,
+        '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'a passphrase');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(SwitchListTile));
+      await tester.pumpAndSettle();
+      await _tapImportSubmit(tester, 'Unlock and import');
+
+      // The key stays imported and the session live; only remembering failed.
+      expect(
+        find.textContaining('remembering the passphrase failed'),
+        findsOneWidget,
+      );
+      expect(security.hasActivePgpSession, isTrue);
+      expect(security.hasStoredPgpPassphrase, isFalse);
+      expect(find.textContaining('a passphrase'), findsNothing);
+    },
+  );
 
   testWidgets('settings store forms use native folder picker rows', (
     tester,
@@ -1643,9 +1979,10 @@ void main() {
     await _tapVisible(tester, find.text('PGP keys'));
     await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'File'));
+    // PGP import opens the shared body directly, with File as a source choice.
+    await tester.tap(find.text('File'));
     await tester.pumpAndSettle();
-    expect(find.text('Import PGP key file'), findsOneWidget);
+    expect(find.byType(PgpKeyImportBody), findsOneWidget);
     expect(find.text('Key file'), findsOneWidget);
     expect(find.text('Store folder'), findsNothing);
   });
@@ -2712,16 +3049,29 @@ Future<void> _pumpSettingsScreen(
   );
 }
 
+/// Taps the import body's submit button, scrolling it into view first.
+///
+/// The passphrase step grows the sheet past the viewport, so the button ends up
+/// below the fold.
+Future<void> _tapImportSubmit(WidgetTester tester, String label) async {
+  final button = find.widgetWithText(FilledButton, label).last;
+  await tester.ensureVisible(button);
+  await tester.pumpAndSettle();
+  await tester.tap(button);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _pumpKeyManagementSheet(
   WidgetTester tester, {
   required _InjectedRepository repository,
   required KeyRecordType type,
   PathPickerService? pathPickerService,
+  SecurityRepository? securityRepository,
 }) async {
   await _pumpSettingsScreen(
     tester,
     repository: repository,
-    securityRepository: InMemorySecurityRepository(),
+    securityRepository: securityRepository ?? InMemorySecurityRepository(),
     pathPickerService: pathPickerService,
   );
   await tester.tap(
@@ -2932,6 +3282,28 @@ class _InjectedRepository
   }) async => keys.first;
 
   @override
+  Future<PgpKeyInspection> inspectPgpKeyText(String armoredText) async =>
+      _publicKeyInspection;
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyFile(String path) async =>
+      _publicKeyInspection;
+
+  @override
+  Future<PgpImportResult> importPgpKeyText(
+    String armoredText, {
+    String? passphrase,
+  }) async =>
+      PgpImportResult(key: keys.first, inspection: _publicKeyInspection);
+
+  @override
+  Future<PgpImportResult> importPgpKeyFile(
+    String path, {
+    String? passphrase,
+  }) async =>
+      PgpImportResult(key: keys.first, inspection: _publicKeyInspection);
+
+  @override
   Future<KeyRecord> importPgpPublicKeyText(String armoredText) async =>
       keys.first;
 
@@ -3063,8 +3435,56 @@ class _KeyManagementSettingsRepository extends _InjectedRepository {
   final List<String> deleteActions = <String>[];
   final List<String> keyActions = <String>[];
 
+  /// What inspection reports for the next import. Tests override it to exercise
+  /// the protected-private branch.
+  PgpKeyInspection pgpInspection = _publicKeyInspection;
+
+  /// Set to fail the next import, e.g. with an incorrect passphrase.
+  PgpImportException? pgpImportFailure;
+
   @override
   List<KeyRecord> get keys => List<KeyRecord>.unmodifiable(_keys);
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyText(String armoredText) async {
+    keyActions.add('inspect-pgp-text:$armoredText');
+    return pgpInspection;
+  }
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyFile(String path) async {
+    keyActions.add('inspect-pgp-file:$path');
+    return pgpInspection;
+  }
+
+  @override
+  Future<PgpImportResult> importPgpKeyText(
+    String armoredText, {
+    String? passphrase,
+  }) async {
+    keyActions.add('import-pgp-text:$armoredText:${passphrase ?? ''}');
+    return _pgpImportResult();
+  }
+
+  @override
+  Future<PgpImportResult> importPgpKeyFile(
+    String path, {
+    String? passphrase,
+  }) async {
+    keyActions.add('import-pgp-file:$path:${passphrase ?? ''}');
+    return _pgpImportResult();
+  }
+
+  PgpImportResult _pgpImportResult() {
+    final failure = pgpImportFailure;
+    if (failure != null) {
+      throw failure;
+    }
+    return PgpImportResult(
+      key: _settingsBackupPgpKey,
+      inspection: pgpInspection,
+    );
+  }
 
   @override
   Future<KeyRecord> importPgpPublicKeyText(String armoredText) async {
@@ -3225,6 +3645,17 @@ class _StorePathSettingsRepository extends _KeyManagementSettingsRepository {
   }
 }
 
+/// Rejects durable writes while behaving normally for in-memory sessions.
+class _FailingStorageSecurityRepository extends InMemorySecurityRepository {
+  @override
+  Future<void> savePgpPassphrase({
+    required String fingerprint,
+    required String passphrase,
+  }) async {
+    throw StateError('Keychain is unavailable');
+  }
+}
+
 class _FakePathPickerService implements PathPickerService {
   _FakePathPickerService({
     List<Object?>? folderResults,
@@ -3274,7 +3705,7 @@ enum _StoreBranch {
 
 enum _PgpBranch {
   create('create', 'generate-pgp:'),
-  importPrivate('import private', 'import-pgp-private:');
+  importPrivate('import private', 'import-pgp-text:');
 
   const _PgpBranch(this.label, this.actionPrefix);
 
@@ -3313,6 +3744,19 @@ class _OnboardingBranchRepository extends _InjectedRepository {
   final List<KeyRecord> _keys;
   final List<String> storeActions = <String>[];
   final List<String> keyActions = <String>[];
+
+  /// What inspection reports for the next import.
+  PgpKeyInspection pgpInspection = const PgpKeyInspection(
+    kind: PgpKeyKind.private,
+    fingerprint: 'IMPORTED PRIVATE PGP',
+    identity: 'Imported Private PGP',
+    hasPrivateKey: true,
+    requiresPassphrase: false,
+    armored: true,
+  );
+
+  /// Set to fail the next import, e.g. with an incorrect passphrase.
+  PgpImportException? pgpImportFailure;
 
   @override
   String get currentRepoName =>
@@ -3406,6 +3850,52 @@ class _OnboardingBranchRepository extends _InjectedRepository {
     );
     _keys.add(key);
     return key;
+  }
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyText(String armoredText) async {
+    keyActions.add('inspect-pgp-text:$armoredText');
+    return pgpInspection;
+  }
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyFile(String path) async {
+    keyActions.add('inspect-pgp-file:$path');
+    return pgpInspection;
+  }
+
+  @override
+  Future<PgpImportResult> importPgpKeyText(
+    String armoredText, {
+    String? passphrase,
+  }) async {
+    keyActions.add('import-pgp-text:$armoredText:${passphrase ?? ''}');
+    return _pgpImportResult();
+  }
+
+  @override
+  Future<PgpImportResult> importPgpKeyFile(
+    String path, {
+    String? passphrase,
+  }) async {
+    keyActions.add('import-pgp-file:$path:${passphrase ?? ''}');
+    return _pgpImportResult();
+  }
+
+  PgpImportResult _pgpImportResult() {
+    final failure = pgpImportFailure;
+    if (failure != null) {
+      throw failure;
+    }
+    final key = KeyRecord(
+      type: KeyRecordType.pgp,
+      name: pgpInspection.identity,
+      fingerprint: pgpInspection.fingerprint,
+      source: 'Imported during onboarding',
+      hasPrivateKey: pgpInspection.hasPrivateKey,
+    );
+    _keys.add(key);
+    return PgpImportResult(key: key, inspection: pgpInspection);
   }
 
   @override
@@ -4364,6 +4854,26 @@ class _StoreSetupRepository
   Future<KeyRecord> generatePgpKey({
     required String name,
     required String email,
+    String? passphrase,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyText(String armoredText) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyFile(String path) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<PgpImportResult> importPgpKeyText(
+    String armoredText, {
+    String? passphrase,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<PgpImportResult> importPgpKeyFile(
+    String path, {
     String? passphrase,
   }) async => throw UnimplementedError();
 

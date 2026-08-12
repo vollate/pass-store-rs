@@ -8,6 +8,7 @@ import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
 import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
+import '../../widgets/pgp_key_import_body.dart';
 
 part 'widgets/onboarding_key_setup_widgets.dart';
 part 'widgets/onboarding_step_widgets.dart';
@@ -385,25 +386,74 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  /// Opens the shared PGP import flow, the same one Settings uses.
+  ///
+  /// Onboarding only advances to SSH once the key is imported and, for a protected private key, its
+  /// passphrase has been validated.
   void _showImportPgpKeyForm(BuildContext context, KeyRepository repository) {
-    final keyText = TextEditingController();
-    _showOnboardingForm(
+    showModalBottomSheet<void>(
       context: context,
-      title: 'Import PGP key',
-      fields: <Widget>[_ImportPgpKeyFields(keyText: keyText)],
-      submitLabel: 'Import',
-      onSubmit: () async {
-        try {
-          final key =
-              keyText.text.contains('PGP PRIVATE KEY BLOCK')
-                  ? await repository.importPgpPrivateKeyText(keyText.text)
-                  : await repository.importPgpPublicKeyText(keyText.text);
-          await _finishPgpStep(repository, key);
-        } finally {
-          keyText.clear();
-        }
-      },
+      isScrollControlled: true,
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Import PGP key',
+                  style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                PgpKeyImportBody(
+                  keyRepository: repository,
+                  securityRepository: widget.securityRepository,
+                  pathPickerService: widget.pathPickerService,
+                  initialDirectory: _defaultKeyFileBasePath(),
+                  onCancel: () => Navigator.of(sheet).pop(),
+                  onCompleted: (completion) async {
+                    if (sheet.mounted) {
+                      Navigator.of(sheet).pop();
+                    }
+                    if (completion.rememberFailed && mounted) {
+                      _showError(
+                        StateError(
+                          'Imported ${completion.key.name}, but remembering '
+                          'the passphrase failed.',
+                        ),
+                      );
+                    }
+                    // Selects the returned fingerprint and advances to SSH.
+                    await _finishPgpStep(repository, completion.key);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
+  }
+
+  String _defaultKeyFileBasePath() {
+    final selectedRoot = _lifecycle?.selectedStoreRoot;
+    if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
+      return parentDirectory(selectedRoot);
+    }
+    final configPath = _lifecycle?.configPath;
+    if (configPath != null && configPath.trim().isNotEmpty) {
+      return parentDirectory(configPath);
+    }
+    return defaultUserDirectory();
   }
 
   void _showCreateSshKeyForm(BuildContext context, KeyRepository repository) {

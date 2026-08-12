@@ -17,6 +17,7 @@ use crate::pgp::backend::{
     KeyGenerationRequest, PgpBackend, PgpBackendConfig, PgpBackendError, PgpBackendResult,
     PgpKeyDetails,
 };
+use crate::pgp::import::{format_fingerprint, public_key_identity, InspectedPgpKey};
 use crate::util::fs_util::get_dir_gpg_id_content;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -164,13 +165,18 @@ impl RpgpBackend {
 
     fn generate_secret_key(request: KeyGenerationRequest) -> PgpBackendResult<SignedSecretKey> {
         let user_id = format!("{} <{}>", request.name.trim(), request.email.trim());
+        // Subkeys carry their own protection. Leaving them unprotected while the primary is locked
+        // would let anyone holding the keyring decrypt entries without the passphrase, since
+        // decryption only ever touches the encryption subkey.
+        let passphrase = request.passphrase.map(|value| value.expose_secret().to_string());
+
         let mut signing_key = SubkeyParamsBuilder::default();
         signing_key
             .key_type(KeyType::Ed25519Legacy)
             .can_sign(true)
             .can_encrypt(EncryptionCaps::None)
             .can_authenticate(false)
-            .passphrase(None);
+            .passphrase(passphrase.clone());
 
         let mut encryption_key = SubkeyParamsBuilder::default();
         encryption_key
@@ -178,7 +184,7 @@ impl RpgpBackend {
             .can_sign(false)
             .can_encrypt(EncryptionCaps::All)
             .can_authenticate(false)
-            .passphrase(None);
+            .passphrase(passphrase.clone());
 
         let mut key_params = SecretKeyParamsBuilder::default();
         key_params
@@ -187,7 +193,7 @@ impl RpgpBackend {
             .can_sign(false)
             .can_encrypt(EncryptionCaps::None)
             .primary_user_id(user_id)
-            .passphrase(request.passphrase.map(|value| value.expose_secret().to_string()))
+            .passphrase(passphrase)
             .subkeys(vec![
                 signing_key.build().map_err(pgp_command_error)?,
                 encryption_key.build().map_err(pgp_command_error)?,
@@ -291,16 +297,22 @@ impl PgpBackend for RpgpBackend {
         Ok(KeyImportResult { fingerprint, imported_private_key: true })
     }
 
-    fn import_public_key(&self, armored_text: &str) -> PgpBackendResult<KeyImportResult> {
-        let key = parse_public_key(armored_text)?;
-        let fingerprint = self.store_public_key(&key)?;
-        Ok(KeyImportResult { fingerprint, imported_private_key: false })
-    }
-
-    fn import_private_key(&self, armored_text: &SecretString) -> PgpBackendResult<KeyImportResult> {
-        let key = parse_secret_key(armored_text.expose_secret())?;
-        let fingerprint = self.store_private_key(&key)?;
-        Ok(KeyImportResult { fingerprint, imported_private_key: true })
+    fn import_key(&self, key: &InspectedPgpKey) -> PgpBackendResult<KeyImportResult> {
+        // The material is already parsed, so this stores it directly instead of re-reading text.
+        // Bindings are verified here because this backend has to use the key itself.
+        let fingerprint = match key.secret_key() {
+            Some(secret_key) => {
+                secret_key.verify_bindings().map_err(pgp_command_error)?;
+                self.store_private_key(secret_key)?
+            }
+            None => {
+                let public_key = key.public_key().map_err(pgp_command_error)?;
+                public_key.verify_bindings().map_err(pgp_command_error)?;
+                self.store_public_key(&public_key)?
+            }
+        };
+        let imported_private_key = key.secret_key().is_some();
+        Ok(KeyImportResult { fingerprint, imported_private_key })
     }
 
     fn export_public_key(&self, fingerprint: &str) -> PgpBackendResult<KeyExportResult> {
@@ -419,15 +431,15 @@ fn asc_files(dir: &Path) -> PgpBackendResult<Vec<PathBuf>> {
 }
 
 fn key_identity(key: &SignedPublicKey) -> String {
-    key.details.users.first().and_then(|user| user.id.as_str()).unwrap_or("OpenPGP key").to_string()
+    public_key_identity(key)
 }
 
 fn fingerprint(key: &impl KeyDetails) -> String {
-    format!("{:X}", key.fingerprint())
+    format_fingerprint(key)
 }
 
 fn secret_fingerprint(key: &SignedSecretKey) -> String {
-    format!("{:X}", key.primary_key.fingerprint())
+    format_fingerprint(&key.primary_key)
 }
 
 fn key_id(key: &impl KeyDetails) -> String {

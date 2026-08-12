@@ -6,6 +6,8 @@ use pars_core::pgp::backend::{
     KeyGenerationRequest, PgpBackend, PgpBackendConfig, PgpBackendError, PgpBackendResult,
     PgpKeyDetails, SystemGpgBackend,
 };
+use pars_core::pgp::import::{inspect_pgp_key_bytes, InspectedPgpKey};
+use pars_core::util::test_util::PgpKeyMaterialFixture;
 use secrecy::SecretString;
 
 #[test]
@@ -104,8 +106,10 @@ fn pgp_backend_trait_covers_milestone_four_operations() {
         email: "alice@example.com".to_string(),
         passphrase: None,
     });
-    let _ = backend.import_public_key("public");
-    let _ = backend.import_private_key(&SecretString::new("private".into()));
+    let fixture = PgpKeyMaterialFixture::generate(None);
+    let inspected =
+        inspect_pgp_key_bytes(fixture.armored_public.clone()).expect("inspect fixture key");
+    let _ = backend.import_key(&inspected);
     let _ = backend.export_public_key("ABC123");
     let _ = backend.export_private_key("ABC123", None);
     let _ = backend.delete_key("ABC123");
@@ -139,14 +143,7 @@ impl PgpBackend for RecordingBackend {
         Ok(KeyImportResult { fingerprint: "ABC123".to_string(), imported_private_key: true })
     }
 
-    fn import_public_key(&self, _armored_text: &str) -> PgpBackendResult<KeyImportResult> {
-        Ok(KeyImportResult { fingerprint: "ABC123".to_string(), imported_private_key: false })
-    }
-
-    fn import_private_key(
-        &self,
-        _armored_text: &SecretString,
-    ) -> PgpBackendResult<KeyImportResult> {
+    fn import_key(&self, _key: &InspectedPgpKey) -> PgpBackendResult<KeyImportResult> {
         Ok(KeyImportResult { fingerprint: "ABC123".to_string(), imported_private_key: true })
     }
 

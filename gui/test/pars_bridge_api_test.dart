@@ -268,6 +268,38 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.PgpKeyInspectionResponse> inspectPgpKeyText({
+    required frb.InspectPgpKeyTextRequest request,
+  }) async {
+    calledMethods.add('inspect_pgp_key_text');
+    return const frb.PgpKeyInspectionResponse();
+  }
+
+  @override
+  Future<frb.PgpKeyInspectionResponse> inspectPgpKeyFile({
+    required frb.InspectPgpKeyFileRequest request,
+  }) async {
+    calledMethods.add('inspect_pgp_key_file');
+    return const frb.PgpKeyInspectionResponse();
+  }
+
+  @override
+  Future<frb.PgpKeyImportResponse> importPgpKeyText({
+    required frb.ImportPgpKeyTextRequest request,
+  }) async {
+    calledMethods.add('import_pgp_key_text');
+    return const frb.PgpKeyImportResponse();
+  }
+
+  @override
+  Future<frb.PgpKeyImportResponse> importPgpKeyFile({
+    required frb.ImportPgpKeyFileRequest request,
+  }) async {
+    calledMethods.add('import_pgp_key_file');
+    return const frb.PgpKeyImportResponse();
+  }
+
+  @override
   Future<frb.KeyMutationResponse> importPgpPublicKey({
     required frb.ImportKeyTextRequest request,
   }) async {

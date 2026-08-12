@@ -156,22 +156,6 @@ class _CreatePgpKeyFields extends StatelessWidget {
   }
 }
 
-class _ImportPgpKeyFields extends StatelessWidget {
-  const _ImportPgpKeyFields({required this.keyText});
-
-  final TextEditingController keyText;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: keyText,
-      minLines: 4,
-      maxLines: 8,
-      decoration: const InputDecoration(labelText: 'Key text'),
-    );
-  }
-}
-
 class _CreateSshKeyFields extends StatelessWidget {
   const _CreateSshKeyFields({required this.name});
 

@@ -6,8 +6,9 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_store_to_config`, `clone_store_inner`, `configure_pgp_backend_inner`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `entry_ref`, `git_remote_exists`, `import_local_store_inner`, `import_pgp_key_text`, `imported_key_kind`, `inspect_app_state_inner`, `inspect_store`, `list_keys_inner`, `list_stores_inner`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `onboarding_state`, `pgp_backend`, `pgp_key_missing`, `read_entry_inner`, `remove_store_inner`, `run_git_command_response`, `run_git`, `save_config_for_mutation`, `select_store_inner`, `simple`, `store_failure`, `store_name`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `add_store_to_config`, `clone_store_inner`, `configure_pgp_backend_inner`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_remote_exists`, `import_local_store_inner`, `imported_key_kind`, `inspect_app_state_inner`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `list_keys_inner`, `list_stores_inner`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `onboarding_state`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_missing`, `pgp_key_record`, `read_entry_inner`, `remove_store_inner`, `run_git_command_response`, `run_git`, `save_config_for_mutation`, `select_store_inner`, `simple`, `store_failure`, `store_name`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AutofillIndexEntryDto`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 
 Future<ConfigResponse> loadConfig({required LoadConfigRequest request}) =>
     RustLib.instance.api.crateApiLoadConfig(request: request);
@@ -32,6 +33,22 @@ Future<EntrySecretResponse> readEntry({required EntryRequest request}) =>
 Future<CopyEntryPasswordResponse> copyEntryPassword({
   required EntryRequest request,
 }) => RustLib.instance.api.crateApiCopyEntryPassword(request: request);
+
+Future<UnitResponse> refreshAutofillIndex({
+  required RefreshAutofillIndexRequest request,
+}) => RustLib.instance.api.crateApiRefreshAutofillIndex(request: request);
+
+Future<AutofillCandidatesResponse> queryAutofillCandidates({
+  required AutofillQueryRequest request,
+}) => RustLib.instance.api.crateApiQueryAutofillCandidates(request: request);
+
+Future<AutofillCredentialResponse> resolveAutofillCredential({
+  required AutofillCredentialRequest request,
+}) => RustLib.instance.api.crateApiResolveAutofillCredential(request: request);
+
+Future<UnitResponse> clearAutofillIndex({
+  required ClearAutofillIndexRequest request,
+}) => RustLib.instance.api.crateApiClearAutofillIndex(request: request);
 
 Future<InsertEntryResponse> insertEntry({
   required InsertEntryRequest request,
@@ -102,6 +119,27 @@ Future<KeyMutationResponse> generatePgpKey({
   required GeneratePgpKeyRequest request,
 }) => RustLib.instance.api.crateApiGeneratePgpKey(request: request);
 
+/// Inspects pasted PGP key material without touching any keyring.
+Future<PgpKeyInspectionResponse> inspectPgpKeyText({
+  required InspectPgpKeyTextRequest request,
+}) => RustLib.instance.api.crateApiInspectPgpKeyText(request: request);
+
+/// Inspects a local key file. The file's bytes are read here and never returned to Flutter.
+Future<PgpKeyInspectionResponse> inspectPgpKeyFile({
+  required InspectPgpKeyFileRequest request,
+}) => RustLib.instance.api.crateApiInspectPgpKeyFile(request: request);
+
+/// Imports pasted PGP key material of either kind, validating any passphrase before mutating.
+Future<PgpKeyImportResponse> importPgpKeyText({
+  required ImportPgpKeyTextRequest request,
+}) => RustLib.instance.api.crateApiImportPgpKeyText(request: request);
+
+/// Imports a PGP key file of either kind. Binary exports are supported because the file is read as
+/// bytes rather than UTF-8 text.
+Future<PgpKeyImportResponse> importPgpKeyFile({
+  required ImportPgpKeyFileRequest request,
+}) => RustLib.instance.api.crateApiImportPgpKeyFile(request: request);
+
 Future<KeyMutationResponse> importPgpPublicKey({
   required ImportKeyTextRequest request,
 }) => RustLib.instance.api.crateApiImportPgpPublicKey(request: request);
@@ -155,22 +193,6 @@ Future<UnitResponse> deleteSshKey({required DeleteSshKeyRequest request}) =>
 Future<OpenExternalUrlResponse> openGithubSshSettings({
   required OpenGithubSshSettingsRequest request,
 }) => RustLib.instance.api.crateApiOpenGithubSshSettings(request: request);
-
-Future<UnitResponse> refreshAutofillIndex({
-  required RefreshAutofillIndexRequest request,
-}) => RustLib.instance.api.crateApiRefreshAutofillIndex(request: request);
-
-Future<AutofillCandidatesResponse> queryAutofillCandidates({
-  required AutofillQueryRequest request,
-}) => RustLib.instance.api.crateApiQueryAutofillCandidates(request: request);
-
-Future<AutofillCredentialResponse> resolveAutofillCredential({
-  required AutofillCredentialRequest request,
-}) => RustLib.instance.api.crateApiResolveAutofillCredential(request: request);
-
-Future<UnitResponse> clearAutofillIndex({
-  required ClearAutofillIndexRequest request,
-}) => RustLib.instance.api.crateApiClearAutofillIndex(request: request);
 
 class AddPgpKeyToGpgIdRequest {
   final String root;
@@ -305,10 +327,7 @@ class AutofillCandidatesResponse {
   final List<AutofillCandidateDto> candidates;
   final BridgeFailure? error;
 
-  const AutofillCandidatesResponse({
-    this.candidates = const <AutofillCandidateDto>[],
-    this.error,
-  });
+  const AutofillCandidatesResponse({required this.candidates, this.error});
 
   @override
   int get hashCode => candidates.hashCode ^ error.hashCode;
@@ -475,11 +494,15 @@ class BridgeFailure {
   final String? conflictKind;
   final String? path;
 
+  /// Set only for PGP import failures, so Flutter can branch on the reason rather than the text.
+  final PgpImportFailureKind? pgpImportKind;
+
   const BridgeFailure({
     required this.category,
     required this.message,
     this.conflictKind,
     this.path,
+    this.pgpImportKind,
   });
 
   @override
@@ -487,7 +510,8 @@ class BridgeFailure {
       category.hashCode ^
       message.hashCode ^
       conflictKind.hashCode ^
-      path.hashCode;
+      path.hashCode ^
+      pgpImportKind.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -497,7 +521,8 @@ class BridgeFailure {
           category == other.category &&
           message == other.message &&
           conflictKind == other.conflictKind &&
-          path == other.path;
+          path == other.path &&
+          pgpImportKind == other.pgpImportKind;
 }
 
 enum BridgeFailureCategory {
@@ -509,6 +534,22 @@ enum BridgeFailureCategory {
   validationError,
   conflict,
   unsupportedPlatform,
+}
+
+class ClearAutofillIndexRequest {
+  final String indexPath;
+
+  const ClearAutofillIndexRequest({required this.indexPath});
+
+  @override
+  int get hashCode => indexPath.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClearAutofillIndexRequest &&
+          runtimeType == other.runtimeType &&
+          indexPath == other.indexPath;
 }
 
 class CloneStoreRequest {
@@ -540,22 +581,6 @@ class CloneStoreRequest {
           remoteUrl == other.remoteUrl &&
           root == other.root &&
           setDefault == other.setDefault;
-}
-
-class ClearAutofillIndexRequest {
-  final String indexPath;
-
-  const ClearAutofillIndexRequest({required this.indexPath});
-
-  @override
-  int get hashCode => indexPath.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ClearAutofillIndexRequest &&
-          runtimeType == other.runtimeType &&
-          indexPath == other.indexPath;
 }
 
 class ConfigResponse {
@@ -1353,6 +1378,72 @@ class ImportLocalStoreRequest {
           setDefault == other.setDefault;
 }
 
+class ImportPgpKeyFileRequest {
+  final String configPath;
+  final String? pgpExecutable;
+  final String path;
+
+  /// Required only when inspection reports `requires_passphrase`.
+  final String? passphrase;
+
+  const ImportPgpKeyFileRequest({
+    required this.configPath,
+    this.pgpExecutable,
+    required this.path,
+    this.passphrase,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      pgpExecutable.hashCode ^
+      path.hashCode ^
+      passphrase.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImportPgpKeyFileRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          pgpExecutable == other.pgpExecutable &&
+          path == other.path &&
+          passphrase == other.passphrase;
+}
+
+class ImportPgpKeyTextRequest {
+  final String configPath;
+  final String? pgpExecutable;
+  final String armoredText;
+
+  /// Required only when inspection reports `requires_passphrase`.
+  final String? passphrase;
+
+  const ImportPgpKeyTextRequest({
+    required this.configPath,
+    this.pgpExecutable,
+    required this.armoredText,
+    this.passphrase,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      pgpExecutable.hashCode ^
+      armoredText.hashCode ^
+      passphrase.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImportPgpKeyTextRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          pgpExecutable == other.pgpExecutable &&
+          armoredText == other.armoredText &&
+          passphrase == other.passphrase;
+}
+
 class InsertEntryRequest {
   final String configPath;
   final String root;
@@ -1447,6 +1538,38 @@ class InspectAppStateRequest {
           runtimeType == other.runtimeType &&
           configPath == other.configPath &&
           pgpExecutable == other.pgpExecutable;
+}
+
+class InspectPgpKeyFileRequest {
+  final String path;
+
+  const InspectPgpKeyFileRequest({required this.path});
+
+  @override
+  int get hashCode => path.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InspectPgpKeyFileRequest &&
+          runtimeType == other.runtimeType &&
+          path == other.path;
+}
+
+class InspectPgpKeyTextRequest {
+  final String armoredText;
+
+  const InspectPgpKeyTextRequest({required this.armoredText});
+
+  @override
+  int get hashCode => armoredText.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InspectPgpKeyTextRequest &&
+          runtimeType == other.runtimeType &&
+          armoredText == other.armoredText;
 }
 
 class KeyDetectionResponse {
@@ -1805,23 +1928,94 @@ class ParsedEntryFieldDto {
           value == other.value;
 }
 
-class RemoveStoreRequest {
-  final String configPath;
-  final String root;
+/// Why a PGP import failed, so Flutter can branch without matching on message text.
+enum PgpImportFailureKind {
+  unsupportedMaterial,
+  kindMismatch,
+  passphraseRequired,
+  incorrectPassphrase,
+  backendError,
+}
 
-  const RemoveStoreRequest({required this.configPath, required this.root});
+class PgpKeyImportResponse {
+  final PgpKeyInspectionDto? inspection;
+  final KeyRecordDto? key;
+  final BridgeFailure? error;
+
+  const PgpKeyImportResponse({this.inspection, this.key, this.error});
 
   @override
-  int get hashCode => configPath.hashCode ^ root.hashCode;
+  int get hashCode => inspection.hashCode ^ key.hashCode ^ error.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is RemoveStoreRequest &&
+      other is PgpKeyImportResponse &&
           runtimeType == other.runtimeType &&
-          configPath == other.configPath &&
-          root == other.root;
+          inspection == other.inspection &&
+          key == other.key &&
+          error == other.error;
 }
+
+/// What inspection found in the supplied material. Carries no key bytes.
+class PgpKeyInspectionDto {
+  final PgpKeyKindDto kind;
+  final String fingerprint;
+  final String identity;
+  final bool hasPrivateKey;
+  final bool requiresPassphrase;
+  final bool armored;
+
+  const PgpKeyInspectionDto({
+    required this.kind,
+    required this.fingerprint,
+    required this.identity,
+    required this.hasPrivateKey,
+    required this.requiresPassphrase,
+    required this.armored,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^
+      fingerprint.hashCode ^
+      identity.hashCode ^
+      hasPrivateKey.hashCode ^
+      requiresPassphrase.hashCode ^
+      armored.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PgpKeyInspectionDto &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          fingerprint == other.fingerprint &&
+          identity == other.identity &&
+          hasPrivateKey == other.hasPrivateKey &&
+          requiresPassphrase == other.requiresPassphrase &&
+          armored == other.armored;
+}
+
+class PgpKeyInspectionResponse {
+  final PgpKeyInspectionDto? inspection;
+  final BridgeFailure? error;
+
+  const PgpKeyInspectionResponse({this.inspection, this.error});
+
+  @override
+  int get hashCode => inspection.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PgpKeyInspectionResponse &&
+          runtimeType == other.runtimeType &&
+          inspection == other.inspection &&
+          error == other.error;
+}
+
+enum PgpKeyKindDto { public, private }
 
 class RefreshAutofillIndexRequest {
   final String configPath;
@@ -1868,6 +2062,24 @@ class RefreshAutofillIndexRequest {
           pgpExecutable == other.pgpExecutable &&
           passphrase == other.passphrase &&
           entries == other.entries;
+}
+
+class RemoveStoreRequest {
+  final String configPath;
+  final String root;
+
+  const RemoveStoreRequest({required this.configPath, required this.root});
+
+  @override
+  int get hashCode => configPath.hashCode ^ root.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RemoveStoreRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          root == other.root;
 }
 
 class SaveConfigRequest {

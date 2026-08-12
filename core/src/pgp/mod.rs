@@ -1,6 +1,7 @@
 #[allow(dead_code)]
 pub mod backend;
 pub mod crypto;
+pub mod import;
 pub mod key_management;
 pub mod rpgp_backend;
 pub mod utils;

@@ -97,6 +97,22 @@ abstract interface class ParsBridgeApi {
     required frb.GeneratePgpKeyRequest request,
   });
 
+  Future<frb.PgpKeyInspectionResponse> inspectPgpKeyText({
+    required frb.InspectPgpKeyTextRequest request,
+  });
+
+  Future<frb.PgpKeyInspectionResponse> inspectPgpKeyFile({
+    required frb.InspectPgpKeyFileRequest request,
+  });
+
+  Future<frb.PgpKeyImportResponse> importPgpKeyText({
+    required frb.ImportPgpKeyTextRequest request,
+  });
+
+  Future<frb.PgpKeyImportResponse> importPgpKeyFile({
+    required frb.ImportPgpKeyFileRequest request,
+  });
+
   Future<frb.KeyMutationResponse> importPgpPublicKey({
     required frb.ImportKeyTextRequest request,
   });
@@ -288,6 +304,26 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   Future<frb.KeyMutationResponse> generatePgpKey({
     required frb.GeneratePgpKeyRequest request,
   }) => frb.generatePgpKey(request: request);
+
+  @override
+  Future<frb.PgpKeyInspectionResponse> inspectPgpKeyText({
+    required frb.InspectPgpKeyTextRequest request,
+  }) => frb.inspectPgpKeyText(request: request);
+
+  @override
+  Future<frb.PgpKeyInspectionResponse> inspectPgpKeyFile({
+    required frb.InspectPgpKeyFileRequest request,
+  }) => frb.inspectPgpKeyFile(request: request);
+
+  @override
+  Future<frb.PgpKeyImportResponse> importPgpKeyText({
+    required frb.ImportPgpKeyTextRequest request,
+  }) => frb.importPgpKeyText(request: request);
+
+  @override
+  Future<frb.PgpKeyImportResponse> importPgpKeyFile({
+    required frb.ImportPgpKeyFileRequest request,
+  }) => frb.importPgpKeyFile(request: request);
 
   @override
   Future<frb.KeyMutationResponse> importPgpPublicKey({

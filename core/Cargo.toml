@@ -40,7 +40,13 @@ sha2 = "0.10.9"
 
 [features]
 default = []
+# Exposes `util::test_util` so the integration tests under `tests/` can share the same helpers as
+# the in-crate unit tests. Not meant for downstream use.
+test-util = []
 
 [dev-dependencies]
 serial_test = "3.2.0"
 pretty_assertions = "1.4.1"
+# Self dev-dependency purely to switch on `test-util` for the test targets, so a plain
+# `cargo test` still builds the integration tests.
+pars-core = { path = ".", features = ["test-util"] }

@@ -1,4 +1,13 @@
 import '../models/key_record.dart';
+import '../models/pgp_key_import.dart';
+
+/// Result of a completed PGP import: the imported key plus what inspection found.
+class PgpImportResult {
+  const PgpImportResult({required this.key, required this.inspection});
+
+  final KeyRecord key;
+  final PgpKeyInspection inspection;
+}
 
 abstract interface class KeyRepository {
   List<KeyRecord> get keys;
@@ -8,6 +17,24 @@ abstract interface class KeyRepository {
     required String email,
     String? passphrase,
   });
+
+  /// Inspects pasted PGP key material without importing it.
+  Future<PgpKeyInspection> inspectPgpKeyText(String armoredText);
+
+  /// Inspects a local key file. Its bytes are read in Rust and never enter Dart.
+  Future<PgpKeyInspection> inspectPgpKeyFile(String path);
+
+  /// Imports pasted PGP key material of either kind.
+  ///
+  /// [passphrase] is required only when inspection reported `requiresPassphrase`; it is validated
+  /// against the material before any keyring is mutated.
+  Future<PgpImportResult> importPgpKeyText(
+    String armoredText, {
+    String? passphrase,
+  });
+
+  /// Imports a PGP key file of either kind, including binary OpenPGP exports.
+  Future<PgpImportResult> importPgpKeyFile(String path, {String? passphrase});
 
   Future<KeyRecord> importPgpPublicKeyText(String armoredText);
 

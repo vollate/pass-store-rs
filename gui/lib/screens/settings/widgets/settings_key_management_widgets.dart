@@ -269,27 +269,86 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     );
   }
 
+  /// Opens the shared source-independent PGP import flow.
+  ///
+  /// SSH keeps its own Text/File dialog because it needs a key name and has no
+  /// public/private detection.
   void _showImportKeyOptions(BuildContext context, KeyRecordType type) {
+    if (type == KeyRecordType.ssh) {
+      _showSshImportKeyOptions(context);
+      return;
+    }
+
+    final sheetContext = context;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Import PGP key',
+                  style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                PgpKeyImportBody(
+                  keyRepository: keyRepository,
+                  securityRepository: securityRepository,
+                  pathPickerService: pathPickerService,
+                  initialDirectory: _defaultKeyFileBasePath(),
+                  onCancel: () => Navigator.of(sheet).pop(),
+                  onCompleted: (completion) async {
+                    // Refresh so the key list reflects what the backend confirmed.
+                    await settingsRepository.refresh();
+                    if (sheet.mounted) {
+                      Navigator.of(sheet).pop();
+                    }
+                    if (!sheetContext.mounted) return;
+                    AppNotification.show(
+                      sheetContext,
+                      _importNotification(completion),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSshImportKeyOptions(BuildContext context) {
     final sheetContext = context;
     showDialog<void>(
       context: context,
       builder:
           (dialogContext) => AlertDialog(
-            title: Text(
-              type == KeyRecordType.pgp ? 'Import PGP key' : 'Import SSH key',
-            ),
+            title: const Text('Import SSH key'),
             actions: <Widget>[
               TextButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  _showImportKeyForm(sheetContext, type);
+                  _showImportKeyForm(sheetContext, KeyRecordType.ssh);
                 },
                 child: const Text('Text'),
               ),
               FilledButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  _showImportKeyFileForm(sheetContext, type);
+                  _showImportKeyFileForm(sheetContext, KeyRecordType.ssh);
                 },
                 child: const Text('File'),
               ),
@@ -298,6 +357,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     );
   }
 
+  /// SSH-only text import. PGP uses [PgpKeyImportBody], which detects the key kind.
   void _showImportKeyForm(BuildContext context, KeyRecordType type) {
     final name = TextEditingController();
     final keyText = TextEditingController();
@@ -305,17 +365,14 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text(
-              type == KeyRecordType.pgp ? 'Import PGP key' : 'Import SSH key',
-            ),
+            title: const Text('Import SSH key'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                if (type == KeyRecordType.ssh)
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'Name'),
-                  ),
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
                 TextField(
                   controller: keyText,
                   minLines: 4,
@@ -333,19 +390,9 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                 onPressed:
                     () => _runKeyAction(context, () async {
                       try {
-                        if (type == KeyRecordType.ssh) {
-                          return await keyRepository.importSshPrivateKeyText(
-                            name: name.text,
-                            privateKey: keyText.text,
-                          );
-                        }
-                        if (keyText.text.contains('PGP PRIVATE KEY BLOCK')) {
-                          return await keyRepository.importPgpPrivateKeyText(
-                            keyText.text,
-                          );
-                        }
-                        return await keyRepository.importPgpPublicKeyText(
-                          keyText.text,
+                        return await keyRepository.importSshPrivateKeyText(
+                          name: name.text,
+                          privateKey: keyText.text,
                         );
                       } finally {
                         keyText.clear();
@@ -415,6 +462,8 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     return parentDirectory(settingsRepository.lifecycle.configPath);
   }
 
+  /// SSH-only file import. The old PGP branch here always called the private-key
+  /// API, which is exactly why a public key from a file used to fail.
   void _showImportKeyFileForm(BuildContext context, KeyRecordType type) {
     final name = TextEditingController();
     final defaultPath = _defaultKeyFileBasePath();
@@ -425,20 +474,15 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
           (context) => StatefulBuilder(
             builder:
                 (context, setDialogState) => AlertDialog(
-                  title: Text(
-                    type == KeyRecordType.pgp
-                        ? 'Import PGP key file'
-                        : 'Import SSH key file',
-                  ),
+                  title: const Text('Import SSH key file'),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      if (type == KeyRecordType.ssh)
-                        TextField(
-                          controller: name,
-                          decoration: const InputDecoration(labelText: 'Name'),
-                        ),
-                      if (type == KeyRecordType.ssh) const SizedBox(height: 12),
+                      TextField(
+                        controller: name,
+                        decoration: const InputDecoration(labelText: 'Name'),
+                      ),
+                      const SizedBox(height: 12),
                       PathPickerRow(
                         title: 'Key file',
                         path: selectedPath ?? defaultPath,
@@ -466,15 +510,10 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                               ? null
                               : () => _runKeyAction(
                                 context,
-                                () =>
-                                    type == KeyRecordType.pgp
-                                        ? keyRepository.importPgpPrivateKeyFile(
-                                          selectedPath!,
-                                        )
-                                        : keyRepository.importSshPrivateKeyFile(
-                                          name: name.text,
-                                          path: selectedPath!,
-                                        ),
+                                () => keyRepository.importSshPrivateKeyFile(
+                                  name: name.text,
+                                  path: selectedPath!,
+                                ),
                               ),
                       child: const Text('Import'),
                     ),
@@ -618,6 +657,17 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
 String _keyConfirmationLabel(KeyRecord key) {
   final name = key.name.trim();
   return name.isEmpty ? key.fingerprint : name;
+}
+
+/// Reports the canonical imported key, and any secure-storage failure.
+///
+/// Never includes the passphrase.
+String _importNotification(PgpImportCompletion completion) {
+  final label = _keyConfirmationLabel(completion.key);
+  if (completion.rememberFailed) {
+    return 'Imported $label, but remembering the passphrase failed.';
+  }
+  return 'Imported $label';
 }
 
 String _privateKeyExportPhrase(KeyRecord key) {

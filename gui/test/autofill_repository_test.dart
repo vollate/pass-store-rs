@@ -176,7 +176,8 @@ class _RecordingAutofillBridge implements AutofillBridgeApi {
   frb.AutofillQueryRequest? lastQueryRequest;
   frb.AutofillCredentialRequest? lastCredentialRequest;
   frb.ClearAutofillIndexRequest? lastClearRequest;
-  frb.AutofillCandidatesResponse queryResponse = const frb.AutofillCandidatesResponse();
+  frb.AutofillCandidatesResponse queryResponse =
+      const frb.AutofillCandidatesResponse(candidates: <frb.AutofillCandidateDto>[]);
   frb.AutofillCredentialResponse credentialResponse = const frb.AutofillCredentialResponse();
 
   @override

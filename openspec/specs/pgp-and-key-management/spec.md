@@ -85,11 +85,16 @@ Sources: `core/src/util/fs_util.rs`, `core/src/pgp/backend.rs`,
 
 ### Requirement: Bridge PGP key management SHALL generate, import, list, and export keys
 
-The bridge SHALL expose methods to list keys, generate PGP keys, import public
-PGP keys, import private PGP keys from text or file, export public PGP keys, and
-export private PGP keys. Private PGP key export SHALL still identify the target
-key by fingerprint, but its confirmation phrase SHALL be derived from the
-human-readable key identity returned by key listing rather than the fingerprint.
+The bridge SHALL expose methods to list keys, generate PGP keys, inspect and
+import public or private PGP keys from text or file sources, export public PGP
+keys, and export private PGP keys. Inspection and import SHALL derive the key
+kind and canonical primary-key fingerprint from supported key material rather
+than inferring kind from the selected source. Protected private-key material
+SHALL be passphrase-validated against the exact import material before the
+configured backend is mutated. Private PGP key export SHALL still identify the
+target key by fingerprint, but its confirmation phrase SHALL be derived from
+the human-readable key identity returned by key listing rather than the
+fingerprint.
 
 Sources: `bridge/src/api.rs`, `core/src/pgp/backend.rs`,
 `bridge/tests/bridge_smoke_test.rs`, `gui/lib/services/key_repository.dart`
@@ -112,9 +117,48 @@ Sources: `bridge/src/api.rs`, `core/src/pgp/backend.rs`,
 
 #### Scenario: Import type must match requested PGP import
 
-- GIVEN pasted key material is detected as PGP public or private
-- WHEN the requested import kind does not match the detected material
+- GIVEN imported key material is detected as PGP public or private
+- WHEN a legacy type-specific import method requests a kind that does not match
+  the detected material
 - THEN the bridge returns a validation error
+
+#### Scenario: Text and file sources detect key kind independently
+
+- GIVEN supported PGP public or private key material is supplied as pasted
+  armored text, an armored file, or a binary OpenPGP file
+- WHEN PGP import inspection runs
+- THEN it returns the material's public/private kind
+- AND the result does not derive key kind from whether Text or File was selected
+
+#### Scenario: Import returns a canonical fingerprint
+
+- GIVEN supported PGP key material has canonical primary fingerprint `ABC`
+- WHEN the key is imported into system GPG or the pure-Rust backend
+- THEN the bridge returns fingerprint `ABC` with backend-confirmed key metadata
+- AND it returns the same fingerprint when the key already exists
+
+#### Scenario: Incorrect protected-key passphrase does not mutate the keyring
+
+- GIVEN private PGP import material is protected by a passphrase
+- WHEN import receives no passphrase or an incorrect passphrase
+- THEN the bridge returns a typed passphrase validation failure
+- AND the configured keyring does not contain a newly imported key
+- AND the error does not contain the passphrase or private key material
+
+#### Scenario: Correct protected-key passphrase completes import
+
+- GIVEN private PGP import material with fingerprint `ABC` is protected by a
+  passphrase
+- WHEN import receives the correct passphrase
+- THEN the bridge validates the encryption-capable private material
+- AND imports the key
+- AND returns fingerprint `ABC`
+
+#### Scenario: Unprotected private key imports without a passphrase
+
+- GIVEN supported private PGP import material is not passphrase-protected
+- WHEN it is imported without a passphrase
+- THEN import succeeds and returns its canonical fingerprint
 
 ### Requirement: GUI-facing PGP key management SHALL delete local PGP keys
 
@@ -230,9 +274,6 @@ Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
 - CLI recipient lookup does not filter comment lines before constructing
   `PGPClient`, while backend validation does. Intended `.gpg-id` comment support
   across CLI and GUI needs verification.
-- System GPG import methods currently return empty fingerprints after import;
-  the GUI record name may therefore fall back to an empty fingerprint. Intended
-  post-import fingerprint resolution needs verification.
 - Pure Rust backend accepts passphrases during key generation, but decryption
   currently attempts empty-password secret-key decryption. Encrypted private-key
   behavior needs verification.

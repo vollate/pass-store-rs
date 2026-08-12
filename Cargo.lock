@@ -2257,6 +2257,7 @@ dependencies = [
  "log",
  "os_pipe",
  "parking_lot",
+ "pars-core",
  "passwords",
  "pgp",
  "pretty_assertions",

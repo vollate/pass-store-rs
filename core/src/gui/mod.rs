@@ -764,6 +764,7 @@ mod tests {
     use crate::pgp::backend::{
         KeyGenerationRequest, PgpBackend, PgpBackendConfig, PgpBackendResult,
     };
+    use crate::pgp::import::InspectedPgpKey;
     use crate::pgp::rpgp_backend::RpgpBackend;
 
     #[test]
@@ -864,14 +865,7 @@ mod tests {
             unreachable!("not used by read-entry passphrase test")
         }
 
-        fn import_public_key(&self, _armored_text: &str) -> PgpBackendResult<KeyImportResult> {
-            unreachable!("not used by read-entry passphrase test")
-        }
-
-        fn import_private_key(
-            &self,
-            _armored_text: &SecretString,
-        ) -> PgpBackendResult<KeyImportResult> {
+        fn import_key(&self, _key: &InspectedPgpKey) -> PgpBackendResult<KeyImportResult> {
             unreachable!("not used by read-entry passphrase test")
         }
 

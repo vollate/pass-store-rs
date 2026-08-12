@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::cli::PgpBackendKind;
 use crate::constants::default_constants::PGP_EXECUTABLE;
 use crate::gui::{KeyExportResult, KeyImportResult, PgpKeySummary};
+use crate::pgp::import::InspectedPgpKey;
 use crate::util::fs_util::get_dir_gpg_id_content;
 
 pub type PgpBackendResult<T> = Result<T, PgpBackendError>;
@@ -91,9 +92,12 @@ pub trait PgpBackend {
 
     fn generate_key(&self, request: KeyGenerationRequest) -> PgpBackendResult<KeyImportResult>;
 
-    fn import_public_key(&self, armored_text: &str) -> PgpBackendResult<KeyImportResult>;
-
-    fn import_private_key(&self, armored_text: &SecretString) -> PgpBackendResult<KeyImportResult>;
+    /// Imports already-inspected key material.
+    ///
+    /// Takes bytes rather than text so binary OpenPGP exports are not forced through UTF-8, and
+    /// takes the inspected form so the caller has already established the key's kind, canonical
+    /// fingerprint, and passphrase validity before any keyring is touched.
+    fn import_key(&self, key: &InspectedPgpKey) -> PgpBackendResult<KeyImportResult>;
 
     fn export_public_key(&self, fingerprint: &str) -> PgpBackendResult<KeyExportResult>;
 
@@ -272,14 +276,21 @@ impl PgpBackend for SystemGpgBackend {
         Ok(KeyImportResult { fingerprint: details.fingerprint, imported_private_key: true })
     }
 
-    fn import_public_key(&self, armored_text: &str) -> PgpBackendResult<KeyImportResult> {
-        self.run_with_input(&["--batch", "--import"], armored_text.as_bytes())?;
-        Ok(KeyImportResult { fingerprint: String::new(), imported_private_key: false })
-    }
-
-    fn import_private_key(&self, armored_text: &SecretString) -> PgpBackendResult<KeyImportResult> {
-        self.run_with_input(&["--batch", "--import"], armored_text.expose_secret().as_bytes())?;
-        Ok(KeyImportResult { fingerprint: String::new(), imported_private_key: true })
+    fn import_key(&self, key: &InspectedPgpKey) -> PgpBackendResult<KeyImportResult> {
+        // `gpg --import` writes its report to stderr and says nothing useful on stdout, and a
+        // duplicate import produces a different status sequence than a new one. So rather than
+        // parse that output, confirm the key by looking up the fingerprint the caller inspected.
+        self.run_with_input(&["--batch", "--import"], key.material())?;
+        let expected = key.fingerprint();
+        let details = self.inspect_fingerprint(expected).map_err(|error| {
+            PgpBackendError::CommandFailed(format!(
+                "PGP key {expected} was imported but could not be confirmed in the keyring: {error}"
+            ))
+        })?;
+        Ok(KeyImportResult {
+            fingerprint: details.fingerprint,
+            imported_private_key: details.has_private_key,
+        })
     }
 
     fn export_public_key(&self, fingerprint: &str) -> PgpBackendResult<KeyExportResult> {

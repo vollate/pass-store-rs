@@ -5,6 +5,7 @@ import '../bridge/frb_generated/api.dart' as frb;
 import '../bridge/pars_bridge_api.dart';
 import '../models/key_record.dart';
 import '../models/password_entry.dart';
+import '../models/pgp_key_import.dart';
 import 'autofill_repository.dart';
 import 'git_repository.dart';
 import 'key_repository.dart';
@@ -629,6 +630,55 @@ class BridgeBackedRepository
   }
 
   @override
+  Future<PgpKeyInspection> inspectPgpKeyText(String armoredText) async {
+    final response = await bridge.inspectPgpKeyText(
+      request: frb.InspectPgpKeyTextRequest(armoredText: armoredText),
+    );
+    return _pgpInspection(response.inspection, response.error);
+  }
+
+  @override
+  Future<PgpKeyInspection> inspectPgpKeyFile(String path) async {
+    // Only the path crosses the boundary; Rust reads the bytes.
+    final response = await bridge.inspectPgpKeyFile(
+      request: frb.InspectPgpKeyFileRequest(path: path),
+    );
+    return _pgpInspection(response.inspection, response.error);
+  }
+
+  @override
+  Future<PgpImportResult> importPgpKeyText(
+    String armoredText, {
+    String? passphrase,
+  }) async {
+    final response = await bridge.importPgpKeyText(
+      request: frb.ImportPgpKeyTextRequest(
+        configPath: configPath,
+        pgpExecutable: _optionalPgpExecutable(),
+        armoredText: armoredText,
+        passphrase: passphrase,
+      ),
+    );
+    return _recordPgpImport(response);
+  }
+
+  @override
+  Future<PgpImportResult> importPgpKeyFile(
+    String path, {
+    String? passphrase,
+  }) async {
+    final response = await bridge.importPgpKeyFile(
+      request: frb.ImportPgpKeyFileRequest(
+        configPath: configPath,
+        pgpExecutable: _optionalPgpExecutable(),
+        path: path,
+        passphrase: passphrase,
+      ),
+    );
+    return _recordPgpImport(response);
+  }
+
+  @override
   Future<KeyRecord> importPgpPublicKeyText(String armoredText) async {
     final response = await bridge.importPgpPublicKey(
       request: frb.ImportKeyTextRequest(
@@ -1060,6 +1110,84 @@ class BridgeBackedRepository
     final key = _keyFromMutation(response);
     _upsertKey(key);
     return key;
+  }
+
+  PgpKeyInspection _pgpInspection(
+    frb.PgpKeyInspectionDto? inspection,
+    frb.BridgeFailure? failure,
+  ) {
+    _throwIfPgpImportFailure(failure);
+    if (inspection == null) {
+      throw const PgpImportException(
+        PgpImportFailureKind.unsupportedMaterial,
+        'The bridge returned no PGP key inspection.',
+      );
+    }
+    return _pgpInspectionFromBridge(inspection);
+  }
+
+  Future<PgpImportResult> _recordPgpImport(
+    frb.PgpKeyImportResponse response,
+  ) async {
+    _throwIfPgpImportFailure(response.error);
+    final key = response.key;
+    final inspection = response.inspection;
+    if (key == null || inspection == null) {
+      throw const PgpImportException(
+        PgpImportFailureKind.backendError,
+        'The bridge reported a successful PGP import without a key record.',
+      );
+    }
+    final record = _keyRecordFromBridge(key);
+    _upsertKey(record);
+    await _refreshAutofillIndex();
+    return PgpImportResult(
+      key: record,
+      inspection: _pgpInspectionFromBridge(inspection),
+    );
+  }
+
+  PgpKeyInspection _pgpInspectionFromBridge(frb.PgpKeyInspectionDto dto) {
+    return PgpKeyInspection(
+      kind: dto.kind == frb.PgpKeyKindDto.private
+          ? PgpKeyKind.private
+          : PgpKeyKind.public,
+      fingerprint: dto.fingerprint,
+      identity: dto.identity,
+      hasPrivateKey: dto.hasPrivateKey,
+      requiresPassphrase: dto.requiresPassphrase,
+      armored: dto.armored,
+    );
+  }
+
+  /// Maps a bridge failure to a typed import exception.
+  ///
+  /// The message is already sanitized in Rust; nothing is added to it here.
+  void _throwIfPgpImportFailure(frb.BridgeFailure? failure) {
+    if (failure == null) {
+      return;
+    }
+    throw PgpImportException(
+      _pgpImportFailureKind(failure.pgpImportKind),
+      failure.message,
+    );
+  }
+
+  PgpImportFailureKind _pgpImportFailureKind(frb.PgpImportFailureKind? kind) {
+    switch (kind) {
+      case frb.PgpImportFailureKind.unsupportedMaterial:
+        return PgpImportFailureKind.unsupportedMaterial;
+      case frb.PgpImportFailureKind.kindMismatch:
+        return PgpImportFailureKind.kindMismatch;
+      case frb.PgpImportFailureKind.passphraseRequired:
+        return PgpImportFailureKind.passphraseRequired;
+      case frb.PgpImportFailureKind.incorrectPassphrase:
+        return PgpImportFailureKind.incorrectPassphrase;
+      case frb.PgpImportFailureKind.backendError:
+        return PgpImportFailureKind.backendError;
+      case null:
+        return PgpImportFailureKind.unknown;
+    }
   }
 
   void _upsertKey(KeyRecord key) {

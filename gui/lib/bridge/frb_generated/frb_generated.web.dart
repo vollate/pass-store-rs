@@ -33,6 +33,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AppStateResponse dco_decode_app_state_response(dynamic raw);
 
   @protected
+  AutofillCandidateDto dco_decode_autofill_candidate_dto(dynamic raw);
+
+  @protected
+  AutofillCandidatesResponse dco_decode_autofill_candidates_response(
+    dynamic raw,
+  );
+
+  @protected
+  AutofillCredentialDto dco_decode_autofill_credential_dto(dynamic raw);
+
+  @protected
+  AutofillCredentialRequest dco_decode_autofill_credential_request(dynamic raw);
+
+  @protected
+  AutofillCredentialResponse dco_decode_autofill_credential_response(
+    dynamic raw,
+  );
+
+  @protected
+  AutofillEntryMetadataDto dco_decode_autofill_entry_metadata_dto(dynamic raw);
+
+  @protected
+  AutofillQueryRequest dco_decode_autofill_query_request(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
 
   @protected
@@ -44,7 +69,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AppStateDto dco_decode_box_autoadd_app_state_dto(dynamic raw);
 
   @protected
+  AutofillCredentialDto dco_decode_box_autoadd_autofill_credential_dto(
+    dynamic raw,
+  );
+
+  @protected
+  AutofillCredentialRequest dco_decode_box_autoadd_autofill_credential_request(
+    dynamic raw,
+  );
+
+  @protected
+  AutofillQueryRequest dco_decode_box_autoadd_autofill_query_request(
+    dynamic raw,
+  );
+
+  @protected
   BridgeFailure dco_decode_box_autoadd_bridge_failure(dynamic raw);
+
+  @protected
+  ClearAutofillIndexRequest dco_decode_box_autoadd_clear_autofill_index_request(
+    dynamic raw,
+  );
 
   @protected
   CloneStoreRequest dco_decode_box_autoadd_clone_store_request(dynamic raw);
@@ -158,6 +203,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ImportPgpKeyFileRequest dco_decode_box_autoadd_import_pgp_key_file_request(
+    dynamic raw,
+  );
+
+  @protected
+  ImportPgpKeyTextRequest dco_decode_box_autoadd_import_pgp_key_text_request(
+    dynamic raw,
+  );
+
+  @protected
   InsertEntryRequest dco_decode_box_autoadd_insert_entry_request(dynamic raw);
 
   @protected
@@ -167,6 +222,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InspectAppStateRequest dco_decode_box_autoadd_inspect_app_state_request(
+    dynamic raw,
+  );
+
+  @protected
+  InspectPgpKeyFileRequest dco_decode_box_autoadd_inspect_pgp_key_file_request(
+    dynamic raw,
+  );
+
+  @protected
+  InspectPgpKeyTextRequest dco_decode_box_autoadd_inspect_pgp_key_text_request(
     dynamic raw,
   );
 
@@ -199,6 +264,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_box_autoadd_open_github_ssh_settings_request(dynamic raw);
 
   @protected
+  PgpImportFailureKind dco_decode_box_autoadd_pgp_import_failure_kind(
+    dynamic raw,
+  );
+
+  @protected
+  PgpKeyInspectionDto dco_decode_box_autoadd_pgp_key_inspection_dto(
+    dynamic raw,
+  );
+
+  @protected
+  RefreshAutofillIndexRequest
+  dco_decode_box_autoadd_refresh_autofill_index_request(dynamic raw);
+
+  @protected
   RemoveStoreRequest dco_decode_box_autoadd_remove_store_request(dynamic raw);
 
   @protected
@@ -208,10 +287,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SelectStoreRequest dco_decode_box_autoadd_select_store_request(dynamic raw);
 
   @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   BridgeFailure dco_decode_bridge_failure(dynamic raw);
 
   @protected
   BridgeFailureCategory dco_decode_bridge_failure_category(dynamic raw);
+
+  @protected
+  ClearAutofillIndexRequest dco_decode_clear_autofill_index_request(
+    dynamic raw,
+  );
 
   @protected
   CloneStoreRequest dco_decode_clone_store_request(dynamic raw);
@@ -317,6 +404,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ImportLocalStoreRequest dco_decode_import_local_store_request(dynamic raw);
 
   @protected
+  ImportPgpKeyFileRequest dco_decode_import_pgp_key_file_request(dynamic raw);
+
+  @protected
+  ImportPgpKeyTextRequest dco_decode_import_pgp_key_text_request(dynamic raw);
+
+  @protected
   InsertEntryRequest dco_decode_insert_entry_request(dynamic raw);
 
   @protected
@@ -327,6 +420,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InspectAppStateRequest dco_decode_inspect_app_state_request(dynamic raw);
+
+  @protected
+  InspectPgpKeyFileRequest dco_decode_inspect_pgp_key_file_request(dynamic raw);
+
+  @protected
+  InspectPgpKeyTextRequest dco_decode_inspect_pgp_key_text_request(dynamic raw);
 
   @protected
   KeyDetectionResponse dco_decode_key_detection_response(dynamic raw);
@@ -345,6 +444,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<AutofillCandidateDto> dco_decode_list_autofill_candidate_dto(
+    dynamic raw,
+  );
+
+  @protected
+  List<AutofillEntryMetadataDto> dco_decode_list_autofill_entry_metadata_dto(
+    dynamic raw,
+  );
 
   @protected
   ListEntriesRequest dco_decode_list_entries_request(dynamic raw);
@@ -409,6 +518,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AppStateDto? dco_decode_opt_box_autoadd_app_state_dto(dynamic raw);
 
   @protected
+  AutofillCredentialDto? dco_decode_opt_box_autoadd_autofill_credential_dto(
+    dynamic raw,
+  );
+
+  @protected
   BridgeFailure? dco_decode_opt_box_autoadd_bridge_failure(dynamic raw);
 
   @protected
@@ -453,7 +567,40 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PgpImportFailureKind? dco_decode_opt_box_autoadd_pgp_import_failure_kind(
+    dynamic raw,
+  );
+
+  @protected
+  PgpKeyInspectionDto? dco_decode_opt_box_autoadd_pgp_key_inspection_dto(
+    dynamic raw,
+  );
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
   ParsedEntryFieldDto dco_decode_parsed_entry_field_dto(dynamic raw);
+
+  @protected
+  PgpImportFailureKind dco_decode_pgp_import_failure_kind(dynamic raw);
+
+  @protected
+  PgpKeyImportResponse dco_decode_pgp_key_import_response(dynamic raw);
+
+  @protected
+  PgpKeyInspectionDto dco_decode_pgp_key_inspection_dto(dynamic raw);
+
+  @protected
+  PgpKeyInspectionResponse dco_decode_pgp_key_inspection_response(dynamic raw);
+
+  @protected
+  PgpKeyKindDto dco_decode_pgp_key_kind_dto(dynamic raw);
+
+  @protected
+  RefreshAutofillIndexRequest dco_decode_refresh_autofill_index_request(
+    dynamic raw,
+  );
 
   @protected
   RemoveStoreRequest dco_decode_remove_store_request(dynamic raw);
@@ -497,6 +644,41 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AppStateResponse sse_decode_app_state_response(SseDeserializer deserializer);
 
   @protected
+  AutofillCandidateDto sse_decode_autofill_candidate_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AutofillCandidatesResponse sse_decode_autofill_candidates_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AutofillCredentialDto sse_decode_autofill_credential_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AutofillCredentialRequest sse_decode_autofill_credential_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AutofillCredentialResponse sse_decode_autofill_credential_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AutofillEntryMetadataDto sse_decode_autofill_entry_metadata_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AutofillQueryRequest sse_decode_autofill_query_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
@@ -510,7 +692,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  AutofillCredentialDto sse_decode_box_autoadd_autofill_credential_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AutofillCredentialRequest sse_decode_box_autoadd_autofill_credential_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AutofillQueryRequest sse_decode_box_autoadd_autofill_query_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   BridgeFailure sse_decode_box_autoadd_bridge_failure(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ClearAutofillIndexRequest sse_decode_box_autoadd_clear_autofill_index_request(
     SseDeserializer deserializer,
   );
 
@@ -642,6 +844,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ImportPgpKeyFileRequest sse_decode_box_autoadd_import_pgp_key_file_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ImportPgpKeyTextRequest sse_decode_box_autoadd_import_pgp_key_text_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   InsertEntryRequest sse_decode_box_autoadd_insert_entry_request(
     SseDeserializer deserializer,
   );
@@ -653,6 +865,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InspectAppStateRequest sse_decode_box_autoadd_inspect_app_state_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InspectPgpKeyFileRequest sse_decode_box_autoadd_inspect_pgp_key_file_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InspectPgpKeyTextRequest sse_decode_box_autoadd_inspect_pgp_key_text_request(
     SseDeserializer deserializer,
   );
 
@@ -703,6 +925,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PgpImportFailureKind sse_decode_box_autoadd_pgp_import_failure_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyInspectionDto sse_decode_box_autoadd_pgp_key_inspection_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RefreshAutofillIndexRequest
+  sse_decode_box_autoadd_refresh_autofill_index_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RemoveStoreRequest sse_decode_box_autoadd_remove_store_request(
     SseDeserializer deserializer,
   );
@@ -718,10 +956,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   BridgeFailure sse_decode_bridge_failure(SseDeserializer deserializer);
 
   @protected
   BridgeFailureCategory sse_decode_bridge_failure_category(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ClearAutofillIndexRequest sse_decode_clear_autofill_index_request(
     SseDeserializer deserializer,
   );
 
@@ -873,6 +1119,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ImportPgpKeyFileRequest sse_decode_import_pgp_key_file_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ImportPgpKeyTextRequest sse_decode_import_pgp_key_text_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   InsertEntryRequest sse_decode_insert_entry_request(
     SseDeserializer deserializer,
   );
@@ -889,6 +1145,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InspectAppStateRequest sse_decode_inspect_app_state_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InspectPgpKeyFileRequest sse_decode_inspect_pgp_key_file_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InspectPgpKeyTextRequest sse_decode_inspect_pgp_key_text_request(
     SseDeserializer deserializer,
   );
 
@@ -915,6 +1181,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<AutofillCandidateDto> sse_decode_list_autofill_candidate_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<AutofillEntryMetadataDto> sse_decode_list_autofill_entry_metadata_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ListEntriesRequest sse_decode_list_entries_request(
@@ -1005,6 +1281,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  AutofillCredentialDto? sse_decode_opt_box_autoadd_autofill_credential_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   BridgeFailure? sse_decode_opt_box_autoadd_bridge_failure(
     SseDeserializer deserializer,
   );
@@ -1059,7 +1340,48 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PgpImportFailureKind? sse_decode_opt_box_autoadd_pgp_import_failure_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyInspectionDto? sse_decode_opt_box_autoadd_pgp_key_inspection_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   ParsedEntryFieldDto sse_decode_parsed_entry_field_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpImportFailureKind sse_decode_pgp_import_failure_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyImportResponse sse_decode_pgp_key_import_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyInspectionDto sse_decode_pgp_key_inspection_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyInspectionResponse sse_decode_pgp_key_inspection_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyKindDto sse_decode_pgp_key_kind_dto(SseDeserializer deserializer);
+
+  @protected
+  RefreshAutofillIndexRequest sse_decode_refresh_autofill_index_request(
     SseDeserializer deserializer,
   );
 
@@ -1115,6 +1437,48 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_autofill_candidate_dto(
+    AutofillCandidateDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_autofill_candidates_response(
+    AutofillCandidatesResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_autofill_credential_dto(
+    AutofillCredentialDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_autofill_credential_request(
+    AutofillCredentialRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_autofill_credential_response(
+    AutofillCredentialResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_autofill_entry_metadata_dto(
+    AutofillEntryMetadataDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_autofill_query_request(
+    AutofillQueryRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
@@ -1130,8 +1494,32 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_autofill_credential_dto(
+    AutofillCredentialDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_autofill_credential_request(
+    AutofillCredentialRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_autofill_query_request(
+    AutofillQueryRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_bridge_failure(
     BridgeFailure self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_clear_autofill_index_request(
+    ClearAutofillIndexRequest self,
     SseSerializer serializer,
   );
 
@@ -1289,6 +1677,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_import_pgp_key_file_request(
+    ImportPgpKeyFileRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_import_pgp_key_text_request(
+    ImportPgpKeyTextRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_insert_entry_request(
     InsertEntryRequest self,
     SseSerializer serializer,
@@ -1303,6 +1703,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_inspect_app_state_request(
     InspectAppStateRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_inspect_pgp_key_file_request(
+    InspectPgpKeyFileRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_inspect_pgp_key_text_request(
+    InspectPgpKeyTextRequest self,
     SseSerializer serializer,
   );
 
@@ -1361,6 +1773,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_pgp_import_failure_kind(
+    PgpImportFailureKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_pgp_key_inspection_dto(
+    PgpKeyInspectionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_refresh_autofill_index_request(
+    RefreshAutofillIndexRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_remove_store_request(
     RemoveStoreRequest self,
     SseSerializer serializer,
@@ -1379,11 +1809,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bridge_failure(BridgeFailure self, SseSerializer serializer);
 
   @protected
   void sse_encode_bridge_failure_category(
     BridgeFailureCategory self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_clear_autofill_index_request(
+    ClearAutofillIndexRequest self,
     SseSerializer serializer,
   );
 
@@ -1577,6 +2016,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_import_pgp_key_file_request(
+    ImportPgpKeyFileRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_import_pgp_key_text_request(
+    ImportPgpKeyTextRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_insert_entry_request(
     InsertEntryRequest self,
     SseSerializer serializer,
@@ -1597,6 +2048,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_inspect_app_state_request(
     InspectAppStateRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_inspect_pgp_key_file_request(
+    InspectPgpKeyFileRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_inspect_pgp_key_text_request(
+    InspectPgpKeyTextRequest self,
     SseSerializer serializer,
   );
 
@@ -1626,6 +2089,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_autofill_candidate_dto(
+    List<AutofillCandidateDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_autofill_entry_metadata_dto(
+    List<AutofillEntryMetadataDto> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_entries_request(
@@ -1745,6 +2220,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_autofill_credential_dto(
+    AutofillCredentialDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_bridge_failure(
     BridgeFailure? self,
     SseSerializer serializer,
@@ -1808,8 +2289,59 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_pgp_import_failure_kind(
+    PgpImportFailureKind? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_pgp_key_inspection_dto(
+    PgpKeyInspectionDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_parsed_entry_field_dto(
     ParsedEntryFieldDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pgp_import_failure_kind(
+    PgpImportFailureKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pgp_key_import_response(
+    PgpKeyImportResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pgp_key_inspection_dto(
+    PgpKeyInspectionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pgp_key_inspection_response(
+    PgpKeyInspectionResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pgp_key_kind_dto(
+    PgpKeyKindDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_refresh_autofill_index_request(
+    RefreshAutofillIndexRequest self,
     SseSerializer serializer,
   );
 

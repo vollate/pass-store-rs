@@ -5,6 +5,7 @@ use pars_core::key_management::{
     export_ssh_public_key, generate_ssh_ed25519_key, import_ssh_private_key_text, list_ssh_keys,
     ImportedKeyKind, PrivateKeyConfirmation,
 };
+use pars_core::pgp::import::inspect_pgp_key_bytes;
 use serial_test::serial;
 
 const PGP_PUBLIC: &str =
@@ -23,6 +24,22 @@ fn detects_key_material_without_echoing_invalid_private_text() {
     let invalid = "-----BEGIN OPENSSH PRIVATE KEY-----\nnot actually complete";
     let err = detect_imported_key_material(invalid).unwrap_err();
     assert!(!err.to_string().contains("not actually complete"));
+}
+
+#[test]
+fn legacy_detection_stays_marker_based_for_unparseable_material() {
+    // This function still classifies by armor markers on purpose: it also handles SSH keys, which
+    // the OpenPGP packet inspector cannot parse. PGP import moved to
+    // `pars_core::pgp::import`, which does parse packets and rejects the blobs below.
+    for (material, expected) in
+        [(PGP_PUBLIC, ImportedKeyKind::PgpPublic), (PGP_PRIVATE, ImportedKeyKind::PgpPrivate)]
+    {
+        assert_eq!(detect_imported_key_material(material).unwrap(), expected);
+        assert!(
+            inspect_pgp_key_bytes(material.as_bytes().to_vec()).is_err(),
+            "packet inspection must reject material that only looks like a key"
+        );
+    }
 }
 
 #[test]
@@ -134,4 +151,23 @@ fn appends_selected_pgp_key_to_root_gpg_id_once() {
 
     let gpg_id = fs::read_to_string(temp.path().join(".gpg-id")).unwrap();
     assert_eq!(gpg_id, "alice@example.com\nA991D3B4A70291EF\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn adding_pgp_key_reports_the_inaccessible_gpg_id_path() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempfile::tempdir().unwrap();
+    let gpg_id_path = temp.path().join(".gpg-id");
+    fs::write(&gpg_id_path, "alice@example.com\n").unwrap();
+    fs::set_permissions(&gpg_id_path, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let result = add_pgp_key_to_gpg_id(temp.path(), "A991D3B4A70291EF");
+
+    // Restore access before TempDir cleanup, even if the assertion below fails.
+    fs::set_permissions(&gpg_id_path, fs::Permissions::from_mode(0o600)).unwrap();
+    let message = result.unwrap_err().to_string();
+    assert!(message.contains("failed to read PGP recipients file"), "{message}");
+    assert!(message.contains(&gpg_id_path.display().to_string()), "{message}");
 }

@@ -3,8 +3,15 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use pars_core::config::cli::PgpBackendKind;
-use pars_core::pgp::backend::{KeyGenerationRequest, PgpBackend, PgpBackendConfig};
+use pars_core::pgp::backend::{
+    KeyGenerationRequest, PgpBackend, PgpBackendConfig, SystemGpgBackend,
+};
+use pars_core::pgp::import::{
+    import_inspected_pgp_key, import_pgp_key_text, inspect_pgp_key_bytes, PgpImportError,
+    PgpImportOutcome,
+};
 use pars_core::pgp::rpgp_backend::RpgpBackend;
+use pars_core::util::test_util::{gpg_key_gen_batch, PgpKeyMaterialFixture};
 use secrecy::{ExposeSecret, SecretString};
 
 #[test]
@@ -72,6 +79,150 @@ fn optional_rpgp_decrypts_gnupg_encrypted_entry() {
     assert_eq!(decrypted.expose_secret(), "gpg secret");
 }
 
+#[test]
+fn optional_gnupg_exported_keys_import_through_the_shared_inspector() {
+    if !run_interop_tests() {
+        return;
+    }
+    let context = InteropContext::new();
+    let email = "interop-import@example.com";
+    context.generate_gnupg_key(email, None);
+    let fingerprint = context.gnupg_fingerprint(email);
+
+    // GnuPG-produced material, in each encoding a user could realistically hand us.
+    for (label, armored, private) in [
+        ("armored public", true, false),
+        ("binary public", false, false),
+        ("armored private", true, true),
+        ("binary private", false, true),
+    ] {
+        let material = context.gnupg_export(&fingerprint, private, armored, None);
+        let target = InteropContext::new();
+        let outcome = import_pgp_key_bytes_into(&target.rpgp, material)
+            .unwrap_or_else(|error| panic!("{label} from GnuPG should import: {error}"));
+
+        assert_eq!(outcome.fingerprint, fingerprint, "{label}");
+        assert_eq!(outcome.inspection.armored, armored, "{label}");
+        assert_eq!(outcome.inspection.has_private_key, private, "{label}");
+    }
+}
+
+#[test]
+fn optional_gnupg_protected_private_key_requires_its_passphrase() {
+    if !run_interop_tests() {
+        return;
+    }
+    let context = InteropContext::new();
+    let email = "interop-protected@example.com";
+    let passphrase = "gnupg interop passphrase";
+    context.generate_gnupg_key(email, Some(passphrase));
+    let fingerprint = context.gnupg_fingerprint(email);
+    let material = context.gnupg_export(&fingerprint, true, true, Some(passphrase));
+
+    let inspected = inspect_pgp_key_bytes(material.clone()).expect("inspect GnuPG private key");
+    assert!(
+        inspected.requires_passphrase(),
+        "a GnuPG key exported under a passphrase must be reported as protected"
+    );
+
+    for (label, supplied, expected) in [
+        ("absent", None, PgpImportError::PassphraseRequired),
+        ("wrong", Some(SecretString::from("not it")), PgpImportError::IncorrectPassphrase),
+    ] {
+        let target = InteropContext::new();
+        let error = import_inspected_pgp_key(
+            &target.rpgp,
+            &inspect_pgp_key_bytes(material.clone()).expect("inspect"),
+            supplied.as_ref(),
+            None,
+        )
+        .expect_err("import should be rejected");
+        assert_eq!(error, expected, "{label} passphrase");
+        assert!(
+            target.rpgp.list_keys().expect("list keys").is_empty(),
+            "{label} passphrase must not mutate the keyring"
+        );
+    }
+
+    let target = InteropContext::new();
+    let outcome = import_inspected_pgp_key(
+        &target.rpgp,
+        &inspect_pgp_key_bytes(material).expect("inspect"),
+        Some(&SecretString::from(passphrase)),
+        None,
+    )
+    .expect("correct passphrase should import");
+    assert_eq!(outcome.fingerprint, fingerprint);
+}
+
+#[test]
+fn optional_system_gpg_import_returns_canonical_fingerprint_and_survives_duplicates() {
+    if !run_interop_tests() {
+        return;
+    }
+    // Guards the bug this change fixes: system GPG used to return an empty fingerprint from import,
+    // so nothing downstream could bind a session or a cache to the key.
+    let context = InteropContext::new();
+    let fixture = PgpKeyMaterialFixture::generate(None);
+    let gpg = context.system_gpg_backend();
+
+    let first = import_pgp_key_bytes_into(&gpg, fixture.armored_public.clone())
+        .expect("import into system GPG");
+    assert_eq!(first.fingerprint, fixture.fingerprint);
+    assert!(!first.fingerprint.is_empty());
+    assert!(first.identity.contains("fixture@example.com"), "{}", first.identity);
+
+    let duplicate = import_pgp_key_bytes_into(&gpg, fixture.armored_public.clone())
+        .expect("re-import of an existing key");
+    assert_eq!(duplicate.fingerprint, first.fingerprint);
+
+    let binary_private = import_pgp_key_bytes_into(&gpg, fixture.binary_private.clone())
+        .expect("binary private material should import");
+    assert_eq!(binary_private.fingerprint, fixture.fingerprint);
+    assert!(binary_private.imported_private_key);
+}
+
+#[test]
+fn optional_system_gpg_import_rejects_a_wrong_passphrase_without_importing() {
+    if !run_interop_tests() {
+        return;
+    }
+    let context = InteropContext::new();
+    let passphrase = "system gpg passphrase";
+    let fixture = PgpKeyMaterialFixture::generate(Some(passphrase));
+    let gpg = context.system_gpg_backend();
+
+    let error = import_pgp_key_text(
+        &gpg,
+        fixture.armored_private_text(),
+        Some(&SecretString::from("not it")),
+        None,
+    )
+    .expect_err("wrong passphrase should be rejected");
+    assert_eq!(error, PgpImportError::IncorrectPassphrase);
+    assert!(
+        gpg.inspect_fingerprint(&fixture.fingerprint).is_err(),
+        "a rejected passphrase must leave no key in the GnuPG keyring"
+    );
+
+    let outcome = import_pgp_key_text(
+        &gpg,
+        fixture.armored_private_text(),
+        Some(&SecretString::from(passphrase)),
+        None,
+    )
+    .expect("correct passphrase should import");
+    assert_eq!(outcome.fingerprint, fixture.fingerprint);
+}
+
+fn import_pgp_key_bytes_into(
+    backend: &dyn PgpBackend,
+    material: Vec<u8>,
+) -> Result<PgpImportOutcome, PgpImportError> {
+    let inspected = inspect_pgp_key_bytes(material)?;
+    import_inspected_pgp_key(backend, &inspected, None, None)
+}
+
 struct InteropContext {
     temp: tempfile::TempDir,
     gnupg_home: std::path::PathBuf,
@@ -96,6 +247,18 @@ impl InteropContext {
         Self { temp, gnupg_home, rpgp }
     }
 
+    /// A `SystemGpgBackend` pinned to this context's throwaway `GNUPGHOME`.
+    fn system_gpg_backend(&self) -> SystemGpgBackend {
+        SystemGpgBackend::from_config(&PgpBackendConfig {
+            backend: PgpBackendKind::SystemGpg,
+            bundled_gpg_path: None,
+            system_gpg_path: Some(gpg_executable()),
+            pure_rust_enabled: false,
+            keyring_home: Some(self.gnupg_home.display().to_string()),
+        })
+        .expect("system gpg backend")
+    }
+
     fn generate_rpgp_key(&self) -> String {
         self.rpgp
             .generate_key(KeyGenerationRequest {
@@ -105,6 +268,57 @@ impl InteropContext {
             })
             .unwrap()
             .fingerprint
+    }
+
+    fn generate_gnupg_key(&self, email: &str, passphrase: Option<&str>) {
+        let batch = gpg_key_gen_batch("Interop Example", email, passphrase);
+        gpg_with_input(&self.gnupg_home, &["--gen-key"], batch.as_bytes());
+    }
+
+    fn gnupg_fingerprint(&self, email: &str) -> String {
+        let output = gpg_command(&self.gnupg_home)
+            .args(["--batch", "--with-colons", "--fingerprint", email])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "gpg --fingerprint failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find_map(|line| {
+                line.strip_prefix("fpr:").map(|rest| rest.trim_matches(':').to_string())
+            })
+            .expect("fingerprint in gpg listing")
+    }
+
+    /// Exports key material from GnuPG in the requested encoding.
+    fn gnupg_export(
+        &self,
+        fingerprint: &str,
+        private: bool,
+        armored: bool,
+        passphrase: Option<&str>,
+    ) -> Vec<u8> {
+        let mut command = gpg_command(&self.gnupg_home);
+        command.args(["--batch", "--yes", "--pinentry-mode", "loopback"]);
+        if armored {
+            command.arg("--armor");
+        }
+        if let Some(passphrase) = passphrase {
+            command.args(["--passphrase", passphrase]);
+        }
+        command.arg(if private { "--export-secret-keys" } else { "--export" }).arg(fingerprint);
+
+        let output = command.output().unwrap();
+        assert!(
+            output.status.success(),
+            "gpg export failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!output.stdout.is_empty(), "gpg export produced no material");
+        output.stdout
     }
 
     fn import_public_key_to_gnupg(&self, fingerprint: &str) {
@@ -144,10 +358,13 @@ fn gpg_with_input(gnupg_home: &Path, args: &[&str], input: &[u8]) {
 }
 
 fn gpg_command(gnupg_home: &Path) -> Command {
-    let executable = std::env::var("PARS_GPG").unwrap_or_else(|_| "gpg".to_string());
-    let mut command = Command::new(executable);
+    let mut command = Command::new(gpg_executable());
     command.env("GNUPGHOME", gnupg_home);
     command
+}
+
+fn gpg_executable() -> String {
+    std::env::var("PARS_GPG").unwrap_or_else(|_| "gpg".to_string())
 }
 
 #[cfg(unix)]

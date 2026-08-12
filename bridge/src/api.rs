@@ -22,6 +22,12 @@ use pars_core::key_management::{
     ImportedKeyKind, PrivateKeyConfirmation,
 };
 use pars_core::pgp::backend::{KeyGenerationRequest, PgpBackend, SystemGpgBackend};
+use pars_core::pgp::import::{
+    import_pgp_key_file as import_pgp_key_file_core,
+    import_pgp_key_text as import_pgp_key_text_core, inspect_pgp_key_bytes,
+    inspect_pgp_key_file as inspect_pgp_key_file_core, PgpImportError, PgpImportInspection,
+    PgpImportOutcome, PgpKeyMaterialKind,
+};
 use pars_core::pgp::rpgp_backend::RpgpBackend;
 use secrecy::SecretString;
 
@@ -53,6 +59,10 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "list_keys",
     "detect_imported_key",
     "generate_pgp_key",
+    "inspect_pgp_key_text",
+    "inspect_pgp_key_file",
+    "import_pgp_key_text",
+    "import_pgp_key_file",
     "import_pgp_public_key",
     "import_pgp_private_key_file",
     "import_pgp_private_key_text",
@@ -91,6 +101,8 @@ pub struct BridgeFailure {
     pub message: String,
     pub conflict_kind: Option<String>,
     pub path: Option<String>,
+    /// Set only for PGP import failures, so Flutter can branch on the reason rather than the text.
+    pub pgp_import_kind: Option<PgpImportFailureKind>,
 }
 
 #[derive(Debug, Clone)]
@@ -228,6 +240,7 @@ impl From<CoreError> for BridgeFailure {
                 message: conflict.to_string(),
                 conflict_kind: Some(format!("{:?}", conflict.kind)),
                 path: Some(conflict.path),
+                pgp_import_kind: None,
             },
             CoreError::UnsupportedPlatform(message) => {
                 Self::simple(BridgeFailureCategory::UnsupportedPlatform, message)
@@ -236,9 +249,49 @@ impl From<CoreError> for BridgeFailure {
     }
 }
 
+impl From<PgpImportError> for BridgeFailure {
+    fn from(value: PgpImportError) -> Self {
+        let kind = match value {
+            PgpImportError::UnsupportedMaterial(_) => PgpImportFailureKind::UnsupportedMaterial,
+            PgpImportError::KindMismatch { .. } => PgpImportFailureKind::KindMismatch,
+            PgpImportError::PassphraseRequired => PgpImportFailureKind::PassphraseRequired,
+            PgpImportError::IncorrectPassphrase => PgpImportFailureKind::IncorrectPassphrase,
+            PgpImportError::Backend(_) => PgpImportFailureKind::BackendError,
+        };
+        // `Display` on the core error is already sanitized: no passphrase, no key material.
+        let category = match value {
+            PgpImportError::Backend(_) => BridgeFailureCategory::PgpError,
+            _ => BridgeFailureCategory::ValidationError,
+        };
+        Self {
+            category,
+            message: value.to_string(),
+            conflict_kind: None,
+            path: None,
+            pgp_import_kind: Some(kind),
+        }
+    }
+}
+
+impl From<&PgpImportInspection> for PgpKeyInspectionDto {
+    fn from(value: &PgpImportInspection) -> Self {
+        Self {
+            kind: match value.kind {
+                PgpKeyMaterialKind::Public => PgpKeyKindDto::Public,
+                PgpKeyMaterialKind::Private => PgpKeyKindDto::Private,
+            },
+            fingerprint: value.fingerprint.clone(),
+            identity: value.identity.clone(),
+            has_private_key: value.has_private_key,
+            requires_passphrase: value.requires_passphrase,
+            armored: value.armored,
+        }
+    }
+}
+
 impl BridgeFailure {
     fn simple(category: BridgeFailureCategory, message: String) -> Self {
-        Self { category, message, conflict_kind: None, path: None }
+        Self { category, message, conflict_kind: None, path: None, pgp_import_kind: None }
     }
 }
 
@@ -426,6 +479,74 @@ pub struct ImportKeyFileRequest {
     pub ssh_dir: Option<String>,
     pub name: Option<String>,
     pub path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct InspectPgpKeyTextRequest {
+    pub armored_text: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct InspectPgpKeyFileRequest {
+    pub path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportPgpKeyTextRequest {
+    pub config_path: String,
+    pub pgp_executable: Option<String>,
+    pub armored_text: String,
+    /// Required only when inspection reports `requires_passphrase`.
+    pub passphrase: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportPgpKeyFileRequest {
+    pub config_path: String,
+    pub pgp_executable: Option<String>,
+    pub path: String,
+    /// Required only when inspection reports `requires_passphrase`.
+    pub passphrase: Option<String>,
+}
+
+/// What inspection found in the supplied material. Carries no key bytes.
+#[derive(Debug, Clone)]
+pub struct PgpKeyInspectionDto {
+    pub kind: PgpKeyKindDto,
+    pub fingerprint: String,
+    pub identity: String,
+    pub has_private_key: bool,
+    pub requires_passphrase: bool,
+    pub armored: bool,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum PgpKeyKindDto {
+    Public,
+    Private,
+}
+
+/// Why a PGP import failed, so Flutter can branch without matching on message text.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum PgpImportFailureKind {
+    UnsupportedMaterial,
+    KindMismatch,
+    PassphraseRequired,
+    IncorrectPassphrase,
+    BackendError,
+}
+
+#[derive(Debug, Clone)]
+pub struct PgpKeyInspectionResponse {
+    pub inspection: Option<PgpKeyInspectionDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PgpKeyImportResponse {
+    pub inspection: Option<PgpKeyInspectionDto>,
+    pub key: Option<KeyRecordDto>,
+    pub error: Option<BridgeFailure>,
 }
 
 #[derive(Debug, Clone)]
@@ -988,33 +1109,89 @@ pub async fn generate_pgp_key(request: GeneratePgpKeyRequest) -> KeyMutationResp
     }
 }
 
+/// Inspects pasted PGP key material without touching any keyring.
+pub async fn inspect_pgp_key_text(request: InspectPgpKeyTextRequest) -> PgpKeyInspectionResponse {
+    match inspect_pgp_key_bytes(request.armored_text.into_bytes()) {
+        Ok(inspected) => PgpKeyInspectionResponse {
+            inspection: Some(PgpKeyInspectionDto::from(inspected.inspection())),
+            error: None,
+        },
+        Err(error) => {
+            PgpKeyInspectionResponse { inspection: None, error: Some(BridgeFailure::from(error)) }
+        }
+    }
+}
+
+/// Inspects a local key file. The file's bytes are read here and never returned to Flutter.
+pub async fn inspect_pgp_key_file(request: InspectPgpKeyFileRequest) -> PgpKeyInspectionResponse {
+    match inspect_pgp_key_file_core(Path::new(&request.path)) {
+        Ok(inspected) => PgpKeyInspectionResponse {
+            inspection: Some(PgpKeyInspectionDto::from(inspected.inspection())),
+            error: None,
+        },
+        Err(error) => {
+            PgpKeyInspectionResponse { inspection: None, error: Some(BridgeFailure::from(error)) }
+        }
+    }
+}
+
+/// Imports pasted PGP key material of either kind, validating any passphrase before mutating.
+pub async fn import_pgp_key_text(request: ImportPgpKeyTextRequest) -> PgpKeyImportResponse {
+    let passphrase = request.passphrase.map(SecretString::from);
+    pgp_key_import_response(
+        pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+            import_pgp_key_text_core(
+                backend.as_ref(),
+                request.armored_text,
+                passphrase.as_ref(),
+                None,
+            )
+            .map_err(BridgeFailure::from)
+        }),
+    )
+}
+
+/// Imports a PGP key file of either kind. Binary exports are supported because the file is read as
+/// bytes rather than UTF-8 text.
+pub async fn import_pgp_key_file(request: ImportPgpKeyFileRequest) -> PgpKeyImportResponse {
+    let passphrase = request.passphrase.map(SecretString::from);
+    pgp_key_import_response(
+        pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+            import_pgp_key_file_core(
+                backend.as_ref(),
+                Path::new(&request.path),
+                passphrase.as_ref(),
+                None,
+            )
+            .map_err(BridgeFailure::from)
+        }),
+    )
+}
+
 pub async fn import_pgp_public_key(request: ImportKeyTextRequest) -> KeyMutationResponse {
-    import_pgp_key_text(request, false)
+    legacy_import_pgp_key_text(request, PgpKeyMaterialKind::Public)
 }
 
 pub async fn import_pgp_private_key_text(request: ImportKeyTextRequest) -> KeyMutationResponse {
-    import_pgp_key_text(request, true)
+    legacy_import_pgp_key_text(request, PgpKeyMaterialKind::Private)
 }
 
 pub async fn import_pgp_private_key_file(request: ImportKeyFileRequest) -> KeyMutationResponse {
-    match fs::read_to_string(&request.path).map_err(|error| {
-        BridgeFailure::from(CoreError::StoreError(format!(
-            "failed to read key file {}: {error}",
-            request.path
-        )))
-    }) {
-        Ok(armored_text) => import_pgp_key_text(
-            ImportKeyTextRequest {
-                config_path: request.config_path,
-                pgp_executable: request.pgp_executable,
-                ssh_dir: request.ssh_dir,
-                name: request.name,
-                armored_text,
-            },
-            true,
-        ),
-        Err(error) => KeyMutationResponse { key: None, error: Some(error) },
-    }
+    let outcome =
+        pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+            import_pgp_key_file_core(
+                backend.as_ref(),
+                Path::new(&request.path),
+                None,
+                Some(PgpKeyMaterialKind::Private),
+            )
+            .map_err(BridgeFailure::from)
+        });
+    legacy_key_mutation_response(
+        outcome,
+        request.name,
+        pgp_import_source_label(PgpKeyMaterialKind::Private),
+    )
 }
 
 pub async fn export_pgp_public_key(request: ExportPgpKeyRequest) -> KeyExportResponse {
@@ -1176,49 +1353,74 @@ fn list_keys_inner(request: ListKeysRequest) -> Result<Vec<KeyRecordDto>, Bridge
     Ok(keys)
 }
 
-fn import_pgp_key_text(request: ImportKeyTextRequest, private_key: bool) -> KeyMutationResponse {
-    let detected = detect_imported_key_material(&request.armored_text);
-    let expected_kind =
-        if private_key { ImportedKeyKind::PgpPrivate } else { ImportedKeyKind::PgpPublic };
-    match detected {
-        Ok(kind) if kind == expected_kind => {}
-        Ok(_) => {
-            return KeyMutationResponse {
-                key: None,
-                error: Some(BridgeFailure::from(CoreError::ValidationError(
-                    "pasted key type does not match the requested PGP import".to_string(),
-                ))),
-            };
-        }
-        Err(error) => {
-            return KeyMutationResponse { key: None, error: Some(BridgeFailure::from(error)) }
-        }
-    }
-
-    let pgp_executable = request.pgp_executable.clone();
-    match pgp_backend(&request.config_path, pgp_executable.as_deref()).and_then(|backend| {
-        if private_key {
-            backend
-                .import_private_key(&SecretString::from(request.armored_text))
-                .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
-        } else {
-            backend
-                .import_public_key(&request.armored_text)
-                .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
-        }
-    }) {
-        Ok(result) => KeyMutationResponse {
-            key: Some(KeyRecordDto {
-                key_type: "pgp".to_string(),
-                name: request.name.unwrap_or_else(|| result.fingerprint.clone()),
-                fingerprint: result.fingerprint,
-                source: if private_key { "Imported private key" } else { "Imported public key" }
-                    .to_string(),
-                has_private_key: result.imported_private_key,
-            }),
+fn pgp_key_import_response(
+    outcome: Result<PgpImportOutcome, BridgeFailure>,
+) -> PgpKeyImportResponse {
+    match outcome {
+        Ok(outcome) => PgpKeyImportResponse {
+            inspection: Some(PgpKeyInspectionDto::from(&outcome.inspection)),
+            key: Some(pgp_key_record(
+                &outcome,
+                None,
+                pgp_import_source_label(outcome.inspection.kind),
+            )),
             error: None,
         },
+        Err(error) => PgpKeyImportResponse { inspection: None, key: None, error: Some(error) },
+    }
+}
+
+/// Legacy type-specific PGP import.
+///
+/// Kept so in-tree callers keep working during the migration; Settings and Onboarding use the
+/// source-independent `import_pgp_key_text` / `import_pgp_key_file` instead. Classification now
+/// comes from packet inspection rather than armor markers, and the fingerprint is the canonical one.
+fn legacy_import_pgp_key_text(
+    request: ImportKeyTextRequest,
+    expected_kind: PgpKeyMaterialKind,
+) -> KeyMutationResponse {
+    let source = pgp_import_source_label(expected_kind);
+    let outcome =
+        pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+            import_pgp_key_text_core(
+                backend.as_ref(),
+                request.armored_text,
+                None,
+                Some(expected_kind),
+            )
+            .map_err(BridgeFailure::from)
+        });
+    legacy_key_mutation_response(outcome, request.name, source)
+}
+
+fn legacy_key_mutation_response(
+    outcome: Result<PgpImportOutcome, BridgeFailure>,
+    name: Option<String>,
+    source: &str,
+) -> KeyMutationResponse {
+    match outcome {
+        Ok(outcome) => {
+            KeyMutationResponse { key: Some(pgp_key_record(&outcome, name, source)), error: None }
+        }
         Err(error) => KeyMutationResponse { key: None, error: Some(error) },
+    }
+}
+
+/// Builds the GUI-facing record from backend-confirmed metadata.
+fn pgp_key_record(outcome: &PgpImportOutcome, name: Option<String>, source: &str) -> KeyRecordDto {
+    KeyRecordDto {
+        key_type: "pgp".to_string(),
+        name: name.unwrap_or_else(|| outcome.identity.clone()),
+        fingerprint: outcome.fingerprint.clone(),
+        source: source.to_string(),
+        has_private_key: outcome.imported_private_key,
+    }
+}
+
+fn pgp_import_source_label(kind: PgpKeyMaterialKind) -> &'static str {
+    match kind {
+        PgpKeyMaterialKind::Public => "Imported public key",
+        PgpKeyMaterialKind::Private => "Imported private key",
     }
 }
 

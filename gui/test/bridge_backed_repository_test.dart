@@ -5,6 +5,7 @@ import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
 import 'package:pars_gui/bridge/pars_bridge_api.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
+import 'package:pars_gui/models/pgp_key_import.dart';
 import 'package:pars_gui/services/autofill_repository.dart';
 import 'package:pars_gui/services/bridge_backed_repository.dart';
 import 'package:pars_gui/services/mobile_pgp_backend.dart';
@@ -476,6 +477,146 @@ void main() {
       );
     },
   );
+
+  test('PGP file inspection sends only the path, never file contents', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+
+    final inspection = await repository.inspectPgpKeyFile(
+      '/tmp/keys/alice.gpg',
+    );
+
+    expect(bridge.lastInspectPgpKeyFileRequest?.path, '/tmp/keys/alice.gpg');
+    // The request DTO has no field that could carry key bytes back into Dart.
+    expect(inspection.fingerprint, 'INSPECTED PGP');
+    expect(inspection.identity, 'Alice <alice@example.com>');
+    expect(inspection.kind, PgpKeyKind.public);
+    expect(inspection.requiresPassphrase, isFalse);
+    expect(bridge.calledMethods, contains('inspect_pgp_key_file'));
+  });
+
+  test('PGP import preserves the canonical fingerprint from the bridge', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+
+    final result = await repository.importPgpKeyText(
+      '-----BEGIN PGP PUBLIC KEY BLOCK-----',
+    );
+
+    expect(result.key.fingerprint, 'IMPORTED PGP');
+    expect(result.inspection.fingerprint, 'IMPORTED PGP');
+    expect(result.key.type, KeyRecordType.pgp);
+    // The imported key is visible without an extra refresh.
+    expect(
+      repository.keys.map((key) => key.fingerprint),
+      contains('IMPORTED PGP'),
+    );
+  });
+
+  test('protected PGP import forwards the passphrase and reports protection', () async {
+    final bridge = _LifecycleBridge();
+    const protected = frb.PgpKeyInspectionDto(
+      kind: frb.PgpKeyKindDto.private,
+      fingerprint: 'PROTECTED PGP',
+      identity: 'Protected <protected@example.com>',
+      hasPrivateKey: true,
+      requiresPassphrase: true,
+      armored: true,
+    );
+    bridge.pgpImportResponse = const frb.PgpKeyImportResponse(
+      inspection: protected,
+      key: frb.KeyRecordDto(
+        keyType: 'pgp',
+        name: 'Protected <protected@example.com>',
+        fingerprint: 'PROTECTED PGP',
+        source: 'Imported private key',
+        hasPrivateKey: true,
+      ),
+    );
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+
+    final result = await repository.importPgpKeyFile(
+      '/tmp/keys/protected.asc',
+      passphrase: 'correct passphrase',
+    );
+
+    expect(
+      bridge.lastImportPgpKeyFileRequest?.passphrase,
+      'correct passphrase',
+    );
+    expect(result.inspection.requiresPassphrase, isTrue);
+    expect(result.key.hasPrivateKey, isTrue);
+    expect(result.key.fingerprint, 'PROTECTED PGP');
+  });
+
+  test('typed PGP import failures are mapped without leaking secret text', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+
+    const cases = <frb.PgpImportFailureKind, PgpImportFailureKind>{
+      frb.PgpImportFailureKind.unsupportedMaterial:
+          PgpImportFailureKind.unsupportedMaterial,
+      frb.PgpImportFailureKind.kindMismatch: PgpImportFailureKind.kindMismatch,
+      frb.PgpImportFailureKind.passphraseRequired:
+          PgpImportFailureKind.passphraseRequired,
+      frb.PgpImportFailureKind.incorrectPassphrase:
+          PgpImportFailureKind.incorrectPassphrase,
+      frb.PgpImportFailureKind.backendError: PgpImportFailureKind.backendError,
+    };
+
+    for (final entry in cases.entries) {
+      bridge.pgpImportResponse = frb.PgpKeyImportResponse(
+        error: frb.BridgeFailure(
+          category: frb.BridgeFailureCategory.validationError,
+          message: 'the PGP private key passphrase is incorrect',
+          pgpImportKind: entry.key,
+        ),
+      );
+
+      await expectLater(
+        repository.importPgpKeyText('material', passphrase: 'super secret'),
+        throwsA(
+          isA<PgpImportException>()
+              .having((error) => error.kind, 'kind', entry.value)
+              .having(
+                (error) => error.message,
+                'message',
+                isNot(contains('super secret')),
+              ),
+        ),
+      );
+    }
+
+    // A failure the bridge did not classify still surfaces as a typed exception.
+    bridge.pgpImportResponse = const frb.PgpKeyImportResponse(
+      error: frb.BridgeFailure(
+        category: frb.BridgeFailureCategory.pgpError,
+        message: 'something else went wrong',
+      ),
+    );
+    await expectLater(
+      repository.importPgpKeyText('material'),
+      throwsA(
+        isA<PgpImportException>().having(
+          (error) => error.kind,
+          'kind',
+          PgpImportFailureKind.unknown,
+        ),
+      ),
+    );
+  });
 }
 
 class _LifecycleBridge implements ParsBridgeApi {
@@ -494,6 +635,74 @@ class _LifecycleBridge implements ParsBridgeApi {
   frb.CreateLocalStoreRequest? lastCreateLocalStoreRequest;
   frb.GitCommitRequest? lastGitCommitRequest;
   frb.GitArgsRequest? lastGitArgsRequest;
+  frb.InspectPgpKeyTextRequest? lastInspectPgpKeyTextRequest;
+  frb.InspectPgpKeyFileRequest? lastInspectPgpKeyFileRequest;
+  frb.ImportPgpKeyTextRequest? lastImportPgpKeyTextRequest;
+  frb.ImportPgpKeyFileRequest? lastImportPgpKeyFileRequest;
+  frb.PgpKeyInspectionResponse pgpInspectionResponse =
+      const frb.PgpKeyInspectionResponse(
+        inspection: frb.PgpKeyInspectionDto(
+          kind: frb.PgpKeyKindDto.public,
+          fingerprint: 'INSPECTED PGP',
+          identity: 'Alice <alice@example.com>',
+          hasPrivateKey: false,
+          requiresPassphrase: false,
+          armored: true,
+        ),
+      );
+  frb.PgpKeyImportResponse pgpImportResponse = const frb.PgpKeyImportResponse(
+    inspection: frb.PgpKeyInspectionDto(
+      kind: frb.PgpKeyKindDto.public,
+      fingerprint: 'IMPORTED PGP',
+      identity: 'Alice <alice@example.com>',
+      hasPrivateKey: false,
+      requiresPassphrase: false,
+      armored: true,
+    ),
+    key: frb.KeyRecordDto(
+      keyType: 'pgp',
+      name: 'Alice <alice@example.com>',
+      fingerprint: 'IMPORTED PGP',
+      source: 'Imported public key',
+      hasPrivateKey: false,
+    ),
+  );
+
+  @override
+  Future<frb.PgpKeyInspectionResponse> inspectPgpKeyText({
+    required frb.InspectPgpKeyTextRequest request,
+  }) async {
+    calledMethods.add('inspect_pgp_key_text');
+    lastInspectPgpKeyTextRequest = request;
+    return pgpInspectionResponse;
+  }
+
+  @override
+  Future<frb.PgpKeyInspectionResponse> inspectPgpKeyFile({
+    required frb.InspectPgpKeyFileRequest request,
+  }) async {
+    calledMethods.add('inspect_pgp_key_file');
+    lastInspectPgpKeyFileRequest = request;
+    return pgpInspectionResponse;
+  }
+
+  @override
+  Future<frb.PgpKeyImportResponse> importPgpKeyText({
+    required frb.ImportPgpKeyTextRequest request,
+  }) async {
+    calledMethods.add('import_pgp_key_text');
+    lastImportPgpKeyTextRequest = request;
+    return pgpImportResponse;
+  }
+
+  @override
+  Future<frb.PgpKeyImportResponse> importPgpKeyFile({
+    required frb.ImportPgpKeyFileRequest request,
+  }) async {
+    calledMethods.add('import_pgp_key_file');
+    lastImportPgpKeyFileRequest = request;
+    return pgpImportResponse;
+  }
 
   @override
   Future<frb.AppStateResponse> inspectAppState({

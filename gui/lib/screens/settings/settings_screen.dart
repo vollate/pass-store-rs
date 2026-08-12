@@ -6,6 +6,7 @@ import '../../services/autofill_repository.dart';
 import '../../services/git_repository.dart';
 import '../../services/key_repository.dart';
 import '../../services/path_picker_service.dart';
+import '../../services/pgp_import_service.dart';
 import '../../services/runtime_diagnostics.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
@@ -14,6 +15,7 @@ import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
+import '../../widgets/pgp_key_import_body.dart';
 
 part 'widgets/settings_security_widgets.dart';
 part 'widgets/settings_key_management_widgets.dart';

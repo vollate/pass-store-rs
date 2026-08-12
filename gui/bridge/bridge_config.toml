@@ -41,6 +41,10 @@ methods = [
   "list_keys",
   "detect_imported_key",
   "generate_pgp_key",
+  "inspect_pgp_key_text",
+  "inspect_pgp_key_file",
+  "import_pgp_key_text",
+  "import_pgp_key_file",
   "import_pgp_public_key",
   "import_pgp_private_key_file",
   "import_pgp_private_key_text",
@@ -64,4 +68,4 @@ methods = [
 [security]
 log_request_payloads = false
 log_response_payloads = false
-secret_fields = ["password", "content", "armored_text", "private_key"]
+secret_fields = ["password", "passphrase", "content", "armored_text", "private_key"]

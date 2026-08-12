@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use std::process::{self, Command, Stdio};
+use std::process::{self, Command};
 
 use pars_core::gui::{
     delete_entry, edit_entry, generate_entry, insert_entry, list_entries, move_entry,
@@ -9,8 +9,8 @@ use pars_core::gui::{
     GitOperationRequest, InsertEntryRequest, ListEntriesRequest, MoveEntryRequest,
     ReadEntryRequest,
 };
-use pars_core::pgp::key_management::key_gen_batch;
 use pars_core::pgp::PGPClient;
+use pars_core::util::test_util::{get_test_executable, TestKeyGuard};
 use secrecy::ExposeSecret;
 use serial_test::serial;
 
@@ -31,41 +31,12 @@ fn assert_entry_already_exists_conflict(err: CoreError, expected_path: &str) {
     }
 }
 
-struct TestKey {
-    executable: String,
-    email: String,
-}
-
-impl Drop for TestKey {
-    fn drop(&mut self) {
-        let _ = Command::new(&self.executable)
-            .args(["--batch", "--yes", "--delete-secret-and-public-keys", &self.email])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-    }
-}
-
-fn test_pgp_executable() -> String {
-    std::env::var("PASS_RS_TEST_EXECUTABLE").unwrap_or("gpg".into())
-}
-
-fn test_key_batch(email: &str) -> String {
-    format!(
-        r#"%echo Generating a GUI test key
-Key-Type: RSA
-Key-Length: 2048
-Subkey-Type: RSA
-Subkey-Length: 2048
-Name-Real: Pars GUI Test
-Name-Email: {email}
-Expire-Date: 0
-%no-protection
-%commit
-%echo Key generation complete
-"#
-    )
+/// Generates an unprotected key named after the calling test, cleaned up when the guard drops.
+fn gui_test_key(purpose: &str) -> (String, String, TestKeyGuard) {
+    let executable = get_test_executable();
+    let email = format!("pars-gui-{purpose}-{}@rs.pass", process::id());
+    let guard = TestKeyGuard::generate(&executable, "Pars GUI Test", &email);
+    (executable, email, guard)
 }
 
 #[test]
@@ -238,10 +209,7 @@ fn delete_entry_removes_directory_when_recursive_is_explicit() {
 #[test]
 #[serial]
 fn read_entry_decrypts_password_file_and_parses_content() {
-    let executable = test_pgp_executable();
-    let email = format!("pars-gui-read-{}@rs.pass", process::id());
-    let _key = TestKey { executable: executable.clone(), email: email.clone() };
-    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+    let (executable, email, _key) = gui_test_key("read");
 
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().to_path_buf();
@@ -271,10 +239,7 @@ fn read_entry_decrypts_password_file_and_parses_content() {
 #[test]
 #[serial]
 fn insert_entry_encrypts_content_and_creates_parent_directories() {
-    let executable = test_pgp_executable();
-    let email = format!("pars-gui-insert-{}@rs.pass", process::id());
-    let _key = TestKey { executable: executable.clone(), email: email.clone() };
-    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+    let (executable, email, _key) = gui_test_key("insert");
 
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().to_path_buf();
@@ -301,10 +266,7 @@ fn insert_entry_encrypts_content_and_creates_parent_directories() {
 #[test]
 #[serial]
 fn insert_entry_requires_explicit_overwrite_for_existing_passwords() {
-    let executable = test_pgp_executable();
-    let email = format!("pars-gui-overwrite-{}@rs.pass", process::id());
-    let _key = TestKey { executable: executable.clone(), email: email.clone() };
-    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+    let (executable, email, _key) = gui_test_key("overwrite");
 
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().to_path_buf();
@@ -344,10 +306,7 @@ fn insert_entry_requires_explicit_overwrite_for_existing_passwords() {
 #[test]
 #[serial]
 fn generate_entry_creates_password_with_requested_shape_and_saves_it() {
-    let executable = test_pgp_executable();
-    let email = format!("pars-gui-generate-{}@rs.pass", process::id());
-    let _key = TestKey { executable: executable.clone(), email: email.clone() };
-    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+    let (executable, email, _key) = gui_test_key("generate");
 
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().to_path_buf();
@@ -376,10 +335,7 @@ fn generate_entry_creates_password_with_requested_shape_and_saves_it() {
 #[test]
 #[serial]
 fn generate_entry_requires_explicit_overwrite_for_existing_passwords() {
-    let executable = test_pgp_executable();
-    let email = format!("pars-gui-generate-overwrite-{}@rs.pass", process::id());
-    let _key = TestKey { executable: executable.clone(), email: email.clone() };
-    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+    let (executable, email, _key) = gui_test_key("generate-overwrite");
 
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().to_path_buf();
@@ -419,10 +375,7 @@ fn generate_entry_requires_explicit_overwrite_for_existing_passwords() {
 #[test]
 #[serial]
 fn edit_entry_reencrypts_confirmed_content_without_prompting() {
-    let executable = test_pgp_executable();
-    let email = format!("pars-gui-edit-{}@rs.pass", process::id());
-    let _key = TestKey { executable: executable.clone(), email: email.clone() };
-    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+    let (executable, email, _key) = gui_test_key("edit");
 
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().to_path_buf();
@@ -446,10 +399,7 @@ fn edit_entry_reencrypts_confirmed_content_without_prompting() {
 #[test]
 #[serial]
 fn move_entry_renames_password_file_without_prompting() {
-    let executable = test_pgp_executable();
-    let email = format!("pars-gui-move-{}@rs.pass", process::id());
-    let _key = TestKey { executable: executable.clone(), email: email.clone() };
-    key_gen_batch(&executable, &test_key_batch(&email)).unwrap();
+    let (executable, email, _key) = gui_test_key("move");
 
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().to_path_buf();

@@ -9,6 +9,7 @@ use pars_core::autofill::{
 };
 use pars_core::gui::{KeyExportResult, KeyImportResult, PgpKeySummary};
 use pars_core::pgp::backend::{KeyGenerationRequest, PgpBackend, PgpBackendResult, PgpKeyDetails};
+use pars_core::pgp::import::InspectedPgpKey;
 use secrecy::SecretString;
 
 #[test]
@@ -231,14 +232,7 @@ impl PgpBackend for RecordingBackend {
         unreachable!("not used by autofill tests")
     }
 
-    fn import_public_key(&self, _armored_text: &str) -> PgpBackendResult<KeyImportResult> {
-        unreachable!("not used by autofill tests")
-    }
-
-    fn import_private_key(
-        &self,
-        _armored_text: &SecretString,
-    ) -> PgpBackendResult<KeyImportResult> {
+    fn import_key(&self, _key: &InspectedPgpKey) -> PgpBackendResult<KeyImportResult> {
         unreachable!("not used by autofill tests")
     }
 
