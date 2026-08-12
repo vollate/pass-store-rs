@@ -210,20 +210,43 @@ pub fn add_pgp_key_to_gpg_id(store_root: &Path, fingerprint: &str) -> GuiResult<
         return Err(CoreError::ValidationError("PGP key fingerprint is invalid".to_string()));
     }
 
-    fs::create_dir_all(store_root)?;
+    fs::create_dir_all(store_root).map_err(|error| {
+        store_path_error("failed to prepare password store directory", store_root, error)
+    })?;
     let gpg_id_path = store_root.join(".gpg-id");
-    let existing = fs::read_to_string(&gpg_id_path).unwrap_or_default();
+    let existing = match fs::read_to_string(&gpg_id_path) {
+        Ok(existing) => existing,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => {
+            return Err(store_path_error(
+                "failed to read PGP recipients file",
+                &gpg_id_path,
+                error,
+            ));
+        }
+    };
     let already_present = existing.lines().any(|line| line.trim() == normalized);
     if already_present {
         return Ok(());
     }
 
-    let mut file = fs::OpenOptions::new().create(true).append(true).open(&gpg_id_path)?;
+    let mut file =
+        fs::OpenOptions::new().create(true).append(true).open(&gpg_id_path).map_err(|error| {
+            store_path_error("failed to open PGP recipients file for writing", &gpg_id_path, error)
+        })?;
     if !existing.is_empty() && !existing.ends_with('\n') {
-        writeln!(file)?;
+        writeln!(file).map_err(|error| {
+            store_path_error("failed to write PGP recipients file", &gpg_id_path, error)
+        })?;
     }
-    writeln!(file, "{normalized}")?;
+    writeln!(file, "{normalized}").map_err(|error| {
+        store_path_error("failed to write PGP recipients file", &gpg_id_path, error)
+    })?;
     Ok(())
+}
+
+fn store_path_error(operation: &str, path: &Path, error: std::io::Error) -> CoreError {
+    CoreError::StoreError(format!("{operation} '{}': {error}", path.display()))
 }
 
 fn ssh_key_summary(ssh_dir: &Path, name: &str) -> GuiResult<SshKeySummary> {

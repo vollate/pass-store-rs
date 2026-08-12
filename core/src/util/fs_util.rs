@@ -6,7 +6,7 @@ use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clean_path::Clean;
 use directories::ProjectDirs;
 use fs_extra::dir::{self, CopyOptions};
@@ -67,22 +67,10 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
     let mut to_check = cur_dir.to_path_buf();
 
     while to_check != root {
-        if to_check.is_dir() {
-            let key_file = to_check.join(".gpg-id");
-            debug!("Check {key_file:?} for .gpg-id file");
-
-            if key_file.exists() && key_file.is_file() {
-                if let Ok(key) = fs::read_to_string(key_file) {
-                    debug!("Found key(s): {key:?}");
-
-                    return Ok(key
-                        .lines()
-                        .map(|line| line.trim())
-                        .filter(|line| !line.is_empty())
-                        .map(|line| line.to_string())
-                        .collect());
-                }
-            }
+        let key_file = to_check.join(".gpg-id");
+        debug!("Check {key_file:?} for .gpg-id file");
+        if let Some(keys) = read_gpg_id_if_present(&key_file)? {
+            return Ok(keys);
         }
         match to_check.parent() {
             Some(parent) => {
@@ -92,22 +80,40 @@ pub fn get_dir_gpg_id_content(root: &Path, cur_dir: &Path) -> Result<Vec<String>
         }
     }
 
-    if root.is_dir() {
-        let key_file = root.join(".gpg-id");
-        debug!("Checking root {root:?} for .gpg-id file");
-        if key_file.exists() && key_file.is_file() {
-            if let Ok(key) = fs::read_to_string(key_file) {
-                debug!("Found key: {key:?}");
-                return Ok(key
-                    .split('\n')
-                    .map(|line| line.trim())
-                    .filter(|line| !line.is_empty())
-                    .map(|line| line.to_string())
-                    .collect());
-            }
-        }
+    let key_file = root.join(".gpg-id");
+    debug!("Checking root {root:?} for .gpg-id file");
+    if let Some(keys) = read_gpg_id_if_present(&key_file)? {
+        return Ok(keys);
     }
-    Err(anyhow!(format!("Cannot find '.gpg-id' for {:?}", cur_dir)))
+    Err(anyhow!(format!(
+        "Cannot find '.gpg-id' while resolving recipients for '{}'",
+        cur_dir.display()
+    )))
+}
+
+fn read_gpg_id_if_present(path: &Path) -> Result<Option<Vec<String>>> {
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(error)
+            if matches!(error.kind(), io::ErrorKind::NotFound | io::ErrorKind::NotADirectory) =>
+        {
+            return Ok(None);
+        }
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!("failed to read PGP recipients file '{}'", path.display())
+            })
+        }
+    };
+    debug!("Found key(s) in {path:?}");
+    Ok(Some(
+        content
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(ToOwned::to_owned)
+            .collect(),
+    ))
 }
 
 pub(crate) fn backup_encrypted_file(file_path: &Path) -> Result<PathBuf> {
