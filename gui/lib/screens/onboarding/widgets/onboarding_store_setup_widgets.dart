@@ -38,18 +38,23 @@ class _StoreSetupActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final selectedStore = lifecycle.selectedStore;
     return ListView(
       children: <Widget>[
-        for (final issue in lifecycle.issues)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              Icons.warning_amber_rounded,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            title: Text(issue.replaceAll('_', ' ')),
-            subtitle: Text(lifecycle.configPath),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.warning_amber_rounded,
+            color: Theme.of(context).colorScheme.error,
           ),
+          title: Text(
+            selectedStore == null
+                ? localizations.noPasswordStoreConfigured
+                : localizations.passwordStoreFolderNotFound,
+          ),
+          subtitle: Text(selectedStore?.root ?? lifecycle.configPath),
+        ),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: () => _showCreateLocalStore(context),
@@ -124,6 +129,11 @@ class _StoreSetupActions extends StatelessWidget {
   }
 
   void _showImportLocalStore(BuildContext context) {
+    final managed = managedPaths;
+    if (managed != null) {
+      _showManagedImportLocalStore(context, managed);
+      return;
+    }
     final defaultBase = _defaultStoreBasePath();
     String? selectedRoot;
     _showPickerStoreForm(
@@ -146,6 +156,42 @@ class _StoreSetupActions extends StatelessWidget {
                           selectedRoot = path;
                         }),
                   ),
+            ),
+          ],
+    );
+  }
+
+  void _showManagedImportLocalStore(
+    BuildContext context,
+    AppManagedPathRepository managed,
+  ) {
+    final localizations = AppLocalizations.of(context);
+    final destinationBase = parentDirectory(managed.storeRootForName('store'));
+    _showPickerStoreForm(
+      context: context,
+      title: 'Import local store',
+      submitLabel: localizations.chooseFolderAndImport,
+      canSubmit: () => true,
+      onSubmit: () async {
+        final importedRoot = await pathPickerService
+            .importFolderToManagedStorage(
+              destinationBaseDirectory: destinationBase,
+              resolveConflict:
+                  (conflict) =>
+                      showManagedStoreConflictSheet(context, conflict),
+            );
+        if (importedRoot == null) {
+          throw PathPickerException(localizations.storeImportCancelled);
+        }
+        await onImportLocalStore(importedRoot);
+      },
+      builder:
+          (_, _) => <Widget>[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.copy_all_outlined),
+              title: Text(localizations.copyIntoAppStorage),
+              subtitle: Text(localizations.copyIntoAppStorageDescription),
             ),
           ],
     );
@@ -452,7 +498,11 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
     } catch (caught) {
       if (!mounted) return;
       setState(() {
-        _error = caught.toString();
+        _error =
+            caught is PathPickerException &&
+                    caught.code == 'store_import_no_passwords'
+                ? AppLocalizations.of(context).storeImportNoPasswords
+                : caught.toString();
         _isSubmitting = false;
       });
     }

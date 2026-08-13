@@ -154,11 +154,16 @@ pub extern "C" fn pars_autofill_resolve_credential_json(
 }
 
 #[no_mangle]
-pub extern "C" fn pars_autofill_free_string(value: *mut c_char) {
+/// Releases a string returned by one of this module's native JSON functions.
+///
+/// # Safety
+///
+/// `value` must be null or a pointer returned by `CString::into_raw` from this library, and it
+/// must not have been freed previously.
+pub unsafe extern "C" fn pars_autofill_free_string(value: *mut c_char) {
     if !value.is_null() {
-        unsafe {
-            drop(CString::from_raw(value));
-        }
+        // SAFETY: upheld by the caller contract above.
+        drop(unsafe { CString::from_raw(value) });
     }
 }
 

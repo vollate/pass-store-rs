@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 573334670;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -167124123;
 
 // Section: executor
 
@@ -1585,6 +1585,45 @@ fn wire__crate__api__open_github_ssh_settings_impl(
         },
     )
 }
+fn wire__crate__api__prepare_pgp_private_key_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "prepare_pgp_private_key",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::PreparePgpPrivateKeyRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::prepare_pgp_private_key(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__query_autofill_candidates_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2248,6 +2287,22 @@ impl SseDecode for crate::api::DeletePgpKeyRequest {
             config_path: var_configPath,
             pgp_executable: var_pgpExecutable,
             fingerprint: var_fingerprint,
+        };
+    }
+}
+
+impl SseDecode for crate::api::DeletePgpKeyResponse {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_result =
+            <Option<crate::api::PgpKeyDeletionResultDto>>::sse_decode(deserializer);
+        let mut var_failureKind =
+            <Option<crate::api::PgpKeyDeletionFailureKind>>::sse_decode(deserializer);
+        let mut var_error = <Option<crate::api::BridgeFailure>>::sse_decode(deserializer);
+        return crate::api::DeletePgpKeyResponse {
+            result: var_result,
+            failure_kind: var_failureKind,
+            error: var_error,
         };
     }
 }
@@ -3097,6 +3152,28 @@ impl SseDecode for Option<crate::api::PgpImportFailureKind> {
     }
 }
 
+impl SseDecode for Option<crate::api::PgpKeyDeletionFailureKind> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::PgpKeyDeletionFailureKind>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::PgpKeyDeletionResultDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::PgpKeyDeletionResultDto>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::PgpKeyInspectionDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3142,8 +3219,38 @@ impl SseDecode for crate::api::PgpImportFailureKind {
             1 => crate::api::PgpImportFailureKind::KindMismatch,
             2 => crate::api::PgpImportFailureKind::PassphraseRequired,
             3 => crate::api::PgpImportFailureKind::IncorrectPassphrase,
-            4 => crate::api::PgpImportFailureKind::BackendError,
+            4 => crate::api::PgpImportFailureKind::UnsupportedProtection,
+            5 => crate::api::PgpImportFailureKind::ReprotectionFailed,
+            6 => crate::api::PgpImportFailureKind::BackendError,
             _ => unreachable!("Invalid variant for PgpImportFailureKind: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::PgpKeyDeletionFailureKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::PgpKeyDeletionFailureKind::PrivateRemovalFailed,
+            1 => crate::api::PgpKeyDeletionFailureKind::PublicCleanupFailed,
+            _ => unreachable!("Invalid variant for PgpKeyDeletionFailureKind: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::PgpKeyDeletionResultDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_fingerprint = <String>::sse_decode(deserializer);
+        let mut var_hadPrivateKey = <bool>::sse_decode(deserializer);
+        let mut var_privateKeyAbsent = <bool>::sse_decode(deserializer);
+        let mut var_publicKeyAbsent = <bool>::sse_decode(deserializer);
+        return crate::api::PgpKeyDeletionResultDto {
+            fingerprint: var_fingerprint,
+            had_private_key: var_hadPrivateKey,
+            private_key_absent: var_privateKeyAbsent,
+            public_key_absent: var_publicKeyAbsent,
         };
     }
 }
@@ -3204,6 +3311,36 @@ impl SseDecode for crate::api::PgpKeyKindDto {
             0 => crate::api::PgpKeyKindDto::Public,
             1 => crate::api::PgpKeyKindDto::Private,
             _ => unreachable!("Invalid variant for PgpKeyKindDto: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::PreparePgpPrivateKeyRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
+        let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
+        let mut var_fingerprint = <String>::sse_decode(deserializer);
+        let mut var_passphrase = <String>::sse_decode(deserializer);
+        return crate::api::PreparePgpPrivateKeyRequest {
+            config_path: var_configPath,
+            pgp_executable: var_pgpExecutable,
+            fingerprint: var_fingerprint,
+            passphrase: var_passphrase,
+        };
+    }
+}
+
+impl SseDecode for crate::api::PreparePgpPrivateKeyResponse {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_fingerprint = <Option<String>>::sse_decode(deserializer);
+        let mut var_migrated = <bool>::sse_decode(deserializer);
+        let mut var_error = <Option<crate::api::BridgeFailure>>::sse_decode(deserializer);
+        return crate::api::PreparePgpPrivateKeyResponse {
+            fingerprint: var_fingerprint,
+            migrated: var_migrated,
+            error: var_error,
         };
     }
 }
@@ -3378,14 +3515,15 @@ fn pde_ffi_dispatcher_primary_impl(
         39 => wire__crate__api__load_config_impl(port, ptr, rust_vec_len, data_len),
         40 => wire__crate__api__move_entry_impl(port, ptr, rust_vec_len, data_len),
         41 => wire__crate__api__open_github_ssh_settings_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__query_autofill_candidates_impl(port, ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__read_entry_impl(port, ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__refresh_autofill_index_impl(port, ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__remove_store_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__resolve_autofill_credential_impl(port, ptr, rust_vec_len, data_len),
-        47 => wire__crate__api__run_git_args_impl(port, ptr, rust_vec_len, data_len),
-        48 => wire__crate__api__save_config_impl(port, ptr, rust_vec_len, data_len),
-        49 => wire__crate__api__select_store_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__prepare_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__query_autofill_candidates_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__read_entry_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__refresh_autofill_index_impl(port, ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__remove_store_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__resolve_autofill_credential_impl(port, ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__run_git_args_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__save_config_impl(port, ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__select_store_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3897,6 +4035,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::DeletePgpKeyRequest>
     for crate::api::DeletePgpKeyRequest
 {
     fn into_into_dart(self) -> crate::api::DeletePgpKeyRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::DeletePgpKeyResponse {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.result.into_into_dart().into_dart(),
+            self.failure_kind.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::DeletePgpKeyResponse
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::DeletePgpKeyResponse>
+    for crate::api::DeletePgpKeyResponse
+{
+    fn into_into_dart(self) -> crate::api::DeletePgpKeyResponse {
         self
     }
 }
@@ -4797,7 +4957,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::PgpImportFailureKind {
             Self::KindMismatch => 1.into_dart(),
             Self::PassphraseRequired => 2.into_dart(),
             Self::IncorrectPassphrase => 3.into_dart(),
-            Self::BackendError => 4.into_dart(),
+            Self::UnsupportedProtection => 4.into_dart(),
+            Self::ReprotectionFailed => 5.into_dart(),
+            Self::BackendError => 6.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -4810,6 +4972,50 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::PgpImportFailureKind>
     for crate::api::PgpImportFailureKind
 {
     fn into_into_dart(self) -> crate::api::PgpImportFailureKind {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::PgpKeyDeletionFailureKind {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::PrivateRemovalFailed => 0.into_dart(),
+            Self::PublicCleanupFailed => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::PgpKeyDeletionFailureKind
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::PgpKeyDeletionFailureKind>
+    for crate::api::PgpKeyDeletionFailureKind
+{
+    fn into_into_dart(self) -> crate::api::PgpKeyDeletionFailureKind {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::PgpKeyDeletionResultDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.fingerprint.into_into_dart().into_dart(),
+            self.had_private_key.into_into_dart().into_dart(),
+            self.private_key_absent.into_into_dart().into_dart(),
+            self.public_key_absent.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::PgpKeyDeletionResultDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::PgpKeyDeletionResultDto>
+    for crate::api::PgpKeyDeletionResultDto
+{
+    fn into_into_dart(self) -> crate::api::PgpKeyDeletionResultDto {
         self
     }
 }
@@ -4891,6 +5097,51 @@ impl flutter_rust_bridge::IntoDart for crate::api::PgpKeyKindDto {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::PgpKeyKindDto {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::PgpKeyKindDto> for crate::api::PgpKeyKindDto {
     fn into_into_dart(self) -> crate::api::PgpKeyKindDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::PreparePgpPrivateKeyRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.config_path.into_into_dart().into_dart(),
+            self.pgp_executable.into_into_dart().into_dart(),
+            self.fingerprint.into_into_dart().into_dart(),
+            self.passphrase.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::PreparePgpPrivateKeyRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::PreparePgpPrivateKeyRequest>
+    for crate::api::PreparePgpPrivateKeyRequest
+{
+    fn into_into_dart(self) -> crate::api::PreparePgpPrivateKeyRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::PreparePgpPrivateKeyResponse {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.fingerprint.into_into_dart().into_dart(),
+            self.migrated.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::PreparePgpPrivateKeyResponse
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::PreparePgpPrivateKeyResponse>
+    for crate::api::PreparePgpPrivateKeyResponse
+{
+    fn into_into_dart(self) -> crate::api::PreparePgpPrivateKeyResponse {
         self
     }
 }
@@ -5277,6 +5528,15 @@ impl SseEncode for crate::api::DeletePgpKeyRequest {
         <String>::sse_encode(self.config_path, serializer);
         <Option<String>>::sse_encode(self.pgp_executable, serializer);
         <String>::sse_encode(self.fingerprint, serializer);
+    }
+}
+
+impl SseEncode for crate::api::DeletePgpKeyResponse {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<crate::api::PgpKeyDeletionResultDto>>::sse_encode(self.result, serializer);
+        <Option<crate::api::PgpKeyDeletionFailureKind>>::sse_encode(self.failure_kind, serializer);
+        <Option<crate::api::BridgeFailure>>::sse_encode(self.error, serializer);
     }
 }
 
@@ -5932,6 +6192,26 @@ impl SseEncode for Option<crate::api::PgpImportFailureKind> {
     }
 }
 
+impl SseEncode for Option<crate::api::PgpKeyDeletionFailureKind> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::PgpKeyDeletionFailureKind>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::PgpKeyDeletionResultDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::PgpKeyDeletionResultDto>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::PgpKeyInspectionDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5970,13 +6250,41 @@ impl SseEncode for crate::api::PgpImportFailureKind {
                 crate::api::PgpImportFailureKind::KindMismatch => 1,
                 crate::api::PgpImportFailureKind::PassphraseRequired => 2,
                 crate::api::PgpImportFailureKind::IncorrectPassphrase => 3,
-                crate::api::PgpImportFailureKind::BackendError => 4,
+                crate::api::PgpImportFailureKind::UnsupportedProtection => 4,
+                crate::api::PgpImportFailureKind::ReprotectionFailed => 5,
+                crate::api::PgpImportFailureKind::BackendError => 6,
                 _ => {
                     unimplemented!("");
                 }
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::PgpKeyDeletionFailureKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::PgpKeyDeletionFailureKind::PrivateRemovalFailed => 0,
+                crate::api::PgpKeyDeletionFailureKind::PublicCleanupFailed => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::PgpKeyDeletionResultDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.fingerprint, serializer);
+        <bool>::sse_encode(self.had_private_key, serializer);
+        <bool>::sse_encode(self.private_key_absent, serializer);
+        <bool>::sse_encode(self.public_key_absent, serializer);
     }
 }
 
@@ -6022,6 +6330,25 @@ impl SseEncode for crate::api::PgpKeyKindDto {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::PreparePgpPrivateKeyRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
+        <Option<String>>::sse_encode(self.pgp_executable, serializer);
+        <String>::sse_encode(self.fingerprint, serializer);
+        <String>::sse_encode(self.passphrase, serializer);
+    }
+}
+
+impl SseEncode for crate::api::PreparePgpPrivateKeyResponse {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<String>>::sse_encode(self.fingerprint, serializer);
+        <bool>::sse_encode(self.migrated, serializer);
+        <Option<crate::api::BridgeFailure>>::sse_encode(self.error, serializer);
     }
 }
 

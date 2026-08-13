@@ -4,9 +4,9 @@ use pars_core::config::cli::{ParsConfig, PgpBackendKind};
 use pars_core::gui::{KeyExportResult, KeyImportResult, PgpKeySummary};
 use pars_core::pgp::backend::{
     KeyGenerationRequest, PgpBackend, PgpBackendConfig, PgpBackendError, PgpBackendResult,
-    PgpKeyDetails, SystemGpgBackend,
+    PgpKeyDeletionResult, PgpKeyDetails, SystemGpgBackend,
 };
-use pars_core::pgp::import::{inspect_pgp_key_bytes, InspectedPgpKey};
+use pars_core::pgp::import::{import_inspected_pgp_key, inspect_pgp_key_bytes, InspectedPgpKey};
 use pars_core::util::test_util::PgpKeyMaterialFixture;
 use secrecy::SecretString;
 
@@ -93,7 +93,7 @@ fn validate_gpg_id_reads_nearest_store_identity_and_rejects_empty_files() {
 
 #[test]
 fn pgp_backend_trait_covers_milestone_four_operations() {
-    let backend = RecordingBackend::default();
+    let backend = RecordingBackend;
 
     let _ = backend.decrypt_file(Path::new("entry.gpg"), None);
     let _ = backend.encrypt_content(
@@ -116,6 +116,23 @@ fn pgp_backend_trait_covers_milestone_four_operations() {
     let _ = backend.list_keys();
     let _ = backend.inspect_fingerprint("alice@example.com");
     let _ = backend.validate_gpg_id(Path::new("/store"), Path::new("/store/entry.gpg"));
+}
+
+#[test]
+fn common_importer_delegates_protected_validation_to_the_backend_once() {
+    let fixture = PgpKeyMaterialFixture::generate(Some("actual passphrase"));
+    let inspected =
+        inspect_pgp_key_bytes(fixture.armored_private).expect("inspect protected fixture");
+
+    let outcome = import_inspected_pgp_key(
+        &RecordingBackend,
+        &inspected,
+        Some(&SecretString::from("deliberately wrong")),
+        None,
+    )
+    .expect("the spy backend owns validation and deliberately accepts this input");
+
+    assert_eq!(outcome.fingerprint, "ABC123");
 }
 
 #[derive(Default)]
@@ -147,6 +164,16 @@ impl PgpBackend for RecordingBackend {
         Ok(KeyImportResult { fingerprint: "ABC123".to_string(), imported_private_key: true })
     }
 
+    fn import_key_with_passphrase(
+        &self,
+        key: &InspectedPgpKey,
+        _passphrase: Option<&SecretString>,
+    ) -> PgpBackendResult<KeyImportResult> {
+        // Deliberately skip validation: the regression test above proves the common importer no
+        // longer performs a first unlock before this backend-owned transaction.
+        self.import_key(key)
+    }
+
     fn export_public_key(&self, _fingerprint: &str) -> PgpBackendResult<KeyExportResult> {
         Ok(KeyExportResult { armored_text: "public".to_string() })
     }
@@ -159,8 +186,14 @@ impl PgpBackend for RecordingBackend {
         Ok(KeyExportResult { armored_text: "private".to_string() })
     }
 
-    fn delete_key(&self, _fingerprint: &str) -> PgpBackendResult<()> {
-        Ok(())
+    fn delete_key(&self, fingerprint: &str) -> PgpBackendResult<PgpKeyDeletionResult> {
+        Ok(PgpKeyDeletionResult {
+            fingerprint: fingerprint.to_string(),
+            had_private_key: true,
+            private_key_absent: true,
+            public_key_absent: true,
+            public_cleanup_error: None,
+        })
     }
 
     fn list_keys(&self) -> PgpBackendResult<Vec<PgpKeySummary>> {

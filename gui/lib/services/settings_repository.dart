@@ -41,6 +41,8 @@ abstract interface class SettingsRepository {
 abstract interface class AppManagedPathRepository {
   bool get usesAppManagedPaths;
 
+  bool isAppManagedStoreRoot(String root);
+
   String storeRootForName(String name);
 
   String storeRootForRemote(String remoteUrl);

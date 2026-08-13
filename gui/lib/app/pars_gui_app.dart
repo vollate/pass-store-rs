@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/security/lock_screen.dart';
 import '../screens/shell/mobile_shell.dart';
@@ -12,7 +13,6 @@ import '../services/key_repository.dart';
 import '../services/path_picker_service.dart';
 import '../services/security_repository.dart';
 import '../services/settings_repository.dart';
-import '../services/store_lifecycle.dart';
 import '../services/vault_repository.dart';
 import 'pars_theme.dart';
 
@@ -129,6 +129,8 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     return MaterialApp(
       title: 'Pars',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: ParsTheme.light(),
       darkTheme: ParsTheme.dark(),
       themeMode: ThemeMode.system,
@@ -209,12 +211,29 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   bool get _isOnboardingSatisfied =>
       widget.securityRepository.onboardingComplete &&
       widget.securityRepository.hasGestureVerifier &&
-      !widget.settingsRepository.lifecycle.onboardingState.requiresSetup;
+      !widget.settingsRepository.lifecycle.requiresStoreSetup;
 
   Future<bool> _unlockWithBiometrics() async {
-    return _runDuringSystemAuthentication(
+    final unlocked = await _runDuringSystemAuthentication(
       widget.securityRepository.unlockWithBiometrics,
     );
+    if (!unlocked) return false;
+
+    final cached = await widget.securityRepository.readPgpPassphrase();
+    if (cached == null) return true;
+    try {
+      final prepared = await widget.keyRepository.preparePgpPrivateKey(
+        fingerprint: cached.fingerprint,
+        passphrase: cached.passphrase,
+      );
+      await widget.securityRepository.startPgpSession(
+        fingerprint: prepared.fingerprint,
+        passphrase: cached.passphrase,
+      );
+    } catch (_) {
+      await widget.securityRepository.clearPgpSession();
+    }
+    return true;
   }
 
   Future<T> _runDuringSystemAuthentication<T>(

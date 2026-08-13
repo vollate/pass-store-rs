@@ -269,9 +269,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PgpKeyDeletionFailureKind
+  dco_decode_box_autoadd_pgp_key_deletion_failure_kind(dynamic raw);
+
+  @protected
+  PgpKeyDeletionResultDto dco_decode_box_autoadd_pgp_key_deletion_result_dto(
+    dynamic raw,
+  );
+
+  @protected
   PgpKeyInspectionDto dco_decode_box_autoadd_pgp_key_inspection_dto(
     dynamic raw,
   );
+
+  @protected
+  PreparePgpPrivateKeyRequest
+  dco_decode_box_autoadd_prepare_pgp_private_key_request(dynamic raw);
 
   @protected
   RefreshAutofillIndexRequest
@@ -336,6 +349,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeletePgpKeyRequest dco_decode_delete_pgp_key_request(dynamic raw);
+
+  @protected
+  DeletePgpKeyResponse dco_decode_delete_pgp_key_response(dynamic raw);
 
   @protected
   DeleteSshKeyRequest dco_decode_delete_ssh_key_request(dynamic raw);
@@ -572,6 +588,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PgpKeyDeletionFailureKind?
+  dco_decode_opt_box_autoadd_pgp_key_deletion_failure_kind(dynamic raw);
+
+  @protected
+  PgpKeyDeletionResultDto?
+  dco_decode_opt_box_autoadd_pgp_key_deletion_result_dto(dynamic raw);
+
+  @protected
   PgpKeyInspectionDto? dco_decode_opt_box_autoadd_pgp_key_inspection_dto(
     dynamic raw,
   );
@@ -586,6 +610,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PgpImportFailureKind dco_decode_pgp_import_failure_kind(dynamic raw);
 
   @protected
+  PgpKeyDeletionFailureKind dco_decode_pgp_key_deletion_failure_kind(
+    dynamic raw,
+  );
+
+  @protected
+  PgpKeyDeletionResultDto dco_decode_pgp_key_deletion_result_dto(dynamic raw);
+
+  @protected
   PgpKeyImportResponse dco_decode_pgp_key_import_response(dynamic raw);
 
   @protected
@@ -596,6 +628,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PgpKeyKindDto dco_decode_pgp_key_kind_dto(dynamic raw);
+
+  @protected
+  PreparePgpPrivateKeyRequest dco_decode_prepare_pgp_private_key_request(
+    dynamic raw,
+  );
+
+  @protected
+  PreparePgpPrivateKeyResponse dco_decode_prepare_pgp_private_key_response(
+    dynamic raw,
+  );
 
   @protected
   RefreshAutofillIndexRequest dco_decode_refresh_autofill_index_request(
@@ -930,7 +972,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PgpKeyDeletionFailureKind
+  sse_decode_box_autoadd_pgp_key_deletion_failure_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyDeletionResultDto sse_decode_box_autoadd_pgp_key_deletion_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PgpKeyInspectionDto sse_decode_box_autoadd_pgp_key_inspection_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PreparePgpPrivateKeyRequest
+  sse_decode_box_autoadd_prepare_pgp_private_key_request(
     SseDeserializer deserializer,
   );
 
@@ -1021,6 +1080,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeletePgpKeyRequest sse_decode_delete_pgp_key_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DeletePgpKeyResponse sse_decode_delete_pgp_key_response(
     SseDeserializer deserializer,
   );
 
@@ -1345,6 +1409,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PgpKeyDeletionFailureKind?
+  sse_decode_opt_box_autoadd_pgp_key_deletion_failure_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyDeletionResultDto?
+  sse_decode_opt_box_autoadd_pgp_key_deletion_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PgpKeyInspectionDto? sse_decode_opt_box_autoadd_pgp_key_inspection_dto(
     SseDeserializer deserializer,
   );
@@ -1359,6 +1435,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PgpImportFailureKind sse_decode_pgp_import_failure_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyDeletionFailureKind sse_decode_pgp_key_deletion_failure_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PgpKeyDeletionResultDto sse_decode_pgp_key_deletion_result_dto(
     SseDeserializer deserializer,
   );
 
@@ -1379,6 +1465,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PgpKeyKindDto sse_decode_pgp_key_kind_dto(SseDeserializer deserializer);
+
+  @protected
+  PreparePgpPrivateKeyRequest sse_decode_prepare_pgp_private_key_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PreparePgpPrivateKeyResponse sse_decode_prepare_pgp_private_key_response(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RefreshAutofillIndexRequest sse_decode_refresh_autofill_index_request(
@@ -1779,8 +1875,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_pgp_key_deletion_failure_kind(
+    PgpKeyDeletionFailureKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_pgp_key_deletion_result_dto(
+    PgpKeyDeletionResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_pgp_key_inspection_dto(
     PgpKeyInspectionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_prepare_pgp_private_key_request(
+    PreparePgpPrivateKeyRequest self,
     SseSerializer serializer,
   );
 
@@ -1889,6 +2003,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_delete_pgp_key_request(
     DeletePgpKeyRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_delete_pgp_key_response(
+    DeletePgpKeyResponse self,
     SseSerializer serializer,
   );
 
@@ -2295,6 +2415,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_pgp_key_deletion_failure_kind(
+    PgpKeyDeletionFailureKind? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_pgp_key_deletion_result_dto(
+    PgpKeyDeletionResultDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_pgp_key_inspection_dto(
     PgpKeyInspectionDto? self,
     SseSerializer serializer,
@@ -2312,6 +2444,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_pgp_import_failure_kind(
     PgpImportFailureKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pgp_key_deletion_failure_kind(
+    PgpKeyDeletionFailureKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pgp_key_deletion_result_dto(
+    PgpKeyDeletionResultDto self,
     SseSerializer serializer,
   );
 
@@ -2336,6 +2480,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_pgp_key_kind_dto(
     PgpKeyKindDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_prepare_pgp_private_key_request(
+    PreparePgpPrivateKeyRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_prepare_pgp_private_key_response(
+    PreparePgpPrivateKeyResponse self,
     SseSerializer serializer,
   );
 

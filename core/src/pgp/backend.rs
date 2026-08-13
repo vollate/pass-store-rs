@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::cli::PgpBackendKind;
 use crate::constants::default_constants::PGP_EXECUTABLE;
 use crate::gui::{KeyExportResult, KeyImportResult, PgpKeySummary};
-use crate::pgp::import::InspectedPgpKey;
+use crate::pgp::import::{InspectedPgpKey, PgpImportError};
 use crate::util::fs_util::get_dir_gpg_id_content;
 
 pub type PgpBackendResult<T> = Result<T, PgpBackendError>;
@@ -54,10 +54,29 @@ pub struct PgpKeyDetails {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PgpPrivateKeyPreparation {
+    pub fingerprint: String,
+    pub migrated: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PgpKeyDeletionResult {
+    pub fingerprint: String,
+    pub had_private_key: bool,
+    pub private_key_absent: bool,
+    pub public_key_absent: bool,
+    pub public_cleanup_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PgpBackendError {
     InvalidConfig(String),
     UnsupportedBackend(String),
     InvalidGpgId(String),
+    PassphraseRequired,
+    IncorrectPassphrase,
+    UnsupportedProtection,
+    ReprotectionFailed,
     CommandFailed(String),
 }
 
@@ -69,6 +88,18 @@ impl Display for PgpBackendError {
                 write!(f, "unsupported PGP backend: {message}")
             }
             PgpBackendError::InvalidGpgId(message) => write!(f, "invalid .gpg-id: {message}"),
+            PgpBackendError::PassphraseRequired => {
+                write!(f, "PGP private-key passphrase is required")
+            }
+            PgpBackendError::IncorrectPassphrase => {
+                write!(f, "PGP private-key passphrase is incorrect")
+            }
+            PgpBackendError::UnsupportedProtection => {
+                write!(f, "unsupported PGP private-key protection")
+            }
+            PgpBackendError::ReprotectionFailed => {
+                write!(f, "PGP private-key re-protection failed")
+            }
             PgpBackendError::CommandFailed(message) => write!(f, "PGP command failed: {message}"),
         }
     }
@@ -99,6 +130,32 @@ pub trait PgpBackend {
     /// fingerprint, and passphrase validity before any keyring is touched.
     fn import_key(&self, key: &InspectedPgpKey) -> PgpBackendResult<KeyImportResult>;
 
+    /// Imports key material with the supplied private-key passphrase. Backends that own local
+    /// protection override this to fuse validation with re-protection; external GPG backends use
+    /// the default validate-then-import behavior.
+    fn import_key_with_passphrase(
+        &self,
+        key: &InspectedPgpKey,
+        passphrase: Option<&SecretString>,
+    ) -> PgpBackendResult<KeyImportResult> {
+        key.validate_passphrase(passphrase).map_err(import_validation_error)?;
+        self.import_key(key)
+    }
+
+    fn prepare_private_key(
+        &self,
+        fingerprint: &str,
+        _passphrase: &SecretString,
+    ) -> PgpBackendResult<PgpPrivateKeyPreparation> {
+        let details = self.inspect_fingerprint(fingerprint)?;
+        if !details.has_private_key {
+            return Err(PgpBackendError::CommandFailed(format!(
+                "no private PGP key found for fingerprint: {fingerprint}"
+            )));
+        }
+        Ok(PgpPrivateKeyPreparation { fingerprint: details.fingerprint, migrated: false })
+    }
+
     fn export_public_key(&self, fingerprint: &str) -> PgpBackendResult<KeyExportResult>;
 
     fn export_private_key(
@@ -107,7 +164,7 @@ pub trait PgpBackend {
         passphrase: Option<&SecretString>,
     ) -> PgpBackendResult<KeyExportResult>;
 
-    fn delete_key(&self, fingerprint: &str) -> PgpBackendResult<()>;
+    fn delete_key(&self, fingerprint: &str) -> PgpBackendResult<PgpKeyDeletionResult>;
 
     fn list_keys(&self) -> PgpBackendResult<Vec<PgpKeySummary>>;
 
@@ -324,7 +381,7 @@ impl PgpBackend for SystemGpgBackend {
         Ok(KeyExportResult { armored_text })
     }
 
-    fn delete_key(&self, fingerprint: &str) -> PgpBackendResult<()> {
+    fn delete_key(&self, fingerprint: &str) -> PgpBackendResult<PgpKeyDeletionResult> {
         let normalized = fingerprint.trim();
         if normalized.is_empty() {
             return Err(PgpBackendError::CommandFailed(
@@ -332,11 +389,36 @@ impl PgpBackend for SystemGpgBackend {
             ));
         }
         let details = self.inspect_fingerprint(normalized)?;
+        let had_private_key = details.has_private_key;
         if details.has_private_key {
             self.run_capture(&["--batch", "--yes", "--delete-secret-keys", &details.fingerprint])?;
         }
-        self.run_capture(&["--batch", "--yes", "--delete-keys", &details.fingerprint])?;
-        Ok(())
+        let private_key_absent = self
+            .run_capture(&["--batch", "--list-secret-keys", "--with-colons", &details.fingerprint])
+            .map_or(true, |listing| !listing.lines().any(|line| line.starts_with("sec:")));
+        if !private_key_absent {
+            return Err(PgpBackendError::CommandFailed(
+                "private PGP key deletion could not be verified".to_string(),
+            ));
+        }
+        let mut public_cleanup_error = self
+            .run_capture(&["--batch", "--yes", "--delete-keys", &details.fingerprint])
+            .err()
+            .map(|error| error.to_string());
+        let public_key_absent = self
+            .run_capture(&["--batch", "--list-keys", "--with-colons", &details.fingerprint])
+            .map_or(true, |listing| !listing.lines().any(|line| line.starts_with("pub:")));
+        if !public_key_absent && public_cleanup_error.is_none() {
+            public_cleanup_error =
+                Some("public PGP key deletion could not be verified".to_string());
+        }
+        Ok(PgpKeyDeletionResult {
+            fingerprint: details.fingerprint,
+            had_private_key,
+            private_key_absent,
+            public_key_absent,
+            public_cleanup_error,
+        })
     }
 
     fn list_keys(&self) -> PgpBackendResult<Vec<PgpKeySummary>> {
@@ -382,6 +464,16 @@ impl PgpBackend for SystemGpgBackend {
         }
 
         Ok(recipients)
+    }
+}
+
+fn import_validation_error(error: PgpImportError) -> PgpBackendError {
+    match error {
+        PgpImportError::PassphraseRequired => PgpBackendError::PassphraseRequired,
+        PgpImportError::IncorrectPassphrase => PgpBackendError::IncorrectPassphrase,
+        PgpImportError::UnsupportedProtection => PgpBackendError::UnsupportedProtection,
+        PgpImportError::ReprotectionFailed => PgpBackendError::ReprotectionFailed,
+        other => PgpBackendError::CommandFailed(other.to_string()),
     }
 }
 

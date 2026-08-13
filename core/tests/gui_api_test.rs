@@ -47,6 +47,8 @@ fn list_entries_returns_pass_files_and_directories_without_gpg_suffix() {
     create_file(root.join("work/dev/github.gpg"));
     create_file(root.join("finance/stripe.gpg"));
     create_file(root.join("README.md"));
+    create_file(root.join("docs/README.md"));
+    create_file(root.join(".git/objects/metadata"));
 
     let entries = list_entries(ListEntriesRequest {
         root: root.to_path_buf(),

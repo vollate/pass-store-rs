@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/pgp_key_import.dart';
 import '../services/key_repository.dart';
 import '../services/path_picker_service.dart';
@@ -84,6 +85,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,9 +140,10 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _remember,
-            onChanged: _isSubmitting
-                ? null
-                : (value) => setState(() => _remember = value),
+            onChanged:
+                _isSubmitting
+                    ? null
+                    : (value) => setState(() => _remember = value),
             title: const Text('Remember in Keychain/KMS'),
             subtitle: const Text(
               'Off by default. The passphrase stays in memory for this session '
@@ -178,7 +181,13 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
             const SizedBox(width: 8),
             FilledButton(
               onPressed: _canSubmit ? _submit : null,
-              child: Text(_needsPassphrase ? 'Unlock and import' : 'Import'),
+              child: Text(
+                _isSubmitting && _needsPassphrase
+                    ? localizations.pgpPreparationInProgress
+                    : _needsPassphrase
+                    ? 'Unlock and import'
+                    : 'Import',
+              ),
             ),
           ],
         ),
@@ -292,9 +301,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
         keyRepository: widget.keyRepository,
         securityRepository: widget.securityRepository,
         source: _source,
-        value: _source == PgpImportSource.text
-            ? _keyText.text
-            : _selectedPath!,
+        value: _source == PgpImportSource.text ? _keyText.text : _selectedPath!,
         passphrase: _needsPassphrase ? _passphrase.text : null,
         remember: _remember,
       );
@@ -332,11 +339,16 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
   /// Import errors are already sanitized in Rust; this only reshapes the wording.
   String _messageFor(Object error) {
     if (error is PgpImportException) {
+      final localizations = AppLocalizations.of(context);
       switch (error.kind) {
         case PgpImportFailureKind.passphraseRequired:
-          return 'This private key needs its passphrase.';
+          return localizations.pgpPassphraseRequired;
         case PgpImportFailureKind.incorrectPassphrase:
-          return 'That passphrase did not unlock this key. Try again.';
+          return localizations.pgpPassphraseIncorrect;
+        case PgpImportFailureKind.unsupportedProtection:
+          return localizations.pgpUnsupportedProtection;
+        case PgpImportFailureKind.reprotectionFailed:
+          return localizations.pgpReprotectionFailed;
         case PgpImportFailureKind.unsupportedMaterial:
         case PgpImportFailureKind.kindMismatch:
         case PgpImportFailureKind.backendError:
@@ -362,9 +374,7 @@ class _InspectionSummary extends StatelessWidget {
           inspection.isPrivate ? Icons.key : Icons.vpn_key_outlined,
         ),
         title: Text(inspection.identity),
-        subtitle: Text(
-          '${inspection.kind.label}\n${inspection.fingerprint}',
-        ),
+        subtitle: Text('${inspection.kind.label}\n${inspection.fingerprint}'),
         isThreeLine: true,
       ),
     );

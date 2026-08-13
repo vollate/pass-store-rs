@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../services/git_repository.dart';
+import '../../services/key_repository.dart';
 import '../../services/security_repository.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
@@ -16,6 +17,7 @@ class VaultScreen extends StatefulWidget {
     super.key,
     required this.vaultRepository,
     required this.gitRepository,
+    this.keyRepository,
     this.securityRepository,
     this.keys = const <KeyRecord>[],
     this.onChooseKey,
@@ -24,6 +26,7 @@ class VaultScreen extends StatefulWidget {
 
   final VaultRepository vaultRepository;
   final GitRepository gitRepository;
+  final KeyRepository? keyRepository;
   final SecurityRepository? securityRepository;
   final List<KeyRecord> keys;
   final VoidCallback? onChooseKey;
@@ -235,6 +238,7 @@ class _VaultScreenState extends State<VaultScreen> {
           (context) => EntryDetailSheet(
             entry: entry,
             repository: widget.vaultRepository,
+            keyRepository: widget.keyRepository,
             securityRepository: widget.securityRepository,
             keys: widget.keys,
             onFavoriteChanged: () => setState(() {}),

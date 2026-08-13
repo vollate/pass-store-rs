@@ -1,7 +1,4 @@
-enum KeyRecordType {
-  pgp,
-  ssh,
-}
+enum KeyRecordType { pgp, ssh }
 
 class KeyRecord {
   const KeyRecord({
@@ -10,6 +7,8 @@ class KeyRecord {
     required this.fingerprint,
     required this.source,
     required this.hasPrivateKey,
+    this.hasLocalKeyMaterial = true,
+    this.referencedByStores = const <String>[],
   });
 
   final KeyRecordType type;
@@ -17,6 +16,8 @@ class KeyRecord {
   final String fingerprint;
   final String source;
   final bool hasPrivateKey;
+  final bool hasLocalKeyMaterial;
+  final List<String> referencedByStores;
 
   String get typeLabel {
     switch (type) {

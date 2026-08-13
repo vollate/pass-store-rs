@@ -27,7 +27,9 @@ extension StoreOnboardingStateLabel on StoreOnboardingState {
     }
   }
 
-  bool get requiresSetup => this != StoreOnboardingState.ready;
+  bool get requiresSetup =>
+      this == StoreOnboardingState.noConfig ||
+      this == StoreOnboardingState.storeMissing;
 }
 
 class StoreStatus {
@@ -116,6 +118,14 @@ class StoreLifecycleSnapshot {
       }
     }
     return stores.isEmpty ? null : stores.first;
+  }
+
+  /// Whether onboarding still needs the user to create, import, or clone a
+  /// store. Missing PGP recipients and Git remotes are diagnostics for an
+  /// existing store, not evidence that the store itself is absent.
+  bool get requiresStoreSetup {
+    final selected = selectedStore;
+    return selected == null || !selected.exists;
   }
 }
 

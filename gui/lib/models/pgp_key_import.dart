@@ -83,6 +83,8 @@ enum PgpImportFailureKind {
   kindMismatch,
   passphraseRequired,
   incorrectPassphrase,
+  unsupportedProtection,
+  reprotectionFailed,
   backendError,
   unknown,
 }

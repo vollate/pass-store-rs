@@ -750,13 +750,6 @@ class SecureStorageSecurityRepository implements SecurityRepository {
     final unlocked = await _biometricAuth.authenticate();
     if (unlocked) {
       await markUnlocked(DateTime.now());
-      final cachedPassphrase = await readPgpPassphrase();
-      if (cachedPassphrase != null) {
-        await startPgpSession(
-          fingerprint: cachedPassphrase.fingerprint,
-          passphrase: cachedPassphrase.passphrase,
-        );
-      }
     }
     return unlocked;
   }

@@ -165,6 +165,8 @@ pub enum PgpImportError {
     },
     PassphraseRequired,
     IncorrectPassphrase,
+    UnsupportedProtection,
+    ReprotectionFailed,
     Backend(String),
 }
 
@@ -184,6 +186,12 @@ impl Display for PgpImportError {
             PgpImportError::IncorrectPassphrase => {
                 write!(f, "the PGP private key passphrase is incorrect")
             }
+            PgpImportError::UnsupportedProtection => {
+                write!(f, "the PGP private key uses unsupported packet protection")
+            }
+            PgpImportError::ReprotectionFailed => {
+                write!(f, "the PGP private key could not be safely re-protected")
+            }
             PgpImportError::Backend(message) => write!(f, "PGP key import failed: {message}"),
         }
     }
@@ -199,6 +207,8 @@ impl PgpImportError {
             PgpImportError::KindMismatch { .. } => "kind_mismatch",
             PgpImportError::PassphraseRequired => "passphrase_required",
             PgpImportError::IncorrectPassphrase => "incorrect_passphrase",
+            PgpImportError::UnsupportedProtection => "unsupported_protection",
+            PgpImportError::ReprotectionFailed => "reprotection_failed",
             PgpImportError::Backend(_) => "backend_error",
         }
     }
@@ -299,10 +309,8 @@ pub fn import_inspected_pgp_key(
             return Err(PgpImportError::KindMismatch { expected, detected });
         }
     }
-    key.validate_passphrase(passphrase)?;
-
     let imported =
-        backend.import_key(key).map_err(|error| PgpImportError::Backend(error.to_string()))?;
+        backend.import_key_with_passphrase(key, passphrase).map_err(import_backend_error)?;
     let fingerprint = if imported.fingerprint.trim().is_empty() {
         key.fingerprint()
     } else {
@@ -322,6 +330,18 @@ pub fn import_inspected_pgp_key(
         identity: details.identity,
         imported_private_key: imported.imported_private_key || details.has_private_key,
     })
+}
+
+fn import_backend_error(error: crate::pgp::backend::PgpBackendError) -> PgpImportError {
+    use crate::pgp::backend::PgpBackendError;
+
+    match error {
+        PgpBackendError::PassphraseRequired => PgpImportError::PassphraseRequired,
+        PgpBackendError::IncorrectPassphrase => PgpImportError::IncorrectPassphrase,
+        PgpBackendError::UnsupportedProtection => PgpImportError::UnsupportedProtection,
+        PgpBackendError::ReprotectionFailed => PgpImportError::ReprotectionFailed,
+        other => PgpImportError::Backend(other.to_string()),
+    }
 }
 
 /// Inspects pasted text and imports it in one step.

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/app/pars_gui_app.dart';
+import 'package:pars_gui/l10n/app_localizations.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/models/pgp_key_import.dart';
@@ -47,6 +48,7 @@ const _settingsPrimaryPgpKey = KeyRecord(
   source: 'Generated on device',
   hasPrivateKey: true,
 );
+const _settingsPrimaryPgpUsername = 'Primary User';
 const _settingsBackupPgpKey = KeyRecord(
   type: KeyRecordType.pgp,
   name: 'Backup User <backup@example.com>',
@@ -60,6 +62,15 @@ const _settingsSshKey = KeyRecord(
   fingerprint: 'SHA256:github-mobile',
   source: 'Generated on device',
   hasPrivateKey: true,
+);
+const _settingsStoreKeyReference = KeyRecord(
+  type: KeyRecordType.pgp,
+  name: 'alice@example.com',
+  fingerprint: 'alice@example.com',
+  source: '.gpg-id',
+  hasPrivateKey: false,
+  hasLocalKeyMaterial: false,
+  referencedByStores: <String>['Imported Store'],
 );
 
 void main() {
@@ -78,6 +89,29 @@ void main() {
     expect(find.text('Vault'), findsWidgets);
     expect(find.text('Manage'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
+  });
+
+  testWidgets('store diagnostics do not reopen completed onboarding', (
+    tester,
+  ) async {
+    final repository = _ManagedPathDiagnosticRepository(storeReady: true);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          onboardingComplete: true,
+          lastUnlockedAt: DateTime.now(),
+        ),
+      ),
+    );
+
+    expect(find.text('Vault'), findsWidgets);
+    expect(find.text('Set up password store'), findsNothing);
   });
 
   testWidgets('onboarding captures gesture before key setup', (tester) async {
@@ -349,6 +383,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Skip SSH'));
     await tester.pumpAndSettle();
+
+    expect(find.text('Import local store'), findsOneWidget);
     await tester.tap(find.text('Create local store'));
     await tester.pumpAndSettle();
 
@@ -361,6 +397,55 @@ void main() {
       repository.storeActions.single,
       'create:Work Store:/app/support/stores/work-store:ABCD 1234:git:false',
     );
+  });
+
+  testWidgets('mobile onboarding copies a local store into app storage', (
+    tester,
+  ) async {
+    final repository = _ManagedPathDiagnosticRepository(storeReady: false);
+    final pathPicker = _FakePathPickerService(
+      managedImportResults: <Object?>['/app/support/stores/existing-store'],
+    );
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          onboardingComplete: false,
+          lastUnlockedAt: DateTime.now(),
+        ),
+        pathPickerService: pathPicker,
+      ),
+    );
+    await tester.tap(find.text('Use PGP key'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Skip SSH'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Import local store'));
+    await tester.pumpAndSettle();
+    expect(find.text('Copy into app storage'), findsOneWidget);
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Choose folder and import'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      pathPicker.managedImportDestinationBaseDirectories.single,
+      '/app/support/stores',
+    );
+    expect(
+      repository.storeActions.single,
+      'import:/app/support/stores/existing-store',
+    );
+    expect(find.text('Review setup'), findsOneWidget);
+    expect(find.text('Configured'), findsWidgets);
+    expect(find.text('Git remote missing'), findsNothing);
+    expect(find.text('PGP key missing'), findsNothing);
   });
 
   testWidgets('onboarding store forms use native folder picker rows', (
@@ -500,19 +585,20 @@ void main() {
     'onboarding protected PGP import advances only after validation',
     (tester) async {
       const passphrase = 'onboarding passphrase';
-      final repository = _OnboardingBranchRepository()
-        ..pgpInspection = const PgpKeyInspection(
-          kind: PgpKeyKind.private,
-          fingerprint: 'PROTECTED ABC',
-          identity: 'Protected <protected@example.com>',
-          hasPrivateKey: true,
-          requiresPassphrase: true,
-          armored: true,
-        )
-        ..pgpImportFailure = const PgpImportException(
-          PgpImportFailureKind.incorrectPassphrase,
-          'the PGP private key passphrase is incorrect',
-        );
+      final repository =
+          _OnboardingBranchRepository()
+            ..pgpInspection = const PgpKeyInspection(
+              kind: PgpKeyKind.private,
+              fingerprint: 'PROTECTED ABC',
+              identity: 'Protected <protected@example.com>',
+              hasPrivateKey: true,
+              requiresPassphrase: true,
+              armored: true,
+            )
+            ..pgpImportFailure = const PgpImportException(
+              PgpImportFailureKind.incorrectPassphrase,
+              'the PGP private key passphrase is incorrect',
+            );
       final security = InMemorySecurityRepository.withPattern(
         const <int>[0, 1, 2, 5],
         biometricUnlockEnabled: true,
@@ -921,6 +1007,63 @@ void main() {
       expect(find.text('session-passphrase'), findsNothing);
     },
   );
+
+  testWidgets('entry passphrase sheet stays above the software keyboard', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+
+    final repository = _SecretActionRepository();
+    final securityRepository = InMemorySecurityRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder:
+              (context) => Scaffold(
+                body: Center(
+                  child: FilledButton(
+                    onPressed:
+                        () => showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          builder:
+                              (_) => EntryDetailSheet(
+                                entry: repository.entries.single,
+                                repository: repository,
+                                securityRepository: securityRepository,
+                                keys: const <KeyRecord>[_testPgpKey],
+                              ),
+                        ),
+                    child: const Text('Open entry'),
+                  ),
+                ),
+              ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open entry'));
+    await tester.pumpAndSettle();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    await tester.pumpAndSettle();
+
+    const keyboardTop = 844.0 - 320.0;
+    expect(
+      tester.getBottomLeft(find.byType(TextField)).dy,
+      lessThan(keyboardTop),
+    );
+    expect(
+      tester
+          .getBottomLeft(find.widgetWithText(FilledButton, 'Unlock entry'))
+          .dy,
+      lessThanOrEqualTo(keyboardTop),
+    );
+  });
 
   testWidgets('vault refresh loads bridge-backed entries and git status', (
     tester,
@@ -1374,6 +1517,8 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SettingsScreen(
             settingsRepository: repository,
@@ -1422,6 +1567,34 @@ void main() {
     expect(find.text('SSH keys'), findsWidgets);
     expect(find.text(_settingsSshKey.name), findsOneWidget);
     expect(find.text(_settingsPrimaryPgpKey.name), findsNothing);
+  });
+
+  testWidgets('settings shows store key references without local-key actions', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository(
+      additionalKeys: const <KeyRecord>[_settingsStoreKeyReference],
+    );
+
+    await _pumpKeyManagementSheet(
+      tester,
+      repository: repository,
+      type: KeyRecordType.pgp,
+    );
+
+    expect(find.text(_settingsStoreKeyReference.name), findsOneWidget);
+    expect(
+      find.textContaining('Referenced by Imported Store (.gpg-id)'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Local key material is not installed'),
+      findsOneWidget,
+    );
+    expect(
+      find.byTooltip('Actions for PGP key ${_settingsStoreKeyReference.name}'),
+      findsNothing,
+    );
   });
 
   testWidgets('settings key sheets expose only create and import globally', (
@@ -1478,8 +1651,14 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
     await tester.pumpAndSettle();
     expect(find.byType(PgpKeyImportBody), findsOneWidget);
-    expect(find.widgetWithText(SegmentedButton<PgpImportSource>, 'Text'), findsOneWidget);
-    expect(find.widgetWithText(SegmentedButton<PgpImportSource>, 'File'), findsOneWidget);
+    expect(
+      find.widgetWithText(SegmentedButton<PgpImportSource>, 'Text'),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(SegmentedButton<PgpImportSource>, 'File'),
+      findsOneWidget,
+    );
 
     await tester.enterText(find.byType(TextField).last, 'PGP PUBLIC KEY');
     await tester.pumpAndSettle();
@@ -1608,19 +1787,20 @@ void main() {
     'settings protected PGP import validates the passphrase before completing',
     (tester) async {
       const passphrase = 'correct horse battery staple';
-      final repository = _KeyManagementSettingsRepository()
-        ..pgpInspection = const PgpKeyInspection(
-          kind: PgpKeyKind.private,
-          fingerprint: 'PGP-BACKUP',
-          identity: 'Backup User <backup@example.com>',
-          hasPrivateKey: true,
-          requiresPassphrase: true,
-          armored: true,
-        )
-        ..pgpImportFailure = const PgpImportException(
-          PgpImportFailureKind.incorrectPassphrase,
-          'the PGP private key passphrase is incorrect',
-        );
+      final repository =
+          _KeyManagementSettingsRepository()
+            ..pgpInspection = const PgpKeyInspection(
+              kind: PgpKeyKind.private,
+              fingerprint: 'PGP-BACKUP',
+              identity: 'Backup User <backup@example.com>',
+              hasPrivateKey: true,
+              requiresPassphrase: true,
+              armored: true,
+            )
+            ..pgpImportFailure = const PgpImportException(
+              PgpImportFailureKind.incorrectPassphrase,
+              'the PGP private key passphrase is incorrect',
+            );
       final security = InMemorySecurityRepository();
 
       await _pumpKeyManagementSheet(
@@ -1688,15 +1868,16 @@ void main() {
     tester,
   ) async {
     const passphrase = 'correct horse battery staple';
-    final repository = _KeyManagementSettingsRepository()
-      ..pgpInspection = const PgpKeyInspection(
-        kind: PgpKeyKind.private,
-        fingerprint: 'PGP-BACKUP',
-        identity: 'Backup User <backup@example.com>',
-        hasPrivateKey: true,
-        requiresPassphrase: true,
-        armored: true,
-      );
+    final repository =
+        _KeyManagementSettingsRepository()
+          ..pgpInspection = const PgpKeyInspection(
+            kind: PgpKeyKind.private,
+            fingerprint: 'PGP-BACKUP',
+            identity: 'Backup User <backup@example.com>',
+            hasPrivateKey: true,
+            requiresPassphrase: true,
+            armored: true,
+          );
     final security = InMemorySecurityRepository();
 
     await _pumpKeyManagementSheet(
@@ -1731,15 +1912,16 @@ void main() {
   testWidgets(
     'settings reports a secure-storage failure without losing the key',
     (tester) async {
-      final repository = _KeyManagementSettingsRepository()
-        ..pgpInspection = const PgpKeyInspection(
-          kind: PgpKeyKind.private,
-          fingerprint: 'PGP-BACKUP',
-          identity: 'Backup User <backup@example.com>',
-          hasPrivateKey: true,
-          requiresPassphrase: true,
-          armored: true,
-        );
+      final repository =
+          _KeyManagementSettingsRepository()
+            ..pgpInspection = const PgpKeyInspection(
+              kind: PgpKeyKind.private,
+              fingerprint: 'PGP-BACKUP',
+              identity: 'Backup User <backup@example.com>',
+              hasPrivateKey: true,
+              requiresPassphrase: true,
+              armored: true,
+            );
       final security = _FailingStorageSecurityRepository();
 
       await _pumpKeyManagementSheet(
@@ -1864,6 +2046,145 @@ void main() {
     );
   });
 
+  testWidgets('settings keeps managed stores inside app storage', (
+    tester,
+  ) async {
+    final repository = _ManagedPathDiagnosticRepository(storeReady: true);
+    final pathPicker = _FakePathPickerService(
+      managedImportResults: <Object?>['/app/support/stores/existing-store'],
+    );
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      pathPickerService: pathPicker,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Password stores'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('Password stores'));
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove from app'), findsNothing);
+    expect(find.text('Delete app copy'), findsOneWidget);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    expect(find.text('Copy into app storage'), findsOneWidget);
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Choose folder and import'),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      pathPicker.managedImportDestinationBaseDirectories.single,
+      '/app/support/stores',
+    );
+    expect(
+      repository.storeActions.single,
+      'import:/app/support/stores/existing-store',
+    );
+    expect(find.text('Import complete: 1 passwords.'), findsOneWidget);
+    repository.storeActions.clear();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await tester.pumpAndSettle();
+    expect(find.text('Default: /app/support/stores/personal'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, 'Choose'))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(find.byType(TextField).first, 'Work Store');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      repository.storeActions.single,
+      'create:Work Store:/app/support/stores/work-store::git:false',
+    );
+  });
+
+  testWidgets('settings localizes an empty Android store import', (
+    tester,
+  ) async {
+    final repository = _ManagedPathDiagnosticRepository(storeReady: true);
+    final pathPicker = _FakePathPickerService(
+      managedImportResults: <Object?>[
+        const PathPickerException(
+          'No passwords were found in the selected folder.',
+          code: 'store_import_no_passwords',
+        ),
+      ],
+    );
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      pathPickerService: pathPicker,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Password stores'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('Password stores'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Choose folder and import'),
+    );
+    await tester.pump();
+
+    expect(find.text('No passwords were found.'), findsOneWidget);
+    expect(repository.storeActions, isEmpty);
+  });
+
+  testWidgets('settings shows progress while Android store import is pending', (
+    tester,
+  ) async {
+    final repository = _ManagedPathDiagnosticRepository(storeReady: true);
+    final pathPicker = _PendingManagedImportPathPicker();
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      pathPickerService: pathPicker,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Password stores'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('Password stores'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Choose folder and import'),
+    );
+    await tester.pump();
+
+    expect(find.text('Working…'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(repository.storeActions, isEmpty);
+
+    pathPicker.complete('/app/support/stores/imported');
+    await tester.pumpAndSettle();
+    expect(
+      repository.storeActions.single,
+      'import:/app/support/stores/imported',
+    );
+  });
+
   testWidgets('settings deletes local store with store-name confirmation', (
     tester,
   ) async {
@@ -1897,6 +2218,39 @@ void main() {
     expect(
       repository.storeActions.single,
       'delete:/Users/alice/Password Stores/personal:personal',
+    );
+  });
+
+  testWidgets('settings deletes an app-managed copy instead of orphaning it', (
+    tester,
+  ) async {
+    final repository = _ManagedPathDiagnosticRepository(storeReady: true);
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: InMemorySecurityRepository(),
+      pathPickerService: _FakePathPickerService(),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Password stores'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await _tapVisible(tester, find.text('Password stores'));
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove from app'), findsNothing);
+    await tester.tap(find.text('Delete app copy'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'existing-store');
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(
+      repository.storeActions.single,
+      'delete:/app/support/stores/existing-store:existing-store',
     );
   });
 
@@ -2047,7 +2401,7 @@ void main() {
   });
 
   testWidgets(
-    'settings deletes PGP key after exact confirmation and clears cache',
+    'settings deletes PGP key using name without email and clears cache',
     (tester) async {
       final repository = _KeyManagementSettingsRepository();
       final securityRepository = InMemorySecurityRepository();
@@ -2081,9 +2435,7 @@ void main() {
         findsWidgets,
       );
       expect(
-        find.textContaining(
-          'Type ${_settingsPrimaryPgpKey.name} to delete this key.',
-        ),
+        find.textContaining('Type $_settingsPrimaryPgpUsername to delete it.'),
         findsOneWidget,
       );
       expect(
@@ -2114,6 +2466,18 @@ void main() {
         tester
             .widget<FilledButton>(find.widgetWithText(FilledButton, 'Delete'))
             .onPressed,
+        isNull,
+      );
+
+      await tester.enterText(
+        find.byType(TextField).last,
+        _settingsPrimaryPgpUsername,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Delete'))
+            .onPressed,
         isNotNull,
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
@@ -2125,6 +2489,51 @@ void main() {
       expect(await securityRepository.readActivePgpPassphrase(), isNull);
     },
   );
+
+  testWidgets('PGP delete confirmation stays usable above the keyboard', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: _KeyManagementSettingsRepository(),
+      securityRepository: InMemorySecurityRepository(),
+    );
+    await tester.tap(find.text('PGP keys'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete key'));
+    await tester.pumpAndSettle();
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsOneWidget,
+    );
+    const keyboardTop = 844.0 - 320.0;
+    expect(
+      tester.getBottomLeft(find.byType(TextField)).dy,
+      lessThanOrEqualTo(keyboardTop),
+    );
+    expect(
+      tester.getBottomLeft(find.widgetWithText(FilledButton, 'Delete')).dy,
+      lessThanOrEqualTo(keyboardTop),
+    );
+  });
 
   testWidgets('settings deletes SSH key after exact confirmation', (
     tester,
@@ -2146,7 +2555,7 @@ void main() {
     await tester.tap(find.text('Delete key'));
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('Type github-mobile to delete this key.'),
+      find.textContaining('Type github-mobile to delete it.'),
       findsOneWidget,
     );
     await tester.enterText(find.byType(TextField).last, _settingsSshKey.name);
@@ -2186,11 +2595,20 @@ void main() {
     tester,
   ) async {
     final repository = _KeyManagementSettingsRepository(failPgpDelete: true);
+    final securityRepository = InMemorySecurityRepository();
+    await securityRepository.savePgpPassphrase(
+      fingerprint: _settingsPrimaryPgpKey.fingerprint,
+      passphrase: 'stored-passphrase',
+    );
+    await securityRepository.startPgpSession(
+      fingerprint: _settingsPrimaryPgpKey.fingerprint,
+      passphrase: 'active-passphrase',
+    );
 
     await _pumpSettingsScreen(
       tester,
       repository: repository,
-      securityRepository: InMemorySecurityRepository(),
+      securityRepository: securityRepository,
     );
 
     await tester.tap(find.text('PGP keys'));
@@ -2203,7 +2621,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byType(TextField).last,
-      _settingsPrimaryPgpKey.name,
+      _settingsPrimaryPgpUsername,
     );
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
@@ -2212,7 +2630,72 @@ void main() {
     expect(repository.deleteActions, <String>['pgp:PGP-PRIMARY']);
     expect(find.textContaining('delete failed visibly'), findsOneWidget);
     expect(find.text(_settingsPrimaryPgpKey.name), findsOneWidget);
+    expect(
+      (await securityRepository.readPgpPassphrase())?.passphrase,
+      'stored-passphrase',
+    );
+    expect(
+      (await securityRepository.readActivePgpPassphrase())?.passphrase,
+      'active-passphrase',
+    );
   });
+
+  testWidgets(
+    'settings reports partial PGP deletion and clears private-key session state',
+    (tester) async {
+      final repository = _KeyManagementSettingsRepository(
+        partialPgpDelete: true,
+      );
+      final securityRepository = InMemorySecurityRepository();
+      await securityRepository.savePgpPassphrase(
+        fingerprint: _settingsPrimaryPgpKey.fingerprint,
+        passphrase: 'stored-passphrase',
+      );
+      await securityRepository.startPgpSession(
+        fingerprint: _settingsPrimaryPgpKey.fingerprint,
+        passphrase: 'active-passphrase',
+      );
+
+      await _pumpSettingsScreen(
+        tester,
+        repository: repository,
+        securityRepository: securityRepository,
+      );
+      await tester.tap(find.text('PGP keys'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete key'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField).last,
+        _settingsPrimaryPgpUsername,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(repository.deleteActions, <String>['pgp:PGP-PRIMARY']);
+      expect(
+        find.text(
+          'The protected private key was deleted, but its public listing could not be removed.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        repository.keys
+            .singleWhere(
+              (key) => key.fingerprint == _settingsPrimaryPgpKey.fingerprint,
+            )
+            .hasPrivateKey,
+        isFalse,
+      );
+      expect(await securityRepository.readPgpPassphrase(), isNull);
+      expect(await securityRepository.readActivePgpPassphrase(), isNull);
+    },
+  );
 
   testWidgets('settings PGP private export confirms with key name phrase', (
     tester,
@@ -3034,6 +3517,8 @@ Future<void> _pumpSettingsScreen(
 }) async {
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SettingsScreen(
           settingsRepository: repository,
@@ -3324,7 +3809,21 @@ class _InjectedRepository
   }) async => 'private';
 
   @override
-  Future<void> deletePgpKey(String fingerprint) async {}
+  Future<PgpPrivateKeyPreparation> preparePgpPrivateKey({
+    required String fingerprint,
+    required String passphrase,
+  }) async =>
+      PgpPrivateKeyPreparation(fingerprint: fingerprint, migrated: false);
+
+  @override
+  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint) async =>
+      PgpKeyDeletionOutcome(
+        fingerprint: fingerprint,
+        hadPrivateKey: true,
+        privateKeyAbsent: true,
+        publicKeyAbsent: true,
+        publicCleanupFailed: false,
+      );
 
   @override
   Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}
@@ -3423,14 +3922,19 @@ class _InjectedRepository
 }
 
 class _KeyManagementSettingsRepository extends _InjectedRepository {
-  _KeyManagementSettingsRepository({this.failPgpDelete = false})
-    : _keys = <KeyRecord>[
-        _settingsPrimaryPgpKey,
-        _settingsBackupPgpKey,
-        _settingsSshKey,
-      ];
+  _KeyManagementSettingsRepository({
+    this.failPgpDelete = false,
+    this.partialPgpDelete = false,
+    List<KeyRecord> additionalKeys = const <KeyRecord>[],
+  }) : _keys = <KeyRecord>[
+         _settingsPrimaryPgpKey,
+         _settingsBackupPgpKey,
+         _settingsSshKey,
+         ...additionalKeys,
+       ];
 
   final bool failPgpDelete;
+  final bool partialPgpDelete;
   final List<KeyRecord> _keys;
   final List<String> deleteActions = <String>[];
   final List<String> keyActions = <String>[];
@@ -3558,13 +4062,43 @@ class _KeyManagementSettingsRepository extends _InjectedRepository {
   }
 
   @override
-  Future<void> deletePgpKey(String fingerprint) async {
+  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint) async {
     deleteActions.add('pgp:$fingerprint');
     if (failPgpDelete) {
       throw Exception('delete failed visibly');
     }
+    if (partialPgpDelete) {
+      final index = _keys.indexWhere(
+        (key) =>
+            key.type == KeyRecordType.pgp && key.fingerprint == fingerprint,
+      );
+      final existing = _keys[index];
+      _keys[index] = KeyRecord(
+        type: existing.type,
+        name: existing.name,
+        fingerprint: existing.fingerprint,
+        source: existing.source,
+        hasPrivateKey: false,
+        hasLocalKeyMaterial: true,
+        referencedByStores: existing.referencedByStores,
+      );
+      return PgpKeyDeletionOutcome(
+        fingerprint: fingerprint,
+        hadPrivateKey: true,
+        privateKeyAbsent: true,
+        publicKeyAbsent: false,
+        publicCleanupFailed: true,
+      );
+    }
     _keys.removeWhere(
       (key) => key.type == KeyRecordType.pgp && key.fingerprint == fingerprint,
+    );
+    return PgpKeyDeletionOutcome(
+      fingerprint: fingerprint,
+      hadPrivateKey: true,
+      privateKeyAbsent: true,
+      publicKeyAbsent: true,
+      publicCleanupFailed: false,
     );
   }
 
@@ -3660,13 +4194,19 @@ class _FakePathPickerService implements PathPickerService {
   _FakePathPickerService({
     List<Object?>? folderResults,
     List<Object?>? fileResults,
+    List<Object?>? managedImportResults,
   }) : _folderResults = List<Object?>.of(folderResults ?? const <Object?>[]),
-       _fileResults = List<Object?>.of(fileResults ?? const <Object?>[]);
+       _fileResults = List<Object?>.of(fileResults ?? const <Object?>[]),
+       _managedImportResults = List<Object?>.of(
+         managedImportResults ?? const <Object?>[],
+       );
 
   final List<Object?> _folderResults;
   final List<Object?> _fileResults;
+  final List<Object?> _managedImportResults;
   final List<String> folderInitialDirectories = <String>[];
   final List<String> fileInitialDirectories = <String>[];
+  final List<String> managedImportDestinationBaseDirectories = <String>[];
 
   @override
   Future<String?> pickFolder({required String initialDirectory}) async {
@@ -3680,6 +4220,15 @@ class _FakePathPickerService implements PathPickerService {
     return _next(_fileResults);
   }
 
+  @override
+  Future<String?> importFolderToManagedStorage({
+    required String destinationBaseDirectory,
+    required ManagedStoreConflictResolver resolveConflict,
+  }) async {
+    managedImportDestinationBaseDirectories.add(destinationBaseDirectory);
+    return _next(_managedImportResults);
+  }
+
   String? _next(List<Object?> results) {
     if (results.isEmpty) {
       return null;
@@ -3690,6 +4239,21 @@ class _FakePathPickerService implements PathPickerService {
     }
     return result as String?;
   }
+}
+
+class _PendingManagedImportPathPicker extends _FakePathPickerService {
+  final Completer<String?> _result = Completer<String?>();
+
+  @override
+  Future<String?> importFolderToManagedStorage({
+    required String destinationBaseDirectory,
+    required ManagedStoreConflictResolver resolveConflict,
+  }) {
+    managedImportDestinationBaseDirectories.add(destinationBaseDirectory);
+    return _result.future;
+  }
+
+  void complete(String? path) => _result.complete(path);
 }
 
 enum _StoreBranch {
@@ -3971,6 +4535,10 @@ class _ManagedPathOnboardingRepository extends _OnboardingBranchRepository
   bool get usesAppManagedPaths => true;
 
   @override
+  bool isAppManagedStoreRoot(String root) =>
+      root.startsWith('/app/support/stores/');
+
+  @override
   String storeRootForName(String name) {
     return '/app/support/stores/${_slug(name)}';
   }
@@ -3989,6 +4557,47 @@ class _ManagedPathOnboardingRepository extends _OnboardingBranchRepository
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
     return slug.isEmpty ? 'password-store' : slug;
+  }
+}
+
+class _ManagedPathDiagnosticRepository
+    extends _ManagedPathOnboardingRepository {
+  _ManagedPathDiagnosticRepository({required super.storeReady});
+
+  @override
+  StoreLifecycleSnapshot get lifecycle {
+    if (!storeReady) {
+      return super.lifecycle;
+    }
+    return const StoreLifecycleSnapshot(
+      configPath: '/app/support/pars_config.toml',
+      configExists: true,
+      selectedStoreId: 'imported-store',
+      selectedStoreRoot: '/app/support/stores/existing-store',
+      onboardingState: StoreOnboardingState.gitRemoteMissing,
+      issues: <String>['git_remote_missing', 'pgp_key_missing'],
+      stores: <StoreStatus>[
+        StoreStatus(
+          id: 'imported-store',
+          name: 'existing-store',
+          root: '/app/support/stores/existing-store',
+          isDefault: true,
+          exists: true,
+          hasGpgId: true,
+          hasGitRemote: false,
+          pgpKeyMissing: true,
+          issues: <String>['git_remote_missing', 'pgp_key_missing'],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> deleteLocalStore({
+    required String root,
+    required String confirmation,
+  }) async {
+    storeActions.add('delete:$root:$confirmation');
   }
 }
 
@@ -4900,7 +5509,13 @@ class _StoreSetupRepository
   }) async => throw UnimplementedError();
 
   @override
-  Future<void> deletePgpKey(String fingerprint) async =>
+  Future<PgpPrivateKeyPreparation> preparePgpPrivateKey({
+    required String fingerprint,
+    required String passphrase,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint) async =>
       throw UnimplementedError();
 
   @override

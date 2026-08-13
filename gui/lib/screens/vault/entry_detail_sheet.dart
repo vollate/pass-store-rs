@@ -7,6 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
+import '../../models/pgp_key_import.dart';
+import '../../l10n/app_localizations.dart';
+import '../../services/key_repository.dart';
 import '../../services/security_repository.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
@@ -16,6 +19,7 @@ class EntryDetailSheet extends StatefulWidget {
     super.key,
     required this.entry,
     required this.repository,
+    this.keyRepository,
     this.securityRepository,
     this.onSecretCleared,
     this.copyText,
@@ -29,6 +33,7 @@ class EntryDetailSheet extends StatefulWidget {
 
   final PasswordEntry entry;
   final VaultRepository repository;
+  final KeyRepository? keyRepository;
   final SecurityRepository? securityRepository;
   final VoidCallback? onSecretCleared;
   final Future<void> Function(String text)? copyText;
@@ -49,6 +54,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
   late bool _isFavorite;
   bool _needsPassphrase = false;
   bool _isLoading = true;
+  bool _isPreparingKey = false;
   SecretContent? _content;
   String? _loadError;
   String? _passphraseError;
@@ -83,40 +89,64 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
   @override
   Widget build(BuildContext context) {
     if (_needsPassphrase) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Center(child: _SheetHandle()),
-              const SizedBox(height: 18),
-              Text(
-                'PGP passphrase required',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              Text(widget.entry.path),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passphraseController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'PGP passphrase',
-                  errorText: _passphraseError,
+      final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+      return AnimatedPadding(
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        child: SafeArea(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Center(child: _SheetHandle()),
+                const SizedBox(height: 18),
+                Text(
+                  'PGP passphrase required',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
-                onSubmitted: (_) => _startPgpSession(),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _startPgpSession,
-                icon: const Icon(Icons.lock_open),
-                label: const Text('Unlock entry'),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(widget.entry.path),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _passphraseController,
+                  autofocus: true,
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: 'PGP passphrase',
+                    errorText: _passphraseError,
+                  ),
+                  onSubmitted: (_) => _startPgpSession(),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isPreparingKey ? null : _startPgpSession,
+                    icon:
+                        _isPreparingKey
+                            ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Icon(Icons.lock_open),
+                    label: Text(
+                      _isPreparingKey
+                          ? AppLocalizations.of(
+                            context,
+                          ).pgpPreparationInProgress
+                          : 'Unlock entry',
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -415,19 +445,58 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
       setState(() => _passphraseError = 'Select or import a private PGP key.');
       return;
     }
-    await securityRepository.startPgpSession(
-      fingerprint: fingerprint,
-      passphrase: passphrase,
-    );
-    _passphraseController.clear();
-    if (!mounted) {
-      return;
-    }
     setState(() {
-      _needsPassphrase = false;
+      _isPreparingKey = true;
       _passphraseError = null;
     });
-    await _loadSecret();
+    try {
+      final keyRepository = widget.keyRepository;
+      if (keyRepository != null) {
+        final prepared = await keyRepository.preparePgpPrivateKey(
+          fingerprint: fingerprint,
+          passphrase: passphrase,
+        );
+        if (prepared.fingerprint.trim().toUpperCase() !=
+            fingerprint.trim().toUpperCase()) {
+          throw const PgpImportException(
+            PgpImportFailureKind.reprotectionFailed,
+            'Prepared PGP fingerprint did not match the selected key.',
+          );
+        }
+      }
+      await securityRepository.startPgpSession(
+        fingerprint: fingerprint,
+        passphrase: passphrase,
+      );
+      _passphraseController.clear();
+      if (!mounted) return;
+      setState(() {
+        _isPreparingKey = false;
+        _needsPassphrase = false;
+        _passphraseError = null;
+      });
+      await _loadSecret();
+    } catch (error) {
+      _passphraseController.clear();
+      if (!mounted) return;
+      final localizations = AppLocalizations.of(context);
+      setState(() {
+        _isPreparingKey = false;
+        _passphraseError = switch (error) {
+          PgpImportException(kind: PgpImportFailureKind.passphraseRequired) =>
+            localizations.pgpPassphraseRequired,
+          PgpImportException(kind: PgpImportFailureKind.incorrectPassphrase) =>
+            localizations.pgpPassphraseIncorrect,
+          PgpImportException(
+            kind: PgpImportFailureKind.unsupportedProtection,
+          ) =>
+            localizations.pgpUnsupportedProtection,
+          PgpImportException(kind: PgpImportFailureKind.reprotectionFailed) =>
+            localizations.pgpReprotectionFailed,
+          _ => error.toString(),
+        };
+      });
+    }
   }
 
   String? get _primaryPrivatePgpFingerprint {

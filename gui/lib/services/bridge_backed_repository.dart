@@ -112,6 +112,27 @@ class BridgeBackedRepository
       managedStoreBaseDir != null && managedStoreBaseDir!.trim().isNotEmpty;
 
   @override
+  bool isAppManagedStoreRoot(String root) {
+    if (!usesAppManagedPaths) {
+      return false;
+    }
+    final baseDirectory = Directory(_requiredManagedStoreBaseDir()).absolute;
+    final candidate = Directory(root).absolute;
+    final base =
+        baseDirectory.existsSync()
+            ? baseDirectory.resolveSymbolicLinksSync()
+            : baseDirectory.path;
+    if (candidate.existsSync()) {
+      return Directory(candidate.resolveSymbolicLinksSync()).parent.path ==
+          base;
+    }
+    final parent = candidate.parent;
+    final parentPath =
+        parent.existsSync() ? parent.resolveSymbolicLinksSync() : parent.path;
+    return parentPath == base;
+  }
+
+  @override
   String storeRootForName(String name) {
     return _joinFilesystemPath(
       _requiredManagedStoreBaseDir(),
@@ -169,7 +190,10 @@ class BridgeBackedRepository
       ),
     );
     _throwIfFailure(keyResponse.error);
-    _keys = keyResponse.keys.map(_keyRecordFromBridge).toList(growable: false);
+    final localKeys = keyResponse.keys
+        .map(_keyRecordFromBridge)
+        .toList(growable: false);
+    _keys = await _withStorePgpReferences(localKeys);
 
     final selected = _lifecycle.selectedStore;
     if (selected == null || !selected.exists) {
@@ -574,6 +598,12 @@ class BridgeBackedRepository
 
   @override
   Future<void> removeStore({required String root}) async {
+    if (isAppManagedStoreRoot(root)) {
+      final confirmation =
+          root.replaceAll(RegExp(r'[/\\]+$'), '').split(RegExp(r'[/\\]')).last;
+      await deleteLocalStore(root: root, confirmation: confirmation);
+      return;
+    }
     final wasSelected = _isSelectedStoreRoot(root);
     final response = await bridge.removeStore(
       request: frb.RemoveStoreRequest(configPath: configPath, root: root),
@@ -750,7 +780,34 @@ class BridgeBackedRepository
   }
 
   @override
-  Future<void> deletePgpKey(String fingerprint) async {
+  Future<PgpPrivateKeyPreparation> preparePgpPrivateKey({
+    required String fingerprint,
+    required String passphrase,
+  }) async {
+    final response = await bridge.preparePgpPrivateKey(
+      request: frb.PreparePgpPrivateKeyRequest(
+        configPath: configPath,
+        pgpExecutable: _optionalPgpExecutable(),
+        fingerprint: fingerprint,
+        passphrase: passphrase,
+      ),
+    );
+    _throwIfPgpImportFailure(response.error);
+    final confirmedFingerprint = response.fingerprint;
+    if (confirmedFingerprint == null || confirmedFingerprint.trim().isEmpty) {
+      throw const PgpImportException(
+        PgpImportFailureKind.backendError,
+        'The bridge returned no prepared PGP fingerprint.',
+      );
+    }
+    return PgpPrivateKeyPreparation(
+      fingerprint: confirmedFingerprint,
+      migrated: response.migrated,
+    );
+  }
+
+  @override
+  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint) async {
     final response = await bridge.deletePgpKey(
       request: frb.DeletePgpKeyRequest(
         configPath: configPath,
@@ -758,9 +815,24 @@ class BridgeBackedRepository
         fingerprint: fingerprint,
       ),
     );
-    _throwIfFailure(response.error);
+    final result = response.result;
+    if (result == null) {
+      _throwIfFailure(response.error);
+      throw const BridgeRepositoryException(
+        'The bridge returned no PGP deletion result.',
+      );
+    }
     await refresh();
     await _refreshAutofillIndex();
+    return PgpKeyDeletionOutcome(
+      fingerprint: result.fingerprint,
+      hadPrivateKey: result.hadPrivateKey,
+      privateKeyAbsent: result.privateKeyAbsent,
+      publicKeyAbsent: result.publicKeyAbsent,
+      publicCleanupFailed:
+          response.failureKind ==
+          frb.PgpKeyDeletionFailureKind.publicCleanupFailed,
+    );
   }
 
   @override
@@ -1106,6 +1178,94 @@ class BridgeBackedRepository
     );
   }
 
+  Future<List<KeyRecord>> _withStorePgpReferences(
+    List<KeyRecord> localKeys,
+  ) async {
+    final identifiers = <String, String>{};
+    final storesByIdentifier = <String, Set<String>>{};
+
+    for (final store in _lifecycle.stores) {
+      if (!store.exists) {
+        continue;
+      }
+      for (final identifier in await _readStorePgpIdentifiers(store.root)) {
+        final normalized = identifier.toLowerCase();
+        identifiers.putIfAbsent(normalized, () => identifier);
+        (storesByIdentifier[normalized] ??= <String>{}).add(store.name);
+      }
+    }
+
+    final keys = <KeyRecord>[...localKeys];
+    for (final entry in identifiers.entries) {
+      final identifier = entry.value;
+      if (localKeys.any((key) => _matchesPgpReference(key, identifier))) {
+        continue;
+      }
+      keys.add(
+        KeyRecord(
+          type: KeyRecordType.pgp,
+          name: identifier,
+          fingerprint: identifier,
+          source: '.gpg-id',
+          hasPrivateKey: false,
+          hasLocalKeyMaterial: false,
+          referencedByStores: List<String>.unmodifiable(
+            storesByIdentifier[entry.key] ?? const <String>{},
+          ),
+        ),
+      );
+    }
+    return List<KeyRecord>.unmodifiable(keys);
+  }
+
+  Future<List<String>> _readStorePgpIdentifiers(String root) async {
+    final gpgId = File(_joinFilesystemPath(root, '.gpg-id'));
+    try {
+      if (!await gpgId.exists()) {
+        return const <String>[];
+      }
+      final content = await gpgId.readAsString();
+      return content
+          .split('\n')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty && !line.startsWith('#'))
+          .toList(growable: false);
+    } on FileSystemException {
+      return const <String>[];
+    }
+  }
+
+  bool _matchesPgpReference(KeyRecord key, String reference) {
+    if (key.type != KeyRecordType.pgp || !key.hasLocalKeyMaterial) {
+      return false;
+    }
+    final normalizedReference = reference.trim().toLowerCase();
+    final normalizedFingerprint = key.fingerprint.trim().toLowerCase();
+    final normalizedName = key.name.trim().toLowerCase();
+    if (normalizedReference == normalizedFingerprint ||
+        normalizedReference == normalizedName ||
+        normalizedName.contains('<$normalizedReference>')) {
+      return true;
+    }
+
+    final compactReference = _compactHexKeyId(normalizedReference);
+    final compactFingerprint = _compactHexKeyId(normalizedFingerprint);
+    return compactReference != null &&
+        compactFingerprint != null &&
+        (compactFingerprint.endsWith(compactReference) ||
+            compactReference.endsWith(compactFingerprint));
+  }
+
+  String? _compactHexKeyId(String value) {
+    final compact = value
+        .replaceFirst(RegExp(r'^0x'), '')
+        .replaceAll(RegExp(r'\s+'), '');
+    if (compact.length < 8 || !RegExp(r'^[0-9a-f]+$').hasMatch(compact)) {
+      return null;
+    }
+    return compact;
+  }
+
   KeyRecord _recordKeyMutation(frb.KeyMutationResponse response) {
     final key = _keyFromMutation(response);
     _upsertKey(key);
@@ -1149,9 +1309,10 @@ class BridgeBackedRepository
 
   PgpKeyInspection _pgpInspectionFromBridge(frb.PgpKeyInspectionDto dto) {
     return PgpKeyInspection(
-      kind: dto.kind == frb.PgpKeyKindDto.private
-          ? PgpKeyKind.private
-          : PgpKeyKind.public,
+      kind:
+          dto.kind == frb.PgpKeyKindDto.private
+              ? PgpKeyKind.private
+              : PgpKeyKind.public,
       fingerprint: dto.fingerprint,
       identity: dto.identity,
       hasPrivateKey: dto.hasPrivateKey,
@@ -1183,6 +1344,10 @@ class BridgeBackedRepository
         return PgpImportFailureKind.passphraseRequired;
       case frb.PgpImportFailureKind.incorrectPassphrase:
         return PgpImportFailureKind.incorrectPassphrase;
+      case frb.PgpImportFailureKind.unsupportedProtection:
+        return PgpImportFailureKind.unsupportedProtection;
+      case frb.PgpImportFailureKind.reprotectionFailed:
+        return PgpImportFailureKind.reprotectionFailed;
       case frb.PgpImportFailureKind.backendError:
         return PgpImportFailureKind.backendError;
       case null:
@@ -1204,6 +1369,14 @@ class BridgeBackedRepository
     }
     if (existing.fingerprint == key.fingerprint) {
       return true;
+    }
+    if (key.type == KeyRecordType.pgp) {
+      if (existing.hasLocalKeyMaterial && !key.hasLocalKeyMaterial) {
+        return _matchesPgpReference(existing, key.fingerprint);
+      }
+      if (!existing.hasLocalKeyMaterial && key.hasLocalKeyMaterial) {
+        return _matchesPgpReference(key, existing.fingerprint);
+      }
     }
     return key.type == KeyRecordType.ssh && existing.name == key.name;
   }

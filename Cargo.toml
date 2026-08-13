@@ -2,6 +2,17 @@
 lto = "fat"
 opt-level = "z"
 
+# Keep application crates optimized for size while compiling third-party dependencies for
+# speed. rPGP's legacy iterated SHA-1 S2K is unusably slow at opt-level "z": a valid count of
+# 65,011,712 otherwise spends tens of seconds in SHA-1 on Android.
+[profile.release.package."*"]
+opt-level = 3
+
+# Apply the same dependency optimization to debug builds. This keeps application crates
+# debuggable without running cryptographic dependencies at opt-level 0.
+[profile.dev.package."*"]
+opt-level = 3
+
 [workspace]
 members = ["bridge", "cli", "core"]
 resolver = "2"

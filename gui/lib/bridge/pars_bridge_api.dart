@@ -133,7 +133,11 @@ abstract interface class ParsBridgeApi {
     required frb.ExportPgpKeyRequest request,
   });
 
-  Future<frb.UnitResponse> deletePgpKey({
+  Future<frb.PreparePgpPrivateKeyResponse> preparePgpPrivateKey({
+    required frb.PreparePgpPrivateKeyRequest request,
+  });
+
+  Future<frb.DeletePgpKeyResponse> deletePgpKey({
     required frb.DeletePgpKeyRequest request,
   });
 
@@ -351,7 +355,12 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   }) => frb.exportPgpPrivateKey(request: request);
 
   @override
-  Future<frb.UnitResponse> deletePgpKey({
+  Future<frb.PreparePgpPrivateKeyResponse> preparePgpPrivateKey({
+    required frb.PreparePgpPrivateKeyRequest request,
+  }) => frb.preparePgpPrivateKey(request: request);
+
+  @override
+  Future<frb.DeletePgpKeyResponse> deletePgpKey({
     required frb.DeletePgpKeyRequest request,
   }) => frb.deletePgpKey(request: request);
 

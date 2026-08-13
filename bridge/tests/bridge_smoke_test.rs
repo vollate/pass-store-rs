@@ -11,7 +11,8 @@ use pars_bridge::api::{
     GenerateSshKeyRequest, ImportKeyTextRequest, ImportPgpKeyFileRequest, ImportPgpKeyTextRequest,
     InsertEntryRequest, InspectAppStateRequest, InspectPgpKeyFileRequest, InspectPgpKeyTextRequest,
     ListEntriesRequest, ListKeysRequest, OpenGithubSshSettingsRequest, PgpImportFailureKind,
-    PgpKeyKindDto, RefreshAutofillIndexRequest, SUPPORTED_METHODS,
+    PgpKeyDeletionFailureKind, PgpKeyKindDto, PreparePgpPrivateKeyRequest,
+    RefreshAutofillIndexRequest, SUPPORTED_METHODS,
 };
 use pars_core::util::test_util::PgpKeyMaterialFixture;
 
@@ -68,6 +69,7 @@ fn bridge_method_table_matches_generated_api_surface() {
         "import_pgp_private_key_text",
         "export_pgp_public_key",
         "export_pgp_private_key",
+        "prepare_pgp_private_key",
         "delete_pgp_key",
         "add_pgp_key_to_gpg_id",
         "generate_ssh_key",
@@ -201,7 +203,7 @@ fn pure_rust_pgp_bridge_generates_lists_and_exports_keys() {
         pgp_executable: None,
         name: "Alice Example".to_string(),
         email: "alice@example.com".to_string(),
-        passphrase: None,
+        passphrase: Some(PASSPHRASE.to_string()),
     }));
     assert!(generated.error.is_none(), "{:?}", generated.error);
     let generated_key = generated.key.expect("generated key");
@@ -255,12 +257,37 @@ fn pure_rust_pgp_bridge_generates_lists_and_exports_keys() {
     assert!(private_exported.error.is_none(), "{:?}", private_exported.error);
     assert!(private_exported.export.unwrap().armored_text.contains("BEGIN PGP PRIVATE KEY BLOCK"));
 
+    let wrong_preparation = block_on(api::prepare_pgp_private_key(PreparePgpPrivateKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        fingerprint: generated_key.fingerprint.clone(),
+        passphrase: "wrong passphrase".to_string(),
+    }));
+    assert_eq!(
+        wrong_preparation.error.and_then(|error| error.pgp_import_kind),
+        Some(PgpImportFailureKind::IncorrectPassphrase)
+    );
+
+    let prepared = block_on(api::prepare_pgp_private_key(PreparePgpPrivateKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        fingerprint: generated_key.fingerprint.clone(),
+        passphrase: PASSPHRASE.to_string(),
+    }));
+    assert!(prepared.error.is_none(), "{:?}", prepared.error);
+    assert_eq!(prepared.fingerprint.as_deref(), Some(generated_key.fingerprint.as_str()));
+    assert!(!prepared.migrated, "a compliant generated key must not be rewritten");
+
     let deleted = block_on(api::delete_pgp_key(DeletePgpKeyRequest {
         config_path: config_path.display().to_string(),
         pgp_executable: None,
         fingerprint: generated_key.fingerprint.clone(),
     }));
     assert!(deleted.error.is_none(), "{:?}", deleted.error);
+    let deletion = deleted.result.expect("verified deletion result");
+    assert!(deletion.had_private_key);
+    assert!(deletion.private_key_absent);
+    assert!(deletion.public_key_absent);
 
     let keys_after_delete = block_on(api::list_keys(ListKeysRequest {
         config_path: config_path.display().to_string(),
@@ -269,6 +296,47 @@ fn pure_rust_pgp_bridge_generates_lists_and_exports_keys() {
     }));
     assert!(keys_after_delete.error.is_none(), "{:?}", keys_after_delete.error);
     assert!(!keys_after_delete.keys.iter().any(|key| key.fingerprint == generated_key.fingerprint));
+}
+
+#[test]
+fn pure_rust_pgp_bridge_preserves_verified_private_absence_on_public_cleanup_failure() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let keyring_home = temp.path().join("pgp");
+    std::fs::write(
+        &config_path,
+        format!(
+            "[pgp_config]\nbackend = \"pure_rust\"\nkeyring_home = \"{}\"\n",
+            toml_path(&keyring_home)
+        ),
+    )
+    .unwrap();
+    let generated = block_on(api::generate_pgp_key(GeneratePgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        name: "Partial Delete".to_string(),
+        email: "partial-delete@example.com".to_string(),
+        passphrase: Some(PASSPHRASE.to_string()),
+    }));
+    let fingerprint = generated.key.expect("generated key").fingerprint;
+    let public_path = keyring_home.join("public").join(format!("{fingerprint}.asc"));
+    std::fs::remove_file(&public_path).expect("replace public record with failure fixture");
+    std::fs::create_dir(&public_path).expect("public cleanup failure fixture");
+
+    let response = block_on(api::delete_pgp_key(DeletePgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        fingerprint: fingerprint.clone(),
+    }));
+
+    assert_eq!(response.failure_kind, Some(PgpKeyDeletionFailureKind::PublicCleanupFailed));
+    assert!(response.error.is_some());
+    let deletion = response.result.expect("partial result");
+    assert!(deletion.had_private_key);
+    assert!(deletion.private_key_absent);
+    assert!(!deletion.public_key_absent);
+    assert!(!keyring_home.join("private").join(format!("{fingerprint}.asc")).exists());
+    assert!(public_path.exists());
 }
 
 #[test]
@@ -650,6 +718,33 @@ fn pgp_import_of_protected_key_reports_typed_sanitized_failures() {
     }));
     assert!(response.error.is_none(), "{:?}", response.error);
     assert_eq!(response.key.expect("imported key").fingerprint, fixture.fingerprint);
+}
+
+#[test]
+fn bridge_returns_legacy_import_only_after_commit_and_then_prepares_as_a_noop() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = pure_rust_config(&temp, "import-legacy-commit");
+    let armored_text =
+        include_str!("../../core/tests/fixtures/legacy-sha1-coded-1-private.asc").to_string();
+    let imported = block_on(api::import_pgp_key_text(ImportPgpKeyTextRequest {
+        config_path: config_path.clone(),
+        pgp_executable: None,
+        armored_text,
+        passphrase: Some("pars legacy fixture password".to_string()),
+    }));
+    assert!(imported.error.is_none(), "{:?}", imported.error);
+    let fingerprint = imported.key.expect("committed legacy import").fingerprint;
+
+    let prepared = block_on(api::prepare_pgp_private_key(PreparePgpPrivateKeyRequest {
+        config_path,
+        pgp_executable: None,
+        fingerprint: fingerprint.clone(),
+        passphrase: "pars legacy fixture password".to_string(),
+    }));
+
+    assert!(prepared.error.is_none(), "{:?}", prepared.error);
+    assert_eq!(prepared.fingerprint.as_deref(), Some(fingerprint.as_str()));
+    assert!(!prepared.migrated, "import must have committed managed protection first");
 }
 
 #[test]

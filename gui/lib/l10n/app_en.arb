@@ -1,0 +1,67 @@
+{
+  "@@locale": "en",
+  "managedStoreConflictTitle": "Store already exists",
+  "managedStoreConflictDescription": "An app-managed copy named {storeName} already exists. Choose how to import the selected folder.",
+  "@managedStoreConflictDescription": {
+    "placeholders": {
+      "storeName": {
+        "type": "String"
+      }
+    }
+  },
+  "managedStoreReplaceLabel": "Replace completely",
+  "managedStoreReplaceDescription": "Replace the existing copy and remove files that are not in the selected folder.",
+  "managedStoreMergeLabel": "Merge and overwrite",
+  "managedStoreMergeDescription": "Overwrite matching files and keep files that exist only in the current copy.",
+  "noPasswordStoreConfigured": "No password store is configured.",
+  "passwordStoreFolderNotFound": "Password store folder not found.",
+  "chooseFolderAndImport": "Choose folder and import",
+  "copyIntoAppStorage": "Copy into app storage",
+  "copyIntoAppStorageDescription": "Pars will copy the selected password store into app storage so every file remains accessible.",
+  "storeAvailable": "Available",
+  "storeFolderNotFound": "Folder not found",
+  "deleteAppCopy": "Delete app copy",
+  "passwordStoreKeyReference": "Referenced by {storeNames} (.gpg-id)",
+  "@passwordStoreKeyReference": {
+    "placeholders": {
+      "storeNames": {
+        "type": "String"
+      }
+    }
+  },
+  "localKeyMaterialMissing": "Local key material is not installed",
+  "privateKeyMaterial": "Private key",
+  "publicKeyMaterial": "Public key",
+  "storeActionInProgress": "Working…",
+  "storeImportCancelled": "No folder was selected.",
+  "storeImportNoPasswords": "No passwords were found.",
+  "storeImportSucceeded": "Import complete: {passwordCount} passwords.",
+  "@storeImportSucceeded": {
+    "placeholders": {
+      "passwordCount": {
+        "type": "int"
+      }
+    }
+  },
+  "pgpPreparationInProgress": "Protecting private key…",
+  "pgpPassphraseRequired": "This private key needs its passphrase.",
+  "pgpPassphraseIncorrect": "That passphrase did not unlock this key. Try again.",
+  "pgpUnsupportedProtection": "This private key uses an unsupported protection format.",
+  "pgpReprotectionFailed": "The private key could not be safely protected for local use.",
+  "deleteKeyAction": "Delete key",
+  "deleteKeyTitle": "Delete {keyType} key",
+  "@deleteKeyTitle": {"placeholders": {"keyType": {"type": "String"}}},
+  "fingerprintValue": "Fingerprint: {fingerprint}",
+  "@fingerprintValue": {"placeholders": {"fingerprint": {"type": "String"}}},
+  "deleteKeyDescription": "This permanently removes local key material from this device, including the protected private key. Type {confirmation} to delete it.",
+  "@deleteKeyDescription": {"placeholders": {"confirmation": {"type": "String"}}},
+  "deleteKeyConfirmation": "Type {confirmation} to confirm",
+  "@deleteKeyConfirmation": {"placeholders": {"confirmation": {"type": "String"}}},
+  "keyDeleted": "Deleted {keyName}",
+  "@keyDeleted": {"placeholders": {"keyName": {"type": "String"}}},
+  "pgpKeyDeletePartial": "The protected private key was deleted, but its public listing could not be removed.",
+  "keyDeleteFailed": "Key deletion failed: {error}",
+  "@keyDeleteFailed": {"placeholders": {"error": {"type": "String"}}},
+  "delete": "Delete",
+  "cancel": "Cancel"
+}

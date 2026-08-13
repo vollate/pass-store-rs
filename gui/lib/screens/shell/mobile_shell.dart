@@ -51,6 +51,7 @@ class _MobileShellState extends State<MobileShell> {
       VaultScreen(
         vaultRepository: widget.vaultRepository,
         gitRepository: widget.gitRepository,
+        keyRepository: widget.keyRepository,
         securityRepository: widget.securityRepository,
         keys: widget.keyRepository.keys,
         onChooseKey: _openSettings,

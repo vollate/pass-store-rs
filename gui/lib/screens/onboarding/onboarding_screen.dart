@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/key_record.dart';
 import '../../services/key_repository.dart';
 import '../../services/path_picker_service.dart';
@@ -7,6 +8,7 @@ import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
 import '../../widgets/gesture_setup_panel.dart';
+import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/path_picker_row.dart';
 import '../../widgets/pgp_key_import_body.dart';
 
@@ -47,12 +49,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   KeyRepository? get _keyRepository => widget.keyRepository;
 
-  bool get _needsStoreSetup =>
-      _lifecycle?.onboardingState.requiresSetup ?? false;
+  bool get _needsStoreSetup => _lifecycle?.requiresStoreSetup ?? false;
 
   List<KeyRecord> get _pgpKeys =>
       _keyRepository?.keys
-          .where((key) => key.type == KeyRecordType.pgp)
+          .where(
+            (key) => key.type == KeyRecordType.pgp && key.hasLocalKeyMaterial,
+          )
           .toList(growable: false) ??
       const <KeyRecord>[];
 
@@ -179,7 +182,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
 
-    if (!lifecycle.onboardingState.requiresSetup) {
+    if (!lifecycle.requiresStoreSetup) {
       final store = lifecycle.selectedStore;
       return ListView(
         children: <Widget>[
@@ -300,10 +303,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildReviewStep(BuildContext context) {
+    final lifecycle = _lifecycle;
+    final selectedStore = lifecycle?.selectedStore;
     return _ReviewStep(
       hasGestureVerifier: widget.securityRepository.hasGestureVerifier,
       biometricUnlockEnabled: widget.securityRepository.biometricUnlockEnabled,
-      storeStatusLabel: _lifecycle?.onboardingState.label ?? 'Unavailable',
+      storeStatusLabel:
+          selectedStore != null && selectedStore.exists
+              ? 'Configured'
+              : lifecycle?.onboardingState.label ?? 'Unavailable',
       storeSetupComplete: !_needsStoreSetup,
       pgpKeyCount: _pgpKeys.length,
       sshKeyCount: _sshKeys.length,
@@ -353,8 +361,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final repository = _keyRepository;
     if (fingerprint == null ||
         repository == null ||
-        _lifecycle?.selectedStore == null ||
-        !_needsStoreSetup) {
+        _lifecycle?.selectedStore == null) {
       return;
     }
     await repository.addPgpKeyToSelectedStore(fingerprint);
@@ -394,53 +401,54 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (sheet) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Import PGP key',
-                  style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+      builder:
+          (sheet) => SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Import PGP key',
+                      style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    PgpKeyImportBody(
+                      keyRepository: repository,
+                      securityRepository: widget.securityRepository,
+                      pathPickerService: widget.pathPickerService,
+                      initialDirectory: _defaultKeyFileBasePath(),
+                      onCancel: () => Navigator.of(sheet).pop(),
+                      onCompleted: (completion) async {
+                        if (sheet.mounted) {
+                          Navigator.of(sheet).pop();
+                        }
+                        if (completion.rememberFailed && mounted) {
+                          _showError(
+                            StateError(
+                              'Imported ${completion.key.name}, but remembering '
+                              'the passphrase failed.',
+                            ),
+                          );
+                        }
+                        // Selects the returned fingerprint and advances to SSH.
+                        await _finishPgpStep(repository, completion.key);
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                PgpKeyImportBody(
-                  keyRepository: repository,
-                  securityRepository: widget.securityRepository,
-                  pathPickerService: widget.pathPickerService,
-                  initialDirectory: _defaultKeyFileBasePath(),
-                  onCancel: () => Navigator.of(sheet).pop(),
-                  onCompleted: (completion) async {
-                    if (sheet.mounted) {
-                      Navigator.of(sheet).pop();
-                    }
-                    if (completion.rememberFailed && mounted) {
-                      _showError(
-                        StateError(
-                          'Imported ${completion.key.name}, but remembering '
-                          'the passphrase failed.',
-                        ),
-                      );
-                    }
-                    // Selects the returned fingerprint and advances to SSH.
-                    await _finishPgpStep(repository, completion.key);
-                  },
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 
@@ -587,8 +595,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       case _OnboardingStep.ssh:
         return 'SSH is optional and helps Git sync with GitHub.';
       case _OnboardingStep.store:
-        return _lifecycle?.onboardingState.label ??
-            'Create, import, or clone a password store.';
+        return _needsStoreSetup
+            ? 'Create, import, or clone a password store.'
+            : 'Password store is configured.';
       case _OnboardingStep.review:
         return 'Confirm the setup before entering Pars.';
     }

@@ -9,6 +9,32 @@ class PgpImportResult {
   final PgpKeyInspection inspection;
 }
 
+class PgpPrivateKeyPreparation {
+  const PgpPrivateKeyPreparation({
+    required this.fingerprint,
+    required this.migrated,
+  });
+
+  final String fingerprint;
+  final bool migrated;
+}
+
+class PgpKeyDeletionOutcome {
+  const PgpKeyDeletionOutcome({
+    required this.fingerprint,
+    required this.hadPrivateKey,
+    required this.privateKeyAbsent,
+    required this.publicKeyAbsent,
+    required this.publicCleanupFailed,
+  });
+
+  final String fingerprint;
+  final bool hadPrivateKey;
+  final bool privateKeyAbsent;
+  final bool publicKeyAbsent;
+  final bool publicCleanupFailed;
+}
+
 abstract interface class KeyRepository {
   List<KeyRecord> get keys;
 
@@ -49,7 +75,12 @@ abstract interface class KeyRepository {
     required String confirmation,
   });
 
-  Future<void> deletePgpKey(String fingerprint);
+  Future<PgpPrivateKeyPreparation> preparePgpPrivateKey({
+    required String fingerprint,
+    required String passphrase,
+  });
+
+  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint);
 
   Future<void> addPgpKeyToSelectedStore(String fingerprint);
 

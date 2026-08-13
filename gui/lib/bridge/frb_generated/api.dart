@@ -6,9 +6,9 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_store_to_config`, `clone_store_inner`, `configure_pgp_backend_inner`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_remote_exists`, `import_local_store_inner`, `imported_key_kind`, `inspect_app_state_inner`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `list_keys_inner`, `list_stores_inner`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `onboarding_state`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_missing`, `pgp_key_record`, `read_entry_inner`, `remove_store_inner`, `run_git_command_response`, `run_git`, `save_config_for_mutation`, `select_store_inner`, `simple`, `store_failure`, `store_name`
+// These functions are ignored because they are not marked as `pub`: `add_store_to_config`, `clone_store_inner`, `configure_pgp_backend_inner`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_remote_exists`, `import_local_store_inner`, `imported_key_kind`, `inspect_app_state_inner`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `list_keys_inner`, `list_stores_inner`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `onboarding_state`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_missing`, `pgp_key_record`, `pgp_preparation_failure`, `read_entry_inner`, `remove_store_inner`, `run_git_command_response`, `run_git`, `save_config_for_mutation`, `select_store_inner`, `simple`, `store_failure`, `store_name`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AutofillIndexEntryDto`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 
 Future<ConfigResponse> loadConfig({required LoadConfigRequest request}) =>
     RustLib.instance.api.crateApiLoadConfig(request: request);
@@ -160,8 +160,13 @@ Future<KeyExportResponse> exportPgpPrivateKey({
   required ExportPgpKeyRequest request,
 }) => RustLib.instance.api.crateApiExportPgpPrivateKey(request: request);
 
-Future<UnitResponse> deletePgpKey({required DeletePgpKeyRequest request}) =>
-    RustLib.instance.api.crateApiDeletePgpKey(request: request);
+Future<PreparePgpPrivateKeyResponse> preparePgpPrivateKey({
+  required PreparePgpPrivateKeyRequest request,
+}) => RustLib.instance.api.crateApiPreparePgpPrivateKey(request: request);
+
+Future<DeletePgpKeyResponse> deletePgpKey({
+  required DeletePgpKeyRequest request,
+}) => RustLib.instance.api.crateApiDeletePgpKey(request: request);
 
 Future<UnitResponse> addPgpKeyToGpgId({
   required AddPgpKeyToGpgIdRequest request,
@@ -818,6 +823,26 @@ class DeletePgpKeyRequest {
           configPath == other.configPath &&
           pgpExecutable == other.pgpExecutable &&
           fingerprint == other.fingerprint;
+}
+
+class DeletePgpKeyResponse {
+  final PgpKeyDeletionResultDto? result;
+  final PgpKeyDeletionFailureKind? failureKind;
+  final BridgeFailure? error;
+
+  const DeletePgpKeyResponse({this.result, this.failureKind, this.error});
+
+  @override
+  int get hashCode => result.hashCode ^ failureKind.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DeletePgpKeyResponse &&
+          runtimeType == other.runtimeType &&
+          result == other.result &&
+          failureKind == other.failureKind &&
+          error == other.error;
 }
 
 class DeleteSshKeyRequest {
@@ -1934,7 +1959,42 @@ enum PgpImportFailureKind {
   kindMismatch,
   passphraseRequired,
   incorrectPassphrase,
+  unsupportedProtection,
+  reprotectionFailed,
   backendError,
+}
+
+enum PgpKeyDeletionFailureKind { privateRemovalFailed, publicCleanupFailed }
+
+class PgpKeyDeletionResultDto {
+  final String fingerprint;
+  final bool hadPrivateKey;
+  final bool privateKeyAbsent;
+  final bool publicKeyAbsent;
+
+  const PgpKeyDeletionResultDto({
+    required this.fingerprint,
+    required this.hadPrivateKey,
+    required this.privateKeyAbsent,
+    required this.publicKeyAbsent,
+  });
+
+  @override
+  int get hashCode =>
+      fingerprint.hashCode ^
+      hadPrivateKey.hashCode ^
+      privateKeyAbsent.hashCode ^
+      publicKeyAbsent.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PgpKeyDeletionResultDto &&
+          runtimeType == other.runtimeType &&
+          fingerprint == other.fingerprint &&
+          hadPrivateKey == other.hadPrivateKey &&
+          privateKeyAbsent == other.privateKeyAbsent &&
+          publicKeyAbsent == other.publicKeyAbsent;
 }
 
 class PgpKeyImportResponse {
@@ -2016,6 +2076,61 @@ class PgpKeyInspectionResponse {
 }
 
 enum PgpKeyKindDto { public, private }
+
+class PreparePgpPrivateKeyRequest {
+  final String configPath;
+  final String? pgpExecutable;
+  final String fingerprint;
+  final String passphrase;
+
+  const PreparePgpPrivateKeyRequest({
+    required this.configPath,
+    this.pgpExecutable,
+    required this.fingerprint,
+    required this.passphrase,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      pgpExecutable.hashCode ^
+      fingerprint.hashCode ^
+      passphrase.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PreparePgpPrivateKeyRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          pgpExecutable == other.pgpExecutable &&
+          fingerprint == other.fingerprint &&
+          passphrase == other.passphrase;
+}
+
+class PreparePgpPrivateKeyResponse {
+  final String? fingerprint;
+  final bool migrated;
+  final BridgeFailure? error;
+
+  const PreparePgpPrivateKeyResponse({
+    this.fingerprint,
+    required this.migrated,
+    this.error,
+  });
+
+  @override
+  int get hashCode => fingerprint.hashCode ^ migrated.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PreparePgpPrivateKeyResponse &&
+          runtimeType == other.runtimeType &&
+          fingerprint == other.fingerprint &&
+          migrated == other.migrated &&
+          error == other.error;
+}
 
 class RefreshAutofillIndexRequest {
   final String configPath;

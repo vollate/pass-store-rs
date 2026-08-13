@@ -21,7 +21,9 @@ use pars_core::key_management::{
     import_ssh_private_key_text as import_ssh_private_key_text_core, list_ssh_keys,
     ImportedKeyKind, PrivateKeyConfirmation,
 };
-use pars_core::pgp::backend::{KeyGenerationRequest, PgpBackend, SystemGpgBackend};
+use pars_core::pgp::backend::{
+    KeyGenerationRequest, PgpBackend, PgpBackendError, PgpKeyDeletionResult, SystemGpgBackend,
+};
 use pars_core::pgp::import::{
     import_pgp_key_file as import_pgp_key_file_core,
     import_pgp_key_text as import_pgp_key_text_core, inspect_pgp_key_bytes,
@@ -68,6 +70,7 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "import_pgp_private_key_text",
     "export_pgp_public_key",
     "export_pgp_private_key",
+    "prepare_pgp_private_key",
     "delete_pgp_key",
     "add_pgp_key_to_gpg_id",
     "generate_ssh_key",
@@ -256,11 +259,15 @@ impl From<PgpImportError> for BridgeFailure {
             PgpImportError::KindMismatch { .. } => PgpImportFailureKind::KindMismatch,
             PgpImportError::PassphraseRequired => PgpImportFailureKind::PassphraseRequired,
             PgpImportError::IncorrectPassphrase => PgpImportFailureKind::IncorrectPassphrase,
+            PgpImportError::UnsupportedProtection => PgpImportFailureKind::UnsupportedProtection,
+            PgpImportError::ReprotectionFailed => PgpImportFailureKind::ReprotectionFailed,
             PgpImportError::Backend(_) => PgpImportFailureKind::BackendError,
         };
         // `Display` on the core error is already sanitized: no passphrase, no key material.
         let category = match value {
-            PgpImportError::Backend(_) => BridgeFailureCategory::PgpError,
+            PgpImportError::Backend(_) | PgpImportError::ReprotectionFailed => {
+                BridgeFailureCategory::PgpError
+            }
             _ => BridgeFailureCategory::ValidationError,
         };
         Self {
@@ -285,6 +292,17 @@ impl From<&PgpImportInspection> for PgpKeyInspectionDto {
             has_private_key: value.has_private_key,
             requires_passphrase: value.requires_passphrase,
             armored: value.armored,
+        }
+    }
+}
+
+impl From<PgpKeyDeletionResult> for PgpKeyDeletionResultDto {
+    fn from(value: PgpKeyDeletionResult) -> Self {
+        Self {
+            fingerprint: value.fingerprint,
+            had_private_key: value.had_private_key,
+            private_key_absent: value.private_key_absent,
+            public_key_absent: value.public_key_absent,
         }
     }
 }
@@ -533,6 +551,8 @@ pub enum PgpImportFailureKind {
     KindMismatch,
     PassphraseRequired,
     IncorrectPassphrase,
+    UnsupportedProtection,
+    ReprotectionFailed,
     BackendError,
 }
 
@@ -550,6 +570,21 @@ pub struct PgpKeyImportResponse {
 }
 
 #[derive(Debug, Clone)]
+pub struct PreparePgpPrivateKeyRequest {
+    pub config_path: String,
+    pub pgp_executable: Option<String>,
+    pub fingerprint: String,
+    pub passphrase: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PreparePgpPrivateKeyResponse {
+    pub fingerprint: Option<String>,
+    pub migrated: bool,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ExportPgpKeyRequest {
     pub config_path: String,
     pub pgp_executable: Option<String>,
@@ -562,6 +597,27 @@ pub struct DeletePgpKeyRequest {
     pub config_path: String,
     pub pgp_executable: Option<String>,
     pub fingerprint: String,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum PgpKeyDeletionFailureKind {
+    PrivateRemovalFailed,
+    PublicCleanupFailed,
+}
+
+#[derive(Debug, Clone)]
+pub struct PgpKeyDeletionResultDto {
+    pub fingerprint: String,
+    pub had_private_key: bool,
+    pub private_key_absent: bool,
+    pub public_key_absent: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeletePgpKeyResponse {
+    pub result: Option<PgpKeyDeletionResultDto>,
+    pub failure_kind: Option<PgpKeyDeletionFailureKind>,
+    pub error: Option<BridgeFailure>,
 }
 
 #[derive(Debug, Clone)]
@@ -1212,15 +1268,68 @@ pub async fn export_pgp_private_key(request: ExportPgpKeyRequest) -> KeyExportRe
     }
 }
 
-pub async fn delete_pgp_key(request: DeletePgpKeyRequest) -> UnitResponse {
-    UnitResponse {
-        error: pgp_backend(&request.config_path, request.pgp_executable.as_deref())
-            .and_then(|backend| {
-                backend
-                    .delete_key(&request.fingerprint)
-                    .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
-            })
-            .err(),
+pub async fn prepare_pgp_private_key(
+    request: PreparePgpPrivateKeyRequest,
+) -> PreparePgpPrivateKeyResponse {
+    let passphrase = SecretString::from(request.passphrase);
+    match pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+        backend
+            .prepare_private_key(&request.fingerprint, &passphrase)
+            .map_err(pgp_preparation_failure)
+    }) {
+        Ok(prepared) => PreparePgpPrivateKeyResponse {
+            fingerprint: Some(prepared.fingerprint),
+            migrated: prepared.migrated,
+            error: None,
+        },
+        Err(error) => {
+            PreparePgpPrivateKeyResponse { fingerprint: None, migrated: false, error: Some(error) }
+        }
+    }
+}
+
+pub async fn delete_pgp_key(request: DeletePgpKeyRequest) -> DeletePgpKeyResponse {
+    let outcome =
+        pgp_backend(&request.config_path, request.pgp_executable.as_deref()).and_then(|backend| {
+            backend
+                .delete_key(&request.fingerprint)
+                .map_err(|error| BridgeFailure::from(CoreError::PgpError(error.to_string())))
+        });
+    match outcome {
+        Ok(mut result) => {
+            let cleanup_error = result.public_cleanup_error.take();
+            DeletePgpKeyResponse {
+                result: Some(result.into()),
+                failure_kind: cleanup_error
+                    .as_ref()
+                    .map(|_| PgpKeyDeletionFailureKind::PublicCleanupFailed),
+                error: cleanup_error
+                    .map(|message| BridgeFailure::simple(BridgeFailureCategory::PgpError, message)),
+            }
+        }
+        Err(error) => DeletePgpKeyResponse {
+            result: None,
+            failure_kind: Some(PgpKeyDeletionFailureKind::PrivateRemovalFailed),
+            error: Some(error),
+        },
+    }
+}
+
+fn pgp_preparation_failure(error: PgpBackendError) -> BridgeFailure {
+    match error {
+        PgpBackendError::PassphraseRequired => {
+            BridgeFailure::from(PgpImportError::PassphraseRequired)
+        }
+        PgpBackendError::IncorrectPassphrase => {
+            BridgeFailure::from(PgpImportError::IncorrectPassphrase)
+        }
+        PgpBackendError::UnsupportedProtection => {
+            BridgeFailure::from(PgpImportError::UnsupportedProtection)
+        }
+        PgpBackendError::ReprotectionFailed => {
+            BridgeFailure::from(PgpImportError::ReprotectionFailed)
+        }
+        other => BridgeFailure::from(CoreError::PgpError(other.to_string())),
     }
 }
 
@@ -1331,7 +1440,7 @@ fn list_stores_inner(request: ListStoresRequest) -> Result<Vec<StoreInfoDto>, Br
                 id: StoreId(format!("store-{index}")),
                 name: name.to_string(),
                 root: root_path.clone(),
-                is_default: root_path == PathBuf::from(&config.path_config.default_repo),
+                is_default: root_path == Path::new(&config.path_config.default_repo),
             }
         })
         .map(StoreInfoDto::from)
@@ -1701,9 +1810,9 @@ fn delete_local_store_inner(request: DeleteLocalStoreRequest) -> Result<(), Brid
             "refusing to delete unconfigured store: {root}"
         ))));
     }
-    if !root_path.is_dir() {
+    if root_path.exists() && !root_path.is_dir() {
         return Err(BridgeFailure::from(CoreError::StoreError(format!(
-            "password store root does not exist: {root}"
+            "password store root is not a directory: {root}"
         ))));
     }
     if root_path.parent().is_none() || root_path == Path::new("/") {
@@ -1712,13 +1821,19 @@ fn delete_local_store_inner(request: DeleteLocalStoreRequest) -> Result<(), Brid
         )));
     }
 
+    // Delete the app-owned files first. If deletion is interrupted, the store
+    // remains configured and the user can retry instead of being left with an
+    // invisible orphan directory that is no longer reachable from the UI.
+    if root_path.is_dir() {
+        fs::remove_dir_all(&root_path).map_err(store_failure)?;
+    }
+
     config.path_config.repos.retain(|repo| repo != &root);
     if config.path_config.default_repo == root {
         config.path_config.default_repo =
             config.path_config.repos.first().cloned().unwrap_or_default();
     }
-    save_config_for_mutation(&config, &request.config_path)?;
-    fs::remove_dir_all(root_path).map_err(store_failure)
+    save_config_for_mutation(&config, &request.config_path)
 }
 
 fn load_config_for_mutation(config_path: &str) -> Result<ParsConfig, BridgeFailure> {

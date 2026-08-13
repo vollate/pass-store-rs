@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../services/autofill_repository.dart';
@@ -14,6 +15,7 @@ import '../../services/store_lifecycle.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/gesture_setup_panel.dart';
+import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/path_picker_row.dart';
 import '../../widgets/pgp_key_import_body.dart';
 

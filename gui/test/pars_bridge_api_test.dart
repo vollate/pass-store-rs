@@ -340,11 +340,29 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
-  Future<frb.UnitResponse> deletePgpKey({
+  Future<frb.PreparePgpPrivateKeyResponse> preparePgpPrivateKey({
+    required frb.PreparePgpPrivateKeyRequest request,
+  }) async {
+    calledMethods.add('prepare_pgp_private_key');
+    return frb.PreparePgpPrivateKeyResponse(
+      fingerprint: request.fingerprint,
+      migrated: false,
+    );
+  }
+
+  @override
+  Future<frb.DeletePgpKeyResponse> deletePgpKey({
     required frb.DeletePgpKeyRequest request,
   }) async {
     calledMethods.add('delete_pgp_key');
-    return const frb.UnitResponse();
+    return frb.DeletePgpKeyResponse(
+      result: frb.PgpKeyDeletionResultDto(
+        fingerprint: request.fingerprint,
+        hadPrivateKey: true,
+        privateKeyAbsent: true,
+        publicKeyAbsent: true,
+      ),
+    );
   }
 
   @override

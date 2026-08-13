@@ -8,7 +8,9 @@ use pars_core::autofill::{
     AutofillQueryRequest, RefreshAutofillIndexRequest,
 };
 use pars_core::gui::{KeyExportResult, KeyImportResult, PgpKeySummary};
-use pars_core::pgp::backend::{KeyGenerationRequest, PgpBackend, PgpBackendResult, PgpKeyDetails};
+use pars_core::pgp::backend::{
+    KeyGenerationRequest, PgpBackend, PgpBackendResult, PgpKeyDeletionResult, PgpKeyDetails,
+};
 use pars_core::pgp::import::InspectedPgpKey;
 use secrecy::SecretString;
 
@@ -248,7 +250,7 @@ impl PgpBackend for RecordingBackend {
         unreachable!("not used by autofill tests")
     }
 
-    fn delete_key(&self, _fingerprint: &str) -> PgpBackendResult<()> {
+    fn delete_key(&self, _fingerprint: &str) -> PgpBackendResult<PgpKeyDeletionResult> {
         unreachable!("not used by autofill tests")
     }
 

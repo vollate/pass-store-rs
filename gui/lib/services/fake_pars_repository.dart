@@ -518,7 +518,21 @@ class FakeParsRepository
       '-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----';
 
   @override
-  Future<void> deletePgpKey(String fingerprint) async {}
+  Future<PgpPrivateKeyPreparation> preparePgpPrivateKey({
+    required String fingerprint,
+    required String passphrase,
+  }) async =>
+      PgpPrivateKeyPreparation(fingerprint: fingerprint, migrated: false);
+
+  @override
+  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint) async =>
+      PgpKeyDeletionOutcome(
+        fingerprint: fingerprint,
+        hadPrivateKey: true,
+        privateKeyAbsent: true,
+        publicKeyAbsent: true,
+        publicCleanupFailed: false,
+      );
 
   @override
   Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}

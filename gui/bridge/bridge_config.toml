@@ -50,6 +50,7 @@ methods = [
   "import_pgp_private_key_text",
   "export_pgp_public_key",
   "export_pgp_private_key",
+  "prepare_pgp_private_key",
   "delete_pgp_key",
   "add_pgp_key_to_gpg_id",
   "generate_ssh_key",

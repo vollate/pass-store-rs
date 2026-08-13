@@ -8,6 +8,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       builder:
           (context) => StatefulBuilder(
             builder: (context, setSheetState) {
+              final localizations = AppLocalizations.of(context);
               final keys = keyRepository.keys
                   .where((key) => key.type == type)
                   .toList(growable: false);
@@ -41,35 +42,49 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                             child: ListTile(
                               title: Text(key.name),
                               subtitle: Text(
-                                '${key.fingerprint}\n${key.source}\n${key.hasPrivateKey ? 'Private' : 'Public'}',
+                                key.hasLocalKeyMaterial
+                                    ? '${key.fingerprint}\n'
+                                        '${key.source}\n'
+                                        '${key.hasPrivateKey ? localizations.privateKeyMaterial : localizations.publicKeyMaterial}'
+                                    : '${localizations.passwordStoreKeyReference(key.referencedByStores.join(', '))}\n'
+                                        '${localizations.localKeyMaterialMissing}',
                               ),
                               isThreeLine: true,
-                              trailing: PopupMenuButton<String>(
-                                tooltip:
-                                    'Actions for ${key.typeLabel} key ${key.name}',
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'export_public':
-                                      _exportPublicKey(context, key);
-                                      break;
-                                    case 'export_private':
-                                      _showPrivateExportForm(context, key);
-                                      break;
-                                    case 'add_to_store':
-                                      _addPgpKeyToStore(context, key);
-                                      break;
-                                    case 'delete':
-                                      _showDeleteKeyDialog(
-                                        context,
-                                        key,
-                                        setSheetState,
-                                      );
-                                      break;
-                                  }
-                                },
-                                itemBuilder:
-                                    (context) => _keyActionMenuItems(key.type),
-                              ),
+                              trailing:
+                                  key.hasLocalKeyMaterial
+                                      ? PopupMenuButton<String>(
+                                        tooltip:
+                                            'Actions for ${key.typeLabel} key ${key.name}',
+                                        onSelected: (value) {
+                                          switch (value) {
+                                            case 'export_public':
+                                              _exportPublicKey(context, key);
+                                              break;
+                                            case 'export_private':
+                                              _showPrivateExportForm(
+                                                context,
+                                                key,
+                                              );
+                                              break;
+                                            case 'add_to_store':
+                                              _addPgpKeyToStore(context, key);
+                                              break;
+                                            case 'delete':
+                                              _showDeleteKeyDialog(
+                                                context,
+                                                key,
+                                                setSheetState,
+                                              );
+                                              break;
+                                          }
+                                        },
+                                        itemBuilder:
+                                            (context) => _keyActionMenuItems(
+                                              context,
+                                              key.type,
+                                            ),
+                                      )
+                                      : null,
                             ),
                           ),
                         const SizedBox(height: 8),
@@ -99,7 +114,11 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     );
   }
 
-  List<PopupMenuEntry<String>> _keyActionMenuItems(KeyRecordType type) {
+  List<PopupMenuEntry<String>> _keyActionMenuItems(
+    BuildContext context,
+    KeyRecordType type,
+  ) {
+    final localizations = AppLocalizations.of(context);
     return <PopupMenuEntry<String>>[
       const PopupMenuItem<String>(
         value: 'export_public',
@@ -115,7 +134,10 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
           child: Text('Add to .gpg-id'),
         ),
       const PopupMenuDivider(),
-      const PopupMenuItem<String>(value: 'delete', child: Text('Delete key')),
+      PopupMenuItem<String>(
+        value: 'delete',
+        child: Text(localizations.deleteKeyAction),
+      ),
     ];
   }
 
@@ -125,85 +147,100 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     StateSetter setSheetState,
   ) {
     final confirmation = TextEditingController();
-    final requiredText = _keyConfirmationLabel(key);
+    final requiredText = _keyDeletionConfirmationLabel(key);
+    var isDeleting = false;
     showDialog<void>(
       context: sheetContext,
       builder:
           (dialogContext) => StatefulBuilder(
-            builder:
-                (dialogContext, setDialogState) => AlertDialog(
-                  title: Text('Delete ${key.typeLabel} key'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        key.name,
-                        style: Theme.of(dialogContext).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text('Fingerprint: ${key.fingerprint}'),
-                      const SizedBox(height: 12),
-                      Text(
-                        'This removes local key material from this device. Type $requiredText to delete this key.',
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: confirmation,
-                        decoration: InputDecoration(
-                          labelText: 'Type $requiredText to confirm',
-                        ),
-                        onChanged: (_) => setDialogState(() {}),
-                      ),
-                    ],
-                  ),
-                  actions: <Widget>[
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('Cancel'),
+            builder: (dialogContext, setDialogState) {
+              final localizations = AppLocalizations.of(dialogContext);
+              return AlertDialog(
+                scrollable: true,
+                title: Text(localizations.deleteKeyTitle(key.typeLabel)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      key.name,
+                      style: Theme.of(dialogContext).textTheme.titleMedium,
                     ),
-                    FilledButton(
-                      onPressed:
-                          confirmation.text == requiredText
-                              ? () async {
-                                try {
-                                  if (key.type == KeyRecordType.pgp) {
-                                    await keyRepository.deletePgpKey(
-                                      key.fingerprint,
-                                    );
+                    const SizedBox(height: 8),
+                    Text(localizations.fingerprintValue(key.fingerprint)),
+                    const SizedBox(height: 12),
+                    Text(localizations.deleteKeyDescription(requiredText)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: confirmation,
+                      decoration: InputDecoration(
+                        labelText: localizations.deleteKeyConfirmation(
+                          requiredText,
+                        ),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                  ],
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: Text(localizations.cancel),
+                  ),
+                  FilledButton(
+                    onPressed:
+                        confirmation.text == requiredText && !isDeleting
+                            ? () async {
+                              setDialogState(() => isDeleting = true);
+                              try {
+                                var notification = localizations.keyDeleted(
+                                  key.name,
+                                );
+                                if (key.type == KeyRecordType.pgp) {
+                                  final outcome = await keyRepository
+                                      .deletePgpKey(key.fingerprint);
+                                  if (outcome.privateKeyAbsent) {
                                     await securityRepository
                                         .clearPgpPassphraseForFingerprint(
                                           key.fingerprint,
                                         );
-                                  } else {
-                                    await keyRepository.deleteSshKey(key.name);
                                   }
-                                  if (dialogContext.mounted) {
-                                    Navigator.of(dialogContext).pop();
+                                  if (outcome.publicCleanupFailed) {
+                                    notification =
+                                        localizations.pgpKeyDeletePartial;
                                   }
-                                  setSheetState(() {});
-                                  if (!sheetContext.mounted) return;
-                                  AppNotification.show(
-                                    sheetContext,
-                                    'Deleted ${key.name}',
-                                  );
-                                } catch (error) {
-                                  if (dialogContext.mounted) {
-                                    Navigator.of(dialogContext).pop();
-                                  }
-                                  setSheetState(() {});
-                                  if (!sheetContext.mounted) return;
-                                  AppNotification.show(
-                                    sheetContext,
-                                    error.toString(),
-                                  );
+                                } else {
+                                  await keyRepository.deleteSshKey(key.name);
                                 }
+                                if (dialogContext.mounted) {
+                                  Navigator.of(dialogContext).pop();
+                                }
+                                setSheetState(() {});
+                                if (!sheetContext.mounted) return;
+                                AppNotification.show(
+                                  sheetContext,
+                                  notification,
+                                );
+                              } catch (error) {
+                                if (dialogContext.mounted) {
+                                  Navigator.of(dialogContext).pop();
+                                }
+                                setSheetState(() {});
+                                if (!sheetContext.mounted) return;
+                                AppNotification.show(
+                                  sheetContext,
+                                  localizations.keyDeleteFailed(
+                                    error.toString(),
+                                  ),
+                                );
                               }
-                              : null,
-                      child: const Text('Delete'),
-                    ),
-                  ],
-                ),
+                            }
+                            : null,
+                    child: Text(localizations.delete),
+                  ),
+                ],
+              );
+            },
           ),
     );
   }
@@ -283,50 +320,51 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (sheet) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Import PGP key',
-                  style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+      builder:
+          (sheet) => SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Import PGP key',
+                      style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    PgpKeyImportBody(
+                      keyRepository: keyRepository,
+                      securityRepository: securityRepository,
+                      pathPickerService: pathPickerService,
+                      initialDirectory: _defaultKeyFileBasePath(),
+                      onCancel: () => Navigator.of(sheet).pop(),
+                      onCompleted: (completion) async {
+                        // Refresh so the key list reflects what the backend confirmed.
+                        await settingsRepository.refresh();
+                        if (sheet.mounted) {
+                          Navigator.of(sheet).pop();
+                        }
+                        if (!sheetContext.mounted) return;
+                        AppNotification.show(
+                          sheetContext,
+                          _importNotification(completion),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                PgpKeyImportBody(
-                  keyRepository: keyRepository,
-                  securityRepository: securityRepository,
-                  pathPickerService: pathPickerService,
-                  initialDirectory: _defaultKeyFileBasePath(),
-                  onCancel: () => Navigator.of(sheet).pop(),
-                  onCompleted: (completion) async {
-                    // Refresh so the key list reflects what the backend confirmed.
-                    await settingsRepository.refresh();
-                    if (sheet.mounted) {
-                      Navigator.of(sheet).pop();
-                    }
-                    if (!sheetContext.mounted) return;
-                    AppNotification.show(
-                      sheetContext,
-                      _importNotification(completion),
-                    );
-                  },
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 
@@ -657,6 +695,17 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
 String _keyConfirmationLabel(KeyRecord key) {
   final name = key.name.trim();
   return name.isEmpty ? key.fingerprint : name;
+}
+
+String _keyDeletionConfirmationLabel(KeyRecord key) {
+  final label = _keyConfirmationLabel(key);
+  if (key.type != KeyRecordType.pgp) return label;
+
+  final trailingEmail = RegExp(r'\s*<[^<>]+>\s*$').firstMatch(label);
+  if (trailingEmail == null) return label;
+
+  final displayName = label.substring(0, trailingEmail.start).trim();
+  return displayName.isEmpty ? label : displayName;
 }
 
 /// Reports the canonical imported key, and any secure-storage failure.

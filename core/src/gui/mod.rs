@@ -365,27 +365,55 @@ pub fn list_entries(request: ListEntriesRequest) -> GuiResult<Vec<EntrySummary>>
         )));
     }
 
-    let max_depth = if request.recursive { usize::MAX } else { 1 };
     let mut paths = BTreeSet::<String>::new();
     let mut entry_types = BTreeMap::<String, EntryType>::new();
 
-    for entry in WalkDir::new(&walk_root).min_depth(1).max_depth(max_depth).follow_links(false) {
+    for entry in WalkDir::new(&walk_root)
+        .min_depth(1)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| entry.file_name() != ".git")
+    {
         let entry = entry?;
         let path = entry.path();
-        if is_hidden_store_file(path) {
+        if !entry.file_type().is_file()
+            || !path.extension().is_some_and(|extension| extension == "gpg")
+        {
             continue;
         }
 
-        if entry.file_type().is_dir() {
-            let store_path = store_path_from_fs_path(&root, path, false)?;
-            paths.insert(store_path.clone());
-            entry_types.insert(store_path, EntryType::Directory);
-        } else if entry.file_type().is_file()
-            && path.extension().is_some_and(|extension| extension == "gpg")
-        {
+        let relative_to_walk_root = path.strip_prefix(&walk_root).map_err(|_| {
+            CoreError::ValidationError(format!(
+                "entry path is outside password store target: {}",
+                path.display()
+            ))
+        })?;
+        let relative_components = relative_to_walk_root.components().collect::<Vec<_>>();
+        if request.recursive || relative_components.len() == 1 {
             let store_path = store_path_from_fs_path(&root, path, true)?;
             paths.insert(store_path.clone());
             entry_types.insert(store_path, EntryType::Password);
+        }
+
+        if request.recursive {
+            let mut parent = path.parent();
+            while let Some(directory) = parent {
+                if directory == walk_root {
+                    break;
+                }
+                if !directory.starts_with(&walk_root) {
+                    break;
+                }
+                let store_path = store_path_from_fs_path(&root, directory, false)?;
+                paths.insert(store_path.clone());
+                entry_types.insert(store_path, EntryType::Directory);
+                parent = directory.parent();
+            }
+        } else if relative_components.len() > 1 {
+            let directory = walk_root.join(relative_components[0].as_os_str());
+            let store_path = store_path_from_fs_path(&root, &directory, false)?;
+            paths.insert(store_path.clone());
+            entry_types.insert(store_path, EntryType::Directory);
         }
     }
 
@@ -700,12 +728,6 @@ fn contains_shell_syntax(arg: &str) -> bool {
         || arg.contains('\r')
 }
 
-fn is_hidden_store_file(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| name == ".gpg-id" || name == ".git")
-}
-
 fn store_path_from_fs_path(root: &Path, path: &Path, trim_gpg: bool) -> GuiResult<String> {
     let relative = path.strip_prefix(root).map_err(|_| {
         CoreError::ValidationError(format!(
@@ -881,7 +903,10 @@ mod tests {
             unreachable!("not used by read-entry passphrase test")
         }
 
-        fn delete_key(&self, _fingerprint: &str) -> PgpBackendResult<()> {
+        fn delete_key(
+            &self,
+            _fingerprint: &str,
+        ) -> PgpBackendResult<crate::pgp::backend::PgpKeyDeletionResult> {
             unreachable!("not used by read-entry passphrase test")
         }
 

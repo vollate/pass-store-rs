@@ -12,7 +12,93 @@ use pars_core::pgp::import::{
 };
 use pars_core::pgp::rpgp_backend::RpgpBackend;
 use pars_core::util::test_util::{gpg_key_gen_batch, PgpKeyMaterialFixture};
+use pgp::crypto::hash::HashAlgorithm;
+use pgp::crypto::sym::SymmetricKeyAlgorithm;
+use pgp::types::{S2kParams, SecretParams, StringToKey};
 use secrecy::{ExposeSecret, SecretString};
+
+#[test]
+fn pure_rust_reprotects_the_low_cost_legacy_sha1_ci_fixture() {
+    const PASSPHRASE: &str = "pars legacy fixture password";
+    let material = include_bytes!("fixtures/legacy-sha1-coded-1-private.asc").to_vec();
+    let inspected = inspect_pgp_key_bytes(material).expect("inspect legacy CI fixture");
+    let fingerprint = inspected.fingerprint().to_string();
+    let source_key = inspected.secret_key().expect("private fixture");
+    assert!(
+        all_protected_packets_match(source_key, |params| {
+            matches!(
+                params,
+                S2kParams::Cfb {
+                    s2k: StringToKey::IteratedAndSalted {
+                        hash_alg: HashAlgorithm::Sha1,
+                        count: 1,
+                        ..
+                    },
+                    ..
+                }
+            )
+        }),
+        "unexpected fixture profiles: {:?}",
+        protected_packet_profiles(source_key)
+    );
+
+    let target = InteropContext::new();
+    let outcome = import_inspected_pgp_key(
+        &target.rpgp,
+        &inspected,
+        Some(&SecretString::from(PASSPHRASE)),
+        None,
+    )
+    .expect("re-protect CI fixture");
+    assert_eq!(outcome.fingerprint, fingerprint);
+
+    let exported = target.rpgp.export_private_key(&fingerprint, None).expect("export prepared key");
+    let prepared =
+        inspect_pgp_key_bytes(exported.armored_text.into_bytes()).expect("inspect prepared key");
+    assert!(all_protected_packets_match(
+        prepared.secret_key().expect("prepared private key"),
+        |params| {
+            matches!(
+                params,
+                S2kParams::Cfb {
+                    sym_alg: SymmetricKeyAlgorithm::AES256,
+                    s2k: StringToKey::IteratedAndSalted {
+                        hash_alg: HashAlgorithm::Sha256,
+                        count: 224,
+                        ..
+                    },
+                    ..
+                }
+            )
+        }
+    ));
+    prepared
+        .validate_passphrase(Some(&SecretString::from(PASSPHRASE)))
+        .expect("same passphrase unlocks prepared fixture");
+    assert_eq!(prepared.fingerprint(), fingerprint);
+
+    let encrypted_path = target.temp.path().join("prepared-ci-entry.gpg");
+    target
+        .rpgp
+        .encrypt_content(
+            &SecretString::new("prepared CI secret".into()),
+            &encrypted_path,
+            &[fingerprint],
+        )
+        .expect("encrypt with migrated fixture");
+    let decrypted = target
+        .rpgp
+        .decrypt_file(&encrypted_path, Some(&SecretString::from(PASSPHRASE)))
+        .expect("decrypt migrated fixture with the same passphrase");
+    assert_eq!(decrypted.expose_secret(), "prepared CI secret");
+    assert!(
+        target
+            .rpgp
+            .decrypt_file(&encrypted_path, Some(&SecretString::from("wrong passphrase")))
+            .is_err(),
+        "the migrated key must still require its original passphrase"
+    );
+}
 
 #[test]
 fn optional_gnupg_decrypts_rpgp_encrypted_entry() {
@@ -153,6 +239,110 @@ fn optional_gnupg_protected_private_key_requires_its_passphrase() {
     )
     .expect("correct passphrase should import");
     assert_eq!(outcome.fingerprint, fingerprint);
+}
+
+#[test]
+fn optional_gnupg_maximum_sha1_s2k_is_reprotected_and_remains_interoperable() {
+    if !run_interop_tests() {
+        return;
+    }
+    const PASSPHRASE: &str = "maximum legacy S2K passphrase";
+    const MAXIMUM_CODED_COUNT: u8 = 255;
+    const MAXIMUM_DECODED_COUNT: usize = 65_011_712;
+
+    assert_eq!(decode_s2k_count(MAXIMUM_CODED_COUNT), MAXIMUM_DECODED_COUNT);
+
+    let source = InteropContext::new();
+    let email = "interop-maximum-sha1@example.com";
+    source.generate_gnupg_key(email, Some(PASSPHRASE));
+    let fingerprint = source.gnupg_fingerprint(email);
+    let legacy_material = source.gnupg_export_sha1(&fingerprint, PASSPHRASE, MAXIMUM_DECODED_COUNT);
+    let inspected = inspect_pgp_key_bytes(legacy_material).expect("inspect legacy GnuPG key");
+    assert!(
+        all_protected_packets_match(inspected.secret_key().expect("secret key"), |params| {
+            matches!(
+                params,
+                S2kParams::Cfb {
+                    s2k: StringToKey::IteratedAndSalted {
+                        hash_alg: HashAlgorithm::Sha1,
+                        count: MAXIMUM_CODED_COUNT,
+                        ..
+                    },
+                    ..
+                }
+            )
+        }),
+        "GnuPG must actually export SHA-1 with coded count 255 for this test; got {:?}",
+        protected_packet_profiles(inspected.secret_key().expect("secret key"))
+    );
+
+    let target = InteropContext::new();
+    let outcome = import_inspected_pgp_key(
+        &target.rpgp,
+        &inspected,
+        Some(&SecretString::from(PASSPHRASE)),
+        None,
+    )
+    .expect("import and re-protect maximum SHA-1 S2K key");
+    assert_eq!(outcome.fingerprint, fingerprint);
+
+    let prepared_export =
+        target.rpgp.export_private_key(&fingerprint, None).expect("export prepared private key");
+    let prepared = inspect_pgp_key_bytes(prepared_export.armored_text.as_bytes().to_vec())
+        .expect("inspect prepared private key");
+    assert!(all_protected_packets_match(
+        prepared.secret_key().expect("prepared secret key"),
+        |params| {
+            matches!(
+                params,
+                S2kParams::Cfb {
+                    sym_alg: SymmetricKeyAlgorithm::AES256,
+                    s2k: StringToKey::IteratedAndSalted {
+                        hash_alg: HashAlgorithm::Sha256,
+                        count: 224,
+                        ..
+                    },
+                    ..
+                }
+            )
+        }
+    ));
+    prepared
+        .validate_passphrase(Some(&SecretString::from(PASSPHRASE)))
+        .expect("the same passphrase unlocks the prepared key");
+
+    let gnupg_target = InteropContext::new();
+    gnupg_target.import_armored_private_to_gnupg(&prepared_export.armored_text);
+    assert_eq!(gnupg_target.gnupg_fingerprint(email), fingerprint);
+
+    let encrypted_path = target.temp.path().join("prepared-to-gpg.gpg");
+    target
+        .rpgp
+        .encrypt_content(
+            &SecretString::new("prepared interop secret".into()),
+            &encrypted_path,
+            &[fingerprint],
+        )
+        .expect("encrypt with prepared public key");
+    let output = gpg_command(&gnupg_target.gnupg_home)
+        .args([
+            "--batch",
+            "--yes",
+            "--pinentry-mode",
+            "loopback",
+            "--passphrase",
+            PASSPHRASE,
+            "--decrypt",
+        ])
+        .arg(&encrypted_path)
+        .output()
+        .expect("run GnuPG decrypt");
+    assert!(
+        output.status.success(),
+        "GnuPG decrypt failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"prepared interop secret");
 }
 
 #[test]
@@ -321,6 +511,43 @@ impl InteropContext {
         output.stdout
     }
 
+    fn gnupg_export_sha1(
+        &self,
+        fingerprint: &str,
+        passphrase: &str,
+        decoded_count: usize,
+    ) -> Vec<u8> {
+        let output = gpg_command(&self.gnupg_home)
+            .args([
+                "--batch",
+                "--yes",
+                "--pinentry-mode",
+                "loopback",
+                "--armor",
+                "--passphrase",
+                passphrase,
+                "--s2k-mode",
+                "3",
+                "--s2k-digest-algo",
+                "SHA1",
+                "--s2k-cipher-algo",
+                "AES256",
+                "--s2k-count",
+                &decoded_count.to_string(),
+                "--export-secret-keys",
+                fingerprint,
+            ])
+            .output()
+            .expect("export legacy GnuPG private key");
+        assert!(
+            output.status.success(),
+            "GnuPG legacy export failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!output.stdout.is_empty(), "GnuPG legacy export was empty");
+        output.stdout
+    }
+
     fn import_public_key_to_gnupg(&self, fingerprint: &str) {
         let public_key = self.rpgp.export_public_key(fingerprint).unwrap();
         gpg_with_input(&self.gnupg_home, &["--import"], public_key.armored_text.as_bytes());
@@ -330,6 +557,45 @@ impl InteropContext {
         let private_key = self.rpgp.export_private_key(fingerprint, None).unwrap();
         gpg_with_input(&self.gnupg_home, &["--import"], private_key.armored_text.as_bytes());
     }
+
+    fn import_armored_private_to_gnupg(&self, armored_text: &str) {
+        gpg_with_input(&self.gnupg_home, &["--import"], armored_text.as_bytes());
+    }
+}
+
+fn decode_s2k_count(coded_count: u8) -> usize {
+    (16usize + usize::from(coded_count & 15)) << (usize::from(coded_count >> 4) + 6)
+}
+
+fn all_protected_packets_match(
+    key: &pgp::composed::SignedSecretKey,
+    predicate: impl Fn(&S2kParams) -> bool,
+) -> bool {
+    let matches = |params: &SecretParams| match params {
+        SecretParams::Encrypted(encrypted) => predicate(encrypted.string_to_key_params()),
+        SecretParams::Plain(_) => true,
+    };
+    matches(key.primary_key.secret_params())
+        && key.secret_subkeys.iter().all(|subkey| matches(subkey.key.secret_params()))
+}
+
+fn protected_packet_profiles(key: &pgp::composed::SignedSecretKey) -> Vec<String> {
+    std::iter::once(key.primary_key.secret_params())
+        .chain(key.secret_subkeys.iter().map(|subkey| subkey.key.secret_params()))
+        .map(|params| match params {
+            SecretParams::Encrypted(encrypted) => match encrypted.string_to_key_params() {
+                S2kParams::Cfb { sym_alg, s2k, .. }
+                | S2kParams::MalleableCfb { sym_alg, s2k, .. } => match s2k {
+                    StringToKey::IteratedAndSalted { hash_alg, count, .. } => {
+                        format!("{sym_alg:?}/{hash_alg:?}/{count}")
+                    }
+                    other => format!("{sym_alg:?}/{other:?}"),
+                },
+                other => format!("{other:?}"),
+            },
+            SecretParams::Plain(_) => "unprotected".to_string(),
+        })
+        .collect()
 }
 
 fn run_interop_tests() -> bool {

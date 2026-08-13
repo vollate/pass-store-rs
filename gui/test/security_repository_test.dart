@@ -233,7 +233,7 @@ void main() {
     });
 
     test(
-      'biometric unlock starts PGP session from cached passphrase',
+      'biometric authentication leaves cached PGP session preparation to app orchestration',
       () async {
         final biometrics = _FakeBiometricAuthAdapter(available: true);
         final repository = await SecureStorageSecurityRepository.load(
@@ -251,9 +251,10 @@ void main() {
         );
 
         expect(await repository.unlockWithBiometrics(), isTrue);
-        expect(repository.hasActivePgpSession, isTrue);
+        expect(repository.hasActivePgpSession, isFalse);
+        expect(await repository.readActivePgpPassphrase(), isNull);
         expect(
-          await repository.readActivePgpPassphrase(),
+          await repository.readPgpPassphrase(),
           const PgpPassphraseCache(
             fingerprint: 'ABC123',
             passphrase: 'pgp-passphrase',
