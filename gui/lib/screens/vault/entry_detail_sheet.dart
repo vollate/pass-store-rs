@@ -88,6 +88,14 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey<String>('entry-detail-sheet'),
+      width: double.infinity,
+      child: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     if (_needsPassphrase) {
       final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
       return AnimatedPadding(
@@ -228,6 +236,11 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     if (content == null) {
       return const SafeArea(child: SizedBox.shrink());
     }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final passwordSurfaceColor =
+        theme.inputDecorationTheme.fillColor ??
+        colorScheme.surfaceContainerHighest;
     final url = _entryUrl(content);
     return SafeArea(
       child: Padding(
@@ -267,8 +280,9 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
               ),
               const SizedBox(height: 16),
               DecoratedBox(
+                key: const ValueKey<String>('entry-password-surface'),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
+                  color: passwordSurfaceColor,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Padding(
@@ -278,11 +292,14 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                       Expanded(
                         child: Text(
                           _isRevealed ? content.password : '••••••••••••••',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(letterSpacing: _isRevealed ? 0 : 2),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: colorScheme.onSurface,
+                            letterSpacing: _isRevealed ? 0 : 2,
+                          ),
                         ),
                       ),
                       IconButton(
+                        color: colorScheme.onSurfaceVariant,
                         tooltip: _isRevealed ? 'Hide' : 'Reveal',
                         onPressed:
                             () => setState(() => _isRevealed = !_isRevealed),
@@ -568,6 +585,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                       data: password,
                       version: QrVersions.auto,
                       size: 200,
+                      // Keep QR modules on a fixed high-contrast background.
                       backgroundColor: Colors.white,
                     ),
                   ],

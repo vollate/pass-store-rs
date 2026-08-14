@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/app/pars_gui_app.dart';
+import 'package:pars_gui/app/pars_theme.dart';
 import 'package:pars_gui/l10n/app_localizations.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
@@ -1063,6 +1064,170 @@ void main() {
           .dy,
       lessThanOrEqualTo(keyboardTop),
     );
+  });
+
+  testWidgets('entry detail surfaces use the active dark theme', (
+    tester,
+  ) async {
+    final darkTheme = ParsTheme.dark();
+    final repository = _SecretActionRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: darkTheme,
+        home: Scaffold(
+          body: EntryDetailSheet(
+            entry: repository.entries.single,
+            repository: repository,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final passwordSurfaceFinder = find.byKey(
+      const ValueKey<String>('entry-password-surface'),
+    );
+    final passwordSurface = tester.widget<DecoratedBox>(passwordSurfaceFinder);
+    final passwordDecoration = passwordSurface.decoration as BoxDecoration;
+    expect(passwordDecoration.color, darkTheme.inputDecorationTheme.fillColor);
+    final passwordText = tester.widget<Text>(
+      find.descendant(of: passwordSurfaceFinder, matching: find.byType(Text)),
+    );
+    expect(passwordText.style?.color, darkTheme.colorScheme.onSurface);
+    final revealButton = tester.widget<IconButton>(
+      find.descendant(
+        of: passwordSurfaceFinder,
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(revealButton.color, darkTheme.colorScheme.onSurfaceVariant);
+
+    final securityRepository = InMemorySecurityRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: darkTheme,
+        home: Scaffold(
+          body: EntryDetailSheet(
+            key: const ValueKey<String>('passphrase-entry-detail'),
+            entry: repository.entries.single,
+            repository: repository,
+            securityRepository: securityRepository,
+            keys: const <KeyRecord>[_testPgpKey],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final passphraseDecorator = tester.widget<InputDecorator>(
+      find.byType(InputDecorator),
+    );
+    expect(passphraseDecorator.decoration.filled, isTrue);
+    expect(
+      passphraseDecorator.decoration.fillColor,
+      darkTheme.inputDecorationTheme.fillColor,
+    );
+  });
+
+  testWidgets('entry detail modal adapts to phone and wider route widths', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final viewportWidth in <double>[390, 900]) {
+      tester.view.physicalSize = Size(viewportWidth, 844);
+      final repository = _ControlledSecretActionRepository();
+      await _openEntryDetailModal(tester, repository: repository);
+
+      final expectedWidth = viewportWidth <= 640 ? viewportWidth : 640.0;
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey<String>('entry-detail-sheet')))
+            .width,
+        expectedWidth,
+      );
+
+      Navigator.of(
+        tester.element(
+          find.byKey(const ValueKey<String>('entry-detail-sheet')),
+        ),
+      ).pop();
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('entry detail modal keeps its width after secret reads finish', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _ControlledSecretActionRepository();
+    await _openEntryDetailModal(tester, repository: repository);
+    final detailFinder = find.byKey(
+      const ValueKey<String>('entry-detail-sheet'),
+    );
+    final loadingWidth = tester.getSize(detailFinder).width;
+
+    repository.completeRead();
+    await tester.pumpAndSettle();
+
+    expect(find.text('alice'), findsOneWidget);
+    expect(tester.getSize(detailFinder).width, loadingWidth);
+
+    Navigator.of(tester.element(detailFinder)).pop();
+    await tester.pumpAndSettle();
+
+    final failingRepository = _ControlledSecretActionRepository();
+    await _openEntryDetailModal(tester, repository: failingRepository);
+    final failingLoadingWidth = tester.getSize(detailFinder).width;
+
+    failingRepository.failRead();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not decrypt entry'), findsOneWidget);
+    expect(tester.getSize(detailFinder).width, failingLoadingWidth);
+  });
+
+  testWidgets('entry detail modal keeps its width after passphrase unlock', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _ControlledSecretActionRepository();
+    final securityRepository = InMemorySecurityRepository();
+    await _openEntryDetailModal(
+      tester,
+      repository: repository,
+      securityRepository: securityRepository,
+      keys: const <KeyRecord>[_testPgpKey],
+    );
+    final detailFinder = find.byKey(
+      const ValueKey<String>('entry-detail-sheet'),
+    );
+    final passphraseWidth = tester.getSize(detailFinder).width;
+
+    await tester.enterText(find.byType(TextField), 'session-passphrase');
+    await tester.tap(find.text('Unlock entry'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(tester.getSize(detailFinder).width, passphraseWidth);
+
+    repository.completeRead();
+    await tester.pumpAndSettle();
+
+    expect(find.text('alice'), findsOneWidget);
+    expect(tester.getSize(detailFinder).width, passphraseWidth);
   });
 
   testWidgets('vault refresh loads bridge-backed entries and git status', (
@@ -3459,6 +3624,47 @@ void main() {
   });
 }
 
+Future<void> _openEntryDetailModal(
+  WidgetTester tester, {
+  required VaultRepository repository,
+  ThemeData? theme,
+  SecurityRepository? securityRepository,
+  List<KeyRecord> keys = const <KeyRecord>[],
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: theme ?? ParsTheme.light(),
+      home: Builder(
+        builder:
+            (context) => Scaffold(
+              body: Center(
+                child: FilledButton(
+                  onPressed:
+                      () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        showDragHandle: false,
+                        builder:
+                            (_) => EntryDetailSheet(
+                              entry: repository.entries.single,
+                              repository: repository,
+                              securityRepository: securityRepository,
+                              keys: keys,
+                            ),
+                      ),
+                  child: const Text('Open entry detail'),
+                ),
+              ),
+            ),
+      ),
+    ),
+  );
+
+  await tester.tap(find.text('Open entry detail'));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 Future<void> _completeGestureSetup(WidgetTester tester) async {
   await _drawGesture(tester);
   await tester.pumpAndSettle();
@@ -4950,6 +5156,32 @@ class _RefreshingVaultRepository implements VaultRepository, GitRepository {
     required String content,
     required bool overwrite,
   }) async => EntryOperationResult(path: path, overwroteExisting: false);
+}
+
+class _ControlledSecretActionRepository extends _SecretActionRepository {
+  final Completer<SecretContent> _readCompleter = Completer<SecretContent>();
+
+  @override
+  Future<SecretContent> readEntry(PasswordEntry entry) {
+    readCount += 1;
+    return _readCompleter.future;
+  }
+
+  void completeRead() {
+    _readCompleter.complete(
+      const SecretContent(
+        password: 'loaded-secret',
+        fields: <ParsedSecretField>[
+          ParsedSecretField(key: 'username', label: 'Username', value: 'alice'),
+        ],
+        rawNotes: '',
+      ),
+    );
+  }
+
+  void failRead() {
+    _readCompleter.completeError(Exception('missing private key'));
+  }
 }
 
 class _SecretActionRepository implements VaultRepository {
