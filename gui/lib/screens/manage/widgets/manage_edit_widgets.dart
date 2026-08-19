@@ -7,10 +7,14 @@ class _EditEntrySheet extends StatefulWidget {
     required this.onReadEntry,
     required this.onSaveRawNotes,
     required this.onReplacePassword,
+    this.title = 'Edit entries',
+    this.showEntryPicker = true,
   });
 
   final List<PasswordEntry> entries;
   final bool canCommit;
+  final String title;
+  final bool showEntryPicker;
   final _ReadEntryForEdit onReadEntry;
   final _SaveEditedEntrySubmit onSaveRawNotes;
   final _ReplaceEntryPasswordSubmit onReplacePassword;
@@ -109,26 +113,29 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
     if (widget.entries.isEmpty) {
       return _operationSheet(
         context: context,
-        title: 'Edit entries',
+        title: widget.title,
         children: const <Widget>[Text('No entries to edit.')],
       );
     }
     final entry = _entry ?? widget.entries.first;
     return _operationSheet(
       context: context,
-      title: 'Edit entries',
+      title: widget.title,
       children: <Widget>[
-        _EntryPicker(
-          entries: widget.entries,
-          value: entry,
-          onChanged:
-              _saving
-                  ? null
-                  : (value) {
-                    setState(() => _entry = value);
-                    _loadEntry(value);
-                  },
-        ),
+        if (widget.showEntryPicker)
+          _EntryPicker(
+            entries: widget.entries,
+            value: entry,
+            onChanged:
+                _saving
+                    ? null
+                    : (value) {
+                      setState(() => _entry = value);
+                      _loadEntry(value);
+                    },
+          )
+        else
+          Text('Path: ${entry.path}'),
         if (_loading) ...const <Widget>[
           SizedBox(height: 16),
           LinearProgressIndicator(),

@@ -12,7 +12,7 @@ class EntryTile extends StatelessWidget {
 
   final PasswordEntry entry;
   final VoidCallback onTap;
-  final VoidCallback onCopy;
+  final VoidCallback? onCopy;
 
   @override
   Widget build(BuildContext context) {
@@ -35,9 +35,10 @@ class EntryTile extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: entry.isDirectory
-            ? const Icon(Icons.chevron_right)
-            : TextButton(onPressed: onCopy, child: const Text('Copy')),
+        trailing:
+            entry.isDirectory
+                ? const Icon(Icons.chevron_right)
+                : TextButton(onPressed: onCopy, child: const Text('Copy')),
       ),
     );
   }

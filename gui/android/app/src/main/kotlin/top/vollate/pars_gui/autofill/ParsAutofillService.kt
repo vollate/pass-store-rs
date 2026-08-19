@@ -8,8 +8,10 @@ import android.service.autofill.FillCallback
 import android.service.autofill.FillRequest
 import android.service.autofill.FillResponse
 import android.service.autofill.SaveCallback
+import android.view.autofill.AutofillId
 import android.service.autofill.SaveRequest
 import android.view.autofill.AutofillValue
+import top.vollate.pars_gui.R
 
 class ParsAutofillService : AutofillService() {
     override fun onFillRequest(
@@ -23,7 +25,7 @@ class ParsAutofillService : AutofillService() {
         }
 
         val structure = request.fillContexts.lastOrNull()?.structure
-        val parsed = structure?.let(ParsAutofillRequestParser::parse)
+        val parsed = structure?.let { ParsAutofillRequestParser.parse(this, it) }
         if (parsed == null) {
             callback.onSuccess(null)
             return
@@ -33,12 +35,12 @@ class ParsAutofillService : AutofillService() {
             ParsAutofillNativeBridge.queryCandidates(
                 context = this,
                 website = parsed.website,
-                androidPackage = parsed.androidPackage,
+                appName = parsed.appName,
                 query = parsed.query,
                 limit = 5,
             )
         if (candidates.isEmpty()) {
-            callback.onSuccess(null)
+            callback.onSuccess(noMatchesResponse(parsed))
             return
         }
 
@@ -56,6 +58,31 @@ class ParsAutofillService : AutofillService() {
         callback.onSuccess()
     }
 
+    @Suppress("DEPRECATION")
+    private fun noMatchesResponse(parsed: ParsedAutofillRequest): FillResponse {
+        val ids =
+            listOfNotNull(parsed.usernameId, parsed.passwordId)
+                .distinct()
+                .toTypedArray<AutofillId>()
+        val target = parsed.website ?: parsed.appName ?: getString(R.string.app_name)
+        val presentation =
+            ParsAutofillUnlockActivity.presentation(
+                context = this,
+                title = getString(R.string.autofill_no_matches_title),
+                subtitle = target,
+            )
+        val intent = ParsAutofillUnlockActivity.noMatchesIntent(this)
+        val authentication =
+            ParsAutofillUnlockActivity.pendingIntent(
+                context = this,
+                requestCode = NO_MATCH_REQUEST_CODE,
+                intent = intent,
+            ).intentSender
+        return FillResponse.Builder()
+            .setAuthentication(ids, authentication, presentation)
+            .build()
+    }
+
     private fun datasetFor(
         candidate: ParsAutofillCandidate,
         parsed: ParsedAutofillRequest,
@@ -64,7 +91,7 @@ class ParsAutofillService : AutofillService() {
             ParsAutofillUnlockActivity.presentation(
                 context = this,
                 title = candidate.displayName,
-                subtitle = candidate.username ?: candidate.matchValue.ifBlank { "Pars password" },
+                subtitle = candidate.username,
             )
         val intent =
             ParsAutofillUnlockActivity.autofillIntent(
@@ -89,5 +116,9 @@ class ParsAutofillService : AutofillService() {
             builder.setValue(id, null as AutofillValue?, presentation)
         }
         return builder.build()
+    }
+
+    private companion object {
+        const val NO_MATCH_REQUEST_CODE = 0x50415253
     }
 }

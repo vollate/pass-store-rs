@@ -15,14 +15,18 @@ struct ParsAutofillIndex: Codable {
 struct ParsAutofillIndexEntry: Codable {
   let path: String
   let displayName: String
-  let username: String?
-  let websites: [String]
+  let serviceName: String?
+  let username: String
+  let pathWebsite: String?
+  let enrichedWebsites: [String]
 
   enum CodingKeys: String, CodingKey {
     case path
     case displayName = "display_name"
+    case serviceName = "service_name"
     case username
-    case websites
+    case pathWebsite = "path_website"
+    case enrichedWebsites = "enriched_websites"
   }
 }
 
@@ -136,19 +140,33 @@ enum ParsAutofillSharedState {
       completion?(false)
       return
     }
-    let identities = index.entries.flatMap { entry in
-      entry.websites.map { website in
-        ASPasswordCredentialIdentity(
-          serviceIdentifier: ASCredentialServiceIdentifier(
-            identifier: website,
-            type: .domain),
-          user: entry.username ?? entry.displayName,
-          recordIdentifier: entry.path)
+    var seen = Set<String>()
+    var identities: [ASPasswordCredentialIdentity] = []
+    for entry in index.entries {
+      var websites = entry.enrichedWebsites
+      if let pathWebsite = entry.pathWebsite {
+        websites.insert(pathWebsite, at: 0)
+      }
+      for website in websites {
+        let key = "\(website)\u{0}\(entry.path)"
+        guard isHostLike(website), seen.insert(key).inserted else { continue }
+        identities.append(
+          ASPasswordCredentialIdentity(
+            serviceIdentifier: ASCredentialServiceIdentifier(
+              identifier: website,
+              type: .domain),
+            user: entry.username,
+            recordIdentifier: entry.path))
       }
     }
     ASCredentialIdentityStore.shared.replaceCredentialIdentities(with: identities) { success, _ in
       completion?(success)
     }
+  }
+
+  private static func isHostLike(_ value: String) -> Bool {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.contains(".") && !trimmed.contains(where: { $0.isWhitespace })
   }
 
   private static func savePassphrase(_ passphrase: String) {

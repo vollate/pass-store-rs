@@ -12,7 +12,7 @@ use pars_bridge::api::{
     InsertEntryRequest, InspectAppStateRequest, InspectPgpKeyFileRequest, InspectPgpKeyTextRequest,
     ListEntriesRequest, ListKeysRequest, OpenGithubSshSettingsRequest, PgpImportFailureKind,
     PgpKeyDeletionFailureKind, PgpKeyKindDto, PreparePgpPrivateKeyRequest,
-    RefreshAutofillIndexRequest, SUPPORTED_METHODS,
+    RebuildAutofillIndexRequest, SUPPORTED_METHODS,
 };
 use pars_core::util::test_util::PgpKeyMaterialFixture;
 
@@ -79,7 +79,14 @@ fn bridge_method_table_matches_generated_api_surface() {
         "export_ssh_private_key",
         "delete_ssh_key",
         "open_github_ssh_settings",
-        "refresh_autofill_index",
+        "rebuild_autofill_index",
+        "upsert_autofill_index_entry",
+        "move_autofill_index_entry",
+        "remove_autofill_index_entry",
+        "patch_autofill_index_ranking",
+        "reconcile_autofill_index",
+        "enrich_autofill_index_websites",
+        "clear_autofill_index_websites",
         "query_autofill_candidates",
         "resolve_autofill_credential",
         "clear_autofill_index",
@@ -369,8 +376,8 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
     let inserted = block_on(api::insert_entry(InsertEntryRequest {
         config_path: config_path.display().to_string(),
         root: store_root.display().to_string(),
-        path: "work/example".to_string(),
-        content: "entry-secret\nusername: entry\nurl: https://example.com/login\nandroid-package: com.example.app"
+        path: "example.com/entry".to_string(),
+        content: "entry-secret\nusername: hidden-name\nurl: https://ignored.example/login"
             .to_string(),
         overwrite: false,
         pgp_executable: String::new(),
@@ -380,66 +387,66 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
     let read = block_on(api::read_entry(EntryRequest {
         config_path: config_path.display().to_string(),
         root: store_root.display().to_string(),
-        path: "work/example".to_string(),
+        path: "example.com/entry".to_string(),
         pgp_executable: None,
         passphrase: None,
     }));
     assert!(read.error.is_none(), "{:?}", read.error);
     let secret = read.secret.expect("secret");
     assert_eq!(secret.password, "entry-secret");
-    assert_eq!(secret.fields[0].value, "entry");
+    assert_eq!(secret.fields[0].value, "hidden-name");
 
     let index_path = temp.path().join("autofill.json");
-    let refreshed = block_on(api::refresh_autofill_index(RefreshAutofillIndexRequest {
-        config_path: config_path.display().to_string(),
+    let rebuilt = block_on(api::rebuild_autofill_index(RebuildAutofillIndexRequest {
         index_path: index_path.display().to_string(),
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         root: store_root.display().to_string(),
-        pgp_executable: None,
-        passphrase: None,
         entries: vec![AutofillEntryMetadataDto {
-            path: "work/example".to_string(),
-            display_name: Some("Example".to_string()),
+            path: "example.com/entry".to_string(),
             is_favorite: true,
             recent_rank: Some(0),
         }],
     }));
-    assert!(refreshed.error.is_none(), "{:?}", refreshed.error);
+    assert!(rebuilt.error.is_none(), "{:?}", rebuilt.error);
+    let raw_index = std::fs::read_to_string(&index_path).expect("path index");
+    assert!(!raw_index.contains("entry-secret"));
+    assert!(!raw_index.contains("hidden-name"));
+    assert!(!raw_index.contains("ignored.example"));
 
     let website = block_on(api::query_autofill_candidates(AutofillQueryRequest {
         index_path: index_path.display().to_string(),
         website: Some("example.com".to_string()),
-        android_package: None,
+        app_name: None,
         query: None,
         limit: 10,
     }));
     assert!(website.error.is_none(), "{:?}", website.error);
-    assert_eq!(website.candidates[0].path, "work/example");
-    assert_eq!(website.candidates[0].match_kind, "website");
+    assert_eq!(website.candidates[0].path, "example.com/entry");
+    assert_eq!(website.candidates[0].match_kind, "path_website");
 
-    let package = block_on(api::query_autofill_candidates(AutofillQueryRequest {
+    let app = block_on(api::query_autofill_candidates(AutofillQueryRequest {
         index_path: index_path.display().to_string(),
         website: None,
-        android_package: Some("com.example.app".to_string()),
+        app_name: Some("EXAMPLE.COM".to_string()),
         query: None,
         limit: 10,
     }));
-    assert!(package.error.is_none(), "{:?}", package.error);
-    assert_eq!(package.candidates[0].match_kind, "android_package");
-    assert!(package.candidates[0].score > website.candidates[0].score);
+    assert!(app.error.is_none(), "{:?}", app.error);
+    assert_eq!(app.candidates[0].match_kind, "app_name");
+    assert!(website.candidates[0].score > app.candidates[0].score);
 
     let credential = block_on(api::resolve_autofill_credential(AutofillCredentialRequest {
         config_path: config_path.display().to_string(),
         index_path: index_path.display().to_string(),
         root: store_root.display().to_string(),
-        path: "work/example".to_string(),
+        path: "example.com/entry".to_string(),
         pgp_executable: None,
         passphrase: None,
     }));
     assert!(credential.error.is_none(), "{:?}", credential.error);
     let credential = credential.credential.expect("credential");
-    assert_eq!(credential.username.as_deref(), Some("entry"));
+    assert_eq!(credential.username, "entry");
     assert_eq!(credential.password, "entry-secret");
 
     let cleared = block_on(api::clear_autofill_index(ClearAutofillIndexRequest {

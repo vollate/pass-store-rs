@@ -1,10 +1,10 @@
 part of '../settings_screen.dart';
 
 extension _SettingsScreenSecuritySheets on SettingsScreen {
-  void _showTextSheet(BuildContext context, String title) {
+  void _showUnavailableSheet(BuildContext context, String title) {
     showModalBottomSheet<void>(
       context: context,
-      builder: (context) => _TextPlaceholderSheetBody(title: title),
+      builder: (context) => _UnavailableFeatureSheetBody(title: title),
     );
   }
 
@@ -88,8 +88,8 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
   }
 }
 
-class _TextPlaceholderSheetBody extends StatelessWidget {
-  const _TextPlaceholderSheetBody({required this.title});
+class _UnavailableFeatureSheetBody extends StatelessWidget {
+  const _UnavailableFeatureSheetBody({required this.title});
 
   final String title;
 
@@ -110,7 +110,8 @@ class _TextPlaceholderSheetBody extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const Text(
-              'This configuration surface is mocked in phase 1 and will be wired to platform services later.',
+              'This repository does not provide the operations required for '
+              'this feature. Use a bridge-backed repository to enable it.',
             ),
           ],
         ),
@@ -593,9 +594,8 @@ class _PgpPassphraseStorageSheetBodyState
                                 fingerprint: _selectedFingerprint!,
                                 passphrase: _passphrase.text,
                               );
-                              await widget.autofillRepository?.refreshIndex(
-                                widget.entries,
-                              );
+                              await widget.autofillRepository
+                                  ?.publishPlatformState();
                               _passphrase.clear();
                               widget.onSecuritySettingsChanged?.call();
                               setState(() {});
@@ -614,7 +614,8 @@ class _PgpPassphraseStorageSheetBodyState
                           ? () async {
                             await widget.securityRepository
                                 .clearPgpPassphrase();
-                            await widget.autofillRepository?.clearIndex();
+                            await widget.autofillRepository
+                                ?.publishPlatformState();
                             widget.onSecuritySettingsChanged?.call();
                             setState(() {});
                           }

@@ -55,23 +55,7 @@ fn pure_rust_reprotects_the_low_cost_legacy_sha1_ci_fixture() {
     let exported = target.rpgp.export_private_key(&fingerprint, None).expect("export prepared key");
     let prepared =
         inspect_pgp_key_bytes(exported.armored_text.into_bytes()).expect("inspect prepared key");
-    assert!(all_protected_packets_match(
-        prepared.secret_key().expect("prepared private key"),
-        |params| {
-            matches!(
-                params,
-                S2kParams::Cfb {
-                    sym_alg: SymmetricKeyAlgorithm::AES256,
-                    s2k: StringToKey::IteratedAndSalted {
-                        hash_alg: HashAlgorithm::Sha256,
-                        count: 224,
-                        ..
-                    },
-                    ..
-                }
-            )
-        }
-    ));
+    assert_calibrated_v4_packets(prepared.secret_key().expect("prepared private key"));
     prepared
         .validate_passphrase(Some(&SecretString::from(PASSPHRASE)))
         .expect("same passphrase unlocks prepared fixture");
@@ -290,23 +274,7 @@ fn optional_gnupg_maximum_sha1_s2k_is_reprotected_and_remains_interoperable() {
         target.rpgp.export_private_key(&fingerprint, None).expect("export prepared private key");
     let prepared = inspect_pgp_key_bytes(prepared_export.armored_text.as_bytes().to_vec())
         .expect("inspect prepared private key");
-    assert!(all_protected_packets_match(
-        prepared.secret_key().expect("prepared secret key"),
-        |params| {
-            matches!(
-                params,
-                S2kParams::Cfb {
-                    sym_alg: SymmetricKeyAlgorithm::AES256,
-                    s2k: StringToKey::IteratedAndSalted {
-                        hash_alg: HashAlgorithm::Sha256,
-                        count: 224,
-                        ..
-                    },
-                    ..
-                }
-            )
-        }
-    ));
+    assert_calibrated_v4_packets(prepared.secret_key().expect("prepared secret key"));
     prepared
         .validate_passphrase(Some(&SecretString::from(PASSPHRASE)))
         .expect("the same passphrase unlocks the prepared key");
@@ -577,6 +545,32 @@ fn all_protected_packets_match(
     };
     matches(key.primary_key.secret_params())
         && key.secret_subkeys.iter().all(|subkey| matches(subkey.key.secret_params()))
+}
+
+fn assert_calibrated_v4_packets(key: &pgp::composed::SignedSecretKey) {
+    const MIN_DECODED_COUNT: usize = 1 << 20;
+    const MAX_DECODED_COUNT: usize = 1 << 24;
+    let mut counts = Vec::new();
+    for params in std::iter::once(key.primary_key.secret_params())
+        .chain(key.secret_subkeys.iter().map(|subkey| subkey.key.secret_params()))
+    {
+        let SecretParams::Encrypted(encrypted) = params else {
+            continue;
+        };
+        let S2kParams::Cfb {
+            sym_alg: SymmetricKeyAlgorithm::AES256,
+            s2k: StringToKey::IteratedAndSalted { hash_alg: HashAlgorithm::Sha256, count, .. },
+            ..
+        } = encrypted.string_to_key_params()
+        else {
+            panic!("unexpected calibrated packet: {params:?}");
+        };
+        let decoded = decode_s2k_count(*count);
+        assert!((MIN_DECODED_COUNT..=MAX_DECODED_COUNT).contains(&decoded));
+        counts.push(*count);
+    }
+    assert!(!counts.is_empty());
+    assert!(counts.iter().all(|count| *count == counts[0]));
 }
 
 fn protected_packet_profiles(key: &pgp::composed::SignedSecretKey) -> Vec<String> {

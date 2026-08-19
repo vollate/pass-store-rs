@@ -4,8 +4,7 @@ use std::process::Command;
 
 use pars_core::autofill::{
     self, AutofillCredential, AutofillCredentialRequest as CoreAutofillCredentialRequest,
-    AutofillEntryMetadata, AutofillIndexEntry, AutofillQueryRequest as CoreAutofillQueryRequest,
-    RefreshAutofillIndexRequest as CoreRefreshAutofillIndexRequest,
+    AutofillEntryMetadata, AutofillQueryRequest as CoreAutofillQueryRequest,
 };
 use pars_core::config::cli::{
     load_config as load_core_config, save_config as save_core_config, ParsConfig, PgpBackendKind,
@@ -80,7 +79,14 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "export_ssh_private_key",
     "delete_ssh_key",
     "open_github_ssh_settings",
-    "refresh_autofill_index",
+    "rebuild_autofill_index",
+    "upsert_autofill_index_entry",
+    "move_autofill_index_entry",
+    "remove_autofill_index_entry",
+    "patch_autofill_index_ranking",
+    "reconcile_autofill_index",
+    "enrich_autofill_index_websites",
+    "clear_autofill_index_websites",
     "query_autofill_candidates",
     "resolve_autofill_credential",
     "clear_autofill_index",
@@ -649,30 +655,78 @@ pub struct DeleteSshKeyRequest {
 pub struct OpenGithubSshSettingsRequest {}
 
 #[derive(Debug, Clone)]
-pub struct RefreshAutofillIndexRequest {
-    pub config_path: String,
+pub struct RebuildAutofillIndexRequest {
     pub index_path: String,
     pub store_id: String,
     pub store_name: String,
     pub root: String,
-    pub pgp_executable: Option<String>,
-    pub passphrase: Option<String>,
     pub entries: Vec<AutofillEntryMetadataDto>,
 }
 
 #[derive(Debug, Clone)]
 pub struct AutofillEntryMetadataDto {
     pub path: String,
-    pub display_name: Option<String>,
     pub is_favorite: bool,
     pub recent_rank: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpsertAutofillIndexEntryRequest {
+    pub index_path: String,
+    pub entry: AutofillEntryMetadataDto,
+}
+
+#[derive(Debug, Clone)]
+pub struct MoveAutofillIndexEntryRequest {
+    pub index_path: String,
+    pub old_path: String,
+    pub new_path: String,
+    pub recursive: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct RemoveAutofillIndexEntryRequest {
+    pub index_path: String,
+    pub path: String,
+    pub recursive: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct PatchAutofillIndexRankingRequest {
+    pub index_path: String,
+    pub entries: Vec<AutofillEntryMetadataDto>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReconcileAutofillIndexRequest {
+    pub index_path: String,
+    pub store_id: String,
+    pub store_name: String,
+    pub root: String,
+    pub entries: Vec<AutofillEntryMetadataDto>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnrichAutofillIndexWebsitesRequest {
+    pub config_path: String,
+    pub index_path: String,
+    pub root: String,
+    pub pgp_executable: Option<String>,
+    pub passphrase: Option<String>,
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClearAutofillIndexWebsitesRequest {
+    pub index_path: String,
+    pub paths: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct AutofillQueryRequest {
     pub index_path: String,
     pub website: Option<String>,
-    pub android_package: Option<String>,
+    pub app_name: Option<String>,
     pub query: Option<String>,
     pub limit: u32,
 }
@@ -804,7 +858,7 @@ pub struct KeyExportDto {
 pub struct AutofillCandidateDto {
     pub path: String,
     pub display_name: String,
-    pub username: Option<String>,
+    pub username: String,
     pub match_kind: String,
     pub match_value: String,
     pub score: i32,
@@ -815,19 +869,8 @@ pub struct AutofillCandidateDto {
 #[derive(Debug, Clone)]
 pub struct AutofillCredentialDto {
     pub path: String,
-    pub username: Option<String>,
+    pub username: String,
     pub password: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct AutofillIndexEntryDto {
-    pub path: String,
-    pub display_name: String,
-    pub username: Option<String>,
-    pub websites: Vec<String>,
-    pub android_packages: Vec<String>,
-    pub is_favorite: bool,
-    pub recent_rank: Option<u32>,
 }
 
 pub async fn load_config(request: LoadConfigRequest) -> ConfigResponse {
@@ -897,23 +940,94 @@ pub async fn copy_entry_password(request: EntryRequest) -> CopyEntryPasswordResp
     }
 }
 
-pub async fn refresh_autofill_index(request: RefreshAutofillIndexRequest) -> UnitResponse {
+pub async fn rebuild_autofill_index(request: RebuildAutofillIndexRequest) -> UnitResponse {
+    let result = autofill::rebuild_autofill_index(autofill::RebuildAutofillIndexRequest {
+        index_path: PathBuf::from(request.index_path),
+        store_id: request.store_id,
+        store_name: request.store_name,
+        store_root: PathBuf::from(request.root),
+        entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
+    });
+    UnitResponse { error: result.err().map(BridgeFailure::from) }
+}
+
+pub async fn upsert_autofill_index_entry(request: UpsertAutofillIndexEntryRequest) -> UnitResponse {
+    let result = autofill::upsert_autofill_index_entry(autofill::UpsertAutofillIndexEntryRequest {
+        index_path: PathBuf::from(request.index_path),
+        entry: request.entry.into(),
+    });
+    UnitResponse { error: result.err().map(BridgeFailure::from) }
+}
+
+pub async fn move_autofill_index_entry(request: MoveAutofillIndexEntryRequest) -> UnitResponse {
+    let result = autofill::move_autofill_index_entry(autofill::MoveAutofillIndexEntryRequest {
+        index_path: PathBuf::from(request.index_path),
+        old_path: request.old_path,
+        new_path: request.new_path,
+        recursive: request.recursive,
+    });
+    UnitResponse { error: result.err().map(BridgeFailure::from) }
+}
+
+pub async fn remove_autofill_index_entry(request: RemoveAutofillIndexEntryRequest) -> UnitResponse {
+    let result = autofill::remove_autofill_index_entry(autofill::RemoveAutofillIndexEntryRequest {
+        index_path: PathBuf::from(request.index_path),
+        path: request.path,
+        recursive: request.recursive,
+    });
+    UnitResponse { error: result.err().map(BridgeFailure::from) }
+}
+
+pub async fn patch_autofill_index_ranking(
+    request: PatchAutofillIndexRankingRequest,
+) -> UnitResponse {
+    let result =
+        autofill::patch_autofill_index_ranking(autofill::PatchAutofillIndexRankingRequest {
+            index_path: PathBuf::from(request.index_path),
+            entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
+        });
+    UnitResponse { error: result.err().map(BridgeFailure::from) }
+}
+
+pub async fn reconcile_autofill_index(request: ReconcileAutofillIndexRequest) -> UnitResponse {
+    let result = autofill::reconcile_autofill_index(autofill::ReconcileAutofillIndexRequest {
+        index_path: PathBuf::from(request.index_path),
+        store_id: request.store_id,
+        store_name: request.store_name,
+        store_root: PathBuf::from(request.root),
+        entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
+    });
+    UnitResponse { error: result.err().map(BridgeFailure::from) }
+}
+
+pub async fn enrich_autofill_index_websites(
+    request: EnrichAutofillIndexWebsitesRequest,
+) -> UnitResponse {
     let backend = match pgp_backend(&request.config_path, request.pgp_executable.as_deref()) {
         Ok(backend) => backend,
         Err(error) => return UnitResponse { error: Some(error) },
     };
-    let result = autofill::refresh_autofill_index_with_backend(
-        CoreRefreshAutofillIndexRequest {
+    let result = autofill::enrich_autofill_index_websites_with_backend(
+        autofill::EnrichAutofillIndexWebsitesRequest {
             index_path: PathBuf::from(request.index_path),
-            store_id: request.store_id,
-            store_name: request.store_name,
             store_root: PathBuf::from(request.root),
             pgp_executable: request.pgp_executable.unwrap_or_default(),
             passphrase: request.passphrase,
-            entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
+            paths: request.paths,
         },
         backend.as_ref(),
     );
+    UnitResponse { error: result.err().map(BridgeFailure::from) }
+}
+
+pub async fn clear_autofill_index_websites(
+    request: ClearAutofillIndexWebsitesRequest,
+) -> UnitResponse {
+    let result =
+        autofill::clear_autofill_index_websites(autofill::ClearAutofillIndexWebsitesRequest {
+            index_path: PathBuf::from(request.index_path),
+            paths: request.paths,
+        });
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
 
@@ -923,7 +1037,7 @@ pub async fn query_autofill_candidates(
     match autofill::query_autofill_candidates(CoreAutofillQueryRequest {
         index_path: PathBuf::from(request.index_path),
         website: request.website,
-        android_package: request.android_package,
+        app_name: request.app_name,
         query: request.query,
         limit: request.limit as usize,
     }) {
@@ -2120,12 +2234,7 @@ impl From<KeyExportResult> for KeyExportDto {
 
 impl From<AutofillEntryMetadataDto> for AutofillEntryMetadata {
     fn from(value: AutofillEntryMetadataDto) -> Self {
-        Self {
-            path: value.path,
-            display_name: value.display_name,
-            is_favorite: value.is_favorite,
-            recent_rank: value.recent_rank,
-        }
+        Self { path: value.path, is_favorite: value.is_favorite, recent_rank: value.recent_rank }
     }
 }
 
@@ -2147,19 +2256,5 @@ impl From<autofill::AutofillCandidate> for AutofillCandidateDto {
 impl From<AutofillCredential> for AutofillCredentialDto {
     fn from(value: AutofillCredential) -> Self {
         Self { path: value.path, username: value.username, password: value.password }
-    }
-}
-
-impl From<AutofillIndexEntry> for AutofillIndexEntryDto {
-    fn from(value: AutofillIndexEntry) -> Self {
-        Self {
-            path: value.path,
-            display_name: value.display_name,
-            username: value.username,
-            websites: value.websites,
-            android_packages: value.android_packages,
-            is_favorite: value.is_favorite,
-            recent_rank: value.recent_rank,
-        }
     }
 }

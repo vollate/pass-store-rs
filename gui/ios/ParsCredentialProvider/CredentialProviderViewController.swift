@@ -99,7 +99,7 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
       return
     }
     let passwordCredential = ASPasswordCredential(
-      user: credential.username ?? credential.path,
+      user: credential.username,
       password: credential.password)
     extensionContext.completeRequest(
       withSelectedCredential: passwordCredential,
@@ -126,7 +126,7 @@ extension CredentialProviderViewController: UITableViewDataSource, UITableViewDe
     let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
     let candidate = candidates[indexPath.row]
     cell.textLabel?.text = candidate.displayName
-    cell.detailTextLabel?.text = candidate.username ?? candidate.matchValue
+    cell.detailTextLabel?.text = candidate.username
     cell.accessoryType = .disclosureIndicator
     return cell
   }

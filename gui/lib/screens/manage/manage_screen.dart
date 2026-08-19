@@ -10,6 +10,195 @@ part 'widgets/manage_batch_widgets.dart';
 part 'widgets/manage_edit_widgets.dart';
 part 'widgets/manage_shared_widgets.dart';
 
+Future<EntryOperationResult?> showFocusedEditEntrySheet({
+  required BuildContext context,
+  required PasswordEntry entry,
+  required ManageRepository repository,
+}) {
+  return showModalBottomSheet<EntryOperationResult>(
+    context: context,
+    isScrollControlled: true,
+    builder:
+        (context) => _EditEntrySheet(
+          entries: <PasswordEntry>[entry],
+          title: 'Edit entry',
+          showEntryPicker: false,
+          canCommit: true,
+          onReadEntry: repository.readEntry,
+          onSaveRawNotes: (entry, password, fields, notes, commit) async {
+            final result = await repository.editEntry(
+              path: entry.path,
+              content: _entryContent(password, fields, notes),
+            );
+            return _commitEntryOperation(
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Edit password ${entry.path}',
+            );
+          },
+          onReplacePassword: (entry, password, commit) async {
+            final result = await repository.replaceEntryPassword(
+              entry: entry,
+              password: password,
+            );
+            return _commitEntryOperation(
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Replace password ${entry.path}',
+            );
+          },
+        ),
+  );
+}
+
+Future<BatchOperationResult?> showFocusedRegenerateEntrySheet({
+  required BuildContext context,
+  required PasswordEntry entry,
+  required ManageRepository repository,
+}) {
+  return showModalBottomSheet<BatchOperationResult>(
+    context: context,
+    isScrollControlled: true,
+    builder:
+        (context) => _BatchRegenerateSheet(
+          entries: <PasswordEntry>[entry],
+          title: 'Regenerate entry',
+          submitLabel: 'Regenerate password',
+          canCommit: true,
+          onSubmit: (noSymbols, commit) async {
+            final result = await repository.batchRegenerateEntries(
+              entries: <PasswordEntry>[entry],
+              length: 24,
+              noSymbols: noSymbols,
+            );
+            return _commitBatchOperation(
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Regenerate password ${entry.path}',
+            );
+          },
+        ),
+  );
+}
+
+Future<EntryOperationResult?> showFocusedDeleteEntrySheet({
+  required BuildContext context,
+  required PasswordEntry entry,
+  required ManageRepository repository,
+}) {
+  return showModalBottomSheet<EntryOperationResult>(
+    context: context,
+    isScrollControlled: true,
+    builder:
+        (context) => _DeleteEntrySheet(
+          entries: <PasswordEntry>[entry],
+          showEntryPicker: false,
+          canCommit: true,
+          onSubmit: (entry, commit) async {
+            final result = await repository.deleteEntry(
+              path: entry.path,
+              recursive: entry.isDirectory,
+            );
+            return _commitEntryOperation(
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Delete password ${entry.path}',
+            );
+          },
+        ),
+  );
+}
+
+Future<EntryOperationResult> _commitEntryOperation({
+  required ManageRepository repository,
+  required EntryOperationResult result,
+  required bool commit,
+  required String message,
+}) async {
+  if (!commit) {
+    return result;
+  }
+  try {
+    final commitResult = await repository.commitChanges(message);
+    if (!commitResult.success) {
+      throw _PostMutationCommitException(
+        mutationSummary: result.summary,
+        commitFailure: _gitFailureSummary(commitResult),
+      );
+    }
+  } on _PostMutationCommitException {
+    rethrow;
+  } catch (error) {
+    throw _PostMutationCommitException(
+      mutationSummary: result.summary,
+      commitFailure: error.toString(),
+    );
+  }
+  return result.copyWith(committed: true);
+}
+
+Future<BatchOperationResult> _commitBatchOperation({
+  required ManageRepository repository,
+  required BatchOperationResult result,
+  required bool commit,
+  required String message,
+}) async {
+  if (!commit) {
+    return result;
+  }
+  try {
+    final commitResult = await repository.commitChanges(message);
+    if (!commitResult.success) {
+      throw _PostMutationCommitException(
+        mutationSummary: result.summary,
+        commitFailure: _gitFailureSummary(commitResult),
+      );
+    }
+  } on _PostMutationCommitException {
+    rethrow;
+  } catch (error) {
+    throw _PostMutationCommitException(
+      mutationSummary: result.summary,
+      commitFailure: error.toString(),
+    );
+  }
+  return result.copyWith(committed: true);
+}
+
+String _gitFailureSummary(GitOperationResult result) {
+  final stderr = result.stderr.trim();
+  if (stderr.isNotEmpty) {
+    return stderr;
+  }
+  final stdout = result.stdout.trim();
+  if (stdout.isNotEmpty) {
+    return stdout;
+  }
+  return result.exitCode == null
+      ? 'Git commit reported failure.'
+      : 'Git commit exited with code ${result.exitCode}.';
+}
+
+class _PostMutationCommitException implements Exception {
+  const _PostMutationCommitException({
+    required this.mutationSummary,
+    required this.commitFailure,
+  });
+
+  final String mutationSummary;
+  final String commitFailure;
+
+  @override
+  String toString() {
+    return '$mutationSummary, but the optional Git commit failed: '
+        '$commitFailure The vault mutation was not rolled back.';
+  }
+}
+
 class ManageScreen extends StatefulWidget {
   const ManageScreen({
     super.key,
@@ -469,11 +658,15 @@ class _ManageScreenState extends State<ManageScreen> {
     String message,
   ) async {
     final manageRepository = _manageRepository;
-    if (!commit || manageRepository == null) {
+    if (manageRepository == null) {
       return result;
     }
-    await manageRepository.commitChanges(message);
-    return result.copyWith(committed: true);
+    return _commitEntryOperation(
+      repository: manageRepository,
+      result: result,
+      commit: commit,
+      message: message,
+    );
   }
 
   Future<BatchOperationResult> _commitBatchResult(
@@ -482,11 +675,15 @@ class _ManageScreenState extends State<ManageScreen> {
     String message,
   ) async {
     final manageRepository = _manageRepository;
-    if (!commit || manageRepository == null) {
+    if (manageRepository == null) {
       return result;
     }
-    await manageRepository.commitChanges(message);
-    return result.copyWith(committed: true);
+    return _commitBatchOperation(
+      repository: manageRepository,
+      result: result,
+      commit: commit,
+      message: message,
+    );
   }
 
   void _showEntryResult(EntryOperationResult? result) {

@@ -16,13 +16,24 @@ import android.view.autofill.AutofillId
 import android.view.autofill.AutofillManager
 import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
+import android.widget.Toast
 import java.util.concurrent.Executor
+import top.vollate.pars_gui.R
 
 class ParsAutofillUnlockActivity : Activity() {
     private var cancellationSignal: CancellationSignal? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.getStringExtra(EXTRA_MODE) == MODE_NO_MATCHES) {
+            Toast.makeText(
+                this,
+                getString(R.string.autofill_no_matches_toast),
+                Toast.LENGTH_SHORT,
+            ).show()
+            finishCanceled()
+            return
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
             finishCanceled()
             return
@@ -92,9 +103,9 @@ class ParsAutofillUnlockActivity : Activity() {
     private fun finishAutofill(credential: ParsAutofillCredential) {
         val usernameId = getParcelableExtraCompat<AutofillId>(EXTRA_USERNAME_ID)
         val passwordId = getParcelableExtraCompat<AutofillId>(EXTRA_PASSWORD_ID)
-        val presentation = presentation(this, credential.username ?: credential.path, "Pars password")
+        val presentation = presentation(this, credential.username, "Pars password")
         val datasetBuilder = Dataset.Builder(presentation).setId(credential.path)
-        if (usernameId != null && credential.username != null) {
+        if (usernameId != null) {
             datasetBuilder.setValue(usernameId, AutofillValue.forText(credential.username), presentation)
         }
         if (passwordId != null) {
@@ -113,7 +124,7 @@ class ParsAutofillUnlockActivity : Activity() {
     private fun finishCredentialManager(credential: ParsAutofillCredential) {
         val data =
             Bundle().apply {
-                putString("android.credentials.BUNDLE_KEY_ID", credential.username ?: credential.path)
+                putString("android.credentials.BUNDLE_KEY_ID", credential.username)
                 putString("android.credentials.BUNDLE_KEY_PASSWORD", credential.password)
             }
         setResult(
@@ -148,6 +159,7 @@ class ParsAutofillUnlockActivity : Activity() {
         private const val EXTRA_PASSWORD_ID = "top.vollate.pars_gui.autofill.PASSWORD_ID"
         private const val MODE_AUTOFILL = "autofill"
         private const val MODE_CREDENTIAL = "credential"
+        private const val MODE_NO_MATCHES = "no_matches"
 
         fun autofillIntent(
             context: Context,
@@ -166,6 +178,10 @@ class ParsAutofillUnlockActivity : Activity() {
                 .putExtra(EXTRA_MODE, MODE_CREDENTIAL)
                 .putExtra(EXTRA_PATH, path)
 
+        fun noMatchesIntent(context: Context): Intent =
+            Intent(context, ParsAutofillUnlockActivity::class.java)
+                .putExtra(EXTRA_MODE, MODE_NO_MATCHES)
+
         fun pendingIntent(
             context: Context,
             requestCode: Int,
@@ -175,7 +191,7 @@ class ParsAutofillUnlockActivity : Activity() {
                 context,
                 requestCode,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+                PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag(),
             )
 
         fun presentation(
@@ -183,12 +199,12 @@ class ParsAutofillUnlockActivity : Activity() {
             title: String,
             subtitle: String,
         ): RemoteViews =
-            RemoteViews(context.packageName, android.R.layout.simple_list_item_2).apply {
-                setTextViewText(android.R.id.text1, title)
-                setTextViewText(android.R.id.text2, subtitle)
+            RemoteViews(context.packageName, R.layout.pars_autofill_presentation).apply {
+                setTextViewText(R.id.autofill_title, title)
+                setTextViewText(R.id.autofill_subtitle, subtitle)
             }
 
-        private fun immutableFlag(): Int =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        private fun mutableFlag(): Int =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
     }
 }

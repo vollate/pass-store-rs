@@ -251,11 +251,15 @@ class _BatchRegenerateSheet extends StatefulWidget {
     required this.entries,
     required this.canCommit,
     required this.onSubmit,
+    this.title = 'Regenerate selected',
+    this.submitLabel = 'Regenerate batch',
   });
 
   final List<PasswordEntry> entries;
   final bool canCommit;
   final _BatchRegenerateSubmit onSubmit;
+  final String title;
+  final String submitLabel;
 
   @override
   State<_BatchRegenerateSheet> createState() => _BatchRegenerateSheetState();
@@ -291,7 +295,7 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
   Widget build(BuildContext context) {
     return _operationSheet(
       context: context,
-      title: 'Regenerate selected',
+      title: widget.title,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
         CheckboxListTile(
@@ -311,7 +315,7 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: 'Regenerate batch',
+          label: widget.submitLabel,
           onPressed: _submit,
         ),
       ],

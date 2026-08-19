@@ -11,10 +11,12 @@ class RunnerTests: XCTestCase {
       {
         "entries": [
           {
-            "path": "mail/example",
-            "display_name": "Example Mail",
+            "path": "example.com/alice",
+            "display_name": "example.com",
+            "service_name": "example.com",
             "username": "alice",
-            "websites": ["example.com"]
+            "path_website": "example.com",
+            "enriched_websites": ["login.example.net"]
           }
         ]
       }
@@ -24,10 +26,12 @@ class RunnerTests: XCTestCase {
       ParsAutofillIndex.self,
       from: Data(raw.utf8))
 
-    XCTAssertEqual(index.entries.first?.path, "mail/example")
-    XCTAssertEqual(index.entries.first?.displayName, "Example Mail")
+    XCTAssertEqual(index.entries.first?.path, "example.com/alice")
+    XCTAssertEqual(index.entries.first?.displayName, "example.com")
+    XCTAssertEqual(index.entries.first?.serviceName, "example.com")
     XCTAssertEqual(index.entries.first?.username, "alice")
-    XCTAssertEqual(index.entries.first?.websites, ["example.com"])
+    XCTAssertEqual(index.entries.first?.pathWebsite, "example.com")
+    XCTAssertEqual(index.entries.first?.enrichedWebsites, ["login.example.net"])
   }
 
 }

@@ -168,7 +168,9 @@ class BridgeBackedRepository
   }
 
   @override
-  Future<void> refresh() async {
+  Future<void> refresh() => _refreshState(reconcileAutofill: true);
+
+  Future<void> _refreshState({required bool reconcileAutofill}) async {
     final stateResponse = await bridge.inspectAppState(
       request: frb.InspectAppStateRequest(
         configPath: configPath,
@@ -220,6 +222,11 @@ class BridgeBackedRepository
       request: frb.GitRequest(root: selected.root),
     );
     _gitStatus = _gitStatusFromBridge(gitResponse);
+    if (reconcileAutofill) {
+      await _runAutofillUpdate(
+        (repository) => repository.reconcileIndex(_entries),
+      );
+    }
   }
 
   @override
@@ -326,8 +333,8 @@ class BridgeBackedRepository
         'Bridge did not return a generated entry result.',
       );
     }
-    await refresh();
-    await _refreshAutofillIndex();
+    await _refreshState(reconcileAutofill: false);
+    await _upsertAutofillEntry(result.entryPath);
     return EntryOperationResult(
       path: result.entryPath,
       overwroteExisting: result.overwroteExisting,
@@ -357,8 +364,8 @@ class BridgeBackedRepository
         'Bridge did not return a saved entry result.',
       );
     }
-    await refresh();
-    await _refreshAutofillIndex();
+    await _refreshState(reconcileAutofill: false);
+    await _upsertAutofillEntry(result.entryPath);
     return EntryOperationResult(
       path: result.entryPath,
       overwroteExisting: result.overwroteExisting,
@@ -386,8 +393,8 @@ class BridgeBackedRepository
         'Bridge did not return an edited entry result.',
       );
     }
-    await refresh();
-    await _refreshAutofillIndex();
+    await _refreshState(reconcileAutofill: false);
+    await _upsertAutofillEntry(result.path);
     return EntryOperationResult(
       path: result.path,
       overwroteExisting: true,
@@ -414,6 +421,7 @@ class BridgeBackedRepository
     required String toPath,
     required bool overwrite,
   }) async {
+    final recursive = _entryForPath(fromPath)?.isDirectory ?? false;
     final response = await bridge.moveEntry(
       request: frb.MoveEntryRequest(
         root: _requiredStoreRoot(),
@@ -429,8 +437,14 @@ class BridgeBackedRepository
         'Bridge did not return a moved entry result.',
       );
     }
-    await refresh();
-    await _refreshAutofillIndex();
+    await _refreshState(reconcileAutofill: false);
+    await _runAutofillUpdate(
+      (repository) => repository.moveEntry(
+        oldPath: fromPath,
+        newPath: result.path,
+        recursive: recursive,
+      ),
+    );
     return EntryOperationResult(
       path: result.path,
       overwroteExisting: overwrite,
@@ -457,8 +471,13 @@ class BridgeBackedRepository
         'Bridge did not return a deleted entry result.',
       );
     }
-    await refresh();
-    await _refreshAutofillIndex();
+    await _refreshState(reconcileAutofill: false);
+    await _runAutofillUpdate(
+      (repository) => repository.removeEntry(
+        path: result.deletedPath,
+        recursive: recursive,
+      ),
+    );
     return EntryOperationResult(
       path: result.deletedPath,
       overwroteExisting: false,
@@ -534,7 +553,6 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
-    await _refreshAutofillIndex();
   }
 
   @override
@@ -557,7 +575,6 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
-    await _refreshAutofillIndex();
   }
 
   @override
@@ -574,7 +591,6 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
-    await _refreshAutofillIndex();
   }
 
   @override
@@ -593,7 +609,6 @@ class BridgeBackedRepository
     );
     _throwIfFailure(response.error);
     await refresh();
-    await _refreshAutofillIndex();
   }
 
   @override
@@ -609,12 +624,8 @@ class BridgeBackedRepository
       request: frb.RemoveStoreRequest(configPath: configPath, root: root),
     );
     _throwIfFailure(response.error);
-    await refresh();
-    if (wasSelected) {
-      await _clearAutofillIndex();
-    } else {
-      await _refreshAutofillIndex();
-    }
+    await _refreshState(reconcileAutofill: !wasSelected);
+    if (wasSelected) await _clearAutofillIndex();
   }
 
   @override
@@ -631,12 +642,8 @@ class BridgeBackedRepository
       ),
     );
     _throwIfFailure(response.error);
-    await refresh();
-    if (wasSelected) {
-      await _clearAutofillIndex();
-    } else {
-      await _refreshAutofillIndex();
-    }
+    await _refreshState(reconcileAutofill: !wasSelected);
+    if (wasSelected) await _clearAutofillIndex();
   }
 
   @override
@@ -654,9 +661,7 @@ class BridgeBackedRepository
         passphrase: passphrase,
       ),
     );
-    final key = _recordKeyMutation(response);
-    await _refreshAutofillIndex();
-    return key;
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -731,9 +736,7 @@ class BridgeBackedRepository
         armoredText: armoredText,
       ),
     );
-    final key = _recordKeyMutation(response);
-    await _refreshAutofillIndex();
-    return key;
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -746,9 +749,7 @@ class BridgeBackedRepository
         path: path,
       ),
     );
-    final key = _recordKeyMutation(response);
-    await _refreshAutofillIndex();
-    return key;
+    return _recordKeyMutation(response);
   }
 
   @override
@@ -823,7 +824,6 @@ class BridgeBackedRepository
       );
     }
     await refresh();
-    await _refreshAutofillIndex();
     return PgpKeyDeletionOutcome(
       fingerprint: result.fingerprint,
       hadPrivateKey: result.hadPrivateKey,
@@ -848,7 +848,6 @@ class BridgeBackedRepository
       ),
     );
     _throwIfFailure(response.error);
-    await _refreshAutofillIndex();
   }
 
   @override
@@ -1300,7 +1299,6 @@ class BridgeBackedRepository
     }
     final record = _keyRecordFromBridge(key);
     _upsertKey(record);
-    await _refreshAutofillIndex();
     return PgpImportResult(
       key: record,
       inspection: _pgpInspectionFromBridge(inspection),
@@ -1473,10 +1471,47 @@ class BridgeBackedRepository
   }
 
   Future<void> _saveMetadata(VaultMetadata metadata) async {
-    _metadata = metadata;
+    final previous = _metadata;
     await _metadataStore.save(metadata);
+    _metadata = metadata;
     _entries = _entries.map(_decorateEntry).toList(growable: false);
-    await _refreshAutofillIndex();
+
+    final changedPaths = <String>{
+      ...previous.favoritePaths,
+      ...metadata.favoritePaths,
+      ...previous.recentPaths,
+      ...metadata.recentPaths,
+    };
+    final changedEntries = _entries
+        .where(
+          (entry) => !entry.isDirectory && changedPaths.contains(entry.path),
+        )
+        .toList(growable: false);
+    await _runAutofillUpdate(
+      (repository) => repository.patchRanking(changedEntries),
+    );
+  }
+
+  PasswordEntry? _entryForPath(String path) {
+    for (final entry in _entries) {
+      if (entry.path == path) return entry;
+    }
+    return null;
+  }
+
+  Future<void> _upsertAutofillEntry(String path) async {
+    final entry =
+        _entryForPath(path) ??
+        PasswordEntry(
+          path: path,
+          displayName: _basename(path),
+          repoName: currentRepoName,
+          encryptedContent: '',
+          isFavorite: _metadata.favoritePaths.contains(path),
+          lastUsedLabel: _lastUsedLabel(path),
+        );
+    if (entry.isDirectory) return;
+    await _runAutofillUpdate((repository) => repository.upsertEntry(entry));
   }
 
   bool _isSelectedStoreRoot(String root) {
@@ -1484,28 +1519,25 @@ class BridgeBackedRepository
         _lifecycle.selectedStore?.root == root;
   }
 
-  Future<void> _refreshAutofillIndex() async {
+  Future<void> _runAutofillUpdate(
+    Future<void> Function(AutofillRepository repository) update,
+  ) async {
     final repository = autofillRepository;
-    if (repository == null) {
-      return;
-    }
-    final selected = _lifecycle.selectedStore;
-    if (selected == null || !selected.exists) {
-      await _clearAutofillIndex();
-      return;
-    }
+    if (repository == null) return;
     try {
-      await repository.refreshIndex(_entries);
-    } catch (_) {
-      // Autofill must not block normal vault operations when the PGP session is unavailable.
+      await update(repository);
+    } catch (error) {
+      repository.recordSyncFailure(error);
     }
   }
 
   Future<void> _clearAutofillIndex() async {
+    final repository = autofillRepository;
+    if (repository == null) return;
     try {
-      await autofillRepository?.clearIndex();
-    } catch (_) {
-      // Clearing is best-effort during lifecycle transitions.
+      await repository.clearIndex();
+    } catch (error) {
+      repository.recordSyncFailure(error);
     }
   }
 

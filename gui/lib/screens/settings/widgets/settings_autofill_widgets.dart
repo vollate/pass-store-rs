@@ -75,11 +75,30 @@ class _AutofillSettingsSheetBodyState
                       repository == null || _busy
                           ? null
                           : () => _run(
-                            () => repository.refreshIndex(widget.entries),
-                            'Autofill data refreshed',
+                            () => repository.rebuildIndex(widget.entries),
+                            'Path-based autofill data rebuilt without decrypting entries',
                           ),
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh'),
+                  label: const Text('Rebuild paths'),
+                ),
+                OutlinedButton.icon(
+                  onPressed:
+                      repository == null || _busy
+                          ? null
+                          : () => _confirmAndEnrich(repository),
+                  icon: const Icon(Icons.link_outlined),
+                  label: const Text('Read URL fields'),
+                ),
+                OutlinedButton.icon(
+                  onPressed:
+                      repository == null || _busy
+                          ? null
+                          : () => _run(
+                            repository.clearWebsiteEnrichment,
+                            'Encrypted website aliases cleared',
+                          ),
+                  icon: const Icon(Icons.link_off_outlined),
+                  label: const Text('Clear URL aliases'),
                 ),
                 OutlinedButton.icon(
                   onPressed:
@@ -90,7 +109,7 @@ class _AutofillSettingsSheetBodyState
                             'Autofill data cleared',
                           ),
                   icon: const Icon(Icons.delete_outline),
-                  label: const Text('Clear'),
+                  label: const Text('Clear all'),
                 ),
                 OutlinedButton.icon(
                   onPressed:
@@ -108,6 +127,42 @@ class _AutofillSettingsSheetBodyState
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _confirmAndEnrich(AutofillRepository repository) async {
+    final paths = widget.entries
+        .where((entry) => !entry.isDirectory)
+        .map((entry) => entry.path)
+        .toList(growable: false);
+    if (paths.isEmpty) {
+      AppNotification.show(context, 'There are no password entries to enrich.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Read encrypted URL fields?'),
+            content: Text(
+              'This optional action decrypts all ${paths.length} selected entries once and stores only normalized website aliases. Path-based Autofill does not require it.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Read selected entries'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _run(
+      () => repository.enrichWebsites(paths),
+      'Encrypted website aliases updated',
     );
   }
 

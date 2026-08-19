@@ -34,7 +34,7 @@ object ParsAutofillNative {
 data class ParsAutofillCandidate(
     val path: String,
     val displayName: String,
-    val username: String?,
+    val username: String,
     val matchKind: String,
     val matchValue: String,
     val score: Int,
@@ -44,7 +44,7 @@ data class ParsAutofillCandidate(
 
 data class ParsAutofillCredential(
     val path: String,
-    val username: String?,
+    val username: String,
     val password: String,
 )
 
@@ -52,7 +52,7 @@ object ParsAutofillNativeBridge {
     fun queryCandidates(
         context: Context,
         website: String?,
-        androidPackage: String?,
+        appName: String?,
         query: String?,
         limit: Int,
     ): List<ParsAutofillCandidate> {
@@ -64,7 +64,7 @@ object ParsAutofillNativeBridge {
             JSONObject()
                 .put("indexPath", state.indexPath)
                 .put("website", website)
-                .put("androidPackage", androidPackage)
+                .put("appName", appName)
                 .put("query", query)
                 .put("limit", limit)
         val response = JSONObject(ParsAutofillNative.queryCandidates(request.toString()))
@@ -79,7 +79,7 @@ object ParsAutofillNativeBridge {
                     ParsAutofillCandidate(
                         path = candidate.getString("path"),
                         displayName = candidate.getString("displayName"),
-                        username = candidate.optString("username").ifBlank { null },
+                        username = candidate.getString("username"),
                         matchKind = candidate.getString("matchKind"),
                         matchValue = candidate.optString("matchValue"),
                         score = candidate.optInt("score"),
@@ -117,7 +117,7 @@ object ParsAutofillNativeBridge {
         val credential = response.getJSONObject("credential")
         return ParsAutofillCredential(
             path = credential.getString("path"),
-            username = credential.optString("username").ifBlank { null },
+            username = credential.getString("username"),
             password = credential.getString("password"),
         )
     }

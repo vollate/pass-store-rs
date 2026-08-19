@@ -147,7 +147,34 @@ void main() {
   );
 
   test(
-    'bridge-backed repository refreshes autofill index after entry changes',
+    'metadata-only entry reads do not rebuild the full autofill index',
+    () async {
+      final bridge = _LifecycleBridge();
+      final autofillRepository = FakeAutofillRepository();
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        autofillRepository: autofillRepository,
+        metadataStore: InMemoryVaultMetadataStore(),
+      );
+
+      await repository.refresh();
+      await repository.readEntry(repository.entries.first);
+      await repository.toggleFavorite(repository.entries.first);
+
+      expect(repository.recentEntries().single.path, 'work/github');
+      expect(repository.entries.first.isFavorite, isTrue);
+      expect(autofillRepository.operations, isNot(contains('rebuild')));
+      expect(
+        autofillRepository.operations.where((value) => value == 'ranking'),
+        hasLength(2),
+      );
+      expect(autofillRepository.lastRankingEntries.single.path, 'work/github');
+    },
+  );
+
+  test(
+    'bridge-backed repository incrementally upserts autofill after entry changes',
     () async {
       final bridge = _LifecycleBridge();
       final autofillRepository = FakeAutofillRepository();
@@ -164,11 +191,36 @@ void main() {
         overwrite: false,
       );
 
-      expect(autofillRepository.lastRefreshedEntries, isNotEmpty);
-      expect(
-        autofillRepository.lastRefreshedEntries.map((entry) => entry.path),
-        contains('work/github'),
+      expect(autofillRepository.operations, contains('upsert:work/new'));
+      expect(autofillRepository.operations, isNot(contains('rebuild')));
+    },
+  );
+
+  test(
+    'autofill update failures do not roll back successful vault mutations',
+    () async {
+      final bridge = _LifecycleBridge();
+      final autofillRepository = FakeAutofillRepository(
+        operationError: StateError('index unavailable'),
       );
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        autofillRepository: autofillRepository,
+        metadataStore: InMemoryVaultMetadataStore(),
+      );
+
+      await repository.refresh();
+      final result = await repository.saveEntry(
+        path: 'work/new',
+        content: 'secret',
+        overwrite: false,
+      );
+
+      expect(result.path, 'work/new');
+      expect(bridge.calledMethods, contains('insert_entry'));
+      expect(autofillRepository.operations, contains('upsert:work/new'));
+      expect(autofillRepository.status.message, contains('Rebuild'));
     },
   );
 

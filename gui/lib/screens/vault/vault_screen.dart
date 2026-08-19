@@ -10,7 +10,10 @@ import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/entry_tile.dart';
+import '../manage/manage_screen.dart';
 import 'entry_detail_sheet.dart';
+
+enum _EntryDetailAction { edit, regenerate, delete }
 
 class VaultScreen extends StatefulWidget {
   const VaultScreen({
@@ -191,7 +194,7 @@ class _VaultScreenState extends State<VaultScreen> {
                             ? () => _openDirectory(entry)
                             : () => _showEntry(entry),
                     onCopy:
-                        entry.isDirectory ? () {} : () => _copyPassword(entry),
+                        entry.isDirectory ? null : () => _copyPassword(entry),
                   ),
                 ),
               ],
@@ -226,26 +229,98 @@ class _VaultScreenState extends State<VaultScreen> {
     }
   }
 
-  void _showEntry(PasswordEntry entry) {
+  Future<void> _showEntry(PasswordEntry entry) async {
     if (entry.isDirectory) {
       return;
     }
-    showModalBottomSheet<void>(
+    final manageRepository =
+        widget.vaultRepository is ManageRepository
+            ? widget.vaultRepository as ManageRepository
+            : null;
+    final action = await showModalBottomSheet<_EntryDetailAction>(
       context: context,
       isScrollControlled: true,
       showDragHandle: false,
       builder:
-          (context) => EntryDetailSheet(
+          (sheetContext) => EntryDetailSheet(
             entry: entry,
             repository: widget.vaultRepository,
             keyRepository: widget.keyRepository,
             securityRepository: widget.securityRepository,
             keys: widget.keys,
             onFavoriteChanged: () => setState(() {}),
+            onEdit:
+                manageRepository == null
+                    ? null
+                    : () =>
+                        Navigator.of(sheetContext).pop(_EntryDetailAction.edit),
+            onRegenerate:
+                manageRepository == null
+                    ? null
+                    : () => Navigator.of(
+                      sheetContext,
+                    ).pop(_EntryDetailAction.regenerate),
+            onDelete:
+                manageRepository == null
+                    ? null
+                    : () => Navigator.of(
+                      sheetContext,
+                    ).pop(_EntryDetailAction.delete),
             onChooseKey: widget.onChooseKey,
             onOpenKeyManagement: widget.onOpenKeyManagement,
           ),
     );
+    if (!mounted || action == null || manageRepository == null) {
+      return;
+    }
+
+    switch (action) {
+      case _EntryDetailAction.edit:
+        final result = await showFocusedEditEntrySheet(
+          context: context,
+          entry: entry,
+          repository: manageRepository,
+        );
+        _showEntryOperationResult(result);
+        break;
+      case _EntryDetailAction.regenerate:
+        final result = await showFocusedRegenerateEntrySheet(
+          context: context,
+          entry: entry,
+          repository: manageRepository,
+        );
+        _showBatchOperationResult(result);
+        break;
+      case _EntryDetailAction.delete:
+        final result = await showFocusedDeleteEntrySheet(
+          context: context,
+          entry: entry,
+          repository: manageRepository,
+        );
+        _showEntryOperationResult(result);
+        break;
+    }
+  }
+
+  void _showEntryOperationResult(EntryOperationResult? result) {
+    if (!mounted || result == null) {
+      return;
+    }
+    setState(() {});
+    AppNotification.show(context, result.summary);
+  }
+
+  void _showBatchOperationResult(BatchOperationResult? result) {
+    if (!mounted || result == null) {
+      return;
+    }
+    setState(() {});
+    final failure =
+        result.failures.isEmpty
+            ? ''
+            : ': ${result.failures.first.path}: '
+                '${result.failures.first.message}';
+    AppNotification.show(context, '${result.summary}$failure');
   }
 
   void _openDirectory(PasswordEntry entry) {

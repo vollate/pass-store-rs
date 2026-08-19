@@ -1,12 +1,13 @@
 package top.vollate.pars_gui.autofill
 
 import android.app.assist.AssistStructure
+import android.content.Context
 import android.text.InputType
 import android.view.View
 import android.view.autofill.AutofillId
 
 data class ParsedAutofillRequest(
-    val androidPackage: String?,
+    val appName: String?,
     val website: String?,
     val query: String?,
     val usernameId: AutofillId?,
@@ -14,7 +15,10 @@ data class ParsedAutofillRequest(
 )
 
 object ParsAutofillRequestParser {
-    fun parse(structure: AssistStructure): ParsedAutofillRequest? {
+    fun parse(
+        context: Context,
+        structure: AssistStructure,
+    ): ParsedAutofillRequest? {
         var website: String? = null
         var usernameId: AutofillId? = null
         var passwordId: AutofillId? = null
@@ -45,7 +49,10 @@ object ParsAutofillRequestParser {
             return null
         }
         return ParsedAutofillRequest(
-            androidPackage = structure.activityComponent?.packageName,
+            appName = ParsAutofillAppName.resolve(
+                context,
+                structure.activityComponent?.packageName,
+            ),
             website = website,
             query = queryParts.joinToString(" ").takeIf { it.isNotBlank() },
             usernameId = usernameId,
@@ -106,5 +113,19 @@ object ParsAutofillRequestParser {
         Username,
         Password,
         Unknown,
+    }
+}
+
+object ParsAutofillAppName {
+    @Suppress("DEPRECATION")
+    fun resolve(
+        context: Context,
+        packageName: String?,
+    ): String? {
+        if (packageName.isNullOrBlank()) return null
+        return runCatching {
+            val applicationInfo = context.packageManager.getApplicationInfo(packageName, 0)
+            context.packageManager.getApplicationLabel(applicationInfo).toString().trim()
+        }.getOrNull()?.ifBlank { null }
     }
 }

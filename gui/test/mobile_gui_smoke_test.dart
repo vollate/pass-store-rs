@@ -1632,13 +1632,20 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     await _tapVisible(tester, find.text('System autofill'));
-    await tester.tap(find.widgetWithText(FilledButton, 'Refresh'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Rebuild paths'));
     await tester.pumpAndSettle();
 
-    expect(autofillRepository.lastRefreshedEntries, isNotEmpty);
+    expect(autofillRepository.lastRebuiltEntries, isNotEmpty);
     expect(autofillRepository.status.available, isTrue);
 
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Clear'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Read URL fields'));
+    await tester.pumpAndSettle();
+    expect(find.text('Read encrypted URL fields?'), findsOneWidget);
+    await tester.tap(find.text('Read selected entries'));
+    await tester.pumpAndSettle();
+    expect(autofillRepository.lastEnrichedPaths, isNotEmpty);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Clear all'));
     await tester.pumpAndSettle();
 
     expect(autofillRepository.cleared, isTrue);

@@ -12,13 +12,13 @@ private func parsAutofillFreeString(_ value: UnsafeMutablePointer<CChar>?)
 struct ParsAutofillIosCandidate {
   let path: String
   let displayName: String
-  let username: String?
+  let username: String
   let matchValue: String
 }
 
 struct ParsAutofillIosCredential {
   let path: String
-  let username: String?
+  let username: String
   let password: String
 }
 
@@ -26,14 +26,14 @@ enum ParsAutofillNative {
   static func queryCandidates(
     indexPath: String,
     website: String?,
-    androidPackage: String? = nil,
+    appName: String? = nil,
     query: String?,
     limit: Int
   ) -> [ParsAutofillIosCandidate] {
     let request: [String: Any?] = [
       "indexPath": indexPath,
       "website": website,
-      "androidPackage": androidPackage,
+      "appName": appName,
       "query": query,
       "limit": limit,
     ]
@@ -45,14 +45,15 @@ enum ParsAutofillNative {
     }
     return rawCandidates.compactMap { candidate in
       guard let path = candidate["path"] as? String,
-        let displayName = candidate["displayName"] as? String
+        let displayName = candidate["displayName"] as? String,
+        let username = candidate["username"] as? String
       else {
         return nil
       }
       return ParsAutofillIosCandidate(
         path: path,
         displayName: displayName,
-        username: candidate["username"] as? String,
+        username: username,
         matchValue: candidate["matchValue"] as? String ?? "")
     }
   }
@@ -76,13 +77,14 @@ enum ParsAutofillNative {
       response["error"] is NSNull || response["error"] == nil,
       let credential = response["credential"] as? [String: Any],
       let resolvedPath = credential["path"] as? String,
+      let username = credential["username"] as? String,
       let password = credential["password"] as? String
     else {
       return nil
     }
     return ParsAutofillIosCredential(
       path: resolvedPath,
-      username: credential["username"] as? String,
+      username: username,
       password: password)
   }
 

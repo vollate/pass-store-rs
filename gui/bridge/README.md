@@ -17,3 +17,22 @@ Build scripts in this directory compile the bridge crate for the major Flutter p
 
 Android Gradle calls `build_unix.sh android` and passes the JNI output directory through `PARS_ANDROID_OUTPUT_DIR`. Platform packaging beyond bridge artifact compilation continues in the platform-packaging milestone.
 Linux desktop CMake calls `build_unix.sh linux` during install and passes the final bundle `lib/` directory through `PARS_LINUX_OUTPUT_DIR`, which causes `libpars_bridge.so` to be copied next to `libflutter_linux_gtk.so`. This keeps `RustLib.init()` able to load `libpars_bridge.so` through the runner's `$ORIGIN/lib` RPATH.
+
+## Autofill bridge contract
+
+Autofill uses password-store paths as its default non-secret index source. For
+`github.com/alice.gpg`, the immediate parent `github.com` is the Website/App
+service and the filename stem `alice` is the Username. Rebuild, reconcile,
+upsert, move, remove, and ranking-patch requests do not contain a PGP executable
+or passphrase and never decrypt entries.
+
+The candidate query ABI accepts `website`, human-readable `appName`, free-text
+`query`, and `limit`. It does not accept or map Android package identifiers.
+After platform authentication, credential resolution decrypts exactly the
+selected indexed path and returns its first-line password with the path-derived
+username.
+
+Reading encrypted `url`, `website`, or `service` fields is a separate explicit
+enrichment operation over a non-empty path selection. It stores normalized host
+aliases only and commits them transactionally; it is never invoked by normal
+index maintenance or credential resolution.

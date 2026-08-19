@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -167124123;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 962699484;
 
 // Section: executor
 
@@ -114,6 +114,45 @@ fn wire__crate__api__clear_autofill_index_impl(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
                             crate::api::clear_autofill_index(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__clear_autofill_index_websites_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "clear_autofill_index_websites",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::ClearAutofillIndexWebsitesRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::clear_autofill_index_websites(api_request).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -489,6 +528,45 @@ fn wire__crate__api__edit_entry_impl(
                     (move || async move {
                         let output_ok =
                             Result::<_, ()>::Ok(crate::api::edit_entry(api_request).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__enrich_autofill_index_websites_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "enrich_autofill_index_websites",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::EnrichAutofillIndexWebsitesRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::enrich_autofill_index_websites(api_request).await,
+                        )?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1509,6 +1587,45 @@ fn wire__crate__api__load_config_impl(
         },
     )
 }
+fn wire__crate__api__move_autofill_index_entry_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "move_autofill_index_entry",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::MoveAutofillIndexEntryRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::move_autofill_index_entry(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__move_entry_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1576,6 +1693,45 @@ fn wire__crate__api__open_github_ssh_settings_impl(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
                             crate::api::open_github_ssh_settings(api__request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__patch_autofill_index_ranking_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "patch_autofill_index_ranking",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::PatchAutofillIndexRankingRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::patch_autofill_index_ranking(api_request).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -1699,7 +1855,7 @@ fn wire__crate__api__read_entry_impl(
         },
     )
 }
-fn wire__crate__api__refresh_autofill_index_impl(
+fn wire__crate__api__rebuild_autofill_index_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -1707,7 +1863,7 @@ fn wire__crate__api__refresh_autofill_index_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "refresh_autofill_index",
+            debug_name: "rebuild_autofill_index",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -1722,13 +1878,91 @@ fn wire__crate__api__refresh_autofill_index_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_request =
-                <crate::api::RefreshAutofillIndexRequest>::sse_decode(&mut deserializer);
+                <crate::api::RebuildAutofillIndexRequest>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, ()>(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
-                            crate::api::refresh_autofill_index(api_request).await,
+                            crate::api::rebuild_autofill_index(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__reconcile_autofill_index_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "reconcile_autofill_index",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::ReconcileAutofillIndexRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::reconcile_autofill_index(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__remove_autofill_index_entry_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "remove_autofill_index_entry",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::RemoveAutofillIndexEntryRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::remove_autofill_index_entry(api_request).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -1925,6 +2159,45 @@ fn wire__crate__api__select_store_impl(
         },
     )
 }
+fn wire__crate__api__upsert_autofill_index_entry_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "upsert_autofill_index_entry",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::UpsertAutofillIndexEntryRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::upsert_autofill_index_entry(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 
 // Section: dart2rust
 
@@ -1984,7 +2257,7 @@ impl SseDecode for crate::api::AutofillCandidateDto {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_path = <String>::sse_decode(deserializer);
         let mut var_displayName = <String>::sse_decode(deserializer);
-        let mut var_username = <Option<String>>::sse_decode(deserializer);
+        let mut var_username = <String>::sse_decode(deserializer);
         let mut var_matchKind = <String>::sse_decode(deserializer);
         let mut var_matchValue = <String>::sse_decode(deserializer);
         let mut var_score = <i32>::sse_decode(deserializer);
@@ -2019,7 +2292,7 @@ impl SseDecode for crate::api::AutofillCredentialDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_path = <String>::sse_decode(deserializer);
-        let mut var_username = <Option<String>>::sse_decode(deserializer);
+        let mut var_username = <String>::sse_decode(deserializer);
         let mut var_password = <String>::sse_decode(deserializer);
         return crate::api::AutofillCredentialDto {
             path: var_path,
@@ -2066,12 +2339,10 @@ impl SseDecode for crate::api::AutofillEntryMetadataDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_path = <String>::sse_decode(deserializer);
-        let mut var_displayName = <Option<String>>::sse_decode(deserializer);
         let mut var_isFavorite = <bool>::sse_decode(deserializer);
         let mut var_recentRank = <Option<u32>>::sse_decode(deserializer);
         return crate::api::AutofillEntryMetadataDto {
             path: var_path,
-            display_name: var_displayName,
             is_favorite: var_isFavorite,
             recent_rank: var_recentRank,
         };
@@ -2083,13 +2354,13 @@ impl SseDecode for crate::api::AutofillQueryRequest {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_indexPath = <String>::sse_decode(deserializer);
         let mut var_website = <Option<String>>::sse_decode(deserializer);
-        let mut var_androidPackage = <Option<String>>::sse_decode(deserializer);
+        let mut var_appName = <Option<String>>::sse_decode(deserializer);
         let mut var_query = <Option<String>>::sse_decode(deserializer);
         let mut var_limit = <u32>::sse_decode(deserializer);
         return crate::api::AutofillQueryRequest {
             index_path: var_indexPath,
             website: var_website,
-            android_package: var_androidPackage,
+            app_name: var_appName,
             query: var_query,
             limit: var_limit,
         };
@@ -2145,6 +2416,18 @@ impl SseDecode for crate::api::ClearAutofillIndexRequest {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_indexPath = <String>::sse_decode(deserializer);
         return crate::api::ClearAutofillIndexRequest { index_path: var_indexPath };
+    }
+}
+
+impl SseDecode for crate::api::ClearAutofillIndexWebsitesRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_indexPath = <String>::sse_decode(deserializer);
+        let mut var_paths = <Vec<String>>::sse_decode(deserializer);
+        return crate::api::ClearAutofillIndexWebsitesRequest {
+            index_path: var_indexPath,
+            paths: var_paths,
+        };
     }
 }
 
@@ -2330,6 +2613,26 @@ impl SseDecode for crate::api::EditEntryRequest {
             path: var_path,
             content: var_content,
             pgp_executable: var_pgpExecutable,
+        };
+    }
+}
+
+impl SseDecode for crate::api::EnrichAutofillIndexWebsitesRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
+        let mut var_indexPath = <String>::sse_decode(deserializer);
+        let mut var_root = <String>::sse_decode(deserializer);
+        let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
+        let mut var_passphrase = <Option<String>>::sse_decode(deserializer);
+        let mut var_paths = <Vec<String>>::sse_decode(deserializer);
+        return crate::api::EnrichAutofillIndexWebsitesRequest {
+            config_path: var_configPath,
+            index_path: var_indexPath,
+            root: var_root,
+            pgp_executable: var_pgpExecutable,
+            passphrase: var_passphrase,
+            paths: var_paths,
         };
     }
 }
@@ -2938,6 +3241,22 @@ impl SseDecode for crate::api::LoadConfigRequest {
     }
 }
 
+impl SseDecode for crate::api::MoveAutofillIndexEntryRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_indexPath = <String>::sse_decode(deserializer);
+        let mut var_oldPath = <String>::sse_decode(deserializer);
+        let mut var_newPath = <String>::sse_decode(deserializer);
+        let mut var_recursive = <bool>::sse_decode(deserializer);
+        return crate::api::MoveAutofillIndexEntryRequest {
+            index_path: var_indexPath,
+            old_path: var_oldPath,
+            new_path: var_newPath,
+            recursive: var_recursive,
+        };
+    }
+}
+
 impl SseDecode for crate::api::MoveEntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3210,6 +3529,18 @@ impl SseDecode for crate::api::ParsedEntryFieldDto {
     }
 }
 
+impl SseDecode for crate::api::PatchAutofillIndexRankingRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_indexPath = <String>::sse_decode(deserializer);
+        let mut var_entries = <Vec<crate::api::AutofillEntryMetadataDto>>::sse_decode(deserializer);
+        return crate::api::PatchAutofillIndexRankingRequest {
+            index_path: var_indexPath,
+            entries: var_entries,
+        };
+    }
+}
+
 impl SseDecode for crate::api::PgpImportFailureKind {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3345,26 +3676,52 @@ impl SseDecode for crate::api::PreparePgpPrivateKeyResponse {
     }
 }
 
-impl SseDecode for crate::api::RefreshAutofillIndexRequest {
+impl SseDecode for crate::api::RebuildAutofillIndexRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_indexPath = <String>::sse_decode(deserializer);
         let mut var_storeId = <String>::sse_decode(deserializer);
         let mut var_storeName = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
-        let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
-        let mut var_passphrase = <Option<String>>::sse_decode(deserializer);
         let mut var_entries = <Vec<crate::api::AutofillEntryMetadataDto>>::sse_decode(deserializer);
-        return crate::api::RefreshAutofillIndexRequest {
-            config_path: var_configPath,
+        return crate::api::RebuildAutofillIndexRequest {
             index_path: var_indexPath,
             store_id: var_storeId,
             store_name: var_storeName,
             root: var_root,
-            pgp_executable: var_pgpExecutable,
-            passphrase: var_passphrase,
             entries: var_entries,
+        };
+    }
+}
+
+impl SseDecode for crate::api::ReconcileAutofillIndexRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_indexPath = <String>::sse_decode(deserializer);
+        let mut var_storeId = <String>::sse_decode(deserializer);
+        let mut var_storeName = <String>::sse_decode(deserializer);
+        let mut var_root = <String>::sse_decode(deserializer);
+        let mut var_entries = <Vec<crate::api::AutofillEntryMetadataDto>>::sse_decode(deserializer);
+        return crate::api::ReconcileAutofillIndexRequest {
+            index_path: var_indexPath,
+            store_id: var_storeId,
+            store_name: var_storeName,
+            root: var_root,
+            entries: var_entries,
+        };
+    }
+}
+
+impl SseDecode for crate::api::RemoveAutofillIndexEntryRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_indexPath = <String>::sse_decode(deserializer);
+        let mut var_path = <String>::sse_decode(deserializer);
+        let mut var_recursive = <bool>::sse_decode(deserializer);
+        return crate::api::RemoveAutofillIndexEntryRequest {
+            index_path: var_indexPath,
+            path: var_path,
+            recursive: var_recursive,
         };
     }
 }
@@ -3465,6 +3822,18 @@ impl SseDecode for crate::api::UnitResponse {
     }
 }
 
+impl SseDecode for crate::api::UpsertAutofillIndexEntryRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_indexPath = <String>::sse_decode(deserializer);
+        let mut var_entry = <crate::api::AutofillEntryMetadataDto>::sse_decode(deserializer);
+        return crate::api::UpsertAutofillIndexEntryRequest {
+            index_path: var_indexPath,
+            entry: var_entry,
+        };
+    }
+}
+
 fn pde_ffi_dispatcher_primary_impl(
     func_id: i32,
     port: flutter_rust_bridge::for_generated::MessagePort,
@@ -3476,54 +3845,67 @@ fn pde_ffi_dispatcher_primary_impl(
     match func_id {
         1 => wire__crate__api__add_pgp_key_to_gpg_id_impl(port, ptr, rust_vec_len, data_len),
         2 => wire__crate__api__clear_autofill_index_impl(port, ptr, rust_vec_len, data_len),
-        3 => wire__crate__api__clone_store_impl(port, ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__configure_pgp_backend_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__copy_entry_password_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__create_local_store_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__delete_entry_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__delete_local_store_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__delete_pgp_key_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__delete_ssh_key_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__detect_imported_key_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__edit_entry_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__export_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__export_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__export_ssh_private_key_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__export_ssh_public_key_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__generate_entry_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__generate_pgp_key_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__generate_ssh_key_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__git_commit_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__git_pull_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__git_push_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__git_status_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__import_local_store_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__import_pgp_key_file_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__import_pgp_key_text_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__import_pgp_private_key_file_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__import_pgp_private_key_text_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__import_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__import_ssh_private_key_file_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__import_ssh_private_key_text_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__insert_entry_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__inspect_app_state_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__inspect_pgp_key_file_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__inspect_pgp_key_text_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__list_entries_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__list_keys_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__list_stores_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__load_config_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__move_entry_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__open_github_ssh_settings_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__prepare_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__query_autofill_candidates_impl(port, ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__read_entry_impl(port, ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__refresh_autofill_index_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__remove_store_impl(port, ptr, rust_vec_len, data_len),
-        47 => wire__crate__api__resolve_autofill_credential_impl(port, ptr, rust_vec_len, data_len),
-        48 => wire__crate__api__run_git_args_impl(port, ptr, rust_vec_len, data_len),
-        49 => wire__crate__api__save_config_impl(port, ptr, rust_vec_len, data_len),
-        50 => wire__crate__api__select_store_impl(port, ptr, rust_vec_len, data_len),
+        3 => {
+            wire__crate__api__clear_autofill_index_websites_impl(port, ptr, rust_vec_len, data_len)
+        }
+        4 => wire__crate__api__clone_store_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__configure_pgp_backend_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__copy_entry_password_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__create_local_store_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__delete_entry_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__delete_local_store_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__delete_pgp_key_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__delete_ssh_key_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__detect_imported_key_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__edit_entry_impl(port, ptr, rust_vec_len, data_len),
+        14 => {
+            wire__crate__api__enrich_autofill_index_websites_impl(port, ptr, rust_vec_len, data_len)
+        }
+        15 => wire__crate__api__export_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__export_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__export_ssh_private_key_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__export_ssh_public_key_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__generate_entry_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__generate_pgp_key_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__generate_ssh_key_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__git_commit_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__git_pull_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__git_push_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__git_status_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__import_local_store_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__import_pgp_key_file_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__import_pgp_key_text_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__import_pgp_private_key_file_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__import_pgp_private_key_text_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__import_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__import_ssh_private_key_file_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__import_ssh_private_key_text_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__insert_entry_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__inspect_app_state_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__inspect_pgp_key_file_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__inspect_pgp_key_text_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__list_entries_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__list_keys_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__list_stores_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__load_config_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__move_autofill_index_entry_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__move_entry_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__open_github_ssh_settings_impl(port, ptr, rust_vec_len, data_len),
+        45 => {
+            wire__crate__api__patch_autofill_index_ranking_impl(port, ptr, rust_vec_len, data_len)
+        }
+        46 => wire__crate__api__prepare_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__query_autofill_candidates_impl(port, ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__read_entry_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__rebuild_autofill_index_impl(port, ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__reconcile_autofill_index_impl(port, ptr, rust_vec_len, data_len),
+        51 => wire__crate__api__remove_autofill_index_entry_impl(port, ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__remove_store_impl(port, ptr, rust_vec_len, data_len),
+        53 => wire__crate__api__resolve_autofill_credential_impl(port, ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__run_git_args_impl(port, ptr, rust_vec_len, data_len),
+        55 => wire__crate__api__save_config_impl(port, ptr, rust_vec_len, data_len),
+        56 => wire__crate__api__select_store_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__upsert_autofill_index_entry_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3711,7 +4093,6 @@ impl flutter_rust_bridge::IntoDart for crate::api::AutofillEntryMetadataDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.path.into_into_dart().into_dart(),
-            self.display_name.into_into_dart().into_dart(),
             self.is_favorite.into_into_dart().into_dart(),
             self.recent_rank.into_into_dart().into_dart(),
         ]
@@ -3735,7 +4116,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::AutofillQueryRequest {
         [
             self.index_path.into_into_dart().into_dart(),
             self.website.into_into_dart().into_dart(),
-            self.android_package.into_into_dart().into_dart(),
+            self.app_name.into_into_dart().into_dart(),
             self.query.into_into_dart().into_dart(),
             self.limit.into_into_dart().into_dart(),
         ]
@@ -3813,6 +4194,24 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ClearAutofillIndexRequest>
     for crate::api::ClearAutofillIndexRequest
 {
     fn into_into_dart(self) -> crate::api::ClearAutofillIndexRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ClearAutofillIndexWebsitesRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.index_path.into_into_dart().into_dart(), self.paths.into_into_dart().into_dart()]
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::ClearAutofillIndexWebsitesRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ClearAutofillIndexWebsitesRequest>
+    for crate::api::ClearAutofillIndexWebsitesRequest
+{
+    fn into_into_dart(self) -> crate::api::ClearAutofillIndexWebsitesRequest {
         self
     }
 }
@@ -4096,6 +4495,31 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::EditEntryRequest>
     for crate::api::EditEntryRequest
 {
     fn into_into_dart(self) -> crate::api::EditEntryRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::EnrichAutofillIndexWebsitesRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.config_path.into_into_dart().into_dart(),
+            self.index_path.into_into_dart().into_dart(),
+            self.root.into_into_dart().into_dart(),
+            self.pgp_executable.into_into_dart().into_dart(),
+            self.passphrase.into_into_dart().into_dart(),
+            self.paths.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::EnrichAutofillIndexWebsitesRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::EnrichAutofillIndexWebsitesRequest>
+    for crate::api::EnrichAutofillIndexWebsitesRequest
+{
+    fn into_into_dart(self) -> crate::api::EnrichAutofillIndexWebsitesRequest {
         self
     }
 }
@@ -4845,6 +5269,29 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::LoadConfigRequest>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::MoveAutofillIndexEntryRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.index_path.into_into_dart().into_dart(),
+            self.old_path.into_into_dart().into_dart(),
+            self.new_path.into_into_dart().into_dart(),
+            self.recursive.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::MoveAutofillIndexEntryRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::MoveAutofillIndexEntryRequest>
+    for crate::api::MoveAutofillIndexEntryRequest
+{
+    fn into_into_dart(self) -> crate::api::MoveAutofillIndexEntryRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::MoveEntryRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -4946,6 +5393,24 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ParsedEntryFieldDto>
     for crate::api::ParsedEntryFieldDto
 {
     fn into_into_dart(self) -> crate::api::ParsedEntryFieldDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::PatchAutofillIndexRankingRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.index_path.into_into_dart().into_dart(), self.entries.into_into_dart().into_dart()]
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::PatchAutofillIndexRankingRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::PatchAutofillIndexRankingRequest>
+    for crate::api::PatchAutofillIndexRankingRequest
+{
+    fn into_into_dart(self) -> crate::api::PatchAutofillIndexRankingRequest {
         self
     }
 }
@@ -5146,29 +5611,72 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::PreparePgpPrivateKeyResponse>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::RefreshAutofillIndexRequest {
+impl flutter_rust_bridge::IntoDart for crate::api::RebuildAutofillIndexRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.config_path.into_into_dart().into_dart(),
             self.index_path.into_into_dart().into_dart(),
             self.store_id.into_into_dart().into_dart(),
             self.store_name.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
-            self.pgp_executable.into_into_dart().into_dart(),
-            self.passphrase.into_into_dart().into_dart(),
             self.entries.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::RefreshAutofillIndexRequest
+    for crate::api::RebuildAutofillIndexRequest
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::RefreshAutofillIndexRequest>
-    for crate::api::RefreshAutofillIndexRequest
+impl flutter_rust_bridge::IntoIntoDart<crate::api::RebuildAutofillIndexRequest>
+    for crate::api::RebuildAutofillIndexRequest
 {
-    fn into_into_dart(self) -> crate::api::RefreshAutofillIndexRequest {
+    fn into_into_dart(self) -> crate::api::RebuildAutofillIndexRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ReconcileAutofillIndexRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.index_path.into_into_dart().into_dart(),
+            self.store_id.into_into_dart().into_dart(),
+            self.store_name.into_into_dart().into_dart(),
+            self.root.into_into_dart().into_dart(),
+            self.entries.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::ReconcileAutofillIndexRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ReconcileAutofillIndexRequest>
+    for crate::api::ReconcileAutofillIndexRequest
+{
+    fn into_into_dart(self) -> crate::api::ReconcileAutofillIndexRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::RemoveAutofillIndexEntryRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.index_path.into_into_dart().into_dart(),
+            self.path.into_into_dart().into_dart(),
+            self.recursive.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::RemoveAutofillIndexEntryRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::RemoveAutofillIndexEntryRequest>
+    for crate::api::RemoveAutofillIndexEntryRequest
+{
+    fn into_into_dart(self) -> crate::api::RemoveAutofillIndexEntryRequest {
         self
     }
 }
@@ -5276,6 +5784,24 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::UnitResponse> for crate::api:
         self
     }
 }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::UpsertAutofillIndexEntryRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.index_path.into_into_dart().into_dart(), self.entry.into_into_dart().into_dart()]
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::UpsertAutofillIndexEntryRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::UpsertAutofillIndexEntryRequest>
+    for crate::api::UpsertAutofillIndexEntryRequest
+{
+    fn into_into_dart(self) -> crate::api::UpsertAutofillIndexEntryRequest {
+        self
+    }
+}
 
 impl SseEncode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -5318,7 +5844,7 @@ impl SseEncode for crate::api::AutofillCandidateDto {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.path, serializer);
         <String>::sse_encode(self.display_name, serializer);
-        <Option<String>>::sse_encode(self.username, serializer);
+        <String>::sse_encode(self.username, serializer);
         <String>::sse_encode(self.match_kind, serializer);
         <String>::sse_encode(self.match_value, serializer);
         <i32>::sse_encode(self.score, serializer);
@@ -5339,7 +5865,7 @@ impl SseEncode for crate::api::AutofillCredentialDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.path, serializer);
-        <Option<String>>::sse_encode(self.username, serializer);
+        <String>::sse_encode(self.username, serializer);
         <String>::sse_encode(self.password, serializer);
     }
 }
@@ -5368,7 +5894,6 @@ impl SseEncode for crate::api::AutofillEntryMetadataDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.path, serializer);
-        <Option<String>>::sse_encode(self.display_name, serializer);
         <bool>::sse_encode(self.is_favorite, serializer);
         <Option<u32>>::sse_encode(self.recent_rank, serializer);
     }
@@ -5379,7 +5904,7 @@ impl SseEncode for crate::api::AutofillQueryRequest {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.index_path, serializer);
         <Option<String>>::sse_encode(self.website, serializer);
-        <Option<String>>::sse_encode(self.android_package, serializer);
+        <Option<String>>::sse_encode(self.app_name, serializer);
         <Option<String>>::sse_encode(self.query, serializer);
         <u32>::sse_encode(self.limit, serializer);
     }
@@ -5429,6 +5954,14 @@ impl SseEncode for crate::api::ClearAutofillIndexRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.index_path, serializer);
+    }
+}
+
+impl SseEncode for crate::api::ClearAutofillIndexWebsitesRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.index_path, serializer);
+        <Vec<String>>::sse_encode(self.paths, serializer);
     }
 }
 
@@ -5556,6 +6089,18 @@ impl SseEncode for crate::api::EditEntryRequest {
         <String>::sse_encode(self.path, serializer);
         <String>::sse_encode(self.content, serializer);
         <String>::sse_encode(self.pgp_executable, serializer);
+    }
+}
+
+impl SseEncode for crate::api::EnrichAutofillIndexWebsitesRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
+        <String>::sse_encode(self.index_path, serializer);
+        <String>::sse_encode(self.root, serializer);
+        <Option<String>>::sse_encode(self.pgp_executable, serializer);
+        <Option<String>>::sse_encode(self.passphrase, serializer);
+        <Vec<String>>::sse_encode(self.paths, serializer);
     }
 }
 
@@ -6004,6 +6549,16 @@ impl SseEncode for crate::api::LoadConfigRequest {
     }
 }
 
+impl SseEncode for crate::api::MoveAutofillIndexEntryRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.index_path, serializer);
+        <String>::sse_encode(self.old_path, serializer);
+        <String>::sse_encode(self.new_path, serializer);
+        <bool>::sse_encode(self.recursive, serializer);
+    }
+}
+
 impl SseEncode for crate::api::MoveEntryRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6241,6 +6796,14 @@ impl SseEncode for crate::api::ParsedEntryFieldDto {
     }
 }
 
+impl SseEncode for crate::api::PatchAutofillIndexRankingRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.index_path, serializer);
+        <Vec<crate::api::AutofillEntryMetadataDto>>::sse_encode(self.entries, serializer);
+    }
+}
+
 impl SseEncode for crate::api::PgpImportFailureKind {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6352,17 +6915,34 @@ impl SseEncode for crate::api::PreparePgpPrivateKeyResponse {
     }
 }
 
-impl SseEncode for crate::api::RefreshAutofillIndexRequest {
+impl SseEncode for crate::api::RebuildAutofillIndexRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.config_path, serializer);
         <String>::sse_encode(self.index_path, serializer);
         <String>::sse_encode(self.store_id, serializer);
         <String>::sse_encode(self.store_name, serializer);
         <String>::sse_encode(self.root, serializer);
-        <Option<String>>::sse_encode(self.pgp_executable, serializer);
-        <Option<String>>::sse_encode(self.passphrase, serializer);
         <Vec<crate::api::AutofillEntryMetadataDto>>::sse_encode(self.entries, serializer);
+    }
+}
+
+impl SseEncode for crate::api::ReconcileAutofillIndexRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.index_path, serializer);
+        <String>::sse_encode(self.store_id, serializer);
+        <String>::sse_encode(self.store_name, serializer);
+        <String>::sse_encode(self.root, serializer);
+        <Vec<crate::api::AutofillEntryMetadataDto>>::sse_encode(self.entries, serializer);
+    }
+}
+
+impl SseEncode for crate::api::RemoveAutofillIndexEntryRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.index_path, serializer);
+        <String>::sse_encode(self.path, serializer);
+        <bool>::sse_encode(self.recursive, serializer);
     }
 }
 
@@ -6438,6 +7018,14 @@ impl SseEncode for crate::api::UnitResponse {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <Option<crate::api::BridgeFailure>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for crate::api::UpsertAutofillIndexEntryRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.index_path, serializer);
+        <crate::api::AutofillEntryMetadataDto>::sse_encode(self.entry, serializer);
     }
 }
 

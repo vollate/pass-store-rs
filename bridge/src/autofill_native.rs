@@ -12,17 +12,17 @@ use serde::{Deserialize, Serialize};
 use crate::api::{self, BridgeFailure};
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct NativeAutofillQueryRequest {
     index_path: String,
     website: Option<String>,
-    android_package: Option<String>,
+    app_name: Option<String>,
     query: Option<String>,
     limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct NativeAutofillCredentialRequest {
     config_path: String,
     index_path: String,
@@ -51,7 +51,7 @@ struct NativeAutofillCredentialResponse {
 struct NativeAutofillCandidate {
     path: String,
     display_name: String,
-    username: Option<String>,
+    username: String,
     match_kind: String,
     match_value: String,
     score: i32,
@@ -63,7 +63,7 @@ struct NativeAutofillCandidate {
 #[serde(rename_all = "camelCase")]
 struct NativeAutofillCredential {
     path: String,
-    username: Option<String>,
+    username: String,
     password: String,
 }
 
@@ -79,7 +79,7 @@ pub fn query_candidates_json(request_json: &str) -> String {
         Ok(request) => match autofill::query_autofill_candidates(CoreAutofillQueryRequest {
             index_path: PathBuf::from(request.index_path),
             website: request.website,
-            android_package: request.android_package,
+            app_name: request.app_name,
             query: request.query,
             limit: request.limit.unwrap_or(10),
         }) {
@@ -284,7 +284,7 @@ mod tests {
     use super::query_candidates_json;
 
     #[test]
-    fn query_candidates_json_matches_android_package() {
+    fn query_candidates_json_matches_path_website_and_app_name() {
         let dir = tempdir().unwrap();
         let index_path = dir.path().join("autofill.json");
         write_autofill_index(
@@ -296,11 +296,12 @@ mod tests {
                 store_root: dir.path().display().to_string(),
                 generated_at_epoch_seconds: 1,
                 entries: vec![AutofillIndexEntry {
-                    path: "bank/example".to_string(),
-                    display_name: "Example Bank".to_string(),
-                    username: Some("alice".to_string()),
-                    websites: vec!["example.com".to_string()],
-                    android_packages: vec!["com.example.bank".to_string()],
+                    path: "example.com/alice".to_string(),
+                    display_name: "example.com".to_string(),
+                    service_name: Some("example.com".to_string()),
+                    username: "alice".to_string(),
+                    path_website: Some("example.com".to_string()),
+                    enriched_websites: Vec::new(),
                     is_favorite: true,
                     recent_rank: Some(0),
                     updated_at_epoch_seconds: 1,
@@ -309,15 +310,44 @@ mod tests {
         )
         .unwrap();
 
-        let raw = query_candidates_json(&format!(
-            r#"{{"indexPath":"{}","androidPackage":"com.example.bank","limit":5}}"#,
+        let website_raw = query_candidates_json(&format!(
+            r#"{{"indexPath":"{}","website":"https://www.example.com/login","limit":5}}"#,
             index_path.display().to_string().replace('\\', "\\\\")
         ));
-        let value: Value = serde_json::from_str(&raw).unwrap();
+        let website: Value = serde_json::from_str(&website_raw).unwrap();
+        assert!(website["error"].is_null());
+        assert_eq!(website["candidates"][0]["path"], "example.com/alice");
+        assert_eq!(website["candidates"][0]["matchKind"], "path_website");
+        assert_eq!(website["candidates"][0]["username"], "alice");
 
-        assert!(value["error"].is_null());
-        assert_eq!(value["candidates"][0]["path"], "bank/example");
-        assert_eq!(value["candidates"][0]["matchKind"], "android_package");
+        let app_raw = query_candidates_json(&format!(
+            r#"{{"indexPath":"{}","appName":"EXAMPLE.COM","limit":5}}"#,
+            index_path.display().to_string().replace('\\', "\\\\")
+        ));
+        let app: Value = serde_json::from_str(&app_raw).unwrap();
+        assert_eq!(app["candidates"][0]["matchKind"], "app_name");
+    }
+
+    #[test]
+    fn query_candidates_json_rejects_package_and_malformed_index_shapes() {
+        let dir = tempdir().unwrap();
+        let index_path = dir.path().join("autofill.json");
+        std::fs::write(&index_path, "{}").unwrap();
+
+        let package_raw = query_candidates_json(&format!(
+            r#"{{"indexPath":"{}","androidPackage":"com.example.app","limit":5}}"#,
+            index_path.display().to_string().replace('\\', "\\\\")
+        ));
+        let package: Value = serde_json::from_str(&package_raw).unwrap();
+        assert_eq!(package["error"]["category"], "validation_error");
+
+        let malformed_raw = query_candidates_json(&format!(
+            r#"{{"indexPath":"{}","query":"alice","limit":5}}"#,
+            index_path.display().to_string().replace('\\', "\\\\")
+        ));
+        let malformed: Value = serde_json::from_str(&malformed_raw).unwrap();
+        assert!(malformed["candidates"].as_array().unwrap().is_empty());
+        assert!(!malformed["error"].is_null());
     }
 
     #[test]

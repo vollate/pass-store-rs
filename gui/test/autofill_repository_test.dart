@@ -5,12 +5,12 @@ import 'package:pars_gui/services/autofill_repository.dart';
 import 'package:pars_gui/services/security_repository.dart';
 
 void main() {
-  test('bridge autofill repository refreshes index with entry metadata and passphrase', () async {
+  test('path rebuild sends ranking metadata without secret inputs', () async {
     final bridge = _RecordingAutofillBridge();
     final securityRepository = InMemorySecurityRepository();
     await securityRepository.startPgpSession(
       fingerprint: 'ABC123',
-      passphrase: 'session-passphrase',
+      passphrase: 'must-not-be-read-for-rebuild',
     );
     final repository = BridgeAutofillRepository(
       bridge: bridge,
@@ -23,169 +23,295 @@ void main() {
       securityRepository: securityRepository,
     );
 
-    await repository.refreshIndex(
-      const <PasswordEntry>[
-        PasswordEntry(
-          path: 'work/github',
-          displayName: 'GitHub',
-          repoName: 'Personal',
-          encryptedContent: '',
-          isFavorite: true,
-          lastUsedLabel: 'today',
-        ),
-        PasswordEntry(
-          path: 'work',
-          displayName: 'work',
-          repoName: 'Personal',
-          encryptedContent: '',
-          isDirectory: true,
-        ),
-      ],
-    );
+    await repository.rebuildIndex(const <PasswordEntry>[
+      PasswordEntry(
+        path: 'github.com/alice',
+        displayName: 'alice',
+        repoName: 'Personal',
+        encryptedContent: '',
+        isFavorite: true,
+        lastUsedLabel: 'Recent',
+      ),
+      PasswordEntry(
+        path: 'github.com',
+        displayName: 'github.com',
+        repoName: 'Personal',
+        encryptedContent: '',
+        isDirectory: true,
+      ),
+    ]);
 
-    expect(bridge.calledMethods, contains('refresh_autofill_index'));
-    final request = bridge.lastRefreshRequest!;
-    expect(request.configPath, '/tmp/pars.toml');
+    expect(bridge.calledMethods, contains('rebuild_autofill_index'));
+    final request = bridge.lastRebuildRequest!;
     expect(request.indexPath, '/tmp/autofill.json');
     expect(request.storeId, 'store-0');
     expect(request.root, '/tmp/store');
-    expect(request.pgpExecutable, '/usr/bin/gpg');
-    expect(request.passphrase, 'session-passphrase');
     expect(request.entries, hasLength(1));
-    expect(request.entries.single.path, 'work/github');
-    expect(request.entries.single.displayName, 'GitHub');
+    expect(request.entries.single.path, 'github.com/alice');
     expect(request.entries.single.isFavorite, isTrue);
     expect(request.entries.single.recentRank, 0);
+    expect(repository.status.indexedEntries, 1);
   });
 
-  test('bridge autofill repository queries and maps candidates', () async {
-    final bridge = _RecordingAutofillBridge()
-      ..queryResponse = const frb.AutofillCandidatesResponse(
-        candidates: <frb.AutofillCandidateDto>[
-          frb.AutofillCandidateDto(
-            path: 'work/github',
-            displayName: 'GitHub',
-            username: 'alice',
-            matchKind: 'website',
-            matchValue: 'example.com',
-            score: 2150,
-            isFavorite: true,
-            recentRank: 0,
-          ),
-        ],
+  test(
+    'incremental methods call only their replacement bridge operations',
+    () async {
+      final bridge = _RecordingAutofillBridge();
+      final repository = _repository(bridge);
+      const entry = PasswordEntry(
+        path: 'github.com/alice',
+        displayName: 'alice',
+        repoName: 'Personal',
+        encryptedContent: '',
+        lastUsedLabel: 'Recent 3',
       );
-    final repository = BridgeAutofillRepository(
-      bridge: bridge,
-      configPath: '/tmp/pars.toml',
-      indexPath: '/tmp/autofill.json',
-      storeId: 'store-0',
-      storeName: 'Personal',
-      storeRoot: '/tmp/store',
-    );
+
+      await repository.upsertEntry(entry);
+      await repository.moveEntry(
+        oldPath: 'github.com/alice',
+        newPath: 'gitlab.com/alice',
+        recursive: false,
+      );
+      await repository.removeEntry(path: 'old', recursive: true);
+      await repository.patchRanking(const <PasswordEntry>[entry]);
+      await repository.reconcileIndex(const <PasswordEntry>[entry]);
+
+      expect(bridge.lastUpsertRequest?.entry.path, 'github.com/alice');
+      expect(bridge.lastUpsertRequest?.entry.recentRank, 2);
+      expect(bridge.lastMoveRequest?.oldPath, 'github.com/alice');
+      expect(bridge.lastMoveRequest?.newPath, 'gitlab.com/alice');
+      expect(bridge.lastRemoveRequest?.recursive, isTrue);
+      expect(
+        bridge.lastRankingRequest?.entries.single.path,
+        'github.com/alice',
+      );
+      expect(bridge.lastReconcileRequest?.storeId, 'store-0');
+      expect(bridge.calledMethods, isNot(contains('rebuild_autofill_index')));
+    },
+  );
+
+  test(
+    'website enrichment is explicit, selected, and secret-bearing',
+    () async {
+      final bridge = _RecordingAutofillBridge();
+      final securityRepository = InMemorySecurityRepository();
+      await securityRepository.startPgpSession(
+        fingerprint: 'ABC123',
+        passphrase: 'session-passphrase',
+      );
+      final repository = _repository(
+        bridge,
+        securityRepository: securityRepository,
+      );
+
+      await expectLater(
+        repository.enrichWebsites(const <String>[]),
+        throwsA(isA<AutofillRepositoryException>()),
+      );
+      await repository.enrichWebsites(const <String>['github.com/alice']);
+      await repository.clearWebsiteEnrichment();
+
+      expect(bridge.lastEnrichRequest?.paths, <String>['github.com/alice']);
+      expect(bridge.lastEnrichRequest?.passphrase, 'session-passphrase');
+      expect(bridge.lastClearWebsitesRequest?.paths, isEmpty);
+    },
+  );
+
+  test('query maps app-name candidates and credential path username', () async {
+    final bridge =
+        _RecordingAutofillBridge()
+          ..queryResponse = const frb.AutofillCandidatesResponse(
+            candidates: <frb.AutofillCandidateDto>[
+              frb.AutofillCandidateDto(
+                path: 'GitHub/alice',
+                displayName: 'GitHub',
+                username: 'alice',
+                matchKind: 'app_name',
+                matchValue: 'github',
+                score: 3650,
+                isFavorite: true,
+                recentRank: 0,
+              ),
+            ],
+          )
+          ..credentialResponse = const frb.AutofillCredentialResponse(
+            credential: frb.AutofillCredentialDto(
+              path: 'GitHub/alice',
+              username: 'alice',
+              password: 'secret',
+            ),
+          );
+    final repository = _repository(bridge);
 
     final candidates = await repository.queryCandidates(
-      website: 'example.com',
+      appName: 'GitHub',
       limit: 5,
     );
+    final credential = await repository.resolveCredential('GitHub/alice');
 
-    expect(bridge.lastQueryRequest?.website, 'example.com');
+    expect(bridge.lastQueryRequest?.appName, 'GitHub');
     expect(bridge.lastQueryRequest?.limit, 5);
-    expect(candidates.single.path, 'work/github');
     expect(candidates.single.username, 'alice');
-    expect(candidates.single.matchKind, 'website');
-    expect(candidates.single.score, 2150);
-  });
-
-  test('bridge autofill repository resolves credentials with active passphrase', () async {
-    final bridge = _RecordingAutofillBridge()
-      ..credentialResponse = const frb.AutofillCredentialResponse(
-        credential: frb.AutofillCredentialDto(
-          path: 'work/github',
-          username: 'alice',
-          password: 'secret',
-        ),
-      );
-    final securityRepository = InMemorySecurityRepository();
-    await securityRepository.startPgpSession(
-      fingerprint: 'ABC123',
-      passphrase: 'session-passphrase',
-    );
-    final repository = BridgeAutofillRepository(
-      bridge: bridge,
-      configPath: '/tmp/pars.toml',
-      indexPath: '/tmp/autofill.json',
-      storeId: 'store-0',
-      storeName: 'Personal',
-      storeRoot: '/tmp/store',
-      securityRepository: securityRepository,
-    );
-
-    final credential = await repository.resolveCredential('work/github');
-
-    expect(bridge.lastCredentialRequest?.path, 'work/github');
-    expect(bridge.lastCredentialRequest?.passphrase, 'session-passphrase');
+    expect(candidates.single.matchKind, 'app_name');
     expect(credential?.username, 'alice');
     expect(credential?.password, 'secret');
   });
 
-  test('fake autofill repository records refreshes and clears candidates', () async {
+  test('fake repository records path operations and clear', () async {
     final repository = FakeAutofillRepository(
       candidates: const <AutofillCandidate>[
         AutofillCandidate(
-          path: 'work/github',
-          displayName: 'GitHub',
-          matchKind: 'website',
-          matchValue: 'example.com',
-          score: 2000,
+          path: 'github.com/alice',
+          displayName: 'github.com',
+          username: 'alice',
+          matchKind: 'path_website',
+          matchValue: 'github.com',
+          score: 4000,
           isFavorite: false,
         ),
       ],
       credentials: const <String, AutofillCredential>{
-        'work/github': AutofillCredential(
-          path: 'work/github',
+        'github.com/alice': AutofillCredential(
+          path: 'github.com/alice',
           username: 'alice',
           password: 'secret',
         ),
       },
     );
+    const entries = <PasswordEntry>[
+      PasswordEntry(
+        path: 'github.com/alice',
+        displayName: 'alice',
+        repoName: 'Personal',
+        encryptedContent: '',
+      ),
+    ];
 
-    await repository.refreshIndex(
-      const <PasswordEntry>[
-        PasswordEntry(
-          path: 'work/github',
-          displayName: 'GitHub',
-          repoName: 'Personal',
-          encryptedContent: '',
-        ),
-      ],
+    await repository.rebuildIndex(entries);
+    await repository.upsertEntry(entries.single);
+    await repository.patchRanking(entries);
+
+    expect(repository.lastRebuiltEntries.single.path, 'github.com/alice');
+    expect(repository.operations, contains('upsert:github.com/alice'));
+    expect(
+      await repository.queryCandidates(website: 'github.com'),
+      hasLength(1),
     );
-
-    expect(repository.lastRefreshedEntries.single.path, 'work/github');
-    expect(await repository.queryCandidates(website: 'example.com'), hasLength(1));
-    expect((await repository.resolveCredential('work/github'))?.password, 'secret');
+    expect(
+      (await repository.resolveCredential('github.com/alice'))?.password,
+      'secret',
+    );
 
     await repository.clearIndex();
     expect(repository.cleared, isTrue);
-    expect(await repository.queryCandidates(website: 'example.com'), isEmpty);
+    expect(await repository.queryCandidates(website: 'github.com'), isEmpty);
   });
+}
+
+BridgeAutofillRepository _repository(
+  _RecordingAutofillBridge bridge, {
+  SecurityRepository? securityRepository,
+}) {
+  return BridgeAutofillRepository(
+    bridge: bridge,
+    configPath: '/tmp/pars.toml',
+    indexPath: '/tmp/autofill.json',
+    storeId: 'store-0',
+    storeName: 'Personal',
+    storeRoot: '/tmp/store',
+    securityRepository: securityRepository,
+  );
 }
 
 class _RecordingAutofillBridge implements AutofillBridgeApi {
   final List<String> calledMethods = <String>[];
-  frb.RefreshAutofillIndexRequest? lastRefreshRequest;
+  frb.RebuildAutofillIndexRequest? lastRebuildRequest;
+  frb.UpsertAutofillIndexEntryRequest? lastUpsertRequest;
+  frb.MoveAutofillIndexEntryRequest? lastMoveRequest;
+  frb.RemoveAutofillIndexEntryRequest? lastRemoveRequest;
+  frb.PatchAutofillIndexRankingRequest? lastRankingRequest;
+  frb.ReconcileAutofillIndexRequest? lastReconcileRequest;
+  frb.EnrichAutofillIndexWebsitesRequest? lastEnrichRequest;
+  frb.ClearAutofillIndexWebsitesRequest? lastClearWebsitesRequest;
   frb.AutofillQueryRequest? lastQueryRequest;
   frb.AutofillCredentialRequest? lastCredentialRequest;
   frb.ClearAutofillIndexRequest? lastClearRequest;
   frb.AutofillCandidatesResponse queryResponse =
-      const frb.AutofillCandidatesResponse(candidates: <frb.AutofillCandidateDto>[]);
-  frb.AutofillCredentialResponse credentialResponse = const frb.AutofillCredentialResponse();
+      const frb.AutofillCandidatesResponse(
+        candidates: <frb.AutofillCandidateDto>[],
+      );
+  frb.AutofillCredentialResponse credentialResponse =
+      const frb.AutofillCredentialResponse();
 
   @override
-  Future<frb.UnitResponse> refreshAutofillIndex({
-    required frb.RefreshAutofillIndexRequest request,
+  Future<frb.UnitResponse> rebuildAutofillIndex({
+    required frb.RebuildAutofillIndexRequest request,
   }) async {
-    calledMethods.add('refresh_autofill_index');
-    lastRefreshRequest = request;
+    calledMethods.add('rebuild_autofill_index');
+    lastRebuildRequest = request;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> upsertAutofillIndexEntry({
+    required frb.UpsertAutofillIndexEntryRequest request,
+  }) async {
+    calledMethods.add('upsert_autofill_index_entry');
+    lastUpsertRequest = request;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> moveAutofillIndexEntry({
+    required frb.MoveAutofillIndexEntryRequest request,
+  }) async {
+    calledMethods.add('move_autofill_index_entry');
+    lastMoveRequest = request;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> removeAutofillIndexEntry({
+    required frb.RemoveAutofillIndexEntryRequest request,
+  }) async {
+    calledMethods.add('remove_autofill_index_entry');
+    lastRemoveRequest = request;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> patchAutofillIndexRanking({
+    required frb.PatchAutofillIndexRankingRequest request,
+  }) async {
+    calledMethods.add('patch_autofill_index_ranking');
+    lastRankingRequest = request;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> reconcileAutofillIndex({
+    required frb.ReconcileAutofillIndexRequest request,
+  }) async {
+    calledMethods.add('reconcile_autofill_index');
+    lastReconcileRequest = request;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> enrichAutofillIndexWebsites({
+    required frb.EnrichAutofillIndexWebsitesRequest request,
+  }) async {
+    calledMethods.add('enrich_autofill_index_websites');
+    lastEnrichRequest = request;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> clearAutofillIndexWebsites({
+    required frb.ClearAutofillIndexWebsitesRequest request,
+  }) async {
+    calledMethods.add('clear_autofill_index_websites');
+    lastClearWebsitesRequest = request;
     return const frb.UnitResponse();
   }
 

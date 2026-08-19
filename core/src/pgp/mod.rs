@@ -3,6 +3,7 @@ pub mod backend;
 pub mod crypto;
 pub mod import;
 pub mod key_management;
+mod local_protection;
 pub mod rpgp_backend;
 pub mod utils;
 

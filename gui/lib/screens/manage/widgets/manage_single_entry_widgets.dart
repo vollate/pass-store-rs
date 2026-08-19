@@ -311,10 +311,12 @@ class _DeleteEntrySheet extends StatefulWidget {
     required this.entries,
     required this.canCommit,
     required this.onSubmit,
+    this.showEntryPicker = true,
   });
 
   final List<PasswordEntry> entries;
   final bool canCommit;
+  final bool showEntryPicker;
   final _DeleteEntrySubmit onSubmit;
 
   @override
@@ -365,18 +367,19 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
       context: context,
       title: 'Delete entry',
       children: <Widget>[
-        _EntryPicker(
-          entries: widget.entries,
-          value: _entry,
-          onChanged:
-              _saving
-                  ? null
-                  : (value) => setState(() {
-                    _entry = value;
-                    _confirmation = '';
-                  }),
-        ),
-        const SizedBox(height: 12),
+        if (widget.showEntryPicker)
+          _EntryPicker(
+            entries: widget.entries,
+            value: _entry,
+            onChanged:
+                _saving
+                    ? null
+                    : (value) => setState(() {
+                      _entry = value;
+                      _confirmation = '';
+                    }),
+          ),
+        if (widget.showEntryPicker) const SizedBox(height: 12),
         Text('Path: ${_entry.path}'),
         const SizedBox(height: 12),
         TextFormField(

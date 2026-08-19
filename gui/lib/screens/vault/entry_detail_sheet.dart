@@ -25,6 +25,9 @@ class EntryDetailSheet extends StatefulWidget {
     this.copyText,
     this.onOpenUri,
     this.onFavoriteChanged,
+    this.onEdit,
+    this.onRegenerate,
+    this.onDelete,
     this.onChooseKey,
     this.onOpenKeyManagement,
     this.keys = const <KeyRecord>[],
@@ -39,6 +42,9 @@ class EntryDetailSheet extends StatefulWidget {
   final Future<void> Function(String text)? copyText;
   final Future<void> Function(Uri uri)? onOpenUri;
   final VoidCallback? onFavoriteChanged;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRegenerate;
+  final VoidCallback? onDelete;
   final VoidCallback? onChooseKey;
   final VoidCallback? onOpenKeyManagement;
   final List<KeyRecord> keys;
@@ -336,7 +342,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                     label: Text(_isFavorite ? 'Unfavorite' : 'Favorite'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: widget.onEdit,
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Edit'),
                   ),
@@ -352,12 +358,12 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                     label: const Text('QR code'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: widget.onRegenerate,
                     icon: const Icon(Icons.refresh),
                     label: const Text('Regenerate'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: widget.onDelete,
                     icon: const Icon(Icons.delete_outline),
                     label: const Text('Delete'),
                   ),

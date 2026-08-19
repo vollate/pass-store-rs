@@ -4,7 +4,7 @@ extension _SettingsScreenGitSheets on SettingsScreen {
   void _showGitSync(BuildContext context) {
     final git = _gitOperations;
     if (git == null) {
-      _showTextSheet(context, 'Git sync and remotes');
+      _showUnavailableSheet(context, 'Git sync and remotes');
       return;
     }
 

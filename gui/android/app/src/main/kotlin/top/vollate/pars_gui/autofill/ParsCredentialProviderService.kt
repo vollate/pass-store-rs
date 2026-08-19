@@ -43,7 +43,10 @@ class ParsCredentialProviderService : CredentialProviderService() {
             ParsAutofillNativeBridge.queryCandidates(
                 context = this,
                 website = request.callingAppInfo?.origin,
-                androidPackage = request.callingAppInfo?.packageName,
+                appName = ParsAutofillAppName.resolve(
+                    this,
+                    request.callingAppInfo?.packageName,
+                ),
                 query = null,
                 limit = 5,
             )
@@ -96,7 +99,7 @@ class ParsCredentialProviderService : CredentialProviderService() {
 
         return Slice.Builder(uri, SliceSpec("CredentialEntry", 1))
             .addText(candidate.displayName, null, listOf(Slice.HINT_TITLE))
-            .addText(candidate.username ?: candidate.matchValue, null, listOf(Slice.HINT_SUMMARY))
+            .addText(candidate.username, null, listOf(Slice.HINT_SUMMARY))
             .addAction(pendingIntent, actionSlice, null)
             .build()
     }
