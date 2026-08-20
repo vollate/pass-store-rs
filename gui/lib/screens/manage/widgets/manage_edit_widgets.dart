@@ -7,13 +7,13 @@ class _EditEntrySheet extends StatefulWidget {
     required this.onReadEntry,
     required this.onSaveRawNotes,
     required this.onReplacePassword,
-    this.title = 'Edit entries',
+    this.title,
     this.showEntryPicker = true,
   });
 
   final List<PasswordEntry> entries;
   final bool canCommit;
-  final String title;
+  final String? title;
   final bool showEntryPicker;
   final _ReadEntryForEdit onReadEntry;
   final _SaveEditedEntrySubmit onSaveRawNotes;
@@ -62,7 +62,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = error.toString();
+          _error = _manageErrorMessage(context, error);
         });
       }
     }
@@ -102,7 +102,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = error.toString();
+          _error = _manageErrorMessage(context, error);
         });
       }
     }
@@ -113,14 +113,14 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
     if (widget.entries.isEmpty) {
       return _operationSheet(
         context: context,
-        title: widget.title,
-        children: const <Widget>[Text('No entries to edit.')],
+        title: widget.title ?? context.l10n.editEntries,
+        children: <Widget>[Text(context.l10n.noEntriesToEdit)],
       );
     }
     final entry = _entry ?? widget.entries.first;
     return _operationSheet(
       context: context,
-      title: widget.title,
+      title: widget.title ?? context.l10n.editEntries,
       children: <Widget>[
         if (widget.showEntryPicker)
           _EntryPicker(
@@ -135,7 +135,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
                     },
           )
         else
-          Text('Path: ${entry.path}'),
+          Text(context.l10n.pathValue(entry.path)),
         if (_loading) ...const <Widget>[
           SizedBox(height: 16),
           LinearProgressIndicator(),
@@ -145,7 +145,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
             key: ValueKey('password-${entry.path}-$_password'),
             initialValue: _password,
             obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password'),
+            decoration: InputDecoration(labelText: context.l10n.password),
             onChanged: (value) => _password = value,
           ),
           const SizedBox(height: 12),
@@ -154,7 +154,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
             initialValue: _notes,
             minLines: 3,
             maxLines: 6,
-            decoration: const InputDecoration(labelText: 'Raw notes'),
+            decoration: InputDecoration(labelText: context.l10n.rawNotes),
             onChanged: (value) => _notes = value,
           ),
           _CommitCheckbox(
@@ -168,7 +168,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
               Expanded(
                 child: _SubmitButton(
                   saving: _saving,
-                  label: 'Save edited entry',
+                  label: context.l10n.saveEditedEntry,
                   onPressed: _saveRawNotes,
                 ),
               ),
@@ -176,7 +176,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
               Expanded(
                 child: _SubmitButton(
                   saving: _saving,
-                  label: 'Replace first line',
+                  label: context.l10n.replaceFirstLine,
                   onPressed: _replacePasswordLine,
                 ),
               ),

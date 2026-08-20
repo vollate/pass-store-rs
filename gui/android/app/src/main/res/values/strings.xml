@@ -3,6 +3,11 @@
     <string name="app_name">Pars</string>
     <string name="autofill_service_summary">Fill passwords from Pars</string>
     <string name="credential_provider_summary">Pars passwords</string>
+    <string name="autofill_unlock_title">Unlock Pars</string>
+    <string name="autofill_unlock_subtitle">Fill the selected password</string>
+    <string name="autofill_cancel">Cancel</string>
+    <string name="autofill_password_source">Password from Pars</string>
+    <string name="autofill_candidate_title">%1$s · Pars</string>
     <string name="autofill_no_matches_title">No matching passwords</string>
     <string name="autofill_no_matches_toast">No matching credentials in Pars</string>
 </resources>

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../l10n/app_localizations.dart';
+import '../l10n/l10n.dart';
 import '../services/path_picker_service.dart';
 
 Future<ManagedStoreConflictPolicy?> showManagedStoreConflictSheet(
@@ -22,7 +22,7 @@ class _ManagedStoreConflictSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
+    final localizations = context.l10n;
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final storeName = _storeNameFromPath(conflict.destinationPath);

@@ -1751,13 +1751,31 @@ fn inspect_app_state_inner(request: InspectAppStateRequest) -> Result<AppStateDt
         .map_err(|error| CoreError::ConfigError(error.to_string()))
         .map_err(BridgeFailure::from)?;
     let default_repo = config.path_config.default_repo.clone();
+    let managed_pgp_keys = if request.pgp_executable.is_none() {
+        pgp_backend(&request.config_path, None)
+            .ok()
+            .and_then(|backend| backend.list_keys().ok())
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let stores = config
         .path_config
         .repos
         .iter()
         .enumerate()
         .map(|(index, root)| {
-            inspect_store(index, root, root == &default_repo, request.pgp_executable.as_deref())
+            inspect_store(
+                index,
+                root,
+                root == &default_repo,
+                request.pgp_executable.as_deref(),
+                if request.pgp_executable.is_none() {
+                    Some(managed_pgp_keys.as_slice())
+                } else {
+                    None
+                },
+            )
         })
         .collect::<Vec<_>>();
     let selected = stores.iter().find(|store| store.is_default).or_else(|| stores.first());
@@ -1780,6 +1798,7 @@ fn inspect_store(
     root: &str,
     is_default: bool,
     pgp_executable: Option<&str>,
+    managed_pgp_keys: Option<&[PgpKeySummary]>,
 ) -> StoreStatusDto {
     let root_path = PathBuf::from(root);
     let name = store_name(&root_path);
@@ -1788,7 +1807,8 @@ fn inspect_store(
     let has_gpg_id = gpg_id_path.is_file();
     let has_git_repo = root_path.join(".git").is_dir();
     let has_git_remote = exists && has_git_repo && git_remote_exists(&root_path);
-    let pgp_key_missing = has_gpg_id && pgp_key_missing(&gpg_id_path, pgp_executable);
+    let pgp_key_missing =
+        has_gpg_id && pgp_key_missing(&gpg_id_path, pgp_executable, managed_pgp_keys);
     let mut issues = Vec::new();
 
     if !exists {
@@ -2057,7 +2077,11 @@ fn git_remote_exists(root: &Path) -> bool {
     output.status.success() && !String::from_utf8_lossy(&output.stdout).trim().is_empty()
 }
 
-fn pgp_key_missing(gpg_id_path: &Path, pgp_executable: Option<&str>) -> bool {
+fn pgp_key_missing(
+    gpg_id_path: &Path,
+    pgp_executable: Option<&str>,
+    managed_pgp_keys: Option<&[PgpKeySummary]>,
+) -> bool {
     let Ok(content) = fs::read_to_string(gpg_id_path) else {
         return true;
     };
@@ -2065,16 +2089,34 @@ fn pgp_key_missing(gpg_id_path: &Path, pgp_executable: Option<&str>) -> bool {
     if keys.is_empty() {
         return true;
     }
-    let Some(executable) = pgp_executable else {
-        return false;
-    };
-    keys.iter().any(|key| {
-        Command::new(executable)
-            .args(["--list-secret-keys", key])
-            .output()
-            .map(|output| !output.status.success())
-            .unwrap_or(true)
+    if let Some(executable) = pgp_executable {
+        return keys.iter().any(|key| {
+            Command::new(executable)
+                .args(["--list-secret-keys", key])
+                .output()
+                .map(|output| !output.status.success())
+                .unwrap_or(true)
+        });
+    }
+    let available = managed_pgp_keys.unwrap_or_default();
+    keys.iter().any(|required| {
+        !available.iter().any(|key| key.has_private_key && pgp_key_matches(required, key))
     })
+}
+
+fn pgp_key_matches(required: &str, key: &PgpKeySummary) -> bool {
+    let required_compact =
+        required.chars().filter(|value| !value.is_whitespace()).collect::<String>();
+    let fingerprint_compact =
+        key.fingerprint.chars().filter(|value| !value.is_whitespace()).collect::<String>();
+    let required_upper = required_compact.to_uppercase();
+    let fingerprint_upper = fingerprint_compact.to_uppercase();
+    if fingerprint_upper == required_upper || fingerprint_upper.ends_with(&required_upper) {
+        return true;
+    }
+    let identity = key.identity.trim();
+    identity.eq_ignore_ascii_case(required)
+        || identity.to_lowercase().contains(&format!("<{}>", required.to_lowercase()))
 }
 
 fn run_git(root: &Path, args: &[&str]) -> Result<(), BridgeFailure> {
@@ -2256,5 +2298,42 @@ impl From<autofill::AutofillCandidate> for AutofillCandidateDto {
 impl From<AutofillCredential> for AutofillCredentialDto {
     fn from(value: AutofillCredential) -> Self {
         Self { path: value.path, username: value.username, password: value.password }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key(fingerprint: &str, identity: &str, has_private_key: bool) -> PgpKeySummary {
+        PgpKeySummary {
+            identity: identity.to_string(),
+            fingerprint: fingerprint.to_string(),
+            has_private_key,
+        }
+    }
+
+    #[test]
+    fn pure_rust_key_check_requires_matching_private_material() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let gpg_id = temp.path().join(".gpg-id");
+        fs::write(&gpg_id, "A1B2C3D4").expect("gpg id");
+
+        let private = key("00000000A1B2C3D4", "Alice <alice@example.com>", true);
+        assert!(!pgp_key_missing(&gpg_id, None, Some(&[private])));
+
+        let public_only = key("00000000A1B2C3D4", "Alice <alice@example.com>", false);
+        assert!(pgp_key_missing(&gpg_id, None, Some(&[public_only])));
+        assert!(pgp_key_missing(&gpg_id, None, Some(&[])));
+    }
+
+    #[test]
+    fn pure_rust_key_check_accepts_identity_email() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let gpg_id = temp.path().join(".gpg-id");
+        fs::write(&gpg_id, "alice@example.com").expect("gpg id");
+        let private = key("A1B2C3D4", "Alice <alice@example.com>", true);
+
+        assert!(!pgp_key_missing(&gpg_id, None, Some(&[private])));
     }
 }

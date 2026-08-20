@@ -37,7 +37,7 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorText = error.toString();
+          _errorText = _manageErrorMessage(context, error);
         });
       }
     }
@@ -47,11 +47,11 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
   Widget build(BuildContext context) {
     return _operationSheet(
       context: context,
-      title: 'Generate and save',
+      title: context.l10n.generateAndSave,
       children: <Widget>[
         TextFormField(
-          decoration: const InputDecoration(
-            labelText: 'Entry path',
+          decoration: InputDecoration(
+            labelText: context.l10n.entryPath,
             hintText: 'work/example',
           ),
           onChanged: (value) => _path = value,
@@ -63,7 +63,7 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
               _saving
                   ? null
                   : (value) => setState(() => _noSymbols = value ?? false),
-          title: const Text('No symbols'),
+          title: Text(context.l10n.noSymbols),
         ),
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,
@@ -72,7 +72,7 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
               _saving
                   ? null
                   : (value) => setState(() => _overwrite = value ?? false),
-          title: const Text('Overwrite if entry exists'),
+          title: Text(context.l10n.overwriteEntry),
         ),
         _CommitCheckbox(
           enabled: widget.canCommit && !_saving,
@@ -82,7 +82,7 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: 'Save generated password',
+          label: context.l10n.saveGeneratedPassword,
           onPressed: _submit,
         ),
       ],
@@ -133,7 +133,7 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorText = error.toString();
+          _errorText = _manageErrorMessage(context, error);
         });
       }
     }
@@ -143,11 +143,11 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
   Widget build(BuildContext context) {
     return _operationSheet(
       context: context,
-      title: 'Save existing password',
+      title: context.l10n.saveExistingPassword,
       children: <Widget>[
         TextFormField(
-          decoration: const InputDecoration(
-            labelText: 'Entry path',
+          decoration: InputDecoration(
+            labelText: context.l10n.entryPath,
             hintText: 'work/example',
           ),
           onChanged: (value) => _path = value,
@@ -155,15 +155,15 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
         const SizedBox(height: 12),
         TextFormField(
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'Password'),
+          decoration: InputDecoration(labelText: context.l10n.password),
           onChanged: (value) => _password = value,
         ),
         const SizedBox(height: 12),
         TextFormField(
           minLines: 2,
           maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Raw notes',
+          decoration: InputDecoration(
+            labelText: context.l10n.rawNotes,
             hintText: 'username: alice',
           ),
           onChanged: (value) => _notes = value,
@@ -175,7 +175,7 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
               _saving
                   ? null
                   : (value) => setState(() => _overwrite = value ?? false),
-          title: const Text('Overwrite if entry exists'),
+          title: Text(context.l10n.overwriteEntry),
         ),
         _CommitCheckbox(
           enabled: widget.canCommit && !_saving,
@@ -185,7 +185,7 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: 'Save password',
+          label: context.l10n.savePassword,
           onPressed: _submit,
         ),
       ],
@@ -245,7 +245,7 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorText = error.toString();
+          _errorText = _manageErrorMessage(context, error);
         });
       }
     }
@@ -256,7 +256,7 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
     final rename = widget.rename;
     return _operationSheet(
       context: context,
-      title: rename ? 'Rename entry' : 'Move entry',
+      title: rename ? context.l10n.renameEntry : context.l10n.moveEntry,
       children: <Widget>[
         _EntryPicker(
           entries: widget.entries,
@@ -276,7 +276,10 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
           key: ValueKey('${rename ? 'rename' : 'move'}-${_entry.path}'),
           initialValue: _target,
           decoration: InputDecoration(
-            labelText: rename ? 'New entry path' : 'Destination folder',
+            labelText:
+                rename
+                    ? context.l10n.newEntryPath
+                    : context.l10n.destinationFolder,
             hintText: rename ? 'work/example-new' : 'archive/work',
           ),
           onChanged: (value) => _target = value,
@@ -288,7 +291,7 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
               _saving
                   ? null
                   : (value) => setState(() => _overwrite = value ?? false),
-          title: const Text('Overwrite if target exists'),
+          title: Text(context.l10n.overwriteTarget),
         ),
         _CommitCheckbox(
           enabled: widget.canCommit && !_saving,
@@ -298,7 +301,7 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: rename ? 'Rename entry' : 'Move entry',
+          label: rename ? context.l10n.renameEntry : context.l10n.moveEntry,
           onPressed: _submit,
         ),
       ],
@@ -339,7 +342,7 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
   Future<void> _submit() async {
     final requiredText = _deleteConfirmationLabel(_entry);
     if (_confirmation.trim() != requiredText) {
-      setState(() => _errorText = 'Type $requiredText to confirm.');
+      setState(() => _errorText = context.l10n.typeToConfirm(requiredText));
       return;
     }
     setState(() {
@@ -355,7 +358,7 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorText = error.toString();
+          _errorText = _manageErrorMessage(context, error);
         });
       }
     }
@@ -365,7 +368,7 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
   Widget build(BuildContext context) {
     return _operationSheet(
       context: context,
-      title: 'Delete entry',
+      title: context.l10n.deleteEntry,
       children: <Widget>[
         if (widget.showEntryPicker)
           _EntryPicker(
@@ -380,12 +383,14 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
                     }),
           ),
         if (widget.showEntryPicker) const SizedBox(height: 12),
-        Text('Path: ${_entry.path}'),
+        Text(context.l10n.pathValue(_entry.path)),
         const SizedBox(height: 12),
         TextFormField(
           key: ValueKey('delete-${_entry.path}'),
           decoration: InputDecoration(
-            labelText: 'Type ${_deleteConfirmationLabel(_entry)} to confirm',
+            labelText: context.l10n.typeToConfirm(
+              _deleteConfirmationLabel(_entry),
+            ),
           ),
           onChanged: (value) => _confirmation = value,
         ),
@@ -397,7 +402,7 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: 'Delete entry',
+          label: context.l10n.deleteEntry,
           onPressed: _submit,
           danger: true,
         ),

@@ -1,5 +1,18 @@
 part of '../settings_screen.dart';
 
+String _localizedPgpExpiration(
+  AppLocalizations localizations,
+  PgpSessionExpiration expiration,
+) {
+  return switch (expiration) {
+    PgpSessionExpiration.immediately => localizations.immediately,
+    PgpSessionExpiration.fiveMinutes => localizations.minutesShort(5),
+    PgpSessionExpiration.fifteenMinutes => localizations.minutesShort(15),
+    PgpSessionExpiration.oneHour => localizations.hoursShort(1),
+    PgpSessionExpiration.untilAppExit => localizations.untilAppExit,
+  };
+}
+
 extension _SettingsScreenSecuritySheets on SettingsScreen {
   void _showUnavailableSheet(BuildContext context, String title) {
     showModalBottomSheet<void>(
@@ -9,19 +22,19 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
   }
 
   void _showRuntimeDiagnostics(BuildContext context) {
+    final localizations = context.l10n;
     final diagnostics =
         _runtimeDiagnostics?.runtimeDiagnostics(securityRepository) ??
         RuntimeDiagnostics(
           bridgeLoaded: false,
-          coreVersion: 'Unavailable',
-          pgpBackend: 'Unavailable',
-          gitBackend: 'Unavailable',
+          coreVersion: localizations.unavailable,
+          pgpBackend: localizations.unavailable,
+          gitBackend: localizations.unavailable,
           keyStorageBackend: keyStorageBackendLabel(securityRepository),
-          nativeLibrary: 'Unavailable',
+          nativeLibrary: localizations.unavailable,
         );
-    showModalBottomSheet<void>(
+    showParsAdaptiveDetail<void>(
       context: context,
-      isScrollControlled: true,
       builder:
           (context) => _RuntimeDiagnosticsSheetBody(diagnostics: diagnostics),
     );
@@ -109,10 +122,7 @@ class _UnavailableFeatureSheetBody extends StatelessWidget {
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'This repository does not provide the operations required for '
-              'this feature. Use a bridge-backed repository to enable it.',
-            ),
+            Text(context.l10n.featureUnavailableDescription),
           ],
         ),
       ),
@@ -136,34 +146,37 @@ class _RuntimeDiagnosticsSheetBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                'Runtime diagnostics',
+                context.l10n.runtimeDiagnosticsTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
               _DiagnosticRow(
-                label: 'Bridge loaded',
-                value: diagnostics.bridgeLoaded ? 'Yes' : 'No',
+                label: context.l10n.bridgeLoadedLabel,
+                value:
+                    diagnostics.bridgeLoaded
+                        ? context.l10n.yes
+                        : context.l10n.no,
               ),
               _DiagnosticRow(
-                label: 'Core version',
+                label: context.l10n.coreVersionLabel,
                 value: diagnostics.coreVersion,
               ),
               _DiagnosticRow(
-                label: 'Native library',
+                label: context.l10n.nativeLibraryLabel,
                 value: diagnostics.nativeLibrary,
               ),
               _DiagnosticRow(
-                label: 'PGP backend',
+                label: context.l10n.pgpBackendLabel,
                 value: diagnostics.pgpBackend,
               ),
               _DiagnosticRow(
-                label: 'Git backend',
+                label: context.l10n.gitBackendLabel,
                 value: diagnostics.gitBackend,
               ),
               _DiagnosticRow(
-                label: 'Key storage backend',
+                label: context.l10n.keyStorageBackendLabel,
                 value: diagnostics.keyStorageBackend,
               ),
             ],
@@ -215,7 +228,7 @@ class _SecuritySettingsSheetBodyState
         onSaved: () {
           widget.onSecuritySettingsChanged?.call();
           setState(() => _isChangingGesture = false);
-          widget.onNotify('Gesture updated');
+          widget.onNotify(context.l10n.gestureConfirmed);
         },
       );
     }
@@ -228,7 +241,7 @@ class _SecuritySettingsSheetBodyState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'Gesture lock and biometrics',
+              context.l10n.gestureBiometricsTitle,
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -237,13 +250,13 @@ class _SecuritySettingsSheetBodyState
             OutlinedButton.icon(
               onPressed: () => setState(() => _isChangingGesture = true),
               icon: const Icon(Icons.pattern),
-              label: const Text('Change gesture'),
+              label: Text(context.l10n.changeGesture),
             ),
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Require unlock on app resume'),
-              subtitle: const Text('Gesture unlock is used as fallback'),
+              title: Text(context.l10n.requireUnlockOnResume),
+              subtitle: Text(context.l10n.gestureFallbackDescription),
               value: widget.securityRepository.lockOnResume,
               onChanged: (value) async {
                 await widget.securityRepository.setLockOnResume(value);
@@ -258,8 +271,8 @@ class _SecuritySettingsSheetBodyState
                     snapshot.data ?? BiometricUnlockStatus.unavailable;
                 return SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Biometric unlock'),
-                  subtitle: Text(_biometricSubtitle(status)),
+                  title: Text(context.l10n.biometricUnlock),
+                  subtitle: Text(_biometricSubtitle(context.l10n, status)),
                   value:
                       status == BiometricUnlockStatus.available &&
                       widget.securityRepository.biometricUnlockEnabled,
@@ -267,6 +280,7 @@ class _SecuritySettingsSheetBodyState
                       status == BiometricUnlockStatus.unavailable
                           ? null
                           : (value) async {
+                            final localizations = context.l10n;
                             try {
                               await widget.runDuringSystemAuthentication(
                                 () => widget.securityRepository
@@ -275,9 +289,10 @@ class _SecuritySettingsSheetBodyState
                               widget.onSecuritySettingsChanged?.call();
                             } catch (error) {
                               final message =
-                                  error is StateError
-                                      ? error.message
-                                      : '$error';
+                                  UiProblem.fromError(
+                                    localizations,
+                                    error,
+                                  ).summary;
                               widget.onNotify(message);
                             }
                             if (mounted) {
@@ -289,7 +304,7 @@ class _SecuritySettingsSheetBodyState
             ),
             const SizedBox(height: 8),
             Text(
-              'Auto-lock timeout',
+              context.l10n.autoLockTimeout,
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -301,7 +316,7 @@ class _SecuritySettingsSheetBodyState
               children: <Widget>[
                 for (final timeout in _timeoutOptions)
                   ChoiceChip(
-                    label: Text(_timeoutLabel(timeout)),
+                    label: Text(_timeoutLabel(context.l10n, timeout)),
                     selected:
                         widget.securityRepository.autoLockTimeout == timeout,
                     onSelected: (_) async {
@@ -324,7 +339,7 @@ class _SecuritySettingsSheetBodyState
                 }
               },
               icon: const Icon(Icons.restart_alt),
-              label: const Text('Reset onboarding'),
+              label: Text(context.l10n.resetOnboarding),
             ),
           ],
         ),
@@ -332,24 +347,25 @@ class _SecuritySettingsSheetBodyState
     );
   }
 
-  String _timeoutLabel(Duration timeout) {
-    if (timeout <= Duration.zero) {
-      return 'Never';
-    }
+  String _timeoutLabel(AppLocalizations localizations, Duration timeout) {
+    if (timeout <= Duration.zero) return localizations.never;
     if (timeout.inMinutes < 60) {
-      return '${timeout.inMinutes} min';
+      return localizations.minutesShort(timeout.inMinutes);
     }
-    return '${timeout.inHours} hour';
+    return localizations.hoursShort(timeout.inHours);
   }
 
-  String _biometricSubtitle(BiometricUnlockStatus status) {
+  String _biometricSubtitle(
+    AppLocalizations localizations,
+    BiometricUnlockStatus status,
+  ) {
     switch (status) {
       case BiometricUnlockStatus.available:
-        return 'Use device biometrics, with gesture fallback';
+        return localizations.enabledOnDevice;
       case BiometricUnlockStatus.disabled:
-        return 'Available on this device';
+        return localizations.availableOnDevice;
       case BiometricUnlockStatus.unavailable:
-        return 'Unavailable on this device';
+        return localizations.unavailableOnDevice;
     }
   }
 }
@@ -374,13 +390,13 @@ class _GestureChangeSheetBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                'Change gesture',
+                context.l10n.changeGesture,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
-              const Text('Draw and confirm a new local unlock gesture.'),
+              Text(context.l10n.drawConfirmGesture),
               const SizedBox(height: 12),
               Expanded(
                 child: GestureSetupPanel(
@@ -422,7 +438,7 @@ class _PgpSessionTimeoutSheetBodyState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'PGP session timeout',
+              context.l10n.pgpSessionTimeoutTitle,
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -434,7 +450,9 @@ class _PgpSessionTimeoutSheetBodyState
               children: <Widget>[
                 for (final expiration in PgpSessionExpiration.values)
                   ChoiceChip(
-                    label: Text(expiration.label),
+                    label: Text(
+                      _localizedPgpExpiration(context.l10n, expiration),
+                    ),
                     selected:
                         widget.securityRepository.pgpSessionExpiration ==
                         expiration,
@@ -511,7 +529,7 @@ class _PgpPassphraseStorageSheetBodyState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'KMS / Keychain passphrase',
+              context.l10n.keychainPassphraseTitle,
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -519,10 +537,8 @@ class _PgpPassphraseStorageSheetBodyState
             const SizedBox(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Store PGP passphrase'),
-              subtitle: const Text(
-                'Saved in the platform secure storage provider',
-              ),
+              title: Text(context.l10n.storePgpPassphrase),
+              subtitle: Text(context.l10n.savedInSecureStorage),
               value: widget.securityRepository.pgpPassphraseStorageEnabled,
               onChanged: (value) async {
                 await widget.securityRepository.setPgpPassphraseStorageEnabled(
@@ -537,19 +553,17 @@ class _PgpPassphraseStorageSheetBodyState
             ),
             const SizedBox(height: 8),
             if (widget.privatePgpKeys.isEmpty)
-              const ListTile(
+              ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.key_off_outlined),
-                title: Text('No private PGP keys'),
-                subtitle: Text(
-                  'Import or create a private PGP key before saving a passphrase.',
-                ),
+                leading: const Icon(Icons.key_off_outlined),
+                title: Text(context.l10n.noPrivatePgpKeys),
+                subtitle: Text(context.l10n.createPrivatePgpKeyFirst),
               )
             else
               DropdownButtonFormField<String>(
                 key: const Key('pgp-passphrase-key-dropdown'),
                 initialValue: _selectedFingerprint,
-                decoration: const InputDecoration(labelText: 'PGP key'),
+                decoration: InputDecoration(labelText: context.l10n.pgpKey),
                 items: widget.privatePgpKeys
                     .map(
                       (key) => DropdownMenuItem<String>(
@@ -575,8 +589,8 @@ class _PgpPassphraseStorageSheetBodyState
               decoration: InputDecoration(
                 labelText:
                     widget.securityRepository.hasStoredPgpPassphrase
-                        ? 'Replace cached passphrase'
-                        : 'PGP passphrase',
+                        ? context.l10n.replaceCachedPassphrase
+                        : context.l10n.pgpPassphraseLabel,
               ),
             ),
             const SizedBox(height: 12),
@@ -601,12 +615,19 @@ class _PgpPassphraseStorageSheetBodyState
                               setState(() {});
                             } catch (error) {
                               if (!context.mounted) return;
-                              AppNotification.show(context, error.toString());
+                              AppNotification.show(
+                                context,
+                                UiProblem.fromError(
+                                  context.l10n,
+                                  error,
+                                ).summary,
+                                severity: AppNotificationSeverity.error,
+                              );
                             }
                           }
                           : null,
                   icon: const Icon(Icons.save_outlined),
-                  label: const Text('Save'),
+                  label: Text(context.l10n.save),
                 ),
                 OutlinedButton.icon(
                   onPressed:
@@ -621,7 +642,7 @@ class _PgpPassphraseStorageSheetBodyState
                           }
                           : null,
                   icon: const Icon(Icons.delete_outline),
-                  label: const Text('Clear'),
+                  label: Text(context.l10n.clear),
                 ),
               ],
             ),
@@ -636,8 +657,10 @@ class _PgpPassphraseStorageSheetBodyState
                         : _keyForFingerprint(cached.fingerprint);
                 return Text(
                   cached == null
-                      ? 'No PGP passphrase is cached.'
-                      : 'Cached for ${cachedKey?.name ?? cached.fingerprint}',
+                      ? context.l10n.noCachedPassphrase
+                      : context.l10n.cachedForKey(
+                        cachedKey?.name ?? cached.fingerprint,
+                      ),
                   style: Theme.of(context).textTheme.bodySmall,
                 );
               },

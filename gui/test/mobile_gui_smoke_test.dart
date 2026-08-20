@@ -23,6 +23,7 @@ import 'package:pars_gui/screens/manage/manage_screen.dart';
 import 'package:pars_gui/screens/settings/settings_screen.dart';
 import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/screens/vault/vault_screen.dart';
+import 'package:pars_gui/widgets/app_notification.dart';
 import 'package:pars_gui/widgets/gesture_lock_input.dart';
 import 'package:pars_gui/widgets/pgp_key_import_body.dart';
 
@@ -75,6 +76,9 @@ const _settingsStoreKeyReference = KeyRecord(
 );
 
 void main() {
+  setUp(AppNotification.dismiss);
+  tearDown(AppNotification.dismiss);
+
   testWidgets('shows onboarding before entering the vault', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
 
@@ -88,11 +92,11 @@ void main() {
     await _completeReadyOnboarding(tester);
 
     expect(find.text('Vault'), findsWidgets);
-    expect(find.text('Manage'), findsOneWidget);
+    expect(find.text('Manage'), findsNothing);
     expect(find.text('Settings'), findsOneWidget);
   });
 
-  testWidgets('store diagnostics do not reopen completed onboarding', (
+  testWidgets('missing required PGP key reopens onboarding repair', (
     tester,
   ) async {
     final repository = _ManagedPathDiagnosticRepository(storeReady: true);
@@ -111,7 +115,8 @@ void main() {
       ),
     );
 
-    expect(find.text('Vault'), findsWidgets);
+    expect(find.text('Vault'), findsNothing);
+    expect(find.text('Choose PGP key'), findsOneWidget);
     expect(find.text('Set up password store'), findsNothing);
   });
 
@@ -312,7 +317,9 @@ void main() {
         await tester.tap(find.text('Generate SSH key'));
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextField).last, 'github-test');
-        await tester.tap(find.widgetWithText(FilledButton, 'Generate'));
+        await tester.tap(
+          find.widgetWithText(FilledButton, 'Generate SSH key').last,
+        );
         await tester.pumpAndSettle();
       } else {
         await tester.tap(find.text('Skip SSH'));
@@ -687,7 +694,7 @@ void main() {
       await tester.pump();
 
       final bottomSheet = find.byType(BottomSheet);
-      final error = find.textContaining('PGP failed visibly');
+      final error = find.text('Operation failed. Try again or open Details.');
       expect(find.descendant(of: bottomSheet, matching: error), findsOneWidget);
       final errorTop = tester.getTopLeft(error).dy;
       final buttonTop =
@@ -775,7 +782,9 @@ void main() {
           await tester.tap(find.text('Generate SSH key'));
           await tester.pumpAndSettle();
           await tester.enterText(find.byType(TextField).last, 'github-test');
-          await tester.tap(find.widgetWithText(FilledButton, 'Generate'));
+          await tester.tap(
+            find.widgetWithText(FilledButton, 'Generate SSH key').last,
+          );
           break;
         case _SshBranch.import:
           await tester.tap(find.text('Import SSH key'));
@@ -870,7 +879,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Copy password'), findsOneWidget);
-    expect(find.text('Reveal'), findsOneWidget);
+    expect(find.byTooltip('Reveal'), findsOneWidget);
     expect(find.text('Raw notes'), findsNothing);
   });
 
@@ -909,6 +918,8 @@ void main() {
     expect(repository.copyCount, 1);
     expect(copiedTexts.last, 'loaded-secret');
 
+    await tester.tap(find.byTooltip('More actions'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('QR code'));
     await tester.pumpAndSettle();
 
@@ -1159,7 +1170,7 @@ void main() {
     }
   });
 
-  testWidgets('entry detail modal keeps its width after secret reads finish', (
+  testWidgets('entry detail keeps stable geometry after secret reads finish', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -1172,13 +1183,13 @@ void main() {
     final detailFinder = find.byKey(
       const ValueKey<String>('entry-detail-sheet'),
     );
-    final loadingWidth = tester.getSize(detailFinder).width;
+    final loadingSize = tester.getSize(detailFinder);
 
     repository.completeRead();
     await tester.pumpAndSettle();
 
     expect(find.text('alice'), findsOneWidget);
-    expect(tester.getSize(detailFinder).width, loadingWidth);
+    expect(tester.getSize(detailFinder), loadingSize);
 
     Navigator.of(tester.element(detailFinder)).pop();
     await tester.pumpAndSettle();
@@ -1249,7 +1260,7 @@ void main() {
 
     expect(repository.refreshCount, 1);
     expect(find.text('Bridge Entry'), findsOneWidget);
-    expect(find.text('Need pull'), findsOneWidget);
+    expect(find.text('Pull needed'), findsOneWidget);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, 320));
     await tester.pumpAndSettle();
@@ -1291,11 +1302,11 @@ void main() {
 
     await tester.tap(find.text('Work GitHub'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Favorite'));
+    await tester.tap(find.byTooltip('Favorite').last);
     await tester.pumpAndSettle();
 
     expect(repository.favoritePaths, contains('work/github'));
-    expect(find.text('Unfavorite'), findsOneWidget);
+    expect(find.byTooltip('Unfavorite'), findsWidgets);
   });
 
   testWidgets('vault shows empty and retry states', (tester) async {
@@ -1313,7 +1324,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Could not load vault'), findsOneWidget);
+    expect(find.textContaining('Could not load the vault'), findsOneWidget);
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
 
@@ -1322,28 +1333,32 @@ void main() {
     expect(find.text('No entries in this store.'), findsOneWidget);
   });
 
-  testWidgets('manage tab exposes batch management workflows', (tester) async {
+  testWidgets('Vault exposes contextual create and selection workflows', (
+    tester,
+  ) async {
     await tester.pumpWidget(ParsGuiApp.fake());
     await _completeReadyOnboarding(tester);
 
-    await tester.tap(find.text('Manage'));
-    await tester.pumpAndSettle();
+    expect(find.text('Manage'), findsNothing);
+    expect(find.text('Create password'), findsOneWidget);
+    expect(find.text('Select'), findsOneWidget);
 
+    await tester.tap(find.text('Create password'));
+    await tester.pumpAndSettle();
     expect(find.text('Generate and save'), findsOneWidget);
     expect(find.text('Save existing password'), findsOneWidget);
-    expect(find.text('Batch delete'), findsOneWidget);
-    expect(find.text('Regenerate selected'), findsOneWidget);
   });
 
   testWidgets('manage generates and saves a new entry', (tester) async {
     final repository = _ManageVaultRepository();
 
-    await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ManageScreen(repository: repository))),
+    await _openManageSurface(
+      tester,
+      (context) => showCreateGeneratedEntrySurface(
+        context: context,
+        repository: repository,
+      ),
     );
-
-    await tester.tap(find.text('Generate and save'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'work/new-entry');
     await tester.tap(find.text('Save generated password'));
     await tester.pumpAndSettle();
@@ -1355,12 +1370,13 @@ void main() {
   testWidgets('manage saves an existing password', (tester) async {
     final repository = _ManageVaultRepository();
 
-    await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ManageScreen(repository: repository))),
+    await _openManageSurface(
+      tester,
+      (context) => showSaveExistingEntrySurface(
+        context: context,
+        repository: repository,
+      ),
     );
-
-    await tester.tap(find.text('Save existing password'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'work/existing');
     await tester.enterText(find.byType(TextField).at(1), 'existing-secret');
     await tester.enterText(find.byType(TextField).at(2), 'username: alice');
@@ -1378,17 +1394,14 @@ void main() {
   ) async {
     final repository = _ManageVaultRepository();
 
-    await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ManageScreen(repository: repository))),
+    await _openManageSurface(
+      tester,
+      (context) => showFocusedEditEntrySheet(
+        context: context,
+        entry: repository.entries.first,
+        repository: repository,
+      ),
     );
-
-    await tester.scrollUntilVisible(
-      find.text('Edit entries'),
-      300,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.text('Edit entries'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(1), 'rotated note');
     await tester.tap(find.text('Save edited entry'));
     await tester.pumpAndSettle();
@@ -1400,13 +1413,14 @@ void main() {
     );
     expect(find.text('Edited work/first (overwrote existing)'), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.text('Edit entries'),
-      300,
-      scrollable: find.byType(Scrollable).last,
+    await _openManageSurface(
+      tester,
+      (context) => showFocusedEditEntrySheet(
+        context: context,
+        entry: repository.entries.first,
+        repository: repository,
+      ),
     );
-    await tester.tap(find.text('Edit entries'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'new-secret');
     await tester.tap(find.text('Replace first line'));
     await tester.pumpAndSettle();
@@ -1423,17 +1437,15 @@ void main() {
   ) async {
     final repository = _ManageVaultRepository();
 
-    await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ManageScreen(repository: repository))),
+    await _openManageSurface(
+      tester,
+      (context) => showFocusedMoveOrRenameEntrySurface(
+        context: context,
+        entry: repository.entries.first,
+        repository: repository,
+        rename: false,
+      ),
     );
-
-    await tester.scrollUntilVisible(
-      find.text('Move entry'),
-      300,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.text('Move entry'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'archive');
     await tester.tap(find.widgetWithText(FilledButton, 'Move entry'));
     await tester.pumpAndSettle();
@@ -1441,13 +1453,15 @@ void main() {
     expect(repository.movedFrom, <String>['work/first']);
     expect(repository.movedTo, <String>['archive/first']);
 
-    await tester.scrollUntilVisible(
-      find.text('Rename entry'),
-      300,
-      scrollable: find.byType(Scrollable).last,
+    await _openManageSurface(
+      tester,
+      (context) => showFocusedMoveOrRenameEntrySurface(
+        context: context,
+        entry: repository.entries.first,
+        repository: repository,
+        rename: true,
+      ),
     );
-    await tester.tap(find.text('Rename entry'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'work/renamed');
     await tester.tap(find.widgetWithText(FilledButton, 'Rename entry'));
     await tester.pumpAndSettle();
@@ -1455,24 +1469,25 @@ void main() {
     expect(repository.movedFrom.last, 'work/first');
     expect(repository.movedTo.last, 'work/renamed');
 
-    await tester.scrollUntilVisible(
-      find.text('Delete entry'),
-      300,
-      scrollable: find.byType(Scrollable).last,
+    await _openManageSurface(
+      tester,
+      (context) => showFocusedDeleteEntrySheet(
+        context: context,
+        entry: repository.entries.first,
+        repository: repository,
+      ),
     );
-    await tester.tap(find.text('Delete entry'));
-    await tester.pumpAndSettle();
     expect(find.text('Path: work/first'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Delete entry'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Type First Entry to confirm.'), findsOneWidget);
+    expect(find.text('Type First Entry to confirm'), findsWidgets);
 
     await tester.enterText(find.byType(TextField).first, 'work/first');
     await tester.tap(find.widgetWithText(FilledButton, 'Delete entry'));
     await tester.pumpAndSettle();
     expect(repository.deletedPaths, isEmpty);
-    expect(find.text('Type First Entry to confirm.'), findsOneWidget);
+    expect(find.text('Type First Entry to confirm'), findsWidgets);
 
     await tester.enterText(find.byType(TextField).first, 'First Entry');
     await tester.tap(find.widgetWithText(FilledButton, 'Delete entry'));
@@ -1484,22 +1499,17 @@ void main() {
   testWidgets('manage batch operations use selected entries', (tester) async {
     final repository = _ManageVaultRepository();
 
-    await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ManageScreen(repository: repository))),
+    final selected = repository.entries
+        .where((entry) => !entry.isDirectory)
+        .toList(growable: false);
+    await _openManageSurface(
+      tester,
+      (context) => showBatchMoveEntriesSurface(
+        context: context,
+        entries: selected,
+        repository: repository,
+      ),
     );
-
-    await tester.scrollUntilVisible(
-      find.text('First Entry'),
-      500,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.text('First Entry'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Second Entry'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Move selected'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'archive');
     await tester.tap(find.widgetWithText(FilledButton, 'Move selected'));
     await tester.pumpAndSettle();
@@ -1510,13 +1520,14 @@ void main() {
       'work/second',
     ]);
 
-    await tester.scrollUntilVisible(
-      find.widgetWithText(OutlinedButton, 'Rename selected'),
-      500,
-      scrollable: find.byType(Scrollable).last,
+    await _openManageSurface(
+      tester,
+      (context) => showBatchRenameEntriesSurface(
+        context: context,
+        entries: selected,
+        repository: repository,
+      ),
     );
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Rename selected'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'old-');
     await tester.enterText(find.byType(TextField).at(1), '-2026');
     await tester.tap(find.widgetWithText(FilledButton, 'Rename selected'));
@@ -1525,13 +1536,14 @@ void main() {
     expect(repository.batchRenamePrefixes, <String>['old-']);
     expect(repository.batchRenameSuffixes, <String>['-2026']);
 
-    await tester.scrollUntilVisible(
-      find.widgetWithText(OutlinedButton, 'Regenerate batch'),
-      500,
-      scrollable: find.byType(Scrollable).last,
+    await _openManageSurface(
+      tester,
+      (context) => showBatchRegenerateEntriesSurface(
+        context: context,
+        entries: selected,
+        repository: repository,
+      ),
     );
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Regenerate batch'));
-    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Regenerate batch'));
     await tester.pumpAndSettle();
 
@@ -1540,13 +1552,14 @@ void main() {
       'work/second',
     ]);
 
-    await tester.scrollUntilVisible(
-      find.widgetWithText(OutlinedButton, 'Delete selected'),
-      500,
-      scrollable: find.byType(Scrollable).last,
+    await _openManageSurface(
+      tester,
+      (context) => showBatchDeleteEntriesSurface(
+        context: context,
+        entries: selected,
+        repository: repository,
+      ),
     );
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete selected'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'DELETE');
     await tester.tap(find.widgetWithText(FilledButton, 'Delete selected'));
     await tester.pumpAndSettle();
@@ -1562,17 +1575,21 @@ void main() {
   ) async {
     final repository = _ManageVaultRepository()..failNextWith = 'target exists';
 
-    await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ManageScreen(repository: repository))),
+    await _openManageSurface(
+      tester,
+      (context) => showCreateGeneratedEntrySurface(
+        context: context,
+        repository: repository,
+      ),
     );
-
-    await tester.tap(find.text('Generate and save'));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'work/conflict');
     await tester.tap(find.text('Save generated password'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Exception: target exists'), findsOneWidget);
+    expect(
+      find.text('Operation failed. Try again or open Details.'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Commit after operation'));
     await tester.pumpAndSettle();
@@ -1596,19 +1613,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Gesture lock and biometrics'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('PGP keys'),
+      260,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('PGP keys'), findsOneWidget);
     expect(find.text('SSH keys'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.text('Advanced git args'),
+      find.text('Advanced Git args'),
       220,
       scrollable: find.byType(Scrollable).last,
     );
     await tester.drag(find.byType(Scrollable).last, const Offset(0, -120));
     await tester.pumpAndSettle();
-    expect(find.text('Advanced git args'), findsOneWidget);
+    expect(find.text('Advanced Git args'), findsOneWidget);
     expect(find.text('Runtime diagnostics'), findsOneWidget);
 
-    await tester.tap(find.text('Advanced git args'));
+    await tester.tap(find.text('Advanced Git args'));
     await tester.pumpAndSettle();
     expect(find.text('git'), findsOneWidget);
     expect(find.text('Run selected command'), findsOneWidget);
@@ -1627,11 +1649,11 @@ void main() {
     );
 
     await tester.scrollUntilVisible(
-      find.text('System autofill'),
+      find.text('System Autofill'),
       220,
       scrollable: find.byType(Scrollable).last,
     );
-    await _tapVisible(tester, find.text('System autofill'));
+    await _tapVisible(tester, find.text('System Autofill'));
     await tester.tap(find.widgetWithText(FilledButton, 'Rebuild paths'));
     await tester.pumpAndSettle();
 
@@ -1641,11 +1663,19 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, 'Read URL fields'));
     await tester.pumpAndSettle();
     expect(find.text('Read encrypted URL fields?'), findsOneWidget);
+    await tester.tap(find.byType(CheckboxListTile).first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Read selected entries'));
     await tester.pumpAndSettle();
-    expect(autofillRepository.lastEnrichedPaths, isNotEmpty);
+    expect(autofillRepository.lastEnrichedPaths, hasLength(1));
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Setup'));
+    await tester.pumpAndSettle();
+    expect(autofillRepository.operations, contains('open-settings'));
 
     await tester.tap(find.widgetWithText(OutlinedButton, 'Clear all'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Clear all'));
     await tester.pumpAndSettle();
 
     expect(autofillRepository.cleared, isTrue);
@@ -1702,7 +1732,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('PGP keys'));
+    await _openSettingsTile(tester, 'PGP keys');
     await tester.pumpAndSettle();
     expect(find.text('No PGP keys'), findsOneWidget);
     Navigator.of(tester.element(find.text('No PGP keys'))).pop();
@@ -1951,7 +1981,10 @@ void main() {
     // A picker error is shown inline.
     await tester.tap(find.widgetWithText(TextButton, 'Choose'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('File picker unavailable.'), findsOneWidget);
+    expect(
+      find.text('Operation failed. Try again or open Details.'),
+      findsOneWidget,
+    );
     expect(repository.keyActions, isEmpty);
   });
 
@@ -2466,7 +2499,10 @@ void main() {
 
     await tester.tap(find.widgetWithText(TextButton, 'Choose'));
     await tester.pumpAndSettle();
-    expect(find.text('Picker unavailable'), findsOneWidget);
+    expect(
+      find.text('Operation failed. Try again or open Details.'),
+      findsOneWidget,
+    );
     expect(repository.storeActions, isEmpty);
   });
 
@@ -2592,7 +2628,7 @@ void main() {
         securityRepository: securityRepository,
       );
 
-      await tester.tap(find.text('PGP keys'));
+      await _openSettingsTile(tester, 'PGP keys');
       await tester.pumpAndSettle();
       await tester.tap(
         find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
@@ -2676,7 +2712,7 @@ void main() {
       repository: _KeyManagementSettingsRepository(),
       securityRepository: InMemorySecurityRepository(),
     );
-    await tester.tap(find.text('PGP keys'));
+    await _openSettingsTile(tester, 'PGP keys');
     await tester.pumpAndSettle();
     await tester.tap(
       find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
@@ -2718,7 +2754,7 @@ void main() {
       securityRepository: InMemorySecurityRepository(),
     );
 
-    await tester.tap(find.text('SSH keys'));
+    await _openSettingsTile(tester, 'SSH keys');
     await tester.pumpAndSettle();
     await tester.tap(
       find.byTooltip('Actions for SSH key ${_settingsSshKey.name}'),
@@ -2748,7 +2784,7 @@ void main() {
       securityRepository: InMemorySecurityRepository(),
     );
 
-    await tester.tap(find.text('PGP keys'));
+    await _openSettingsTile(tester, 'PGP keys');
     await tester.pumpAndSettle();
     await tester.tap(
       find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
@@ -2783,7 +2819,7 @@ void main() {
       securityRepository: securityRepository,
     );
 
-    await tester.tap(find.text('PGP keys'));
+    await _openSettingsTile(tester, 'PGP keys');
     await tester.pumpAndSettle();
     await tester.tap(
       find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
@@ -2800,7 +2836,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.deleteActions, <String>['pgp:PGP-PRIMARY']);
-    expect(find.textContaining('delete failed visibly'), findsOneWidget);
+    expect(find.textContaining('Key deletion failed'), findsOneWidget);
     expect(find.text(_settingsPrimaryPgpKey.name), findsOneWidget);
     expect(
       (await securityRepository.readPgpPassphrase())?.passphrase,
@@ -2833,7 +2869,7 @@ void main() {
         repository: repository,
         securityRepository: securityRepository,
       );
-      await tester.tap(find.text('PGP keys'));
+      await _openSettingsTile(tester, 'PGP keys');
       await tester.pumpAndSettle();
       await tester.tap(
         find.byTooltip('Actions for PGP key ${_settingsPrimaryPgpKey.name}'),
@@ -3022,7 +3058,7 @@ void main() {
     );
     await tester.drag(find.byType(Scrollable).last, const Offset(0, -220));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Git sync and remotes'));
+    await _openSettingsTile(tester, 'Git sync and remotes');
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Pull'));
@@ -3071,10 +3107,7 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).last,
     );
-    expect(
-      find.text('Type example-store to delete the local repo.'),
-      findsOneWidget,
-    );
+    expect(find.text('Type example-store to confirm'), findsWidgets);
     expect(
       tester
           .widget<FilledButton>(
@@ -3166,7 +3199,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PGP keys'));
+    await _openSettingsTile(tester, 'PGP keys');
     await tester.pumpAndSettle();
 
     expect(find.text('Injected User <injected@example.com>'), findsOneWidget);
@@ -3556,7 +3589,10 @@ void main() {
 
     expect(securityRepository.biometricUnlockEnabled, isFalse);
     expect(biometrics.authenticateCount, 1);
-    expect(find.text('Biometric authentication failed.'), findsOneWidget);
+    expect(
+      find.text('Operation failed. Try again or open Details.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('settings stores and clears PGP passphrase cache', (
@@ -3631,6 +3667,36 @@ void main() {
   });
 }
 
+Future<void> _openManageSurface(
+  WidgetTester tester,
+  Future<Object?> Function(BuildContext context) showSurface,
+) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder:
+            (context) => Scaffold(
+              body: FilledButton(
+                onPressed: () async {
+                  final result = await showSurface(context);
+                  if (!context.mounted || result == null) return;
+                  final summary = switch (result) {
+                    EntryOperationResult(:final summary) => summary,
+                    BatchOperationResult(:final summary) => summary,
+                    _ => result.toString(),
+                  };
+                  AppNotification.show(context, summary);
+                },
+                child: const Text('Open workflow'),
+              ),
+            ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('Open workflow'));
+  await tester.pumpAndSettle();
+}
+
 Future<void> _openEntryDetailModal(
   WidgetTester tester, {
   required VaultRepository repository,
@@ -3682,7 +3748,7 @@ Future<void> _completeGestureSetup(WidgetTester tester) async {
 
 Future<void> _completeReadyOnboarding(WidgetTester tester) async {
   await _completeGestureSetup(tester);
-  for (var i = 0; i < 8; i += 1) {
+  for (var i = 0; i < 12; i += 1) {
     await tester.pumpAndSettle();
     if (find.text('Vault').evaluate().isNotEmpty) {
       return;
@@ -3703,6 +3769,12 @@ Future<void> _completeReadyOnboarding(WidgetTester tester) async {
       await _tapVisible(tester, find.text('Skip SSH'));
       continue;
     }
+    if (find.text('Review setup').evaluate().isNotEmpty &&
+        find.text('Finish setup').evaluate().isEmpty) {
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      continue;
+    }
     if (find.text('Finish setup').evaluate().isNotEmpty) {
       await _tapVisible(
         tester,
@@ -3711,7 +3783,10 @@ Future<void> _completeReadyOnboarding(WidgetTester tester) async {
       continue;
     }
   }
-  fail('Onboarding did not reach the vault.');
+  fail(
+    'Onboarding did not reach the vault. Visible text: '
+    '${tester.widgetList<Text>(find.byType(Text)).map((widget) => widget.data).whereType<String>().join(' | ')}',
+  );
 }
 
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
@@ -3759,6 +3834,21 @@ Future<void> _tapImportSubmit(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _openSettingsTile(WidgetTester tester, String label) async {
+  final tile = find.text(label);
+  await tester.scrollUntilVisible(
+    tile,
+    300,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.drag(find.byType(Scrollable).last, const Offset(0, 100));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.ancestor(of: tile, matching: find.byType(ListTile)).last,
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> _pumpKeyManagementSheet(
   WidgetTester tester, {
   required _InjectedRepository repository,
@@ -3772,10 +3862,10 @@ Future<void> _pumpKeyManagementSheet(
     securityRepository: securityRepository ?? InMemorySecurityRepository(),
     pathPickerService: pathPickerService,
   );
-  await tester.tap(
-    find.text(type == KeyRecordType.pgp ? 'PGP keys' : 'SSH keys'),
+  await _openSettingsTile(
+    tester,
+    type == KeyRecordType.pgp ? 'PGP keys' : 'SSH keys',
   );
-  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpAdvancedGitArgsSheet(
@@ -3788,13 +3878,13 @@ Future<void> _pumpAdvancedGitArgsSheet(
     securityRepository: InMemorySecurityRepository(),
   );
   await tester.scrollUntilVisible(
-    find.text('Advanced git args'),
+    find.text('Advanced Git args'),
     300,
     scrollable: find.byType(Scrollable).last,
   );
   await tester.drag(find.byType(Scrollable).last, const Offset(0, -260));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Advanced git args'));
+  await tester.tap(find.text('Advanced Git args'));
   await tester.pumpAndSettle();
 }
 

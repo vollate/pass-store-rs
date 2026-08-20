@@ -127,6 +127,15 @@ class StoreLifecycleSnapshot {
     final selected = selectedStore;
     return selected == null || !selected.exists;
   }
+
+  bool get requiresKeyRepair {
+    final selected = selectedStore;
+    return selected != null &&
+        selected.exists &&
+        (selected.pgpKeyMissing ||
+            selected.issues.contains('pgp_key_missing') ||
+            onboardingState == StoreOnboardingState.pgpKeyMissing);
+  }
 }
 
 StoreOnboardingState _onboardingStateFromBridge(String value) {

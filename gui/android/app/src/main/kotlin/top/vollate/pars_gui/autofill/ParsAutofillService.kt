@@ -24,8 +24,7 @@ class ParsAutofillService : AutofillService() {
             return
         }
 
-        val structure = request.fillContexts.lastOrNull()?.structure
-        val parsed = structure?.let { ParsAutofillRequestParser.parse(this, it) }
+        val parsed = parseRequest(request)
         if (parsed == null) {
             callback.onSuccess(null)
             return
@@ -49,6 +48,26 @@ class ParsAutofillService : AutofillService() {
             response.addDataset(datasetFor(candidate, parsed))
         }
         callback.onSuccess(response.build())
+    }
+
+    private fun parseRequest(request: FillRequest): ParsedAutofillRequest? {
+        val contexts = request.fillContexts
+        val latestStructure = contexts.lastOrNull()?.structure ?: return null
+        val latest = ParsAutofillRequestParser.parse(this, latestStructure) ?: return null
+        val previous =
+            contexts.dropLast(1).asReversed().firstNotNullOfOrNull { context ->
+                ParsAutofillRequestParser.parse(this, context.structure)
+            }
+        val mergedQuery =
+            listOfNotNull(previous?.query, latest.query)
+                .distinct()
+                .joinToString(" ")
+                .takeIf { it.isNotBlank() }
+        return latest.copy(
+            appName = latest.appName ?: previous?.appName,
+            website = latest.website ?: previous?.website,
+            query = mergedQuery,
+        )
     }
 
     override fun onSaveRequest(
@@ -90,7 +109,7 @@ class ParsAutofillService : AutofillService() {
         val presentation =
             ParsAutofillUnlockActivity.presentation(
                 context = this,
-                title = candidate.displayName,
+                title = getString(R.string.autofill_candidate_title, candidate.displayName),
                 subtitle = candidate.username,
             )
         val intent =

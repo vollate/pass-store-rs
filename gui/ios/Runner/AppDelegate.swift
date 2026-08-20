@@ -12,6 +12,62 @@ import UIKit
 
   private func configureParsPlatformChannels(binaryMessenger: FlutterBinaryMessenger) {
     FlutterMethodChannel(
+      name: "top.vollate.pars_gui/sensitive_clipboard",
+      binaryMessenger: binaryMessenger
+    ).setMethodCallHandler { call, result in
+      guard let arguments = call.arguments as? [String: Any] else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      switch call.method {
+      case "setClipboard":
+        guard let text = arguments["text"] as? String,
+          let ownerToken = arguments["ownerToken"] as? String
+        else {
+          result(
+            FlutterError(
+              code: "INVALID_CLIPBOARD",
+              message: "Missing clipboard text",
+              details: nil))
+          return
+        }
+        var options: [UIPasteboard.OptionsKey: Any] = [.localOnly: true]
+        if let seconds = arguments["expiresAfterSeconds"] as? NSNumber,
+          seconds.doubleValue > 0
+        {
+          options[.expirationDate] = Date(timeIntervalSinceNow: seconds.doubleValue)
+        }
+        UIPasteboard.general.setItems(
+          [[
+            "public.utf8-plain-text": text,
+            "top.vollate.pars.clipboard-owner": Data(ownerToken.utf8),
+          ]],
+          options: options)
+        result(nil)
+      case "clearIfMatches":
+        guard let expected = arguments["expectedText"] as? String,
+          let ownerToken = arguments["ownerToken"] as? String
+        else {
+          result(
+            FlutterError(
+              code: "INVALID_CLIPBOARD",
+              message: "Missing expected clipboard text",
+              details: nil))
+          return
+        }
+        let ownerData =
+          UIPasteboard.general.items.first?["top.vollate.pars.clipboard-owner"] as? Data
+        let currentOwner = ownerData.flatMap { String(data: $0, encoding: .utf8) }
+        if UIPasteboard.general.string == expected && currentOwner == ownerToken {
+          UIPasteboard.general.items = []
+        }
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    FlutterMethodChannel(
       name: "top.vollate.pars_gui/ios_runtime",
       binaryMessenger: binaryMessenger
     ).setMethodCallHandler { call, result in
@@ -41,6 +97,18 @@ import UIKit
       case "clearState":
         ParsAutofillSharedState.clear()
         result(nil)
+      case "openSettings":
+        guard let url = URL(string: UIApplication.openSettingsURLString) else {
+          result(
+            FlutterError(
+              code: "SETTINGS_UNAVAILABLE",
+              message: "System settings URL is unavailable",
+              details: nil))
+          return
+        }
+        UIApplication.shared.open(url) { opened in
+          result(opened)
+        }
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -66,8 +134,16 @@ import UIKit
         indexPath: indexPath,
         storeRoot: args["storeRoot"] as? String,
         passphrase: args["passphrase"] as? String)
-      ParsAutofillSharedState.syncCredentialIdentities { _ in
-        result(nil)
+      ParsAutofillSharedState.syncCredentialIdentities { success in
+        if success {
+          result(nil)
+        } else {
+          result(
+            FlutterError(
+              code: "AUTOFILL_IDENTITY_SYNC_FAILED",
+              message: "Credential identities could not be synchronized",
+              details: nil))
+        }
       }
     } catch {
       result(

@@ -53,19 +53,29 @@ class AutofillCredential {
   final String password;
 }
 
+enum AutofillStatusKind { ready, needsRebuild, busy, disabled, unavailable }
+
 class AutofillStatus {
   const AutofillStatus({
     required this.available,
     required this.indexedEntries,
+    this.kind = AutofillStatusKind.ready,
     this.message,
   });
 
   const AutofillStatus.unavailable(this.message)
     : available = false,
-      indexedEntries = 0;
+      indexedEntries = 0,
+      kind = AutofillStatusKind.unavailable;
+
+  const AutofillStatus.disabled(this.message)
+    : available = false,
+      indexedEntries = 0,
+      kind = AutofillStatusKind.disabled;
 
   final bool available;
   final int indexedEntries;
+  final AutofillStatusKind kind;
   final String? message;
 }
 
@@ -102,6 +112,8 @@ abstract interface class AutofillRepository {
   Future<AutofillCredential?> resolveCredential(String path);
 
   Future<void> publishPlatformState();
+
+  Future<void> openPlatformSettings();
 
   void recordSyncFailure(Object error);
 
@@ -226,6 +238,7 @@ class BridgeAutofillRepository implements AutofillRepository {
     this.currentStoreId,
     this.currentStoreName,
     this.currentStoreRoot,
+    this.forcePlatformPublication = false,
   });
 
   final AutofillBridgeApi bridge;
@@ -239,6 +252,7 @@ class BridgeAutofillRepository implements AutofillRepository {
   final String Function()? currentStoreId;
   final String Function()? currentStoreName;
   final String Function()? currentStoreRoot;
+  final bool forcePlatformPublication;
   AutofillStatus _status = const AutofillStatus.unavailable(
     'Autofill data has not been built',
   );
@@ -365,6 +379,7 @@ class BridgeAutofillRepository implements AutofillRepository {
     _status = AutofillStatus(
       available: _status.available,
       indexedEntries: _status.indexedEntries,
+      kind: _status.kind,
       message: 'Encrypted website aliases updated for ${paths.length} entries',
     );
   }
@@ -384,6 +399,7 @@ class BridgeAutofillRepository implements AutofillRepository {
     _status = AutofillStatus(
       available: _status.available,
       indexedEntries: _status.indexedEntries,
+      kind: _status.kind,
       message: 'Encrypted website aliases cleared',
     );
   }
@@ -434,14 +450,28 @@ class BridgeAutofillRepository implements AutofillRepository {
 
   @override
   Future<void> publishPlatformState() async {
-    if (!Platform.isAndroid && !Platform.isIOS) return;
+    if (!forcePlatformPublication && !Platform.isAndroid && !Platform.isIOS) {
+      return;
+    }
     try {
       await _platformAutofillChannel.invokeMethod<void>('publishState', {
         'configPath': configPath,
         'indexPath': indexPath,
         'storeRoot': currentStoreRoot?.call() ?? storeRoot,
-        'passphrase': await _activePassphrase(),
+        'passphrase': await _storedPlatformPassphrase(),
       });
+    } on MissingPluginException {
+      return;
+    }
+  }
+
+  @override
+  Future<void> openPlatformSettings() async {
+    if (!forcePlatformPublication && !Platform.isAndroid && !Platform.isIOS) {
+      return;
+    }
+    try {
+      await _platformAutofillChannel.invokeMethod<void>('openSettings');
     } on MissingPluginException {
       return;
     }
@@ -450,8 +480,9 @@ class BridgeAutofillRepository implements AutofillRepository {
   @override
   void recordSyncFailure(Object error) {
     _status = AutofillStatus(
-      available: _status.available,
+      available: false,
       indexedEntries: _status.indexedEntries,
+      kind: AutofillStatusKind.needsRebuild,
       message: 'Autofill sync failed: $error. Rebuild it from Settings.',
     );
   }
@@ -463,7 +494,7 @@ class BridgeAutofillRepository implements AutofillRepository {
     );
     _throwIfFailure(response.error);
     await _clearPlatformState();
-    _status = const AutofillStatus.unavailable('Autofill data is cleared');
+    _status = const AutofillStatus.disabled('Autofill data is cleared');
   }
 
   Future<void> _completeIncremental(frb.UnitResponse response) async {
@@ -480,6 +511,11 @@ class BridgeAutofillRepository implements AutofillRepository {
 
   Future<String?> _activePassphrase() async {
     final passphrase = await securityRepository?.readActivePgpPassphrase();
+    return passphrase?.passphrase;
+  }
+
+  Future<String?> _storedPlatformPassphrase() async {
+    final passphrase = await securityRepository?.readPgpPassphrase();
     return passphrase?.passphrase;
   }
 
@@ -645,10 +681,16 @@ class FakeAutofillRepository implements AutofillRepository {
   }
 
   @override
+  Future<void> openPlatformSettings() async {
+    operations.add('open-settings');
+  }
+
+  @override
   void recordSyncFailure(Object error) {
     _status = AutofillStatus(
-      available: _status.available,
+      available: false,
       indexedEntries: _status.indexedEntries,
+      kind: AutofillStatusKind.needsRebuild,
       message: 'Autofill sync failed: $error. Rebuild it from Settings.',
     );
   }
@@ -659,6 +701,6 @@ class FakeAutofillRepository implements AutofillRepository {
     _credentials.clear();
     operations.add('clear');
     cleared = true;
-    _status = const AutofillStatus.unavailable('Autofill data is cleared');
+    _status = const AutofillStatus.disabled('Autofill data is cleared');
   }
 }

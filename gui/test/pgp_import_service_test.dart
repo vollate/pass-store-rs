@@ -29,10 +29,7 @@ void main() {
 
   test('unprotected private import skips passphrase work', () async {
     final keyRepository = _StubKeyRepository(
-      inspection: _inspection(
-        kind: PgpKeyKind.private,
-        hasPrivateKey: true,
-      ),
+      inspection: _inspection(kind: PgpKeyKind.private, hasPrivateKey: true),
     );
     final security = InMemorySecurityRepository();
 
@@ -48,22 +45,55 @@ void main() {
     expect(security.hasStoredPgpPassphrase, isFalse);
   });
 
+  test('validated protected import starts a session for the returned fingerprint '
+      'without durable storage', () async {
+    // The repository returns a different fingerprint than the caller could guess, so this also
+    // proves the session binds to what the backend confirmed.
+    final keyRepository = _StubKeyRepository(
+      inspection: _inspection(
+        kind: PgpKeyKind.private,
+        hasPrivateKey: true,
+        requiresPassphrase: true,
+        fingerprint: 'CONFIRMED ABC',
+      ),
+      fingerprint: 'CONFIRMED ABC',
+    );
+    final security = InMemorySecurityRepository();
+
+    final completion = await importPgpKeyWithSecurity(
+      keyRepository: keyRepository,
+      securityRepository: security,
+      source: PgpImportSource.text,
+      value: '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      passphrase: _passphrase,
+    );
+
+    expect(completion.storage, PgpPassphraseStorageOutcome.sessionOnly);
+    expect(completion.key.fingerprint, 'CONFIRMED ABC');
+    expect(security.hasActivePgpSession, isTrue);
+
+    final session = await security.readActivePgpPassphrase();
+    expect(session?.fingerprint, 'CONFIRMED ABC');
+    expect(session?.passphrase, _passphrase);
+
+    // Remember was not requested, so nothing is durable.
+    expect(security.hasStoredPgpPassphrase, isFalse);
+    expect(security.pgpPassphraseStorageEnabled, isFalse);
+    expect(await security.readPgpPassphrase(), isNull);
+  });
+
   test(
-    'validated protected import starts a session for the returned fingerprint '
-    'without durable storage',
+    'opting in enables secure storage and caches for the same fingerprint',
     () async {
-      // The repository returns a different fingerprint than the caller could guess, so this also
-      // proves the session binds to what the backend confirmed.
       final keyRepository = _StubKeyRepository(
         inspection: _inspection(
           kind: PgpKeyKind.private,
           hasPrivateKey: true,
           requiresPassphrase: true,
-          fingerprint: 'CONFIRMED ABC',
         ),
-        fingerprint: 'CONFIRMED ABC',
       );
       final security = InMemorySecurityRepository();
+      expect(security.pgpPassphraseStorageEnabled, isFalse);
 
       final completion = await importPgpKeyWithSecurity(
         keyRepository: keyRepository,
@@ -71,84 +101,57 @@ void main() {
         source: PgpImportSource.text,
         value: '-----BEGIN PGP PRIVATE KEY BLOCK-----',
         passphrase: _passphrase,
+        remember: true,
       );
 
-      expect(completion.storage, PgpPassphraseStorageOutcome.sessionOnly);
-      expect(completion.key.fingerprint, 'CONFIRMED ABC');
+      expect(completion.storage, PgpPassphraseStorageOutcome.remembered);
+      expect(security.pgpPassphraseStorageEnabled, isTrue);
+
+      final stored = await security.readPgpPassphrase();
+      expect(stored?.fingerprint, completion.key.fingerprint);
+      expect(stored?.passphrase, _passphrase);
       expect(security.hasActivePgpSession, isTrue);
-
-      final session = await security.readActivePgpPassphrase();
-      expect(session?.fingerprint, 'CONFIRMED ABC');
-      expect(session?.passphrase, _passphrase);
-
-      // Remember was not requested, so nothing is durable.
-      expect(security.hasStoredPgpPassphrase, isFalse);
-      expect(security.pgpPassphraseStorageEnabled, isFalse);
-      expect(await security.readPgpPassphrase(), isNull);
     },
   );
 
-  test('opting in enables secure storage and caches for the same fingerprint', () async {
-    final keyRepository = _StubKeyRepository(
-      inspection: _inspection(
-        kind: PgpKeyKind.private,
-        hasPrivateKey: true,
-        requiresPassphrase: true,
-      ),
-    );
-    final security = InMemorySecurityRepository();
-    expect(security.pgpPassphraseStorageEnabled, isFalse);
+  test(
+    'secure-storage failure keeps the imported key and active session',
+    () async {
+      final keyRepository = _StubKeyRepository(
+        inspection: _inspection(
+          kind: PgpKeyKind.private,
+          hasPrivateKey: true,
+          requiresPassphrase: true,
+        ),
+      );
+      final security = _FailingStorageSecurityRepository();
 
-    final completion = await importPgpKeyWithSecurity(
-      keyRepository: keyRepository,
-      securityRepository: security,
-      source: PgpImportSource.text,
-      value: '-----BEGIN PGP PRIVATE KEY BLOCK-----',
-      passphrase: _passphrase,
-      remember: true,
-    );
+      final completion = await importPgpKeyWithSecurity(
+        keyRepository: keyRepository,
+        securityRepository: security,
+        source: PgpImportSource.text,
+        value: '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+        passphrase: _passphrase,
+        remember: true,
+      );
 
-    expect(completion.storage, PgpPassphraseStorageOutcome.remembered);
-    expect(security.pgpPassphraseStorageEnabled, isTrue);
-
-    final stored = await security.readPgpPassphrase();
-    expect(stored?.fingerprint, completion.key.fingerprint);
-    expect(stored?.passphrase, _passphrase);
-    expect(security.hasActivePgpSession, isTrue);
-  });
-
-  test('secure-storage failure keeps the imported key and active session', () async {
-    final keyRepository = _StubKeyRepository(
-      inspection: _inspection(
-        kind: PgpKeyKind.private,
-        hasPrivateKey: true,
-        requiresPassphrase: true,
-      ),
-    );
-    final security = _FailingStorageSecurityRepository();
-
-    final completion = await importPgpKeyWithSecurity(
-      keyRepository: keyRepository,
-      securityRepository: security,
-      source: PgpImportSource.text,
-      value: '-----BEGIN PGP PRIVATE KEY BLOCK-----',
-      passphrase: _passphrase,
-      remember: true,
-    );
-
-    expect(completion.storage, PgpPassphraseStorageOutcome.rememberFailed);
-    expect(completion.rememberFailed, isTrue);
-    // The key stays imported and usable; only remembering failed.
-    expect(completion.key.fingerprint, isNotEmpty);
-    expect(security.hasActivePgpSession, isTrue);
-    expect(security.hasStoredPgpPassphrase, isFalse);
-    expect(completion.storageError, isNotNull);
-    expect(completion.storageError, isNot(contains(_passphrase)));
-  });
+      expect(completion.storage, PgpPassphraseStorageOutcome.rememberFailed);
+      expect(completion.rememberFailed, isTrue);
+      // The key stays imported and usable; only remembering failed.
+      expect(completion.key.fingerprint, isNotEmpty);
+      expect(security.hasActivePgpSession, isTrue);
+      expect(security.hasStoredPgpPassphrase, isFalse);
+      expect(completion.storageError, isNotNull);
+      expect(completion.storageError, isNot(contains(_passphrase)));
+    },
+  );
 
   test('import failures propagate and leave no session or cache', () async {
     final keyRepository = _StubKeyRepository(
-      inspection: _inspection(kind: PgpKeyKind.private, requiresPassphrase: true),
+      inspection: _inspection(
+        kind: PgpKeyKind.private,
+        requiresPassphrase: true,
+      ),
       failure: const PgpImportException(
         PgpImportFailureKind.incorrectPassphrase,
         'the PGP private key passphrase is incorrect',
@@ -219,9 +222,10 @@ class _StubKeyRepository implements KeyRepository {
         type: KeyRecordType.pgp,
         name: inspection.identity,
         fingerprint: fingerprint,
-        source: inspection.isPrivate
-            ? 'Imported private key'
-            : 'Imported public key',
+        source:
+            inspection.isPrivate
+                ? 'Imported private key'
+                : 'Imported public key',
         hasPrivateKey: inspection.hasPrivateKey,
       ),
       inspection: inspection,

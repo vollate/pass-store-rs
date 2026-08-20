@@ -12,7 +12,9 @@ import '../services/git_repository.dart';
 import '../services/key_repository.dart';
 import '../services/path_picker_service.dart';
 import '../services/security_repository.dart';
+import '../services/sensitive_clipboard_service.dart';
 import '../services/settings_repository.dart';
+import '../services/ui_preferences_store.dart';
 import '../services/vault_repository.dart';
 import 'pars_theme.dart';
 
@@ -25,11 +27,13 @@ class ParsGuiApp extends StatefulWidget {
     required this.gitRepository,
     required this.securityRepository,
     this.autofillRepository,
+    this.uiPreferencesStore,
+    this.clipboardService,
     this.pathPickerService = const SystemPathPickerService(),
     this.now = DateTime.now,
   });
 
-  factory ParsGuiApp.fake({Key? key}) {
+  factory ParsGuiApp.fake({Key? key, UiPreferencesStore? uiPreferencesStore}) {
     const repository = FakeParsRepository();
     return ParsGuiApp(
       key: key,
@@ -38,6 +42,7 @@ class ParsGuiApp extends StatefulWidget {
       keyRepository: repository,
       gitRepository: repository,
       securityRepository: InMemorySecurityRepository(),
+      uiPreferencesStore: uiPreferencesStore,
     );
   }
 
@@ -47,6 +52,8 @@ class ParsGuiApp extends StatefulWidget {
   final GitRepository gitRepository;
   final SecurityRepository securityRepository;
   final AutofillRepository? autofillRepository;
+  final UiPreferencesStore? uiPreferencesStore;
+  final SensitiveClipboardService? clipboardService;
   final PathPickerService pathPickerService;
   final DateTime Function() now;
 
@@ -64,12 +71,22 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   DateTime? _suppressLifecycleLocksUntil;
   int _systemAuthDepth = 0;
   late final AutofillRepository _autofillRepository;
+  late final UiPreferencesStore _uiPreferencesStore;
+  late final SensitiveClipboardService _clipboardService;
+  late final bool _ownsClipboardService;
+  AppLocalePreference _localePreference = AppLocalePreference.system;
+  final ValueNotifier<int> _privacyEpoch = ValueNotifier<int>(0);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _autofillRepository = widget.autofillRepository ?? FakeAutofillRepository();
+    _uiPreferencesStore =
+        widget.uiPreferencesStore ?? InMemoryUiPreferencesStore();
+    _ownsClipboardService = widget.clipboardService == null;
+    _clipboardService = widget.clipboardService ?? SensitiveClipboardService();
+    unawaited(_loadLocalePreference());
     _isOnboardingComplete = _isOnboardingSatisfied;
     _isLocked =
         _isOnboardingComplete &&
@@ -83,6 +100,8 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _lockTimer?.cancel();
+    if (_ownsClipboardService) _clipboardService.dispose();
+    _privacyEpoch.dispose();
     super.dispose();
   }
 
@@ -97,6 +116,9 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     if (isBackgrounded) {
       _backgroundedAt ??= now;
       _lockTimer?.cancel();
+      _privacyEpoch.value += 1;
+      unawaited(_clearClipboardAfterLock());
+      unawaited(_refreshNativeAutofillSecurityState());
       return;
     }
 
@@ -131,6 +153,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
       debugShowCheckedModeBanner: false,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      locale: _localePreference.locale,
       theme: ParsTheme.light(),
       darkTheme: ParsTheme.dark(),
       themeMode: ThemeMode.system,
@@ -166,6 +189,11 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
                 securityRepository: widget.securityRepository,
                 autofillRepository: _autofillRepository,
                 pathPickerService: widget.pathPickerService,
+                localePreference: _localePreference,
+                onLocalePreferenceChanged: _setLocalePreference,
+                clipboardService: _clipboardService,
+                privacyEvents: _privacyEpoch,
+                onLock: _lock,
                 onSecuritySettingsChanged: _scheduleAutoLock,
                 runDuringSystemAuthentication: _runDuringSystemAuthentication,
                 onOnboardingReset: () {
@@ -177,6 +205,24 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
                 },
               ),
     );
+  }
+
+  Future<void> _loadLocalePreference() async {
+    final preference = await _uiPreferencesStore.loadLocale();
+    if (!mounted || preference == _localePreference) return;
+    setState(() => _localePreference = preference);
+  }
+
+  Future<void> _setLocalePreference(AppLocalePreference preference) async {
+    if (preference == _localePreference) return;
+    final previous = _localePreference;
+    setState(() => _localePreference = preference);
+    try {
+      await _uiPreferencesStore.saveLocale(preference);
+    } catch (_) {
+      if (mounted) setState(() => _localePreference = previous);
+      rethrow;
+    }
   }
 
   void _scheduleAutoLock() {
@@ -200,18 +246,38 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     _lockTimer = Timer(remaining, _lock);
   }
 
-  void _lock() {
+  Future<void> _lock() async {
     _lockTimer?.cancel();
-    widget.securityRepository.markLocked();
+    await widget.securityRepository.markLocked();
+    _privacyEpoch.value += 1;
     if (mounted && _isOnboardingComplete) {
       setState(() => _isLocked = true);
+    }
+    unawaited(_clearClipboardAfterLock());
+    unawaited(_refreshNativeAutofillSecurityState());
+  }
+
+  Future<void> _refreshNativeAutofillSecurityState() async {
+    try {
+      await _autofillRepository.publishPlatformState();
+    } catch (_) {
+      // Locking remains authoritative even if native publication is unavailable.
+    }
+  }
+
+  Future<void> _clearClipboardAfterLock() async {
+    try {
+      await _clipboardService.clearNow();
+    } catch (_) {
+      // Clipboard cleanup is best-effort and must never block locking.
     }
   }
 
   bool get _isOnboardingSatisfied =>
       widget.securityRepository.onboardingComplete &&
       widget.securityRepository.hasGestureVerifier &&
-      !widget.settingsRepository.lifecycle.requiresStoreSetup;
+      !widget.settingsRepository.lifecycle.requiresStoreSetup &&
+      !widget.settingsRepository.lifecycle.requiresKeyRepair;
 
   Future<bool> _unlockWithBiometrics() async {
     final unlocked = await _runDuringSystemAuthentication(

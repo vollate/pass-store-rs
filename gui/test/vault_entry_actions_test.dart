@@ -27,12 +27,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byTooltip('More actions'));
+    await tester.pumpAndSettle();
     for (final label in <String>['Edit', 'Regenerate', 'Delete']) {
-      final finder = find.widgetWithText(OutlinedButton, label);
-      await tester.ensureVisible(finder);
-      final button = tester.widget<OutlinedButton>(finder);
-      expect(button.onPressed, isNull, reason: '$label must be disabled');
+      expect(
+        find.text(label),
+        findsNothing,
+        reason: '$label must not be presented as supported',
+      );
     }
+    expect(find.text('QR code'), findsOneWidget);
   });
 
   testWidgets('entry detail invokes every supplied mutation callback', (
@@ -59,9 +63,10 @@ void main() {
     await tester.pumpAndSettle();
 
     for (final label in <String>['Edit', 'Regenerate', 'Delete']) {
-      final finder = find.widgetWithText(OutlinedButton, label);
-      await tester.ensureVisible(finder);
-      await tester.tap(finder);
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
     }
 
     expect(editCalls, 1);
@@ -76,14 +81,14 @@ void main() {
     await _pumpVault(tester, repository);
 
     for (final action in <(String, String)>[
-      ('Edit', 'Edit entry'),
-      ('Regenerate', 'Regenerate entry'),
+      ('Edit', 'Edit entries'),
+      ('Regenerate', 'Regenerate'),
       ('Delete', 'Delete entry'),
     ]) {
       await _openEntry(tester);
-      final actionFinder = find.widgetWithText(OutlinedButton, action.$1);
-      await tester.ensureVisible(actionFinder);
-      await tester.tap(actionFinder);
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(action.$1));
       await tester.pumpAndSettle();
 
       expect(
@@ -134,9 +139,7 @@ void main() {
       await _openFocusedAction(tester, 'Regenerate');
 
       await tester.tap(find.text('No symbols'));
-      await tester.tap(
-        find.widgetWithText(FilledButton, 'Regenerate password'),
-      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Regenerate'));
       await tester.pumpAndSettle();
 
       expect(repository.regenerateCalls, 1);
@@ -182,7 +185,7 @@ void main() {
     await tester.pump();
 
     expect(repository.deleteAttempts, 0);
-    expect(find.text('Type Alice to confirm.'), findsOneWidget);
+    expect(find.text('Type Alice to confirm'), findsWidgets);
 
     await tester.enterText(confirmation, 'Alice');
     await tester.tap(find.widgetWithText(FilledButton, 'Delete entry'));
@@ -210,8 +213,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.editAttempts, 1);
-    expect(find.text('Edit entry'), findsOneWidget);
-    expect(find.textContaining('edit failed'), findsOneWidget);
+    expect(find.text('Edit entries'), findsOneWidget);
+    expect(
+      find.text('Operation failed. Try again or open Details.'),
+      findsOneWidget,
+    );
     expect(
       find.widgetWithText(FilledButton, 'Save edited entry'),
       findsOneWidget,
@@ -231,7 +237,7 @@ void main() {
 
       expect(repository.editAttempts, 1);
       expect(repository.commitAttempts, 1);
-      expect(find.text('Edit entry'), findsOneWidget);
+      expect(find.text('Edit entries'), findsOneWidget);
       expect(find.textContaining('optional Git commit failed'), findsOneWidget);
       expect(find.textContaining('was not rolled back'), findsOneWidget);
       expect(
@@ -270,9 +276,9 @@ Future<void> _openEntry(WidgetTester tester) async {
 
 Future<void> _openFocusedAction(WidgetTester tester, String action) async {
   await _openEntry(tester);
-  final finder = find.widgetWithText(OutlinedButton, action);
-  await tester.ensureVisible(finder);
-  await tester.tap(finder);
+  await tester.tap(find.byTooltip('More actions'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(action));
   await tester.pumpAndSettle();
 }
 

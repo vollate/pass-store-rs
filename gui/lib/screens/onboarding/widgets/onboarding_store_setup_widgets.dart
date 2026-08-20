@@ -38,7 +38,7 @@ class _StoreSetupActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
+    final localizations = context.l10n;
     final selectedStore = lifecycle.selectedStore;
     return ListView(
       children: <Widget>[
@@ -59,25 +59,25 @@ class _StoreSetupActions extends StatelessWidget {
         FilledButton.icon(
           onPressed: () => _showCreateLocalStore(context),
           icon: const Icon(Icons.create_new_folder_outlined),
-          label: const Text('Create local store'),
+          label: Text(context.l10n.createLocalStore),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: () => _showImportLocalStore(context),
           icon: const Icon(Icons.folder_open_outlined),
-          label: const Text('Import local store'),
+          label: Text(context.l10n.importLocalStore),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: hasSshKey ? () => _showCloneStore(context) : null,
           icon: const Icon(Icons.cloud_download_outlined),
-          label: const Text('Clone Git store'),
+          label: Text(context.l10n.cloneGitStore),
         ),
         if (!hasSshKey)
-          const ListTile(
+          ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.info_outline),
-            title: Text('Add an SSH key before cloning a Git store.'),
+            leading: const Icon(Icons.info_outline),
+            title: Text(context.l10n.addSshBeforeClone),
           ),
       ],
     );
@@ -89,8 +89,8 @@ class _StoreSetupActions extends StatelessWidget {
     String? selectedBase;
     _showPickerStoreForm(
       context: context,
-      title: 'Create local store',
-      submitLabel: 'Create',
+      title: context.l10n.createLocalStore,
+      submitLabel: context.l10n.create,
       canSubmit: () => managedPaths != null || selectedBase != null,
       onSubmit:
           () => onCreateLocalStore(
@@ -138,8 +138,8 @@ class _StoreSetupActions extends StatelessWidget {
     String? selectedRoot;
     _showPickerStoreForm(
       context: context,
-      title: 'Import local store',
-      submitLabel: 'Import',
+      title: context.l10n.importLocalStore,
+      submitLabel: context.l10n.importAction,
       canSubmit: () => selectedRoot != null,
       onSubmit: () => onImportLocalStore(selectedRoot!),
       builder:
@@ -165,11 +165,11 @@ class _StoreSetupActions extends StatelessWidget {
     BuildContext context,
     AppManagedPathRepository managed,
   ) {
-    final localizations = AppLocalizations.of(context);
+    final localizations = context.l10n;
     final destinationBase = parentDirectory(managed.storeRootForName('store'));
     _showPickerStoreForm(
       context: context,
-      title: 'Import local store',
+      title: localizations.importLocalStore,
       submitLabel: localizations.chooseFolderAndImport,
       canSubmit: () => true,
       onSubmit: () async {
@@ -203,8 +203,8 @@ class _StoreSetupActions extends StatelessWidget {
     String? selectedBase;
     _showPickerStoreForm(
       context: context,
-      title: 'Clone Git store',
-      submitLabel: 'Clone',
+      title: context.l10n.cloneGitStore,
+      submitLabel: context.l10n.cloneAction,
       canSubmit:
           () => hasSshKey && (managedPaths != null || selectedBase != null),
       onSubmit:
@@ -258,9 +258,11 @@ class _StoreSetupActions extends StatelessWidget {
       onSelected(path);
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text('$error')));
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(UiProblem.fromError(context.l10n, error).summary),
+        ),
+      );
     }
   }
 
@@ -323,12 +325,12 @@ class _CreateLocalStoreFields extends StatelessWidget {
       children: <Widget>[
         TextField(
           controller: name,
-          decoration: const InputDecoration(labelText: 'Name'),
+          decoration: InputDecoration(labelText: context.l10n.nameField),
           onChanged: (_) => onNameChanged(),
         ),
         const SizedBox(height: 12),
         PathPickerRow(
-          title: 'Store folder',
+          title: context.l10n.storeFolder,
           path:
               managedPaths?.storeRootForName(name.text) ??
               joinFilesystemPath(
@@ -357,7 +359,7 @@ class _ImportLocalStoreFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PathPickerRow(
-      title: 'Store folder',
+      title: context.l10n.storeFolder,
       path: selectedRoot ?? defaultBase,
       isSelected: selectedRoot != null,
       onPressed: onChooseRoot,
@@ -389,12 +391,12 @@ class _CloneStoreFields extends StatelessWidget {
       children: <Widget>[
         TextField(
           controller: remote,
-          decoration: const InputDecoration(labelText: 'Remote URL'),
+          decoration: InputDecoration(labelText: context.l10n.remoteUrlField),
           onChanged: (_) => onRemoteChanged(),
         ),
         const SizedBox(height: 12),
         PathPickerRow(
-          title: 'Store folder',
+          title: context.l10n.storeFolder,
           path:
               managedPaths?.storeRootForRemote(remote.text) ??
               joinFilesystemPath(
@@ -501,8 +503,8 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
         _error =
             caught is PathPickerException &&
                     caught.code == 'store_import_no_passwords'
-                ? AppLocalizations.of(context).storeImportNoPasswords
-                : caught.toString();
+                ? context.l10n.storeImportNoPasswords
+                : UiProblem.fromError(context.l10n, caught).summary;
         _isSubmitting = false;
       });
     }

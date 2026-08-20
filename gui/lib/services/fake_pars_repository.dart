@@ -279,13 +279,9 @@ class FakeParsRepository
 
   @override
   List<PasswordEntry> recentEntries() {
-    final recent = entries
+    return entries
         .where((entry) => !entry.isDirectory && entry.lastUsedLabel != null)
         .toList(growable: false);
-    if (recent.isNotEmpty) {
-      return recent;
-    }
-    return entries.where((entry) => !entry.isDirectory).toList(growable: false);
   }
 
   @override

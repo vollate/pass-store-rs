@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
 import 'package:pars_gui/models/password_entry.dart';
@@ -5,6 +6,53 @@ import 'package:pars_gui/services/autofill_repository.dart';
 import 'package:pars_gui/services/security_repository.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('native publication never persists a session-only passphrase', () async {
+    const channel = MethodChannel('top.vollate.pars_gui/autofill');
+    final published = <Map<Object?, Object?>>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'publishState') {
+            published.add((call.arguments as Map).cast<Object?, Object?>());
+          }
+          return null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+    final security = InMemorySecurityRepository();
+    await security.startPgpSession(
+      fingerprint: 'ABC',
+      passphrase: 'session-only',
+    );
+    final repository = BridgeAutofillRepository(
+      bridge: _RecordingAutofillBridge(),
+      configPath: '/tmp/pars.toml',
+      indexPath: '/tmp/autofill.json',
+      storeId: 'store-0',
+      storeName: 'Personal',
+      storeRoot: '/tmp/store',
+      securityRepository: security,
+      forcePlatformPublication: true,
+    );
+
+    await repository.publishPlatformState();
+    expect(published.last['passphrase'], isNull);
+
+    await security.savePgpPassphrase(
+      fingerprint: 'ABC',
+      passphrase: 'explicitly-remembered',
+    );
+    await repository.publishPlatformState();
+    expect(published.last['passphrase'], 'explicitly-remembered');
+
+    await security.clearPgpPassphrase();
+    await repository.publishPlatformState();
+    expect(published.last['passphrase'], isNull);
+  });
+
   test('path rebuild sends ranking metadata without secret inputs', () async {
     final bridge = _RecordingAutofillBridge();
     final securityRepository = InMemorySecurityRepository();

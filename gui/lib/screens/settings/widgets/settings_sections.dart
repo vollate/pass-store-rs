@@ -32,8 +32,8 @@ class _SettingsSection extends StatelessWidget {
           Text(
             title.toUpperCase(),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: const Color(0xFF64748B),
-              letterSpacing: 0,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              letterSpacing: 0.4,
               fontWeight: FontWeight.w700,
             ),
           ),

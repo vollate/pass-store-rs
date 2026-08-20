@@ -80,6 +80,8 @@ enum ParsAutofillSharedState {
         try FileManager.default.removeItem(at: sharedIndexURL)
       }
       try FileManager.default.copyItem(at: sourceIndexURL, to: sharedIndexURL)
+    } else if FileManager.default.fileExists(atPath: sharedIndexURL.path) {
+      try FileManager.default.removeItem(at: sharedIndexURL)
     }
 
     let state = ParsAutofillStoredState(
@@ -137,7 +139,9 @@ enum ParsAutofillSharedState {
 
   static func syncCredentialIdentities(completion: ((Bool) -> Void)? = nil) {
     guard let index = loadIndex() else {
-      completion?(false)
+      ASCredentialIdentityStore.shared.removeAllCredentialIdentities { success, _ in
+        completion?(success)
+      }
       return
     }
     var seen = Set<String>()

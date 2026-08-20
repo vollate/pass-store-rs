@@ -20,13 +20,14 @@ object ParsAutofillRequestParser {
         structure: AssistStructure,
     ): ParsedAutofillRequest? {
         var website: String? = null
-        var usernameId: AutofillId? = null
-        var passwordId: AutofillId? = null
+        val fields = mutableListOf<AutofillFieldCandidate<AutofillId>>()
         val queryParts = mutableListOf<String>()
+        var traversalIndex = 0
 
         for (index in 0 until structure.windowNodeCount) {
             val root = structure.getWindowNodeAt(index).rootViewNode
             visit(root) { node ->
+                val nodeIndex = traversalIndex++
                 if (website == null) {
                     website = node.webDomain?.ifBlank { null }
                 }
@@ -35,9 +36,18 @@ object ParsAutofillRequestParser {
                     return@visit
                 }
                 val role = roleFor(node)
-                when {
-                    role == FieldRole.Password && passwordId == null -> passwordId = autofillId
-                    role == FieldRole.Username && usernameId == null -> usernameId = autofillId
+                if (role != FieldRole.Unknown) {
+                    fields +=
+                        AutofillFieldCandidate(
+                            value = autofillId,
+                            role = role,
+                            traversalIndex = nodeIndex,
+                            focused = node.isFocused,
+                            visible =
+                                node.visibility == View.VISIBLE &&
+                                    node.width > 0 &&
+                                    node.height > 0,
+                        )
                 }
                 node.idEntry?.let(queryParts::add)
                 node.hint?.toString()?.let(queryParts::add)
@@ -45,7 +55,8 @@ object ParsAutofillRequestParser {
             }
         }
 
-        if (passwordId == null && usernameId == null) {
+        val selectedFields = selectAutofillFields(fields)
+        if (selectedFields.password == null && selectedFields.username == null) {
             return null
         }
         return ParsedAutofillRequest(
@@ -55,8 +66,8 @@ object ParsAutofillRequestParser {
             ),
             website = website,
             query = queryParts.joinToString(" ").takeIf { it.isNotBlank() },
-            usernameId = usernameId,
-            passwordId = passwordId,
+            usernameId = selectedFields.username,
+            passwordId = selectedFields.password,
         )
     }
 
@@ -68,6 +79,62 @@ object ParsAutofillRequestParser {
         for (index in 0 until node.childCount) {
             visit(node.getChildAt(index), block)
         }
+    }
+
+    internal data class AutofillFieldCandidate<T>(
+        val value: T,
+        val role: FieldRole,
+        val traversalIndex: Int,
+        val focused: Boolean,
+        val visible: Boolean,
+    )
+
+    internal data class AutofillFieldSelection<T>(
+        val username: T?,
+        val password: T?,
+    )
+
+    internal fun <T> selectAutofillFields(
+        candidates: List<AutofillFieldCandidate<T>>,
+    ): AutofillFieldSelection<T> {
+        val visible = candidates.filter { it.visible }
+        val pool = visible.ifEmpty { candidates }
+        val focused = pool.lastOrNull { it.focused }
+        if (focused != null) {
+            val companionRole =
+                if (focused.role == FieldRole.Username) FieldRole.Password else FieldRole.Username
+            val companion =
+                pool.filter { it.role == companionRole }
+                    .minWithOrNull(
+                        compareBy<AutofillFieldCandidate<T>> {
+                            kotlin.math.abs(it.traversalIndex - focused.traversalIndex)
+                        }.thenByDescending { it.traversalIndex },
+                    )
+            return if (focused.role == FieldRole.Username) {
+                AutofillFieldSelection(focused.value, companion?.value)
+            } else {
+                AutofillFieldSelection(companion?.value, focused.value)
+            }
+        }
+
+        val usernames = pool.filter { it.role == FieldRole.Username }
+        val passwords = pool.filter { it.role == FieldRole.Password }
+        if (usernames.isNotEmpty() && passwords.isNotEmpty()) {
+            val pair =
+                usernames.flatMap { username -> passwords.map { password -> username to password } }
+                    .minWithOrNull(
+                        compareBy<Pair<AutofillFieldCandidate<T>, AutofillFieldCandidate<T>>> {
+                            kotlin.math.abs(it.first.traversalIndex - it.second.traversalIndex)
+                        }.thenByDescending {
+                            maxOf(it.first.traversalIndex, it.second.traversalIndex)
+                        },
+                    )!!
+            return AutofillFieldSelection(pair.first.value, pair.second.value)
+        }
+        return AutofillFieldSelection(
+            username = usernames.lastOrNull()?.value,
+            password = passwords.lastOrNull()?.value,
+        )
     }
 
     private fun roleFor(node: AssistStructure.ViewNode): FieldRole {
@@ -109,7 +176,7 @@ object ParsAutofillRequestParser {
         }
     }
 
-    private enum class FieldRole {
+    internal enum class FieldRole {
         Username,
         Password,
         Unknown,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../app/pars_design_tokens.dart';
+
 class AppSection extends StatelessWidget {
   const AppSection({
     super.key,
@@ -23,8 +25,8 @@ class AppSection extends StatelessWidget {
             Text(
               title.toUpperCase(),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: const Color(0xFF64748B),
-                letterSpacing: 0,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                letterSpacing: 0.4,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -37,7 +39,11 @@ class AppSection extends StatelessWidget {
                 ),
               )
             else
-              ...children,
+              for (var index = 0; index < children.length; index++) ...<Widget>[
+                children[index],
+                if (index != children.length - 1)
+                  const SizedBox(height: ParsSpacing.xs),
+              ],
           ],
         ),
       ),

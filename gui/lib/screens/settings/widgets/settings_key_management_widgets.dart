@@ -2,13 +2,12 @@ part of '../settings_screen.dart';
 
 extension _SettingsScreenKeyManagementSheets on SettingsScreen {
   void _showKeys(BuildContext context, KeyRecordType type) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveDetail<void>(
       context: context,
-      isScrollControlled: true,
       builder:
           (context) => StatefulBuilder(
             builder: (context, setSheetState) {
-              final localizations = AppLocalizations.of(context);
+              final localizations = context.l10n;
               final keys = keyRepository.keys
                   .where((key) => key.type == type)
                   .toList(growable: false);
@@ -21,7 +20,9 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          type == KeyRecordType.pgp ? 'PGP keys' : 'SSH keys',
+                          type == KeyRecordType.pgp
+                              ? localizations.pgpKeysTitle
+                              : localizations.sshKeysTitle,
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
@@ -32,10 +33,10 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                             leading: const Icon(Icons.key_off_outlined),
                             title: Text(
                               type == KeyRecordType.pgp
-                                  ? 'No PGP keys'
-                                  : 'No SSH keys',
+                                  ? localizations.noPgpKeys
+                                  : localizations.noSshKeys,
                             ),
-                            subtitle: const Text('Create or import a key.'),
+                            subtitle: Text(localizations.createOrImportKey),
                           ),
                         for (final key in keys)
                           Card(
@@ -53,8 +54,13 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                               trailing:
                                   key.hasLocalKeyMaterial
                                       ? PopupMenuButton<String>(
-                                        tooltip:
-                                            'Actions for ${key.typeLabel} key ${key.name}',
+                                        tooltip: localizations
+                                            .keyActionsTooltip(
+                                              key.type == KeyRecordType.pgp
+                                                  ? localizations.pgpStep
+                                                  : localizations.sshStep,
+                                              key.name,
+                                            ),
                                         onSelected: (value) {
                                           switch (value) {
                                             case 'export_public':
@@ -95,12 +101,12 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                             FilledButton(
                               onPressed:
                                   () => _showCreateKeyForm(context, type),
-                              child: const Text('Create'),
+                              child: Text(localizations.create),
                             ),
                             OutlinedButton(
                               onPressed:
                                   () => _showImportKeyOptions(context, type),
-                              child: const Text('Import'),
+                              child: Text(localizations.importAction),
                             ),
                           ],
                         ),
@@ -118,20 +124,20 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     BuildContext context,
     KeyRecordType type,
   ) {
-    final localizations = AppLocalizations.of(context);
+    final localizations = context.l10n;
     return <PopupMenuEntry<String>>[
-      const PopupMenuItem<String>(
+      PopupMenuItem<String>(
         value: 'export_public',
-        child: Text('Export public'),
+        child: Text(localizations.exportPublic),
       ),
-      const PopupMenuItem<String>(
+      PopupMenuItem<String>(
         value: 'export_private',
-        child: Text('Export private'),
+        child: Text(localizations.exportPrivate),
       ),
       if (type == KeyRecordType.pgp)
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'add_to_store',
-          child: Text('Add to .gpg-id'),
+          child: Text(localizations.addToGpgId),
         ),
       const PopupMenuDivider(),
       PopupMenuItem<String>(
@@ -157,7 +163,13 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
               final localizations = AppLocalizations.of(dialogContext);
               return AlertDialog(
                 scrollable: true,
-                title: Text(localizations.deleteKeyTitle(key.typeLabel)),
+                title: Text(
+                  localizations.deleteKeyTitle(
+                    key.type == KeyRecordType.pgp
+                        ? localizations.pgpStep
+                        : localizations.sshStep,
+                  ),
+                ),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -230,7 +242,10 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                                 AppNotification.show(
                                   sheetContext,
                                   localizations.keyDeleteFailed(
-                                    error.toString(),
+                                    UiProblem.fromError(
+                                      sheetContext.l10n,
+                                      error,
+                                    ).summary,
                                   ),
                                 );
                               }
@@ -254,32 +269,40 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       builder:
           (context) => AlertDialog(
             title: Text(
-              type == KeyRecordType.pgp ? 'Create PGP key' : 'Create SSH key',
+              type == KeyRecordType.pgp
+                  ? context.l10n.createPgpKey
+                  : context.l10n.createSshKey,
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 TextField(
                   controller: name,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: InputDecoration(
+                    labelText: context.l10n.nameField,
+                  ),
                 ),
                 if (type == KeyRecordType.pgp)
                   TextField(
                     controller: email,
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    decoration: InputDecoration(
+                      labelText: context.l10n.emailField,
+                    ),
                   ),
                 if (type == KeyRecordType.pgp)
                   TextField(
                     controller: passphrase,
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Passphrase'),
+                    decoration: InputDecoration(
+                      labelText: context.l10n.passphraseField,
+                    ),
                   ),
               ],
             ),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(context.l10n.cancel),
               ),
               FilledButton(
                 onPressed:
@@ -299,7 +322,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                         passphrase.clear();
                       }
                     }),
-                child: const Text('Create'),
+                child: Text(context.l10n.create),
               ),
             ],
           ),
@@ -335,7 +358,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      'Import PGP key',
+                      context.l10n.importPgpKey,
                       style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -356,7 +379,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                         if (!sheetContext.mounted) return;
                         AppNotification.show(
                           sheetContext,
-                          _importNotification(completion),
+                          _importNotification(context.l10n, completion),
                         );
                       },
                     ),
@@ -374,21 +397,21 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       context: context,
       builder:
           (dialogContext) => AlertDialog(
-            title: const Text('Import SSH key'),
+            title: Text(dialogContext.l10n.importSshKey),
             actions: <Widget>[
               TextButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
                   _showImportKeyForm(sheetContext, KeyRecordType.ssh);
                 },
-                child: const Text('Text'),
+                child: Text(dialogContext.l10n.textSource),
               ),
               FilledButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
                   _showImportKeyFileForm(sheetContext, KeyRecordType.ssh);
                 },
-                child: const Text('File'),
+                child: Text(dialogContext.l10n.fileSource),
               ),
             ],
           ),
@@ -403,26 +426,30 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Import SSH key'),
+            title: Text(context.l10n.importSshKey),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 TextField(
                   controller: name,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: InputDecoration(
+                    labelText: context.l10n.nameField,
+                  ),
                 ),
                 TextField(
                   controller: keyText,
                   minLines: 4,
                   maxLines: 8,
-                  decoration: const InputDecoration(labelText: 'Key text'),
+                  decoration: InputDecoration(
+                    labelText: context.l10n.keyTextField,
+                  ),
                 ),
               ],
             ),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(context.l10n.cancel),
               ),
               FilledButton(
                 onPressed:
@@ -436,7 +463,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                         keyText.clear();
                       }
                     }),
-                child: const Text('Import'),
+                child: Text(context.l10n.importAction),
               ),
             ],
           ),
@@ -458,7 +485,11 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       onSelected(path);
     } catch (error) {
       if (!context.mounted) return;
-      AppNotification.show(context, '$error');
+      AppNotification.show(
+        context,
+        UiProblem.fromError(context.l10n, error).summary,
+        severity: AppNotificationSeverity.error,
+      );
     }
   }
 
@@ -477,7 +508,11 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       onSelected(path);
     } catch (error) {
       if (!context.mounted) return;
-      AppNotification.show(context, '$error');
+      AppNotification.show(
+        context,
+        UiProblem.fromError(context.l10n, error).summary,
+        severity: AppNotificationSeverity.error,
+      );
     }
   }
 
@@ -512,17 +547,19 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
           (context) => StatefulBuilder(
             builder:
                 (context, setDialogState) => AlertDialog(
-                  title: const Text('Import SSH key file'),
+                  title: Text(context.l10n.importSshKeyFile),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       TextField(
                         controller: name,
-                        decoration: const InputDecoration(labelText: 'Name'),
+                        decoration: InputDecoration(
+                          labelText: context.l10n.nameField,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       PathPickerRow(
-                        title: 'Key file',
+                        title: context.l10n.keyFileField,
                         path: selectedPath ?? defaultPath,
                         isSelected: selectedPath != null,
                         onPressed:
@@ -540,7 +577,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                   actions: <Widget>[
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text(context.l10n.cancel),
                     ),
                     FilledButton(
                       onPressed:
@@ -553,7 +590,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                                   path: selectedPath!,
                                 ),
                               ),
-                      child: const Text('Import'),
+                      child: Text(context.l10n.importAction),
                     ),
                   ],
                 ),
@@ -570,7 +607,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
           (dialogContext) => StatefulBuilder(
             builder:
                 (dialogContext, setDialogState) => AlertDialog(
-                  title: const Text('Export private key'),
+                  title: Text(dialogContext.l10n.exportPrivateKey),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -580,16 +617,20 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                         style: Theme.of(dialogContext).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
-                      Text('Fingerprint: ${key.fingerprint}'),
+                      Text(
+                        dialogContext.l10n.fingerprintValue(key.fingerprint),
+                      ),
                       const SizedBox(height: 12),
                       Text(
-                        'Private key export is sensitive. Type $requiredText to export.',
+                        dialogContext.l10n.privateExportSensitive(requiredText),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: confirmation,
                         decoration: InputDecoration(
-                          labelText: 'Type $requiredText to confirm',
+                          labelText: dialogContext.l10n.typeToConfirm(
+                            requiredText,
+                          ),
                         ),
                         onChanged: (_) => setDialogState(() {}),
                       ),
@@ -598,7 +639,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                   actions: <Widget>[
                     TextButton(
                       onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('Cancel'),
+                      child: Text(dialogContext.l10n.cancel),
                     ),
                     FilledButton(
                       onPressed:
@@ -620,7 +661,7 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                                 );
                               }
                               : null,
-                      child: const Text('Export'),
+                      child: Text(dialogContext.l10n.exportAction),
                     ),
                   ],
                 ),
@@ -639,7 +680,11 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       AppNotification.show(context, key.name);
     } catch (error) {
       if (!context.mounted) return;
-      AppNotification.show(context, error.toString());
+      AppNotification.show(
+        context,
+        UiProblem.fromError(context.l10n, error).summary,
+        severity: AppNotificationSeverity.error,
+      );
     }
   }
 
@@ -664,19 +709,23 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
         context: context,
         builder:
             (context) => AlertDialog(
-              title: const Text('Exported key'),
+              title: Text(context.l10n.exportedKey),
               content: SelectableText(text),
               actions: <Widget>[
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
+                  child: Text(context.l10n.close),
                 ),
               ],
             ),
       );
     } catch (error) {
       if (!context.mounted) return;
-      AppNotification.show(context, error.toString());
+      AppNotification.show(
+        context,
+        UiProblem.fromError(context.l10n, error).summary,
+        severity: AppNotificationSeverity.error,
+      );
     }
   }
 
@@ -687,7 +736,11 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
       AppNotification.show(context, key.fingerprint);
     } catch (error) {
       if (!context.mounted) return;
-      AppNotification.show(context, error.toString());
+      AppNotification.show(
+        context,
+        UiProblem.fromError(context.l10n, error).summary,
+        severity: AppNotificationSeverity.error,
+      );
     }
   }
 }
@@ -711,12 +764,15 @@ String _keyDeletionConfirmationLabel(KeyRecord key) {
 /// Reports the canonical imported key, and any secure-storage failure.
 ///
 /// Never includes the passphrase.
-String _importNotification(PgpImportCompletion completion) {
+String _importNotification(
+  AppLocalizations localizations,
+  PgpImportCompletion completion,
+) {
   final label = _keyConfirmationLabel(completion.key);
   if (completion.rememberFailed) {
-    return 'Imported $label, but remembering the passphrase failed.';
+    return localizations.importedKeyRememberFailed(label);
   }
-  return 'Imported $label';
+  return localizations.importedKey(label);
 }
 
 String _privateKeyExportPhrase(KeyRecord key) {

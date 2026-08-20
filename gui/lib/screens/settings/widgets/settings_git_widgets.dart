@@ -4,13 +4,12 @@ extension _SettingsScreenGitSheets on SettingsScreen {
   void _showGitSync(BuildContext context) {
     final git = _gitOperations;
     if (git == null) {
-      _showUnavailableSheet(context, 'Git sync and remotes');
+      _showUnavailableSheet(context, context.l10n.gitSyncTitle);
       return;
     }
 
-    showModalBottomSheet<void>(
+    showParsAdaptiveDetail<void>(
       context: context,
-      isScrollControlled: true,
       builder:
           (context) => _GitSyncSheetBody(
             git: git,
@@ -22,9 +21,8 @@ extension _SettingsScreenGitSheets on SettingsScreen {
   }
 
   void _showGitArgs(BuildContext context) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveDetail<void>(
       context: context,
-      isScrollControlled: true,
       builder:
           (context) => _GitArgsSheetBody(
             git: _gitOperations,
@@ -61,7 +59,8 @@ class _GitSyncSheetBody extends StatefulWidget {
 }
 
 class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
-  var _message = 'Update password store';
+  var _message = '';
+  var _messageInitialized = false;
   var _remoteName = 'origin';
   var _remoteUrl = '';
   var _deleteConfirmation = '';
@@ -70,6 +69,15 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
   GitOperationResult? _output;
   List<GitRemote> _remotes = const <GitRemote>[];
   String? _errorText;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_messageInitialized) {
+      _message = context.l10n.updatePasswordStore;
+      _messageInitialized = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +95,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                'Git sync and remotes',
+                context.l10n.gitSyncTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -105,29 +113,31 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                             ? null
                             : () => _run(widget.git.refreshGitStatus),
                     icon: const Icon(Icons.info_outline),
-                    label: const Text('Status'),
+                    label: Text(context.l10n.status),
                   ),
                   OutlinedButton.icon(
                     onPressed: _running ? null : () => _run(widget.git.pull),
                     icon: const Icon(Icons.download_outlined),
-                    label: const Text('Pull'),
+                    label: Text(context.l10n.pull),
                   ),
                   OutlinedButton.icon(
                     onPressed: _running ? null : () => _run(widget.git.push),
                     icon: const Icon(Icons.upload_outlined),
-                    label: const Text('Push'),
+                    label: Text(context.l10n.push),
                   ),
                   OutlinedButton.icon(
                     onPressed:
                         _running ? null : () => _run(widget.git.recoverByPull),
                     icon: const Icon(Icons.healing_outlined),
-                    label: const Text('Recover pull'),
+                    label: Text(context.l10n.recoverPull),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               TextField(
-                decoration: const InputDecoration(labelText: 'Commit message'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.commitMessageField,
+                ),
                 onChanged: (value) => _message = value,
               ),
               CheckboxListTile(
@@ -138,7 +148,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                         ? null
                         : (value) =>
                             setState(() => _pushAfterCommit = value ?? false),
-                title: const Text('Push after commit'),
+                title: Text(context.l10n.pushAfterCommit),
               ),
               const SizedBox(height: 8),
               FilledButton.icon(
@@ -154,7 +164,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                           return widget.combineGitOutput(commit, push);
                         }),
                 icon: const Icon(Icons.add_task_outlined),
-                label: const Text('Commit'),
+                label: Text(context.l10n.commit),
               ),
               const Divider(height: 28),
               _RemoteList(remotes: _remotes),
@@ -165,18 +175,22 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                   OutlinedButton.icon(
                     onPressed: _running ? null : _refreshRemotes,
                     icon: const Icon(Icons.list_alt_outlined),
-                    label: const Text('List remotes'),
+                    label: Text(context.l10n.listRemotes),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               TextField(
-                decoration: const InputDecoration(labelText: 'Remote name'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.remoteNameField,
+                ),
                 onChanged: (value) => _remoteName = value,
               ),
               const SizedBox(height: 8),
               TextField(
-                decoration: const InputDecoration(labelText: 'Remote URL'),
+                decoration: InputDecoration(
+                  labelText: context.l10n.remoteUrlField,
+                ),
                 onChanged: (value) => _remoteUrl = value,
               ),
               const SizedBox(height: 8),
@@ -194,7 +208,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                                 url: _remoteUrl,
                               ),
                             ),
-                    child: const Text('Add remote'),
+                    child: Text(context.l10n.addRemote),
                   ),
                   OutlinedButton(
                     onPressed:
@@ -206,7 +220,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                                 url: _remoteUrl,
                               ),
                             ),
-                    child: const Text('Update remote'),
+                    child: Text(context.l10n.updateRemote),
                   ),
                   OutlinedButton(
                     onPressed:
@@ -215,23 +229,27 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                             : () => _run(
                               () => widget.git.removeRemote(_remoteName),
                             ),
-                    child: const Text('Remove remote'),
+                    child: Text(context.l10n.removeRemote),
                   ),
                 ],
               ),
               const Divider(height: 28),
               Text(
                 widget.deleteConfirmationLabel.isEmpty
-                    ? 'Select a store before deleting the local repo.'
-                    : 'Type ${widget.deleteConfirmationLabel} to delete the local repo.',
+                    ? context.l10n.selectStoreBeforeDelete
+                    : context.l10n.typeToConfirm(
+                      widget.deleteConfirmationLabel,
+                    ),
               ),
               const SizedBox(height: 8),
               TextField(
                 decoration: InputDecoration(
                   labelText:
                       widget.deleteConfirmationLabel.isEmpty
-                          ? 'Delete confirmation'
-                          : 'Type ${widget.deleteConfirmationLabel} to confirm',
+                          ? context.l10n.confirmation
+                          : context.l10n.typeToConfirm(
+                            widget.deleteConfirmationLabel,
+                          ),
                 ),
                 onChanged:
                     (value) => setState(() => _deleteConfirmation = value),
@@ -250,7 +268,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                           ),
                         ),
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Delete local repo'),
+                label: Text(context.l10n.deleteLocalRepo),
               ),
               if (_running) ...const <Widget>[
                 SizedBox(height: 12),
@@ -282,7 +300,9 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
       }
     } catch (error) {
       if (mounted) {
-        setState(() => _errorText = error.toString());
+        setState(
+          () => _errorText = UiProblem.fromError(context.l10n, error).summary,
+        );
       }
     }
   }
@@ -303,7 +323,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _errorText = error.toString();
+          _errorText = UiProblem.fromError(context.l10n, error).summary;
           _running = false;
         });
       }
@@ -343,15 +363,13 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                'Advanced git args',
+                context.l10n.advancedGitArgsTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Only enter arguments after git. Shell syntax is not accepted.',
-              ),
+              Text(context.l10n.gitArgsOnlyDescription),
               const SizedBox(height: 12),
               Row(
                 children: <Widget>[
@@ -379,9 +397,9 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: _running ? null : _run,
-                child: const SizedBox(
+                child: SizedBox(
                   width: double.infinity,
-                  child: Center(child: Text('Run selected command')),
+                  child: Center(child: Text(context.l10n.runSelectedCommand)),
                 ),
               ),
               if (_running) ...const <Widget>[
@@ -409,11 +427,11 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
   Future<void> _run() async {
     final git = widget.git;
     if (git == null) {
-      setState(() => _errorText = 'Git operations are not available.');
+      setState(() => _errorText = context.l10n.gitOperationsUnavailable);
       return;
     }
     if (_argsText.trim().isEmpty) {
-      setState(() => _errorText = 'Enter at least one Git argument.');
+      setState(() => _errorText = context.l10n.gitArgumentRequired);
       return;
     }
     setState(() {
@@ -431,7 +449,7 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _errorText = error.toString();
+          _errorText = UiProblem.fromError(context.l10n, error).summary;
           _running = false;
         });
       }
@@ -488,21 +506,25 @@ class _GitOutputPanel extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
-            Text('Exit: ${output.exitCode ?? 'signal'}'),
-            Text(output.success ? 'Success' : 'Failed'),
+            Text(
+              context.l10n.exitCodeValue(
+                output.exitCode?.toString() ?? 'signal',
+              ),
+            ),
+            Text(output.success ? context.l10n.success : context.l10n.failed),
             if (output.stdout.trim().isNotEmpty) ...<Widget>[
               const SizedBox(height: 8),
-              const Text(
-                'stdout',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Text(
+                context.l10n.standardOutput,
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               SelectableText(output.stdout),
             ],
             if (output.stderr.trim().isNotEmpty) ...<Widget>[
               const SizedBox(height: 8),
-              const Text(
-                'stderr',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Text(
+                context.l10n.standardError,
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               SelectableText(output.stderr),
             ],

@@ -1,18 +1,20 @@
-import 'dart:async';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../models/pgp_key_import.dart';
-import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n.dart';
 import '../../services/key_repository.dart';
 import '../../services/security_repository.dart';
+import '../../services/sensitive_clipboard_service.dart';
+import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
+
+enum _EntryDetailMenuAction { edit, move, rename, qr, regenerate, delete }
 
 class EntryDetailSheet extends StatefulWidget {
   const EntryDetailSheet({
@@ -21,11 +23,15 @@ class EntryDetailSheet extends StatefulWidget {
     required this.repository,
     this.keyRepository,
     this.securityRepository,
+    this.clipboardService,
+    this.privacyEvents,
     this.onSecretCleared,
     this.copyText,
     this.onOpenUri,
     this.onFavoriteChanged,
     this.onEdit,
+    this.onMove,
+    this.onRename,
     this.onRegenerate,
     this.onDelete,
     this.onChooseKey,
@@ -38,11 +44,15 @@ class EntryDetailSheet extends StatefulWidget {
   final VaultRepository repository;
   final KeyRepository? keyRepository;
   final SecurityRepository? securityRepository;
+  final SensitiveClipboardService? clipboardService;
+  final ValueListenable<int>? privacyEvents;
   final VoidCallback? onSecretCleared;
   final Future<void> Function(String text)? copyText;
   final Future<void> Function(Uri uri)? onOpenUri;
   final VoidCallback? onFavoriteChanged;
   final VoidCallback? onEdit;
+  final VoidCallback? onMove;
+  final VoidCallback? onRename;
   final VoidCallback? onRegenerate;
   final VoidCallback? onDelete;
   final VoidCallback? onChooseKey;
@@ -64,18 +74,34 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
   SecretContent? _content;
   String? _loadError;
   String? _passphraseError;
-  Timer? _clipboardClearTimer;
+  late final SensitiveClipboardService _clipboardService;
+  late final bool _ownsClipboardService;
 
   @override
   void initState() {
     super.initState();
     _isFavorite = widget.entry.isFavorite;
+    _ownsClipboardService = widget.clipboardService == null;
+    widget.privacyEvents?.addListener(_handlePrivacyEvent);
+    _clipboardService =
+        widget.clipboardService ??
+        SensitiveClipboardService(
+          platform:
+              widget.copyText == null
+                  ? const SystemSensitiveClipboardPlatform()
+                  : CallbackSensitiveClipboardPlatform(widget.copyText!),
+          clearDelay: widget.clipboardClearDelay,
+        );
     _prepareSecretLoad();
   }
 
   @override
   void didUpdateWidget(covariant EntryDetailSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.privacyEvents != widget.privacyEvents) {
+      oldWidget.privacyEvents?.removeListener(_handlePrivacyEvent);
+      widget.privacyEvents?.addListener(_handlePrivacyEvent);
+    }
     if (oldWidget.entry.path != widget.entry.path ||
         oldWidget.repository != widget.repository) {
       _clearSecret();
@@ -86,7 +112,8 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
 
   @override
   void dispose() {
-    _clipboardClearTimer?.cancel();
+    widget.privacyEvents?.removeListener(_handlePrivacyEvent);
+    if (_ownsClipboardService) _clipboardService.dispose();
     _clearSecret();
     _passphraseController.dispose();
     super.dispose();
@@ -94,73 +121,79 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      key: const ValueKey<String>('entry-detail-sheet'),
-      width: double.infinity,
-      child: _buildContent(context),
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final availableHeight = MediaQuery.sizeOf(context).height - keyboardInset;
+    final preferredHeight = (availableHeight * 0.78).clamp(0.0, 720.0);
+    final stableHeight =
+        availableHeight < 240
+            ? availableHeight
+            : preferredHeight.clamp(240.0, 720.0);
+    return AnimatedPadding(
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      child: SizedBox(
+        key: const ValueKey<String>('entry-detail-sheet'),
+        width: double.infinity,
+        height: stableHeight.toDouble(),
+        child: _buildContent(context),
+      ),
     );
   }
 
   Widget _buildContent(BuildContext context) {
+    final localizations = context.l10n;
     if (_needsPassphrase) {
-      final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-      return AnimatedPadding(
-        padding: EdgeInsets.only(bottom: keyboardInset),
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        child: SafeArea(
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                const Center(child: _SheetHandle()),
-                const SizedBox(height: 18),
-                Text(
-                  'PGP passphrase required',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+      return SafeArea(
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Center(child: _SheetHandle()),
+              const SizedBox(height: 18),
+              Text(
+                localizations.pgpPassphraseRequiredTitle,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(widget.entry.path),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passphraseController,
+                autofocus: true,
+                obscureText: true,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: localizations.pgpPassphraseLabel,
+                  errorText: _passphraseError,
                 ),
-                const SizedBox(height: 8),
-                Text(widget.entry.path),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _passphraseController,
-                  autofocus: true,
-                  obscureText: true,
-                  textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(
-                    labelText: 'PGP passphrase',
-                    errorText: _passphraseError,
-                  ),
-                  onSubmitted: (_) => _startPgpSession(),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _isPreparingKey ? null : _startPgpSession,
-                    icon:
-                        _isPreparingKey
-                            ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : const Icon(Icons.lock_open),
-                    label: Text(
+                onSubmitted: (_) => _startPgpSession(),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _isPreparingKey ? null : _startPgpSession,
+                  icon:
                       _isPreparingKey
-                          ? AppLocalizations.of(
-                            context,
-                          ).pgpPreparationInProgress
-                          : 'Unlock entry',
-                    ),
+                          ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Icon(Icons.lock_open),
+                  label: Text(
+                    _isPreparingKey
+                        ? context.l10n.pgpPreparationInProgress
+                        : localizations.unlockEntry,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
@@ -194,7 +227,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
               const Center(child: _SheetHandle()),
               const SizedBox(height: 18),
               Text(
-                'Could not decrypt entry',
+                localizations.decryptEntryFailedTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -214,21 +247,21 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                   FilledButton.icon(
                     onPressed: _loadSecret,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
+                    label: Text(localizations.retry),
                   ),
                   OutlinedButton.icon(
                     onPressed:
                         widget.onChooseKey ??
-                        () => _showMessage('Open key import from Settings'),
+                        () => _showMessage(localizations.openKeyImportHint),
                     icon: const Icon(Icons.key_outlined),
-                    label: const Text('Choose/import key'),
+                    label: Text(localizations.chooseImportKey),
                   ),
                   OutlinedButton.icon(
                     onPressed:
                         widget.onOpenKeyManagement ??
-                        () => _showMessage('Open Settings > PGP keys'),
+                        () => _showMessage(localizations.openPgpKeysHint),
                     icon: const Icon(Icons.settings_outlined),
-                    label: const Text('Open key management'),
+                    label: Text(localizations.openKeyManagement),
                   ),
                 ],
               ),
@@ -282,6 +315,22 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                       ],
                     ),
                   ),
+                  IconButton(
+                    tooltip:
+                        _isFavorite
+                            ? localizations.unfavorite
+                            : localizations.favorite,
+                    isSelected: _isFavorite,
+                    onPressed: _toggleFavorite,
+                    icon: const Icon(Icons.star_border_outlined),
+                    selectedIcon: const Icon(Icons.star),
+                  ),
+                  PopupMenuButton<_EntryDetailMenuAction>(
+                    tooltip: localizations.moreActions,
+                    onSelected:
+                        (action) => _handleMenuAction(action, content.password),
+                    itemBuilder: (context) => _secondaryMenuItems(context),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -306,7 +355,10 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                       ),
                       IconButton(
                         color: colorScheme.onSurfaceVariant,
-                        tooltip: _isRevealed ? 'Hide' : 'Reveal',
+                        tooltip:
+                            _isRevealed
+                                ? localizations.hide
+                                : localizations.reveal,
                         onPressed:
                             () => setState(() => _isRevealed = !_isRevealed),
                         icon: Icon(
@@ -327,52 +379,20 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                   FilledButton.icon(
                     onPressed: _copyPassword,
                     icon: const Icon(Icons.copy),
-                    label: const Text('Copy password'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => setState(() => _isRevealed = !_isRevealed),
-                    icon: const Icon(Icons.visibility_outlined),
-                    label: const Text('Reveal'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _toggleFavorite,
-                    icon: Icon(
-                      _isFavorite ? Icons.star : Icons.star_border_outlined,
-                    ),
-                    label: Text(_isFavorite ? 'Unfavorite' : 'Favorite'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onEdit,
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Edit'),
+                    label: Text(localizations.copyPassword),
                   ),
                   if (url != null)
                     OutlinedButton.icon(
                       onPressed: () => _openUrl(url),
                       icon: const Icon(Icons.open_in_new),
-                      label: const Text('Open URL'),
+                      label: Text(localizations.openUrl),
                     ),
-                  OutlinedButton.icon(
-                    onPressed: () => _showQrCode(content.password),
-                    icon: const Icon(Icons.qr_code_2),
-                    label: const Text('QR code'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onRegenerate,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Regenerate'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onDelete,
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Delete'),
-                  ),
                 ],
               ),
               if (content.fields.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 16),
                 Text(
-                  'Fields',
+                  localizations.fields,
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -386,14 +406,14 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                     subtitle: Text(field.value),
                     trailing: TextButton(
                       onPressed: () => _copyField(field),
-                      child: const Text('Copy'),
+                      child: Text(localizations.copy),
                     ),
                   ),
               ],
               if (content.rawNotes.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 16),
                 Text(
-                  'Raw notes',
+                  localizations.rawNotes,
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -406,6 +426,92 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
         ),
       ),
     );
+  }
+
+  List<PopupMenuEntry<_EntryDetailMenuAction>> _secondaryMenuItems(
+    BuildContext context,
+  ) {
+    final localizations = context.l10n;
+    return <PopupMenuEntry<_EntryDetailMenuAction>>[
+      if (widget.onEdit != null)
+        _menuItem(
+          value: _EntryDetailMenuAction.edit,
+          icon: Icons.edit_outlined,
+          label: localizations.edit,
+        ),
+      if (widget.onMove != null)
+        _menuItem(
+          value: _EntryDetailMenuAction.move,
+          icon: Icons.drive_file_move_outlined,
+          label: localizations.move,
+        ),
+      if (widget.onRename != null)
+        _menuItem(
+          value: _EntryDetailMenuAction.rename,
+          icon: Icons.drive_file_rename_outline,
+          label: localizations.rename,
+        ),
+      _menuItem(
+        value: _EntryDetailMenuAction.qr,
+        icon: Icons.qr_code_2,
+        label: localizations.qrCode,
+      ),
+      if (widget.onRegenerate != null)
+        _menuItem(
+          value: _EntryDetailMenuAction.regenerate,
+          icon: Icons.refresh,
+          label: localizations.regenerate,
+        ),
+      if (widget.onDelete != null) const PopupMenuDivider(),
+      if (widget.onDelete != null)
+        _menuItem(
+          value: _EntryDetailMenuAction.delete,
+          icon: Icons.delete_outline,
+          label: localizations.delete,
+          color: Theme.of(context).colorScheme.error,
+        ),
+    ];
+  }
+
+  PopupMenuItem<_EntryDetailMenuAction> _menuItem({
+    required _EntryDetailMenuAction value,
+    required IconData icon,
+    required String label,
+    Color? color,
+  }) {
+    return PopupMenuItem<_EntryDetailMenuAction>(
+      value: value,
+      child: Row(
+        children: <Widget>[
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Text(label, style: color == null ? null : TextStyle(color: color)),
+        ],
+      ),
+    );
+  }
+
+  void _handleMenuAction(_EntryDetailMenuAction action, String password) {
+    switch (action) {
+      case _EntryDetailMenuAction.edit:
+        widget.onEdit?.call();
+        break;
+      case _EntryDetailMenuAction.move:
+        widget.onMove?.call();
+        break;
+      case _EntryDetailMenuAction.rename:
+        widget.onRename?.call();
+        break;
+      case _EntryDetailMenuAction.qr:
+        _showQrCode(password);
+        break;
+      case _EntryDetailMenuAction.regenerate:
+        widget.onRegenerate?.call();
+        break;
+      case _EntryDetailMenuAction.delete:
+        widget.onDelete?.call();
+        break;
+    }
   }
 
   Future<void> _loadSecret() async {
@@ -431,7 +537,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
       _clearSecret();
       setState(() {
         _isLoading = false;
-        _loadError = error.toString();
+        _loadError = UiProblem.fromError(context.l10n, error).summary;
       });
     }
   }
@@ -456,7 +562,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
   Future<void> _startPgpSession() async {
     final passphrase = _passphraseController.text;
     if (passphrase.isEmpty) {
-      setState(() => _passphraseError = 'Enter a passphrase.');
+      setState(() => _passphraseError = context.l10n.enterPassphrase);
       return;
     }
     final securityRepository = widget.securityRepository;
@@ -465,7 +571,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     }
     final fingerprint = _primaryPrivatePgpFingerprint;
     if (fingerprint == null) {
-      setState(() => _passphraseError = 'Select or import a private PGP key.');
+      setState(() => _passphraseError = context.l10n.selectPrivatePgpKey);
       return;
     }
     setState(() {
@@ -502,7 +608,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     } catch (error) {
       _passphraseController.clear();
       if (!mounted) return;
-      final localizations = AppLocalizations.of(context);
+      final localizations = context.l10n;
       setState(() {
         _isPreparingKey = false;
         _passphraseError = switch (error) {
@@ -516,7 +622,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
             localizations.pgpUnsupportedProtection,
           PgpImportException(kind: PgpImportFailureKind.reprotectionFailed) =>
             localizations.pgpReprotectionFailed,
-          _ => error.toString(),
+          _ => UiProblem.fromError(context.l10n, error).summary,
         };
       });
     }
@@ -532,18 +638,20 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
   }
 
   Future<void> _copyPassword() async {
+    final localizations = context.l10n;
     try {
       final password = await widget.repository.copyEntryPassword(widget.entry);
       await _copyText(password);
-      _showMessage('Copied ${widget.entry.displayName} password');
-    } catch (error) {
-      _showMessage('Could not copy password: $error');
+      _showMessage(localizations.copiedEntryPassword(widget.entry.displayName));
+    } catch (_) {
+      _showMessage(localizations.couldNotCopyPassword);
     }
   }
 
   Future<void> _copyField(ParsedSecretField field) async {
+    final message = context.l10n.copiedField(field.label);
     await _copyText(field.value);
-    _showMessage('Copied ${field.label}');
+    _showMessage(message);
   }
 
   Future<void> _toggleFavorite() async {
@@ -574,13 +682,13 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                       children: <Widget>[
                         Expanded(
                           child: Text(
-                            'Password QR code',
+                            context.l10n.passwordQrCode,
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                         ),
                         IconButton(
-                          tooltip: 'Close QR code',
+                          tooltip: context.l10n.closeQrCode,
                           onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(Icons.close),
                         ),
@@ -602,19 +710,12 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     );
   }
 
-  Future<void> _copyText(String text) async {
-    final writer = widget.copyText ?? _copyToSystemClipboard;
-    await writer(text);
-    _clipboardClearTimer?.cancel();
-    if (widget.clipboardClearDelay <= Duration.zero) {
-      return;
-    }
-    _clipboardClearTimer = Timer(widget.clipboardClearDelay, () {
-      writer('');
-    });
+  Future<void> _copyText(String text) {
+    return _clipboardService.copySecret(text);
   }
 
   Future<void> _openUrl(Uri uri) async {
+    final failureMessage = context.l10n.couldNotOpenUrl;
     final opener = widget.onOpenUri;
     if (opener != null) {
       await opener(uri);
@@ -622,7 +723,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     }
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened) {
-      _showMessage('Could not open ${uri.toString()}');
+      _showMessage(failureMessage);
     }
   }
 
@@ -638,10 +739,6 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     return uri;
   }
 
-  Future<void> _copyToSystemClipboard(String text) {
-    return Clipboard.setData(ClipboardData(text: text));
-  }
-
   void _showMessage(String message) {
     if (!mounted) {
       return;
@@ -649,10 +746,17 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     AppNotification.show(context, message);
   }
 
+  void _handlePrivacyEvent() {
+    if (!mounted) return;
+    _clearSecret();
+    Navigator.of(context).maybePop();
+  }
+
   void _clearSecret() {
+    final hadSecret = _content != null;
     _isRevealed = false;
     _content = null;
-    widget.onSecretCleared?.call();
+    if (hadSecret) widget.onSecretCleared?.call();
   }
 }
 
@@ -665,7 +769,7 @@ class _SheetHandle extends StatelessWidget {
       width: 42,
       height: 4,
       decoration: BoxDecoration(
-        color: const Color(0xFFCBD5E1),
+        color: Theme.of(context).colorScheme.outlineVariant,
         borderRadius: BorderRadius.circular(999),
       ),
     );

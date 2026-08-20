@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../services/security_repository.dart';
 import '../../widgets/gesture_lock_input.dart';
 
@@ -38,62 +39,85 @@ class _LockScreenState extends State<LockScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const SizedBox(height: 24),
-              Text(
-                'Unlock Pars',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final widthBound = (constraints.maxWidth - 40).clamp(0.0, 320.0);
+            final heightBound = (constraints.maxHeight * 0.52).clamp(
+              160.0,
+              320.0,
+            );
+            final gridSize =
+                (widthBound < heightBound ? widthBound : heightBound)
+                    .toDouble();
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight:
+                      (constraints.maxHeight - 40)
+                          .clamp(0, double.infinity)
+                          .toDouble(),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text('Draw your gesture to open the local app session.'),
-              const Spacer(),
-              FutureBuilder<BiometricUnlockStatus>(
-                future: _biometricStatus,
-                builder: (context, snapshot) {
-                  if (snapshot.data != BiometricUnlockStatus.available) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: Center(
-                      child: FilledButton.icon(
-                        onPressed:
-                            _biometricUnlockInProgress
-                                ? null
-                                : _unlockWithBiometrics,
-                        icon: const Icon(Icons.fingerprint),
-                        label: const Text('Unlock with biometrics'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const SizedBox(height: 24),
+                    Text(
+                      context.l10n.unlockPars,
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(context.l10n.drawGestureToUnlock),
+                    const SizedBox(height: 28),
+                    FutureBuilder<BiometricUnlockStatus>(
+                      future: _biometricStatus,
+                      builder: (context, snapshot) {
+                        if (snapshot.data != BiometricUnlockStatus.available) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: Center(
+                            child: FilledButton.icon(
+                              onPressed:
+                                  _biometricUnlockInProgress
+                                      ? null
+                                      : _unlockWithBiometrics,
+                              icon: const Icon(Icons.fingerprint),
+                              label: Text(context.l10n.unlockWithBiometrics),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    Center(
+                      child: GestureLockInput(
+                        size: gridSize,
+                        onCompleted: (pattern) => _unlock(context, pattern),
                       ),
                     ),
-                  );
-                },
-              ),
-              Center(
-                child: GestureLockInput(
-                  onCompleted: (pattern) => _unlock(context, pattern),
+                    if (_error != null) ...<Widget>[
+                      const SizedBox(height: 16),
+                      Center(
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                  ],
                 ),
               ),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-              const Spacer(),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -105,7 +129,7 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
     if (!isValid) {
-      setState(() => _error = 'Gesture did not match');
+      setState(() => _error = context.l10n.gestureDidNotMatch);
       return;
     }
     await widget.securityRepository.markUnlocked(DateTime.now());
@@ -140,7 +164,7 @@ class _LockScreenState extends State<LockScreen> {
     }
     if (!unlocked) {
       setState(() {
-        _error = 'Biometric unlock failed';
+        _error = context.l10n.biometricUnlockFailed;
         _biometricUnlockInProgress = false;
       });
       return;

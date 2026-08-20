@@ -15,7 +15,7 @@ class _EntryPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<PasswordEntry>(
       initialValue: value,
-      decoration: const InputDecoration(labelText: 'Entry'),
+      decoration: InputDecoration(labelText: context.l10n.entryField),
       items: entries
           .map(
             (entry) => DropdownMenuItem<PasswordEntry>(
@@ -46,7 +46,7 @@ class _CommitCheckbox extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       value: enabled && value,
       onChanged: enabled ? onChanged : null,
-      title: const Text('Commit after operation'),
+      title: Text(context.l10n.commitAfterOperation),
     );
   }
 }
@@ -108,40 +108,6 @@ class _ErrorText extends StatelessWidget {
       child: Text(
         message,
         style: TextStyle(color: Theme.of(context).colorScheme.error),
-      ),
-    );
-  }
-}
-
-class _ManageActionCard extends StatelessWidget {
-  const _ManageActionCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-    this.isDanger = false,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool isDanger;
-
-  @override
-  Widget build(BuildContext context) {
-    final color =
-        isDanger
-            ? Theme.of(context).colorScheme.error
-            : Theme.of(context).colorScheme.primary;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: color),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }

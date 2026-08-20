@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
+import '../../l10n/operation_localizations.dart';
 import '../../models/password_entry.dart';
+import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
-import '../../widgets/app_notification.dart';
+import '../../widgets/pars_adaptive_surface.dart';
 
 part 'widgets/manage_operation_typedefs.dart';
 part 'widgets/manage_single_entry_widgets.dart';
@@ -15,22 +18,25 @@ Future<EntryOperationResult?> showFocusedEditEntrySheet({
   required PasswordEntry entry,
   required ManageRepository repository,
 }) {
-  return showModalBottomSheet<EntryOperationResult>(
+  return showParsAdaptiveDetail<EntryOperationResult>(
     context: context,
-    isScrollControlled: true,
     builder:
         (context) => _EditEntrySheet(
           entries: <PasswordEntry>[entry],
-          title: 'Edit entry',
+          title: context.l10n.editEntries,
           showEntryPicker: false,
           canCommit: true,
           onReadEntry: repository.readEntry,
           onSaveRawNotes: (entry, password, fields, notes, commit) async {
+            final localizations = context.l10n;
             final result = await repository.editEntry(
               path: entry.path,
               content: _entryContent(password, fields, notes),
             );
             return _commitEntryOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedEntryOperationSummary(localizations, result),
+              ),
               repository: repository,
               result: result,
               commit: commit,
@@ -38,11 +44,15 @@ Future<EntryOperationResult?> showFocusedEditEntrySheet({
             );
           },
           onReplacePassword: (entry, password, commit) async {
+            final localizations = context.l10n;
             final result = await repository.replaceEntryPassword(
               entry: entry,
               password: password,
             );
             return _commitEntryOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedEntryOperationSummary(localizations, result),
+              ),
               repository: repository,
               result: result,
               commit: commit,
@@ -58,22 +68,25 @@ Future<BatchOperationResult?> showFocusedRegenerateEntrySheet({
   required PasswordEntry entry,
   required ManageRepository repository,
 }) {
-  return showModalBottomSheet<BatchOperationResult>(
+  return showParsAdaptiveDetail<BatchOperationResult>(
     context: context,
-    isScrollControlled: true,
     builder:
         (context) => _BatchRegenerateSheet(
           entries: <PasswordEntry>[entry],
-          title: 'Regenerate entry',
-          submitLabel: 'Regenerate password',
+          title: context.l10n.regenerate,
+          submitLabel: context.l10n.regenerate,
           canCommit: true,
           onSubmit: (noSymbols, commit) async {
+            final localizations = context.l10n;
             final result = await repository.batchRegenerateEntries(
               entries: <PasswordEntry>[entry],
               length: 24,
               noSymbols: noSymbols,
             );
             return _commitBatchOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedBatchOperationSummary(localizations, result),
+              ),
               repository: repository,
               result: result,
               commit: commit,
@@ -89,20 +102,23 @@ Future<EntryOperationResult?> showFocusedDeleteEntrySheet({
   required PasswordEntry entry,
   required ManageRepository repository,
 }) {
-  return showModalBottomSheet<EntryOperationResult>(
+  return showParsAdaptiveDetail<EntryOperationResult>(
     context: context,
-    isScrollControlled: true,
     builder:
         (context) => _DeleteEntrySheet(
           entries: <PasswordEntry>[entry],
           showEntryPicker: false,
           canCommit: true,
           onSubmit: (entry, commit) async {
+            final localizations = context.l10n;
             final result = await repository.deleteEntry(
               path: entry.path,
               recursive: entry.isDirectory,
             );
             return _commitEntryOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedEntryOperationSummary(localizations, result),
+              ),
               repository: repository,
               result: result,
               commit: commit,
@@ -113,7 +129,240 @@ Future<EntryOperationResult?> showFocusedDeleteEntrySheet({
   );
 }
 
+Future<EntryOperationResult?> showCreateGeneratedEntrySurface({
+  required BuildContext context,
+  required ManageRepository repository,
+}) {
+  return showParsAdaptiveDetail<EntryOperationResult>(
+    context: context,
+    builder:
+        (context) => _GenerateEntrySheet(
+          canCommit: true,
+          onSubmit: (path, noSymbols, overwrite, commit) async {
+            final trimmedPath = path.trim();
+            final localizations = context.l10n;
+            final result = await repository.generateEntry(
+              path: trimmedPath,
+              length: 24,
+              noSymbols: noSymbols,
+              overwrite: overwrite,
+            );
+            return _commitEntryOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedEntryOperationSummary(localizations, result),
+              ),
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Generate password $trimmedPath',
+            );
+          },
+        ),
+  );
+}
+
+Future<EntryOperationResult?> showSaveExistingEntrySurface({
+  required BuildContext context,
+  required ManageRepository repository,
+}) {
+  return showParsAdaptiveDetail<EntryOperationResult>(
+    context: context,
+    builder:
+        (context) => _SaveExistingEntrySheet(
+          canCommit: true,
+          onSubmit: (path, password, notes, overwrite, commit) async {
+            final trimmedPath = path.trim();
+            final localizations = context.l10n;
+            final result = await repository.saveEntry(
+              path: trimmedPath,
+              content: _manualEntryContent(password, notes),
+              overwrite: overwrite,
+            );
+            return _commitEntryOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedEntryOperationSummary(localizations, result),
+              ),
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Save password $trimmedPath',
+            );
+          },
+        ),
+  );
+}
+
+Future<EntryOperationResult?> showFocusedMoveOrRenameEntrySurface({
+  required BuildContext context,
+  required PasswordEntry entry,
+  required ManageRepository repository,
+  required bool rename,
+}) {
+  return showParsAdaptiveDetail<EntryOperationResult>(
+    context: context,
+    builder:
+        (context) => _MoveOrRenameEntrySheet(
+          entries: <PasswordEntry>[entry],
+          rename: rename,
+          canCommit: true,
+          onSubmit: (selected, target, overwrite, commit) async {
+            final toPath =
+                rename
+                    ? target.trim()
+                    : _joinEntryPath(target, _basename(selected.path));
+            final localizations = context.l10n;
+            final result = await repository.moveEntry(
+              fromPath: selected.path,
+              toPath: toPath,
+              overwrite: overwrite,
+            );
+            final mutationResult = result.copyWith(
+              action: rename ? 'Renamed' : 'Moved',
+            );
+            return _commitEntryOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedEntryOperationSummary(localizations, mutationResult),
+              ),
+              repository: repository,
+              result: mutationResult,
+              commit: commit,
+              message:
+                  '${rename ? 'Rename' : 'Move'} password ${selected.path}',
+            );
+          },
+        ),
+  );
+}
+
+Future<BatchOperationResult?> showBatchMoveEntriesSurface({
+  required BuildContext context,
+  required List<PasswordEntry> entries,
+  required ManageRepository repository,
+}) {
+  return showParsAdaptiveDetail<BatchOperationResult>(
+    context: context,
+    builder:
+        (context) => _BatchMoveSheet(
+          entries: entries,
+          canCommit: true,
+          onSubmit: (destination, overwrite, commit) async {
+            final localizations = context.l10n;
+            final result = await repository.batchMoveEntries(
+              entries: entries,
+              destinationDirectory: destination,
+              overwrite: overwrite,
+            );
+            return _commitBatchOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedBatchOperationSummary(localizations, result),
+              ),
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Move ${entries.length} passwords',
+            );
+          },
+        ),
+  );
+}
+
+Future<BatchOperationResult?> showBatchRenameEntriesSurface({
+  required BuildContext context,
+  required List<PasswordEntry> entries,
+  required ManageRepository repository,
+}) {
+  return showParsAdaptiveDetail<BatchOperationResult>(
+    context: context,
+    builder:
+        (context) => _BatchRenameSheet(
+          entries: entries,
+          canCommit: true,
+          onSubmit: (prefix, suffix, overwrite, commit) async {
+            final localizations = context.l10n;
+            final result = await repository.batchRenameEntries(
+              entries: entries,
+              prefix: prefix,
+              suffix: suffix,
+              overwrite: overwrite,
+            );
+            return _commitBatchOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedBatchOperationSummary(localizations, result),
+              ),
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Rename ${entries.length} passwords',
+            );
+          },
+        ),
+  );
+}
+
+Future<BatchOperationResult?> showBatchDeleteEntriesSurface({
+  required BuildContext context,
+  required List<PasswordEntry> entries,
+  required ManageRepository repository,
+}) {
+  return showParsAdaptiveDetail<BatchOperationResult>(
+    context: context,
+    builder:
+        (context) => _BatchDeleteSheet(
+          entries: entries,
+          canCommit: true,
+          onSubmit: (commit) async {
+            final localizations = context.l10n;
+            final result = await repository.batchDeleteEntries(
+              entries: entries,
+            );
+            return _commitBatchOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedBatchOperationSummary(localizations, result),
+              ),
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Delete ${entries.length} passwords',
+            );
+          },
+        ),
+  );
+}
+
+Future<BatchOperationResult?> showBatchRegenerateEntriesSurface({
+  required BuildContext context,
+  required List<PasswordEntry> entries,
+  required ManageRepository repository,
+}) {
+  return showParsAdaptiveDetail<BatchOperationResult>(
+    context: context,
+    builder:
+        (context) => _BatchRegenerateSheet(
+          entries: entries,
+          canCommit: true,
+          onSubmit: (noSymbols, commit) async {
+            final localizations = context.l10n;
+            final result = await repository.batchRegenerateEntries(
+              entries: entries,
+              length: 24,
+              noSymbols: noSymbols,
+            );
+            return _commitBatchOperation(
+              failureMessage: localizations.postMutationCommitFailed(
+                localizedBatchOperationSummary(localizations, result),
+              ),
+              repository: repository,
+              result: result,
+              commit: commit,
+              message: 'Regenerate ${entries.length} passwords',
+            );
+          },
+        ),
+  );
+}
+
 Future<EntryOperationResult> _commitEntryOperation({
+  required String failureMessage,
   required ManageRepository repository,
   required EntryOperationResult result,
   required bool commit,
@@ -125,23 +374,18 @@ Future<EntryOperationResult> _commitEntryOperation({
   try {
     final commitResult = await repository.commitChanges(message);
     if (!commitResult.success) {
-      throw _PostMutationCommitException(
-        mutationSummary: result.summary,
-        commitFailure: _gitFailureSummary(commitResult),
-      );
+      throw _PostMutationCommitException(failureMessage);
     }
   } on _PostMutationCommitException {
     rethrow;
-  } catch (error) {
-    throw _PostMutationCommitException(
-      mutationSummary: result.summary,
-      commitFailure: error.toString(),
-    );
+  } catch (_) {
+    throw _PostMutationCommitException(failureMessage);
   }
   return result.copyWith(committed: true);
 }
 
 Future<BatchOperationResult> _commitBatchOperation({
+  required String failureMessage,
   required ManageRepository repository,
   required BatchOperationResult result,
   required bool commit,
@@ -153,566 +397,26 @@ Future<BatchOperationResult> _commitBatchOperation({
   try {
     final commitResult = await repository.commitChanges(message);
     if (!commitResult.success) {
-      throw _PostMutationCommitException(
-        mutationSummary: result.summary,
-        commitFailure: _gitFailureSummary(commitResult),
-      );
+      throw _PostMutationCommitException(failureMessage);
     }
   } on _PostMutationCommitException {
     rethrow;
-  } catch (error) {
-    throw _PostMutationCommitException(
-      mutationSummary: result.summary,
-      commitFailure: error.toString(),
-    );
+  } catch (_) {
+    throw _PostMutationCommitException(failureMessage);
   }
   return result.copyWith(committed: true);
 }
 
-String _gitFailureSummary(GitOperationResult result) {
-  final stderr = result.stderr.trim();
-  if (stderr.isNotEmpty) {
-    return stderr;
-  }
-  final stdout = result.stdout.trim();
-  if (stdout.isNotEmpty) {
-    return stdout;
-  }
-  return result.exitCode == null
-      ? 'Git commit reported failure.'
-      : 'Git commit exited with code ${result.exitCode}.';
-}
-
 class _PostMutationCommitException implements Exception {
-  const _PostMutationCommitException({
-    required this.mutationSummary,
-    required this.commitFailure,
-  });
+  const _PostMutationCommitException(this.message);
 
-  final String mutationSummary;
-  final String commitFailure;
+  final String message;
 
   @override
-  String toString() {
-    return '$mutationSummary, but the optional Git commit failed: '
-        '$commitFailure The vault mutation was not rolled back.';
-  }
+  String toString() => message;
 }
 
-class ManageScreen extends StatefulWidget {
-  const ManageScreen({
-    super.key,
-    required this.repository,
-    this.manageRepository,
-  });
-
-  final VaultRepository repository;
-  final ManageRepository? manageRepository;
-
-  @override
-  State<ManageScreen> createState() => _ManageScreenState();
-}
-
-class _ManageScreenState extends State<ManageScreen> {
-  final Set<String> _selectedPaths = <String>{};
-
-  List<PasswordEntry> get _entries => widget.repository.entries
-      .where((entry) => !entry.isDirectory)
-      .toList(growable: false);
-
-  List<PasswordEntry> get _selectedEntries => _entries
-      .where((entry) => _selectedPaths.contains(entry.path))
-      .toList(growable: false);
-
-  ManageRepository? get _manageRepository =>
-      widget.manageRepository ??
-      (widget.repository is ManageRepository
-          ? widget.repository as ManageRepository
-          : null);
-
-  bool get _canCommit => _manageRepository != null;
-
-  @override
-  Widget build(BuildContext context) {
-    final manageRepository = _manageRepository;
-    return CustomScrollView(
-      slivers: <Widget>[
-        SliverAppBar(
-          pinned: true,
-          title: Text(
-            'Manage',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverList.list(
-            children: <Widget>[
-              Text(
-                'Maintain passwords in batches or one at a time.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              _ManageActionCard(
-                title: 'Generate and save',
-                subtitle:
-                    'Create one or many entries with generated passwords.',
-                icon: Icons.auto_fix_high,
-                onTap: _showGenerateSheet,
-              ),
-              _ManageActionCard(
-                title: 'Save existing password',
-                subtitle: 'Manual entry for credentials you already have.',
-                icon: Icons.add_circle_outline,
-                onTap: _showSaveExistingSheet,
-              ),
-              _ManageActionCard(
-                title: 'Batch delete',
-                subtitle:
-                    'Preview full paths before removing selected entries.',
-                icon: Icons.delete_outline,
-                isDanger: true,
-                onTap:
-                    manageRepository == null
-                        ? _showManageUnavailable
-                        : _showBatchDeleteSheet,
-              ),
-              _ManageActionCard(
-                title: 'Regenerate selected',
-                subtitle:
-                    'Replace password lines while preserving parsed fields and raw notes.',
-                icon: Icons.refresh,
-                onTap:
-                    manageRepository == null
-                        ? _showManageUnavailable
-                        : _showBatchRegenerateSheet,
-              ),
-              _ManageActionCard(
-                title: 'Edit entries',
-                subtitle:
-                    'Update password lines and raw notes without changing the path.',
-                icon: Icons.edit_outlined,
-                onTap:
-                    manageRepository == null
-                        ? _showManageUnavailable
-                        : _showEditSheet,
-              ),
-              _ManageActionCard(
-                title: 'Move entry',
-                subtitle: 'Move one entry into another folder.',
-                icon: Icons.drive_file_move_outlined,
-                onTap:
-                    manageRepository == null
-                        ? _showManageUnavailable
-                        : () => _showMoveOrRenameSheet(rename: false),
-              ),
-              _ManageActionCard(
-                title: 'Rename entry',
-                subtitle: 'Change one entry path with overwrite handling.',
-                icon: Icons.drive_file_rename_outline,
-                onTap:
-                    manageRepository == null
-                        ? _showManageUnavailable
-                        : () => _showMoveOrRenameSheet(rename: true),
-              ),
-              _ManageActionCard(
-                title: 'Delete entry',
-                subtitle: 'Remove one entry after name confirmation.',
-                icon: Icons.delete_forever_outlined,
-                isDanger: true,
-                onTap:
-                    manageRepository == null
-                        ? _showManageUnavailable
-                        : _showDeleteSheet,
-              ),
-              const SizedBox(height: 8),
-              _BatchSelectionPanel(
-                entries: _entries,
-                selectedPaths: _selectedPaths,
-                onChanged: (path, selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedPaths.add(path);
-                    } else {
-                      _selectedPaths.remove(path);
-                    }
-                  });
-                },
-                onMove: _showBatchMoveSheet,
-                onRename: _showBatchRenameSheet,
-                onDelete: _showBatchDeleteSheet,
-                onRegenerate: _showBatchRegenerateSheet,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _showGenerateSheet() async {
-    final result = await showModalBottomSheet<EntryOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _GenerateEntrySheet(
-            canCommit: _canCommit,
-            onSubmit: (path, noSymbols, overwrite, commit) async {
-              final trimmedPath = path.trim();
-              final result = await widget.repository.generateEntry(
-                path: trimmedPath,
-                length: 24,
-                noSymbols: noSymbols,
-                overwrite: overwrite,
-              );
-              return _commitEntryResult(
-                result,
-                commit,
-                'Generate password $trimmedPath',
-              );
-            },
-          ),
-    );
-    _showEntryResult(result);
-  }
-
-  Future<void> _showSaveExistingSheet() async {
-    final result = await showModalBottomSheet<EntryOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _SaveExistingEntrySheet(
-            canCommit: _canCommit,
-            onSubmit: (path, password, notes, overwrite, commit) async {
-              final trimmedPath = path.trim();
-              final result = await widget.repository.saveEntry(
-                path: trimmedPath,
-                content: _manualEntryContent(password, notes),
-                overwrite: overwrite,
-              );
-              return _commitEntryResult(
-                result,
-                commit,
-                'Save password $trimmedPath',
-              );
-            },
-          ),
-    );
-    _showEntryResult(result);
-  }
-
-  Future<void> _showEditSheet() async {
-    final manageRepository = _manageRepository;
-    if (manageRepository == null) {
-      _showManageUnavailable();
-      return;
-    }
-    final result = await showModalBottomSheet<EntryOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _EditEntrySheet(
-            entries: _entries,
-            canCommit: _canCommit,
-            onReadEntry: manageRepository.readEntry,
-            onSaveRawNotes: (entry, password, fields, notes, commit) async {
-              final result = await manageRepository.editEntry(
-                path: entry.path,
-                content: _entryContent(password, fields, notes),
-              );
-              return _commitEntryResult(
-                result,
-                commit,
-                'Edit password ${entry.path}',
-              );
-            },
-            onReplacePassword: (entry, password, commit) async {
-              final result = await manageRepository.replaceEntryPassword(
-                entry: entry,
-                password: password,
-              );
-              return _commitEntryResult(
-                result,
-                commit,
-                'Replace password ${entry.path}',
-              );
-            },
-          ),
-    );
-    _showEntryResult(result);
-  }
-
-  Future<void> _showMoveOrRenameSheet({required bool rename}) async {
-    final manageRepository = _manageRepository;
-    if (manageRepository == null) {
-      _showManageUnavailable();
-      return;
-    }
-    if (_entries.isEmpty) {
-      _showError('No entries to manage.');
-      return;
-    }
-
-    final result = await showModalBottomSheet<EntryOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _MoveOrRenameEntrySheet(
-            entries: _entries,
-            rename: rename,
-            canCommit: _canCommit,
-            onSubmit: (entry, target, overwrite, commit) async {
-              final toPath =
-                  rename
-                      ? target.trim()
-                      : _joinEntryPath(target, _basename(entry.path));
-              final result = await manageRepository.moveEntry(
-                fromPath: entry.path,
-                toPath: toPath,
-                overwrite: overwrite,
-              );
-              return _commitEntryResult(
-                result.copyWith(action: rename ? 'Renamed' : 'Moved'),
-                commit,
-                '${rename ? 'Rename' : 'Move'} password ${entry.path}',
-              );
-            },
-          ),
-    );
-    _showEntryResult(result);
-  }
-
-  Future<void> _showDeleteSheet() async {
-    final manageRepository = _manageRepository;
-    if (manageRepository == null) {
-      _showManageUnavailable();
-      return;
-    }
-    if (_entries.isEmpty) {
-      _showError('No entries to manage.');
-      return;
-    }
-
-    final result = await showModalBottomSheet<EntryOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _DeleteEntrySheet(
-            entries: _entries,
-            canCommit: _canCommit,
-            onSubmit: (entry, commit) async {
-              final result = await manageRepository.deleteEntry(
-                path: entry.path,
-                recursive: entry.isDirectory,
-              );
-              return _commitEntryResult(
-                result,
-                commit,
-                'Delete password ${entry.path}',
-              );
-            },
-          ),
-    );
-    _showEntryResult(result);
-  }
-
-  Future<void> _showBatchMoveSheet() async {
-    final manageRepository = _manageRepository;
-    final selected = _selectedEntries;
-    if (!_ensureBatchReady(manageRepository, selected)) {
-      return;
-    }
-    final result = await showModalBottomSheet<BatchOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _BatchMoveSheet(
-            entries: selected,
-            canCommit: _canCommit,
-            onSubmit: (destination, overwrite, commit) async {
-              final result = await manageRepository!.batchMoveEntries(
-                entries: selected,
-                destinationDirectory: destination,
-                overwrite: overwrite,
-              );
-              return _commitBatchResult(
-                result,
-                commit,
-                'Move ${selected.length} passwords',
-              );
-            },
-          ),
-    );
-    _showBatchResult(result);
-  }
-
-  Future<void> _showBatchRenameSheet() async {
-    final manageRepository = _manageRepository;
-    final selected = _selectedEntries;
-    if (!_ensureBatchReady(manageRepository, selected)) {
-      return;
-    }
-    final result = await showModalBottomSheet<BatchOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _BatchRenameSheet(
-            entries: selected,
-            canCommit: _canCommit,
-            onSubmit: (prefix, suffix, overwrite, commit) async {
-              final result = await manageRepository!.batchRenameEntries(
-                entries: selected,
-                prefix: prefix,
-                suffix: suffix,
-                overwrite: overwrite,
-              );
-              return _commitBatchResult(
-                result,
-                commit,
-                'Rename ${selected.length} passwords',
-              );
-            },
-          ),
-    );
-    _showBatchResult(result);
-  }
-
-  Future<void> _showBatchDeleteSheet() async {
-    final manageRepository = _manageRepository;
-    final selected = _selectedEntries;
-    if (!_ensureBatchReady(manageRepository, selected)) {
-      return;
-    }
-    final result = await showModalBottomSheet<BatchOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _BatchDeleteSheet(
-            entries: selected,
-            canCommit: _canCommit,
-            onSubmit: (commit) async {
-              final result = await manageRepository!.batchDeleteEntries(
-                entries: selected,
-              );
-              return _commitBatchResult(
-                result,
-                commit,
-                'Delete ${selected.length} passwords',
-              );
-            },
-          ),
-    );
-    _showBatchResult(result);
-  }
-
-  Future<void> _showBatchRegenerateSheet() async {
-    final manageRepository = _manageRepository;
-    final selected = _selectedEntries;
-    if (!_ensureBatchReady(manageRepository, selected)) {
-      return;
-    }
-    final result = await showModalBottomSheet<BatchOperationResult>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _BatchRegenerateSheet(
-            entries: selected,
-            canCommit: _canCommit,
-            onSubmit: (noSymbols, commit) async {
-              final result = await manageRepository!.batchRegenerateEntries(
-                entries: selected,
-                length: 24,
-                noSymbols: noSymbols,
-              );
-              return _commitBatchResult(
-                result,
-                commit,
-                'Regenerate ${selected.length} passwords',
-              );
-            },
-          ),
-    );
-    _showBatchResult(result);
-  }
-
-  bool _ensureBatchReady(
-    ManageRepository? manageRepository,
-    List<PasswordEntry> selected,
-  ) {
-    if (manageRepository == null) {
-      _showManageUnavailable();
-      return false;
-    }
-    if (selected.isEmpty) {
-      _showError('Select at least one entry.');
-      return false;
-    }
-    return true;
-  }
-
-  Future<EntryOperationResult> _commitEntryResult(
-    EntryOperationResult result,
-    bool commit,
-    String message,
-  ) async {
-    final manageRepository = _manageRepository;
-    if (manageRepository == null) {
-      return result;
-    }
-    return _commitEntryOperation(
-      repository: manageRepository,
-      result: result,
-      commit: commit,
-      message: message,
-    );
-  }
-
-  Future<BatchOperationResult> _commitBatchResult(
-    BatchOperationResult result,
-    bool commit,
-    String message,
-  ) async {
-    final manageRepository = _manageRepository;
-    if (manageRepository == null) {
-      return result;
-    }
-    return _commitBatchOperation(
-      repository: manageRepository,
-      result: result,
-      commit: commit,
-      message: message,
-    );
-  }
-
-  void _showEntryResult(EntryOperationResult? result) {
-    if (result == null || !mounted) {
-      return;
-    }
-    _setSummary(result.summary);
-  }
-
-  void _showBatchResult(BatchOperationResult? result) {
-    if (result == null || !mounted) {
-      return;
-    }
-    final failure =
-        result.failures.isEmpty
-            ? ''
-            : ': ${result.failures.first.path}: ${result.failures.first.message}';
-    _setSummary('${result.summary}$failure');
-  }
-
-  void _setSummary(String summary) {
-    AppNotification.show(context, summary);
-  }
-
-  void _showError(String message) {
-    AppNotification.show(context, message);
-  }
-
-  void _showManageUnavailable() {
-    _showError('Manage operations are not available.');
-  }
+String _manageErrorMessage(BuildContext context, Object error) {
+  if (error is _PostMutationCommitException) return error.message;
+  return UiProblem.fromError(context.l10n, error).summary;
 }

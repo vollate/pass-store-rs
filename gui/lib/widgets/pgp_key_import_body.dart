@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import '../l10n/l10n.dart';
 import '../models/pgp_key_import.dart';
 import '../services/key_repository.dart';
 import '../services/path_picker_service.dart';
 import '../services/pgp_import_service.dart';
 import '../services/security_repository.dart';
+import '../services/ui_problem.dart';
 import 'path_picker_row.dart';
 
 /// Reusable PGP import body shared by Settings and Onboarding.
@@ -85,7 +87,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final localizations = AppLocalizations.of(context);
+    final localizations = context.l10n;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,7 +97,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
             for (final source in PgpImportSource.values)
               ButtonSegment<PgpImportSource>(
                 value: source,
-                label: Text(source.label),
+                label: Text(_sourceLabel(localizations, source)),
               ),
           ],
           selected: <PgpImportSource>{_source},
@@ -108,15 +110,15 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
             minLines: 4,
             maxLines: 8,
             enabled: !_isSubmitting,
-            decoration: const InputDecoration(
-              labelText: 'Key text',
-              helperText: 'Paste a PGP public or private key.',
+            decoration: InputDecoration(
+              labelText: localizations.keyTextField,
+              helperText: localizations.pastePgpKeyHelp,
             ),
             onChanged: (_) => _resetInspection(),
           )
         else
           PathPickerRow(
-            title: 'Key file',
+            title: localizations.keyFileField,
             path: _selectedPath ?? _initialDirectory,
             isSelected: _selectedPath != null,
             onPressed: _isSubmitting ? null : _chooseFile,
@@ -131,9 +133,9 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
             controller: _passphrase,
             obscureText: true,
             enabled: !_isSubmitting,
-            decoration: const InputDecoration(
-              labelText: 'PGP passphrase',
-              helperText: 'Required to unlock this private key.',
+            decoration: InputDecoration(
+              labelText: localizations.pgpPassphraseLabel,
+              helperText: localizations.pgpPassphraseUnlockHelp,
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -144,24 +146,21 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
                 _isSubmitting
                     ? null
                     : (value) => setState(() => _remember = value),
-            title: const Text('Remember in Keychain/KMS'),
-            subtitle: const Text(
-              'Off by default. The passphrase stays in memory for this session '
-              'unless you enable this.',
-            ),
+            title: Text(localizations.rememberInKeychain),
+            subtitle: Text(localizations.rememberPassphraseDescription),
           ),
         ],
         if (_isInspecting) ...<Widget>[
           const SizedBox(height: 12),
-          const Row(
+          Row(
             children: <Widget>[
-              SizedBox(
+              const SizedBox(
                 width: 16,
                 height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              SizedBox(width: 10),
-              Text('Inspecting key material...'),
+              const SizedBox(width: 10),
+              Text(localizations.inspectingKeyMaterial),
             ],
           ),
         ],
@@ -176,7 +175,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
             if (widget.onCancel != null)
               TextButton(
                 onPressed: _isSubmitting ? null : _cancel,
-                child: const Text('Cancel'),
+                child: Text(localizations.cancel),
               ),
             const SizedBox(width: 8),
             FilledButton(
@@ -185,14 +184,21 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
                 _isSubmitting && _needsPassphrase
                     ? localizations.pgpPreparationInProgress
                     : _needsPassphrase
-                    ? 'Unlock and import'
-                    : 'Import',
+                    ? localizations.unlockAndImport
+                    : localizations.importAction,
               ),
             ),
           ],
         ),
       ],
     );
+  }
+
+  String _sourceLabel(AppLocalizations localizations, PgpImportSource source) {
+    return switch (source) {
+      PgpImportSource.text => localizations.textSource,
+      PgpImportSource.file => localizations.fileSource,
+    };
   }
 
   void _changeSource(Set<PgpImportSource> selection) {
@@ -242,7 +248,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString());
+      setState(() => _error = UiProblem.fromError(context.l10n, error).summary);
     }
   }
 
@@ -339,7 +345,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
   /// Import errors are already sanitized in Rust; this only reshapes the wording.
   String _messageFor(Object error) {
     if (error is PgpImportException) {
-      final localizations = AppLocalizations.of(context);
+      final localizations = context.l10n;
       switch (error.kind) {
         case PgpImportFailureKind.passphraseRequired:
           return localizations.pgpPassphraseRequired;
@@ -356,7 +362,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
           return error.message;
       }
     }
-    return error.toString();
+    return UiProblem.fromError(context.l10n, error).summary;
   }
 }
 
@@ -374,9 +380,19 @@ class _InspectionSummary extends StatelessWidget {
           inspection.isPrivate ? Icons.key : Icons.vpn_key_outlined,
         ),
         title: Text(inspection.identity),
-        subtitle: Text('${inspection.kind.label}\n${inspection.fingerprint}'),
+        subtitle: Text(
+          '${_kindLabel(context.l10n, inspection.kind)}\n'
+          '${inspection.fingerprint}',
+        ),
         isThreeLine: true,
       ),
     );
+  }
+
+  String _kindLabel(AppLocalizations localizations, PgpKeyKind kind) {
+    return switch (kind) {
+      PgpKeyKind.public => localizations.publicKeyMaterial,
+      PgpKeyKind.private => localizations.privateKeyMaterial,
+    };
   }
 }

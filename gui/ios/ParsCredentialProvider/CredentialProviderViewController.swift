@@ -73,7 +73,9 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     }
     context.evaluatePolicy(
       .deviceOwnerAuthentication,
-      localizedReason: "Unlock Pars to fill this password"
+      localizedReason: NSLocalizedString(
+        "autofill_authentication_reason",
+        comment: "Reason shown before filling the selected password")
     ) { [weak self] success, _ in
       DispatchQueue.main.async {
         guard success else {

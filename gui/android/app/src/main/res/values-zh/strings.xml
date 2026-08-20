@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Pars</string>
+    <string name="autofill_service_summary">使用 Pars 自动填充密码</string>
+    <string name="credential_provider_summary">Pars 中的密码</string>
+    <string name="autofill_unlock_title">解锁 Pars</string>
+    <string name="autofill_unlock_subtitle">填充所选密码</string>
+    <string name="autofill_cancel">取消</string>
+    <string name="autofill_password_source">来自 Pars 的密码</string>
+    <string name="autofill_candidate_title">%1$s · Pars</string>
     <string name="autofill_no_matches_title">没有匹配的密码</string>
     <string name="autofill_no_matches_toast">Pars 中没有匹配的凭据</string>
 </resources>

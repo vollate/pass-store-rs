@@ -9,6 +9,7 @@ import android.credentials.GetCredentialResponse
 import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import android.os.Bundle
+import android.net.Uri
 import android.os.CancellationSignal
 import android.service.autofill.Dataset
 import android.service.credentials.CredentialProviderService
@@ -17,6 +18,7 @@ import android.view.autofill.AutofillManager
 import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
 import android.widget.Toast
+import java.util.UUID
 import java.util.concurrent.Executor
 import top.vollate.pars_gui.R
 
@@ -55,8 +57,8 @@ class ParsAutofillUnlockActivity : Activity() {
         cancellationSignal = signal
         val promptBuilder =
             BiometricPrompt.Builder(this)
-                .setTitle("Unlock Pars")
-                .setSubtitle("Fill the selected password")
+                .setTitle(getString(R.string.autofill_unlock_title))
+                .setSubtitle(getString(R.string.autofill_unlock_subtitle))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             promptBuilder.setAllowedAuthenticators(
                 android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_STRONG or
@@ -66,7 +68,7 @@ class ParsAutofillUnlockActivity : Activity() {
             promptBuilder.setDeviceCredentialAllowed(true)
         } else {
             promptBuilder.setNegativeButton(
-                "Cancel",
+                getString(R.string.autofill_cancel),
                 directExecutor(),
             ) { _, _ -> finishCanceled() }
         }
@@ -103,7 +105,12 @@ class ParsAutofillUnlockActivity : Activity() {
     private fun finishAutofill(credential: ParsAutofillCredential) {
         val usernameId = getParcelableExtraCompat<AutofillId>(EXTRA_USERNAME_ID)
         val passwordId = getParcelableExtraCompat<AutofillId>(EXTRA_PASSWORD_ID)
-        val presentation = presentation(this, credential.username, "Pars password")
+        val presentation =
+            presentation(
+                this,
+                credential.username,
+                getString(R.string.autofill_password_source),
+            )
         val datasetBuilder = Dataset.Builder(presentation).setId(credential.path)
         if (usernameId != null) {
             datasetBuilder.setValue(usernameId, AutofillValue.forText(credential.username), presentation)
@@ -186,13 +193,20 @@ class ParsAutofillUnlockActivity : Activity() {
             context: Context,
             requestCode: Int,
             intent: Intent,
-        ): PendingIntent =
-            PendingIntent.getActivity(
+        ): PendingIntent {
+            intent.data =
+                Uri.Builder()
+                    .scheme("pars-autofill")
+                    .authority("request")
+                    .appendPath(UUID.randomUUID().toString())
+                    .build()
+            return PendingIntent.getActivity(
                 context,
                 requestCode,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag(),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_ONE_SHOT or mutableFlag(),
             )
+        }
 
         fun presentation(
             context: Context,

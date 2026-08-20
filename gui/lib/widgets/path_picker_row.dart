@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 class PathPickerRow extends StatelessWidget {
   const PathPickerRow({
     super.key,
@@ -17,8 +19,12 @@ class PathPickerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final pathPrefix = isSelected ? 'Selected' : 'Default';
-    final actionLabel = isSelected ? 'Change' : 'Choose';
+    final pathPrefix =
+        isSelected
+            ? context.l10n.selectedPathPrefix
+            : context.l10n.defaultPathPrefix;
+    final actionLabel =
+        isSelected ? context.l10n.changeAction : context.l10n.chooseAction;
 
     return Semantics(
       label: '$title, $pathPrefix: $path',

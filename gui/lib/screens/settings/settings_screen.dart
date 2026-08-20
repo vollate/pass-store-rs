@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n.dart';
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../services/autofill_repository.dart';
@@ -12,12 +13,15 @@ import '../../services/runtime_diagnostics.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
+import '../../services/ui_preferences_store.dart';
+import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/path_picker_row.dart';
 import '../../widgets/pgp_key_import_body.dart';
+import '../../widgets/pars_adaptive_surface.dart';
 
 part 'widgets/settings_security_widgets.dart';
 part 'widgets/settings_key_management_widgets.dart';
@@ -36,6 +40,9 @@ class SettingsScreen extends StatelessWidget {
     this.autofillRepository,
     this.vaultRepository,
     this.pathPickerService = const SystemPathPickerService(),
+    this.localePreference = AppLocalePreference.system,
+    this.scrollController,
+    this.onLocalePreferenceChanged,
     this.onSecuritySettingsChanged,
     this.runDuringSystemAuthentication,
     this.onOnboardingReset,
@@ -48,6 +55,10 @@ class SettingsScreen extends StatelessWidget {
   final AutofillRepository? autofillRepository;
   final VaultRepository? vaultRepository;
   final PathPickerService pathPickerService;
+  final AppLocalePreference localePreference;
+  final ScrollController? scrollController;
+  final Future<void> Function(AppLocalePreference preference)?
+  onLocalePreferenceChanged;
   final VoidCallback? onSecuritySettingsChanged;
   final Future<T> Function<T>(Future<T> Function() action)?
   runDuringSystemAuthentication;
@@ -55,12 +66,14 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = context.l10n;
     return CustomScrollView(
+      controller: scrollController,
       slivers: <Widget>[
         SliverAppBar(
           pinned: true,
           title: Text(
-            'Settings',
+            localizations.settingsTitle,
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -71,86 +84,105 @@ class SettingsScreen extends StatelessWidget {
           sliver: SliverList.list(
             children: <Widget>[
               _SettingsSection(
-                title: 'Security',
+                title: localizations.appearanceSection,
                 children: <Widget>[
                   _SettingsTile(
-                    title: 'Gesture lock and biometrics',
+                    title: localizations.languageTitle,
+                    subtitle: _localeLabel(localizations, localePreference),
+                    icon: Icons.language,
+                    onTap: () => _showLanguage(context),
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: localizations.securityPrivacySection,
+                children: <Widget>[
+                  _SettingsTile(
+                    title: localizations.gestureBiometricsTitle,
                     subtitle:
                         securityRepository.lockOnResume
-                            ? 'Lock on app resume'
-                            : 'Gesture unlock configured',
+                            ? localizations.lockOnResumeState
+                            : localizations.gestureConfiguredState,
                     icon: Icons.pattern,
                     onTap: () => _showSecuritySheet(context),
                   ),
                   _SettingsTile(
-                    title: 'PGP session timeout',
-                    subtitle: securityRepository.pgpSessionExpiration.label,
+                    title: localizations.pgpSessionTimeoutTitle,
+                    subtitle: _localizedPgpExpiration(
+                      localizations,
+                      securityRepository.pgpSessionExpiration,
+                    ),
                     icon: Icons.timer_outlined,
                     onTap: () => _showPgpSessionTimeoutSheet(context),
                   ),
                   _SettingsTile(
-                    title: 'KMS / Keychain passphrase',
+                    title: localizations.keychainPassphraseTitle,
                     subtitle:
                         securityRepository.hasStoredPgpPassphrase
-                            ? 'PGP passphrase cached'
-                            : 'Optional encrypted passphrase cache',
+                            ? localizations.pgpPassphraseCachedState
+                            : localizations.optionalPassphraseCacheState,
                     icon: Icons.key_outlined,
                     onTap: () => _showPgpPassphraseStorageSheet(context),
                   ),
                 ],
               ),
               _SettingsSection(
-                title: 'Key management',
+                title: localizations.vaultSyncSection,
                 children: <Widget>[
                   _SettingsTile(
-                    title: 'PGP keys',
-                    subtitle: 'Create, import, export, delete',
+                    title: localizations.passwordStoresTitle,
+                    subtitle: settingsRepository.currentRepoName,
+                    icon: Icons.folder_outlined,
+                    onTap: () => _showPasswordStores(context),
+                  ),
+                  _SettingsTile(
+                    title: localizations.gitSyncTitle,
+                    subtitle: localizations.gitSyncDescription,
+                    icon: Icons.sync,
+                    onTap: () => _showGitSync(context),
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: localizations.autofillSection,
+                children: <Widget>[
+                  _SettingsTile(
+                    title: localizations.systemAutofillTitle,
+                    subtitle: _autofillSubtitle(localizations),
+                    icon: Icons.password_outlined,
+                    onTap: () => _showAutofill(context),
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: localizations.keyManagementSection,
+                children: <Widget>[
+                  _SettingsTile(
+                    title: localizations.pgpKeysTitle,
+                    subtitle: localizations.pgpKeyActionsDescription,
                     icon: Icons.enhanced_encryption_outlined,
                     onTap: () => _showKeys(context, KeyRecordType.pgp),
                   ),
                   _SettingsTile(
-                    title: 'SSH keys',
-                    subtitle: 'GitHub access keys',
+                    title: localizations.sshKeysTitle,
+                    subtitle: localizations.githubAccessKeysDescription,
                     icon: Icons.vpn_key_outlined,
                     onTap: () => _showKeys(context, KeyRecordType.ssh),
                   ),
                 ],
               ),
               _SettingsSection(
-                title: 'Password stores and Git',
+                title: localizations.advancedSupportSection,
                 children: <Widget>[
                   _SettingsTile(
-                    title: 'Password stores',
-                    subtitle: settingsRepository.currentRepoName,
-                    icon: Icons.folder_outlined,
-                    onTap: () => _showPasswordStores(context),
-                  ),
-                  _SettingsTile(
-                    title: 'Git sync and remotes',
-                    subtitle: 'Pull, push, status, remotes',
-                    icon: Icons.sync,
-                    onTap: () => _showGitSync(context),
-                  ),
-                  _SettingsTile(
-                    title: 'Advanced git args',
-                    subtitle: 'Arguments after git only',
+                    title: localizations.advancedGitArgsTitle,
+                    subtitle: localizations.advancedGitArgsDescription,
                     icon: Icons.terminal,
                     onTap: () => _showGitArgs(context),
                   ),
-                ],
-              ),
-              _SettingsSection(
-                title: 'Platform',
-                children: <Widget>[
                   _SettingsTile(
-                    title: 'System autofill',
-                    subtitle: _autofillSubtitle,
-                    icon: Icons.password_outlined,
-                    onTap: () => _showAutofill(context),
-                  ),
-                  _SettingsTile(
-                    title: 'Runtime diagnostics',
-                    subtitle: 'Bridge, core, crypto, Git, key storage',
+                    title: localizations.runtimeDiagnosticsTitle,
+                    subtitle: localizations.runtimeDiagnosticsDescription,
                     icon: Icons.health_and_safety_outlined,
                     onTap: () => _showRuntimeDiagnostics(context),
                   ),
@@ -163,6 +195,58 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _showLanguage(BuildContext context) async {
+    final localizations = context.l10n;
+    final onChanged = onLocalePreferenceChanged;
+    if (onChanged == null) {
+      AppNotification.show(context, localizations.languageUnavailable);
+      return;
+    }
+    final selected = await showParsAdaptiveSurface<AppLocalePreference>(
+      context: context,
+      title: localizations.languageTitle,
+      builder:
+          (surfaceContext) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: AppLocalePreference.values
+                .map(
+                  (preference) => ListTile(
+                    leading: Icon(
+                      preference == localePreference
+                          ? Icons.check_circle
+                          : Icons.circle_outlined,
+                    ),
+                    title: Text(_localeLabel(localizations, preference)),
+                    selected: preference == localePreference,
+                    onTap: () => Navigator.of(surfaceContext).pop(preference),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+    );
+    if (selected == null || selected == localePreference || !context.mounted) {
+      return;
+    }
+    try {
+      await onChanged(selected);
+    } catch (_) {
+      if (context.mounted) {
+        AppNotification.show(context, localizations.languageSaveFailed);
+      }
+    }
+  }
+
+  String _localeLabel(
+    AppLocalizations localizations,
+    AppLocalePreference preference,
+  ) {
+    return switch (preference) {
+      AppLocalePreference.system => localizations.languageSystem,
+      AppLocalePreference.english => localizations.languageEnglish,
+      AppLocalePreference.chinese => localizations.languageChinese,
+    };
+  }
+
   GitOperationsRepository? get _gitOperations =>
       gitRepository is GitOperationsRepository
           ? gitRepository as GitOperationsRepository
@@ -173,16 +257,18 @@ class SettingsScreen extends StatelessWidget {
           ? settingsRepository as RuntimeDiagnosticsRepository
           : null;
 
-  String get _autofillSubtitle {
-    final repository = autofillRepository;
-    if (repository == null) {
-      return 'Unavailable';
-    }
-    final status = repository.status;
-    if (status.available) {
-      return '${status.indexedEntries} entries indexed';
-    }
-    return status.message ?? 'Not refreshed';
+  String _autofillSubtitle(AppLocalizations localizations) {
+    final status = autofillRepository?.status;
+    if (status == null) return localizations.autofillUnavailableState;
+    return switch (status.kind) {
+      AutofillStatusKind.ready => localizations.autofillIndexedEntries(
+        status.indexedEntries,
+      ),
+      AutofillStatusKind.needsRebuild => localizations.autofillNeedsRebuild,
+      AutofillStatusKind.busy => localizations.autofillBusy,
+      AutofillStatusKind.disabled => localizations.autofillDisabled,
+      AutofillStatusKind.unavailable => localizations.autofillUnavailableState,
+    };
   }
 
   List<String> _parseGitArgs(String value) {

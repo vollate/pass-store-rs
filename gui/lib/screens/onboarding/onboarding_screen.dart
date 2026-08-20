@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n.dart';
 import '../../models/key_record.dart';
 import '../../services/key_repository.dart';
 import '../../services/path_picker_service.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
+import '../../services/ui_problem.dart';
 import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/path_picker_row.dart';
@@ -50,11 +52,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   KeyRepository? get _keyRepository => widget.keyRepository;
 
   bool get _needsStoreSetup => _lifecycle?.requiresStoreSetup ?? false;
+  bool get _needsKeyRepair => _lifecycle?.requiresKeyRepair ?? false;
 
   List<KeyRecord> get _pgpKeys =>
       _keyRepository?.keys
           .where(
-            (key) => key.type == KeyRecordType.pgp && key.hasLocalKeyMaterial,
+            (key) =>
+                key.type == KeyRecordType.pgp &&
+                key.hasLocalKeyMaterial &&
+                key.hasPrivateKey,
           )
           .toList(growable: false) ??
       const <KeyRecord>[];
@@ -96,13 +102,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: <Widget>[
                     if (_stepHistory.isNotEmpty)
                       IconButton(
-                        tooltip: 'Back',
+                        tooltip: context.l10n.back,
                         onPressed: _goBack,
                         icon: const Icon(Icons.arrow_back),
                       ),
                     Expanded(
                       child: Text(
-                        _stepTitle(_step),
+                        _stepTitle(context.l10n, _step),
                         style: Theme.of(context).textTheme.headlineMedium
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
@@ -110,9 +116,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(_stepSubtitle(_step)),
+                Text(_stepSubtitle(context.l10n, _step)),
                 const SizedBox(height: 16),
-                _StepRail(currentStep: _step),
+                _OnboardingProgress(currentStep: _step, steps: _progressSteps),
                 if (_error != null) ...<Widget>[
                   const SizedBox(height: 12),
                   Text(
@@ -136,7 +142,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!widget.securityRepository.hasGestureVerifier) {
       return _OnboardingStep.gesture;
     }
-    if (_needsStoreSetup) {
+    if (_needsStoreSetup || _needsKeyRepair) {
       return _OnboardingStep.pgp;
     }
     if (!widget.securityRepository.biometricUnlockEnabled) {
@@ -144,6 +150,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
     return _OnboardingStep.pgp;
   }
+
+  List<_OnboardingStep> get _progressSteps => <_OnboardingStep>[
+    _OnboardingStep.gesture,
+    _OnboardingStep.biometrics,
+    _OnboardingStep.pgp,
+    _OnboardingStep.ssh,
+    if (_needsStoreSetup) _OnboardingStep.store,
+    _OnboardingStep.review,
+  ];
 
   Widget _buildStep(BuildContext context) {
     switch (_step) {
@@ -176,8 +191,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (repository == null || lifecycle == null) {
       return _EmptyOnboardingStep(
         icon: Icons.folder_off_outlined,
-        title: 'No store repository available',
-        buttonLabel: 'Continue',
+        title: context.l10n.noStoreRepository,
+        buttonLabel: context.l10n.continueAction,
         onPressed: () => _setStep(_OnboardingStep.review),
       );
     }
@@ -196,9 +211,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 12),
           FilledButton(
             onPressed: () => _setStep(_OnboardingStep.review),
-            child: const SizedBox(
+            child: SizedBox(
               width: double.infinity,
-              child: Center(child: Text('Continue')),
+              child: Center(child: Text(context.l10n.continueAction)),
             ),
           ),
         ],
@@ -265,8 +280,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (repository == null) {
       return _EmptyOnboardingStep(
         icon: Icons.enhanced_encryption_outlined,
-        title: 'No key repository available',
-        buttonLabel: 'Continue',
+        title: context.l10n.noKeyRepository,
+        buttonLabel: context.l10n.continueAction,
         onPressed: () => _setStep(_OnboardingStep.ssh),
       );
     }
@@ -284,8 +299,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (repository == null) {
       return _EmptyOnboardingStep(
         icon: Icons.vpn_key_off_outlined,
-        title: 'No SSH repository available',
-        buttonLabel: 'Continue',
+        title: context.l10n.noSshRepository,
+        buttonLabel: context.l10n.continueAction,
         onPressed: () => _setStep(_OnboardingStep.review),
       );
     }
@@ -310,9 +325,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       biometricUnlockEnabled: widget.securityRepository.biometricUnlockEnabled,
       storeStatusLabel:
           selectedStore != null && selectedStore.exists
-              ? 'Configured'
-              : lifecycle?.onboardingState.label ?? 'Unavailable',
-      storeSetupComplete: !_needsStoreSetup,
+              ? context.l10n.configured
+              : lifecycle?.onboardingState.label ?? context.l10n.unavailable,
+      storeSetupComplete: !_needsStoreSetup && !_needsKeyRepair,
       pgpKeyCount: _pgpKeys.length,
       sshKeyCount: _sshKeys.length,
       onFinish: _finishOnboarding,
@@ -338,7 +353,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _showError(Object error) {
-    final message = error is StateError ? error.message : error.toString();
+    final message = UiProblem.fromError(context.l10n, error).summary;
     setState(() => _error = message);
   }
 
@@ -352,6 +367,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _selectedPgpFingerprint = key.fingerprint;
     if (!_needsStoreSetup) {
       await repository.addPgpKeyToSelectedStore(key.fingerprint);
+      await widget.settingsRepository?.refresh();
     }
     _setStep(_OnboardingStep.ssh);
   }
@@ -373,11 +389,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final passphrase = TextEditingController();
     _showOnboardingForm(
       context: context,
-      title: 'Create PGP key',
+      title: context.l10n.createPgpKey,
       fields: <Widget>[
         _CreatePgpKeyFields(name: name, email: email, passphrase: passphrase),
       ],
-      submitLabel: 'Create',
+      submitLabel: context.l10n.create,
       onSubmit: () async {
         try {
           final key = await repository.generatePgpKey(
@@ -416,7 +432,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      'Import PGP key',
+                      context.l10n.importPgpKey,
                       style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -433,11 +449,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           Navigator.of(sheet).pop();
                         }
                         if (completion.rememberFailed && mounted) {
-                          _showError(
-                            StateError(
-                              'Imported ${completion.key.name}, but remembering '
-                              'the passphrase failed.',
-                            ),
+                          setState(
+                            () =>
+                                _error = context.l10n.importedKeyRememberFailed(
+                                  completion.key.name,
+                                ),
                           );
                         }
                         // Selects the returned fingerprint and advances to SSH.
@@ -468,9 +484,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final name = TextEditingController(text: 'github-mobile-ed25519');
     _showOnboardingForm(
       context: context,
-      title: 'Generate SSH key',
+      title: context.l10n.generateSshKey,
       fields: <Widget>[_CreateSshKeyFields(name: name)],
-      submitLabel: 'Generate',
+      submitLabel: context.l10n.generateSshKey,
       onSubmit: () async {
         await repository.generateSshKey(name.text);
         _setStep(
@@ -485,9 +501,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final privateKey = TextEditingController();
     _showOnboardingForm(
       context: context,
-      title: 'Import SSH key',
+      title: context.l10n.importSshKey,
       fields: <Widget>[_ImportSshKeyFields(name: name, privateKey: privateKey)],
-      submitLabel: 'Import',
+      submitLabel: context.l10n.importAction,
       onSubmit: () async {
         try {
           await repository.importSshPrivateKeyText(
@@ -516,12 +532,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('GitHub SSH settings'),
+            title: Text(context.l10n.githubSshSettings),
             content: SelectableText(url.toString()),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+                child: Text(context.l10n.close),
               ),
             ],
           ),
@@ -559,6 +575,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _finishOnboarding() async {
+    if (_needsStoreSetup || _needsKeyRepair) {
+      setState(() => _error = context.l10n.selectPrivatePgpKey);
+      return;
+    }
     await widget.securityRepository.setOnboardingComplete(true);
     await widget.securityRepository.markUnlocked(DateTime.now());
     if (!mounted) {
@@ -567,39 +587,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     widget.onComplete();
   }
 
-  String _stepTitle(_OnboardingStep step) {
-    switch (step) {
-      case _OnboardingStep.gesture:
-        return 'Set gesture lock';
-      case _OnboardingStep.biometrics:
-        return 'Enable biometric unlock';
-      case _OnboardingStep.pgp:
-        return 'Choose PGP key';
-      case _OnboardingStep.ssh:
-        return 'Set up SSH for GitHub';
-      case _OnboardingStep.store:
-        return 'Set up password store';
-      case _OnboardingStep.review:
-        return 'Review setup';
-    }
+  String _stepTitle(AppLocalizations localizations, _OnboardingStep step) {
+    return switch (step) {
+      _OnboardingStep.gesture => localizations.setGestureLock,
+      _OnboardingStep.biometrics => localizations.enableBiometricUnlock,
+      _OnboardingStep.pgp => localizations.choosePgpKey,
+      _OnboardingStep.ssh => localizations.setupSshGithub,
+      _OnboardingStep.store => localizations.setupPasswordStore,
+      _OnboardingStep.review => localizations.reviewSetup,
+    };
   }
 
-  String _stepSubtitle(_OnboardingStep step) {
-    switch (step) {
-      case _OnboardingStep.gesture:
-        return 'Use a 9-dot gesture as the local Pars unlock method.';
-      case _OnboardingStep.biometrics:
-        return 'Biometrics are optional and keep the gesture as fallback.';
-      case _OnboardingStep.pgp:
-        return 'Select, create, or import the key used by pass entries.';
-      case _OnboardingStep.ssh:
-        return 'SSH is optional and helps Git sync with GitHub.';
-      case _OnboardingStep.store:
-        return _needsStoreSetup
-            ? 'Create, import, or clone a password store.'
-            : 'Password store is configured.';
-      case _OnboardingStep.review:
-        return 'Confirm the setup before entering Pars.';
-    }
+  String _stepSubtitle(AppLocalizations localizations, _OnboardingStep step) {
+    return switch (step) {
+      _OnboardingStep.gesture => localizations.gestureStepSubtitle,
+      _OnboardingStep.biometrics => localizations.biometricsStepSubtitle,
+      _OnboardingStep.pgp => localizations.pgpStepSubtitle,
+      _OnboardingStep.ssh => localizations.sshStepSubtitle,
+      _OnboardingStep.store =>
+        _needsStoreSetup
+            ? localizations.createImportCloneStore
+            : localizations.storeAvailable,
+      _OnboardingStep.review => localizations.reviewStepSubtitle,
+    };
   }
 }

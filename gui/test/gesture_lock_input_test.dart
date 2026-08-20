@@ -39,6 +39,49 @@ void main() {
     expect(completed.last, const <int>[0, 2, 1, 7, 4]);
   });
 
+  testWidgets('accessible dot actions can clear and submit a pattern', (
+    tester,
+  ) async {
+    final completed = <List<int>>[];
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        builder:
+            (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(accessibleNavigation: true),
+              child: child!,
+            ),
+        home: Scaffold(
+          body: Center(
+            child: GestureLockInput(size: 240, onCompleted: completed.add),
+          ),
+        ),
+      ),
+    );
+
+    for (final number in <int>[1, 2, 3, 6]) {
+      tester.semantics.tap(find.semantics.byLabel('Gesture dot $number'));
+      await tester.pump();
+    }
+    await tester.tap(find.text('Clear gesture'));
+    await tester.pump();
+    expect(completed, isEmpty);
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
+
+    for (final number in <int>[1, 2, 3, 6]) {
+      tester.semantics.tap(find.semantics.byLabel('Gesture dot $number'));
+      await tester.pump();
+    }
+    await tester.tap(find.text('Submit gesture'));
+    await tester.pump();
+
+    expect(completed.single, const <int>[0, 1, 2, 5]);
+    semantics.dispose();
+  });
+
   testWidgets('gesture input preserves deliberate node jumps', (tester) async {
     final completed = <List<int>>[];
     await _pumpGestureInput(tester, completed);

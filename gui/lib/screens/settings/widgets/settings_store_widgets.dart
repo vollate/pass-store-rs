@@ -13,9 +13,8 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
   }
 
   void _showPasswordStores(BuildContext context) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveDetail<void>(
       context: context,
-      isScrollControlled: true,
       builder:
           (context) => _PasswordStoresSheetBody(
             stores: settingsRepository.stores,
@@ -58,14 +57,15 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
 
   void _showCreateStoreForm(BuildContext context) {
     final managedPaths = _managedPaths;
+    final localizations = context.l10n;
     final name = TextEditingController(text: 'Personal');
     final keys = TextEditingController();
     final defaultBase = _defaultStoreBasePath();
     String? selectedBase;
     _showPickerStoreForm(
       context: context,
-      title: 'Create local store',
-      submitLabel: 'Create',
+      title: localizations.createLocalStore,
+      submitLabel: localizations.create,
       canSubmit: () => managedPaths != null || selectedBase != null,
       onSubmit:
           () => settingsRepository.createLocalStore(
@@ -85,12 +85,12 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
           (sheetContext, setSheetState) => <Widget>[
             TextField(
               controller: name,
-              decoration: const InputDecoration(labelText: 'Name'),
+              decoration: InputDecoration(labelText: localizations.nameField),
               onChanged: (_) => setSheetState(() {}),
             ),
             const SizedBox(height: 12),
             PathPickerRow(
-              title: 'Store folder',
+              title: context.l10n.storeFolder,
               path:
                   managedPaths?.storeRootForName(name.text) ??
                   joinFilesystemPath(
@@ -113,7 +113,9 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
             const SizedBox(height: 12),
             TextField(
               controller: keys,
-              decoration: const InputDecoration(labelText: 'PGP keys'),
+              decoration: InputDecoration(
+                labelText: localizations.pgpKeysTitle,
+              ),
             ),
           ],
     );
@@ -121,6 +123,7 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
 
   void _showImportStoreForm(BuildContext context) {
     final managedPaths = _managedPaths;
+    final localizations = context.l10n;
     if (managedPaths != null) {
       _showManagedImportStoreForm(context, managedPaths);
       return;
@@ -129,8 +132,8 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
     String? selectedRoot;
     _showPickerStoreForm(
       context: context,
-      title: 'Import local store',
-      submitLabel: 'Import',
+      title: localizations.importLocalStore,
+      submitLabel: localizations.importAction,
       canSubmit: () => selectedRoot != null,
       onSubmit:
           () => settingsRepository.importLocalStore(
@@ -140,7 +143,7 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
       builder:
           (sheetContext, setSheetState) => <Widget>[
             PathPickerRow(
-              title: 'Store folder',
+              title: context.l10n.storeFolder,
               path: selectedRoot ?? defaultBase,
               isSelected: selectedRoot != null,
               onPressed:
@@ -161,13 +164,13 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
     BuildContext context,
     AppManagedPathRepository managedPaths,
   ) {
-    final localizations = AppLocalizations.of(context);
+    final localizations = context.l10n;
     final destinationBase = parentDirectory(
       managedPaths.storeRootForName('store'),
     );
     _showPickerStoreForm(
       context: context,
-      title: 'Import local store',
+      title: localizations.importLocalStore,
       submitLabel: localizations.chooseFolderAndImport,
       canSubmit: () => true,
       onSubmit: () async {
@@ -211,13 +214,14 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
 
   void _showCloneStoreForm(BuildContext context) {
     final managedPaths = _managedPaths;
+    final localizations = context.l10n;
     final remote = TextEditingController();
     final defaultBase = _defaultStoreBasePath();
     String? selectedBase;
     _showPickerStoreForm(
       context: context,
-      title: 'Clone Git store',
-      submitLabel: 'Clone',
+      title: localizations.cloneGitStore,
+      submitLabel: localizations.cloneAction,
       canSubmit: () => managedPaths != null || selectedBase != null,
       onSubmit:
           () => settingsRepository.cloneStore(
@@ -234,12 +238,14 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
           (sheetContext, setSheetState) => <Widget>[
             TextField(
               controller: remote,
-              decoration: const InputDecoration(labelText: 'Remote URL'),
+              decoration: InputDecoration(
+                labelText: context.l10n.remoteUrlField,
+              ),
               onChanged: (_) => setSheetState(() {}),
             ),
             const SizedBox(height: 12),
             PathPickerRow(
-              title: 'Store folder',
+              title: context.l10n.storeFolder,
               path:
                   managedPaths?.storeRootForRemote(remote.text) ??
                   joinFilesystemPath(
@@ -289,19 +295,22 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
   }
 
   void _showDeleteStoreForm(BuildContext context, String root) {
+    final localizations = context.l10n;
     final confirmation = TextEditingController();
     final storeName = _storeNameFromRoot(root);
     _showStoreForm(
       context: context,
-      title: 'Delete local store',
+      title: context.l10n.deleteLocalStore,
       fields: <Widget>[
         Text(root),
         TextField(
           controller: confirmation,
-          decoration: InputDecoration(labelText: 'Type $storeName to confirm'),
+          decoration: InputDecoration(
+            labelText: localizations.typeToConfirm(storeName),
+          ),
         ),
       ],
-      submitLabel: 'Delete',
+      submitLabel: localizations.delete,
       onSubmit:
           () => settingsRepository.deleteLocalStore(
             root: root,
@@ -344,8 +353,8 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
         final message =
             error is PathPickerException &&
                     error.code == 'store_import_no_passwords'
-                ? AppLocalizations.of(context).storeImportNoPasswords
-                : '$error';
+                ? context.l10n.storeImportNoPasswords
+                : UiProblem.fromError(context.l10n, error).summary;
         AppNotification.show(context, message);
       }
     }
@@ -379,7 +388,7 @@ class _PasswordStoresSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
+    final localizations = context.l10n;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -389,18 +398,18 @@ class _PasswordStoresSheetBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                'Password stores',
+                context.l10n.passwordStoresTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
               if (stores.isEmpty)
-                const ListTile(
+                ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.folder_off_outlined),
-                  title: Text('No password stores'),
-                  subtitle: Text('Create, import, or clone a store.'),
+                  leading: const Icon(Icons.folder_off_outlined),
+                  title: Text(context.l10n.noPasswordStores),
+                  subtitle: Text(context.l10n.createImportCloneStore),
                 ),
               for (final store in stores)
                 Card(
@@ -419,21 +428,21 @@ class _PasswordStoresSheetBody extends StatelessWidget {
                       onSelected: (value) => onStoreMenu(value, store.root),
                       itemBuilder:
                           (context) => <PopupMenuEntry<String>>[
-                            const PopupMenuItem<String>(
+                            PopupMenuItem<String>(
                               value: 'select',
-                              child: Text('Select'),
+                              child: Text(context.l10n.select),
                             ),
                             if (!isAppManagedStore(store.root))
-                              const PopupMenuItem<String>(
+                              PopupMenuItem<String>(
                                 value: 'remove',
-                                child: Text('Remove from app'),
+                                child: Text(context.l10n.removeFromApp),
                               ),
                             PopupMenuItem<String>(
                               value: 'delete',
                               child: Text(
                                 isAppManagedStore(store.root)
                                     ? localizations.deleteAppCopy
-                                    : 'Delete local store',
+                                    : context.l10n.deleteLocalStore,
                               ),
                             ),
                           ],
@@ -448,17 +457,17 @@ class _PasswordStoresSheetBody extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: onCreate,
                     icon: const Icon(Icons.create_new_folder_outlined),
-                    label: const Text('Create'),
+                    label: Text(context.l10n.create),
                   ),
                   OutlinedButton.icon(
                     onPressed: onImport,
                     icon: const Icon(Icons.folder_open_outlined),
-                    label: const Text('Import'),
+                    label: Text(context.l10n.importAction),
                   ),
                   OutlinedButton.icon(
                     onPressed: onClone,
                     icon: const Icon(Icons.cloud_download_outlined),
-                    label: const Text('Clone'),
+                    label: Text(context.l10n.cloneAction),
                   ),
                 ],
               ),
@@ -495,7 +504,7 @@ class _PickerStoreFormSheetBodyState extends State<_PickerStoreFormSheetBody> {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
+    final localizations = context.l10n;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(

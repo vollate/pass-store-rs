@@ -18,11 +18,11 @@ class _PgpSetupStep extends StatelessWidget {
     return ListView(
       children: <Widget>[
         if (keys.isEmpty)
-          const ListTile(
+          ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.key_off_outlined),
-            title: Text('No PGP keys found'),
-            subtitle: Text('Create or import a key to encrypt entries.'),
+            leading: const Icon(Icons.key_off_outlined),
+            title: Text(context.l10n.noPgpKeysFound),
+            subtitle: Text(context.l10n.createOrImportEncryptionKey),
           )
         else
           for (final key in keys)
@@ -33,7 +33,7 @@ class _PgpSetupStep extends StatelessWidget {
                 isThreeLine: true,
                 trailing: TextButton(
                   onPressed: () => onUseKey(key),
-                  child: const Text('Use PGP key'),
+                  child: Text(context.l10n.usePgpKey),
                 ),
               ),
             ),
@@ -45,12 +45,12 @@ class _PgpSetupStep extends StatelessWidget {
             FilledButton.icon(
               onPressed: onCreateKey,
               icon: const Icon(Icons.add),
-              label: const Text('Create PGP key'),
+              label: Text(context.l10n.createPgpKey),
             ),
             OutlinedButton.icon(
               onPressed: onImportKey,
               icon: const Icon(Icons.file_upload_outlined),
-              label: const Text('Import PGP key'),
+              label: Text(context.l10n.importPgpKey),
             ),
           ],
         ),
@@ -79,11 +79,11 @@ class _SshSetupStep extends StatelessWidget {
     return ListView(
       children: <Widget>[
         if (keys.isEmpty)
-          const ListTile(
+          ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.vpn_key_outlined),
-            title: Text('No SSH keys configured'),
-            subtitle: Text('SSH is optional and can be added later.'),
+            leading: const Icon(Icons.vpn_key_outlined),
+            title: Text(context.l10n.noSshKeysConfigured),
+            subtitle: Text(context.l10n.sshOptionalDescription),
           )
         else
           for (final key in keys)
@@ -102,19 +102,19 @@ class _SshSetupStep extends StatelessWidget {
             FilledButton.icon(
               onPressed: onCreateKey,
               icon: const Icon(Icons.add),
-              label: const Text('Generate SSH key'),
+              label: Text(context.l10n.generateSshKey),
             ),
             OutlinedButton.icon(
               onPressed: onImportKey,
               icon: const Icon(Icons.file_upload_outlined),
-              label: const Text('Import SSH key'),
+              label: Text(context.l10n.importSshKey),
             ),
             OutlinedButton.icon(
               onPressed: onOpenGithubSettings,
               icon: const Icon(Icons.open_in_new),
-              label: const Text('GitHub settings'),
+              label: Text(context.l10n.githubSettings),
             ),
-            TextButton(onPressed: onSkip, child: const Text('Skip SSH')),
+            TextButton(onPressed: onSkip, child: Text(context.l10n.skipSsh)),
           ],
         ),
       ],
@@ -140,16 +140,16 @@ class _CreatePgpKeyFields extends StatelessWidget {
       children: <Widget>[
         TextField(
           controller: name,
-          decoration: const InputDecoration(labelText: 'Name'),
+          decoration: InputDecoration(labelText: context.l10n.nameField),
         ),
         TextField(
           controller: email,
-          decoration: const InputDecoration(labelText: 'Email'),
+          decoration: InputDecoration(labelText: context.l10n.emailField),
         ),
         TextField(
           controller: passphrase,
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'Passphrase'),
+          decoration: InputDecoration(labelText: context.l10n.passphraseField),
         ),
       ],
     );
@@ -165,7 +165,7 @@ class _CreateSshKeyFields extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       controller: name,
-      decoration: const InputDecoration(labelText: 'Name'),
+      decoration: InputDecoration(labelText: context.l10n.nameField),
     );
   }
 }
@@ -183,13 +183,15 @@ class _ImportSshKeyFields extends StatelessWidget {
       children: <Widget>[
         TextField(
           controller: name,
-          decoration: const InputDecoration(labelText: 'Name'),
+          decoration: InputDecoration(labelText: context.l10n.nameField),
         ),
         TextField(
           controller: privateKey,
           minLines: 4,
           maxLines: 8,
-          decoration: const InputDecoration(labelText: 'Private key'),
+          decoration: InputDecoration(
+            labelText: context.l10n.privateKeyMaterial,
+          ),
         ),
       ],
     );
@@ -295,7 +297,7 @@ class _OnboardingFormSheetState extends State<_OnboardingFormSheet> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _error = error.toString();
+          _error = UiProblem.fromError(context.l10n, error).summary;
           _isSubmitting = false;
         });
       }

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+
+import '../l10n/l10n.dart';
 
 const int _gestureDimension = 3;
 const double _gestureDotSize = 48;
@@ -28,63 +31,99 @@ class _GestureLockInputState extends State<GestureLockInput> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final semanticActions = <CustomSemanticsAction, VoidCallback>{
+      if (widget.enabled)
+        CustomSemanticsAction(label: context.l10n.clearGesture): _clearPattern,
+      if (widget.enabled)
+        CustomSemanticsAction(label: context.l10n.submitGesture):
+            _completePattern,
+    };
     return Semantics(
-      label: 'Gesture pattern input',
-      child: SizedBox.square(
-        dimension: widget.size,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onPanStart:
-                  widget.enabled
-                      ? (details) => _selectDotAt(
-                        details.localPosition,
-                        constraints.biggest,
-                      )
-                      : null,
-              onPanUpdate:
-                  widget.enabled
-                      ? (details) => _selectDotAt(
-                        details.localPosition,
-                        constraints.biggest,
-                      )
-                      : null,
-              onPanEnd: widget.enabled ? (_) => _completePattern() : null,
-              onPanCancel: widget.enabled ? _clearPattern : null,
-              child: CustomPaint(
-                painter: _GestureLockPainter(
-                  selected: List<int>.unmodifiable(_selected),
-                  currentPosition: _currentPosition,
-                  activeColor: colorScheme.primary,
-                  inactiveColor: colorScheme.outline,
-                  selectedFillColor: colorScheme.primaryContainer,
-                ),
-                child: Stack(
-                  children: List<Widget>.generate(
-                    _gestureDimension * _gestureDimension,
-                    (index) {
-                      final isSelected = _selected.contains(index);
-                      final center = _gestureGridCenterFor(
-                        index,
-                        constraints.biggest,
-                      );
-                      return Positioned(
-                        left: center.dx - _gestureDotSize / 2,
-                        top: center.dy - _gestureDotSize / 2,
-                        child: _GestureDot(
-                          index: index,
-                          selected: isSelected,
-                          enabled: widget.enabled,
-                        ),
-                      );
-                    },
+      label: context.l10n.gesturePatternInput,
+      enabled: widget.enabled,
+      customSemanticsActions: semanticActions,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          SizedBox.square(
+            dimension: widget.size,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onPanStart:
+                      widget.enabled
+                          ? (details) => _selectDotAt(
+                            details.localPosition,
+                            constraints.biggest,
+                          )
+                          : null,
+                  onPanUpdate:
+                      widget.enabled
+                          ? (details) => _selectDotAt(
+                            details.localPosition,
+                            constraints.biggest,
+                          )
+                          : null,
+                  onPanEnd: widget.enabled ? (_) => _completePattern() : null,
+                  onPanCancel: widget.enabled ? _clearPattern : null,
+                  child: CustomPaint(
+                    painter: _GestureLockPainter(
+                      selected: List<int>.unmodifiable(_selected),
+                      currentPosition: _currentPosition,
+                      activeColor: colorScheme.primary,
+                      inactiveColor: colorScheme.outline,
+                      selectedFillColor: colorScheme.primaryContainer,
+                    ),
+                    child: Stack(
+                      children: List<Widget>.generate(
+                        _gestureDimension * _gestureDimension,
+                        (index) {
+                          final isSelected = _selected.contains(index);
+                          final center = _gestureGridCenterFor(
+                            index,
+                            constraints.biggest,
+                          );
+                          return Positioned(
+                            left: center.dx - _gestureDotSize / 2,
+                            top: center.dy - _gestureDotSize / 2,
+                            child: _GestureDot(
+                              index: index,
+                              selected: isSelected,
+                              enabled: widget.enabled,
+                              onActivate:
+                                  widget.enabled
+                                      ? () => _selectSemanticDot(index)
+                                      : null,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
+                );
+              },
+            ),
+          ),
+          if (MediaQuery.accessibleNavigationOf(context))
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                TextButton(
+                  onPressed: widget.enabled ? _clearPattern : null,
+                  child: Text(context.l10n.clearGesture),
                 ),
-              ),
-            );
-          },
-        ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed:
+                      widget.enabled && _selected.isNotEmpty
+                          ? _completePattern
+                          : null,
+                  child: Text(context.l10n.submitGesture),
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -96,6 +135,13 @@ class _GestureLockInputState extends State<GestureLockInput> {
       if (index == null) {
         return;
       }
+      _appendDot(index);
+    });
+  }
+
+  void _selectSemanticDot(int index) {
+    setState(() {
+      _currentPosition = null;
       _appendDot(index);
     });
   }
@@ -141,18 +187,24 @@ class _GestureDot extends StatelessWidget {
     required this.index,
     required this.selected,
     required this.enabled,
+    required this.onActivate,
   });
 
   final int index;
   final bool selected;
   final bool enabled;
+  final VoidCallback? onActivate;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final color = selected ? colorScheme.primary : colorScheme.outline;
     return Semantics(
-      label: 'Gesture dot ${index + 1}',
+      label: context.l10n.gestureDot(index + 1),
+      button: true,
+      enabled: enabled,
+      selected: selected,
+      onTap: onActivate,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
         width: _gestureDotSize,

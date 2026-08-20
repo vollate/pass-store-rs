@@ -512,12 +512,29 @@ fn inspect_app_state_treats_non_git_local_store_as_ready() {
     let temp = tempfile::tempdir().unwrap();
     let config_path = temp.path().join("pars_config.toml");
     let store_root = temp.path().join("local-store");
+    let keyring_home = temp.path().join("pgp");
+    let configured = block_on(api::configure_pgp_backend(ConfigurePgpBackendRequest {
+        config_path: config_path.display().to_string(),
+        backend: "pure_rust".to_string(),
+        keyring_home: Some(keyring_home.display().to_string()),
+        pgp_executable: None,
+    }));
+    assert!(configured.error.is_none(), "{:?}", configured.error);
+    let generated = block_on(api::generate_pgp_key(GeneratePgpKeyRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+        name: "Local User".to_string(),
+        email: "local@example.com".to_string(),
+        passphrase: Some(PASSPHRASE.to_string()),
+    }));
+    assert!(generated.error.is_none(), "{:?}", generated.error);
+    let fingerprint = generated.key.expect("generated key").fingerprint;
 
     let created = block_on(api::create_local_store(CreateLocalStoreRequest {
         config_path: config_path.display().to_string(),
         name: "Local".to_string(),
         root: store_root.display().to_string(),
-        pgp_keys: vec!["local@example.com".to_string()],
+        pgp_keys: vec![fingerprint],
         set_default: true,
         initialize_git: false,
     }));

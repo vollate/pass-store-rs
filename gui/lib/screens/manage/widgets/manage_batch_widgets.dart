@@ -36,7 +36,7 @@ class _BatchMoveSheetState extends State<_BatchMoveSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorText = error.toString();
+          _errorText = _manageErrorMessage(context, error);
         });
       }
     }
@@ -46,13 +46,13 @@ class _BatchMoveSheetState extends State<_BatchMoveSheet> {
   Widget build(BuildContext context) {
     return _operationSheet(
       context: context,
-      title: 'Batch move',
+      title: context.l10n.batchMove,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
         const SizedBox(height: 12),
         TextFormField(
-          decoration: const InputDecoration(
-            labelText: 'Destination folder',
+          decoration: InputDecoration(
+            labelText: context.l10n.destinationFolder,
             hintText: 'archive/work',
           ),
           onChanged: (value) => _destination = value,
@@ -64,7 +64,7 @@ class _BatchMoveSheetState extends State<_BatchMoveSheet> {
               _saving
                   ? null
                   : (value) => setState(() => _overwrite = value ?? false),
-          title: const Text('Overwrite if target exists'),
+          title: Text(context.l10n.overwriteTarget),
         ),
         _CommitCheckbox(
           enabled: widget.canCommit && !_saving,
@@ -74,7 +74,7 @@ class _BatchMoveSheetState extends State<_BatchMoveSheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: 'Move selected',
+          label: context.l10n.moveSelected,
           onPressed: _submit,
         ),
       ],
@@ -124,7 +124,7 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorText = error.toString();
+          _errorText = _manageErrorMessage(context, error);
         });
       }
     }
@@ -134,17 +134,17 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
   Widget build(BuildContext context) {
     return _operationSheet(
       context: context,
-      title: 'Batch rename',
+      title: context.l10n.batchRename,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
         const SizedBox(height: 12),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Prefix'),
+          decoration: InputDecoration(labelText: context.l10n.prefix),
           onChanged: (value) => _prefix = value,
         ),
         const SizedBox(height: 12),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Suffix'),
+          decoration: InputDecoration(labelText: context.l10n.suffix),
           onChanged: (value) => _suffix = value,
         ),
         CheckboxListTile(
@@ -154,7 +154,7 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
               _saving
                   ? null
                   : (value) => setState(() => _overwrite = value ?? false),
-          title: const Text('Overwrite if target exists'),
+          title: Text(context.l10n.overwriteTarget),
         ),
         _CommitCheckbox(
           enabled: widget.canCommit && !_saving,
@@ -164,7 +164,7 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: 'Rename selected',
+          label: context.l10n.renameSelected,
           onPressed: _submit,
         ),
       ],
@@ -195,7 +195,7 @@ class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
 
   Future<void> _submit() async {
     if (_confirmation != 'DELETE') {
-      setState(() => _errorText = 'Type DELETE to confirm.');
+      setState(() => _errorText = context.l10n.typeToConfirm('DELETE'));
       return;
     }
     setState(() {
@@ -211,7 +211,7 @@ class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorText = error.toString();
+          _errorText = _manageErrorMessage(context, error);
         });
       }
     }
@@ -221,12 +221,12 @@ class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
   Widget build(BuildContext context) {
     return _operationSheet(
       context: context,
-      title: 'Batch delete',
+      title: context.l10n.batchDelete,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
         const SizedBox(height: 12),
         TextFormField(
-          decoration: const InputDecoration(labelText: 'Confirmation'),
+          decoration: InputDecoration(labelText: context.l10n.confirmation),
           onChanged: (value) => _confirmation = value,
         ),
         _CommitCheckbox(
@@ -237,7 +237,7 @@ class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: 'Delete selected',
+          label: context.l10n.deleteSelected,
           onPressed: _submit,
           danger: true,
         ),
@@ -251,15 +251,15 @@ class _BatchRegenerateSheet extends StatefulWidget {
     required this.entries,
     required this.canCommit,
     required this.onSubmit,
-    this.title = 'Regenerate selected',
-    this.submitLabel = 'Regenerate batch',
+    this.title,
+    this.submitLabel,
   });
 
   final List<PasswordEntry> entries;
   final bool canCommit;
   final _BatchRegenerateSubmit onSubmit;
-  final String title;
-  final String submitLabel;
+  final String? title;
+  final String? submitLabel;
 
   @override
   State<_BatchRegenerateSheet> createState() => _BatchRegenerateSheetState();
@@ -285,7 +285,7 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorText = error.toString();
+          _errorText = _manageErrorMessage(context, error);
         });
       }
     }
@@ -295,7 +295,7 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
   Widget build(BuildContext context) {
     return _operationSheet(
       context: context,
-      title: widget.title,
+      title: widget.title ?? context.l10n.regenerateSelected,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
         CheckboxListTile(
@@ -305,7 +305,7 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
               _saving
                   ? null
                   : (value) => setState(() => _noSymbols = value ?? false),
-          title: const Text('No symbols'),
+          title: Text(context.l10n.noSymbols),
         ),
         _CommitCheckbox(
           enabled: widget.canCommit && !_saving,
@@ -315,85 +315,9 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
-          label: widget.submitLabel,
+          label: widget.submitLabel ?? context.l10n.regenerateBatch,
           onPressed: _submit,
         ),
-      ],
-    );
-  }
-}
-
-class _BatchSelectionPanel extends StatelessWidget {
-  const _BatchSelectionPanel({
-    required this.entries,
-    required this.selectedPaths,
-    required this.onChanged,
-    required this.onMove,
-    required this.onRename,
-    required this.onDelete,
-    required this.onRegenerate,
-  });
-
-  final List<PasswordEntry> entries;
-  final Set<String> selectedPaths;
-  final void Function(String path, bool selected) onChanged;
-  final VoidCallback onMove;
-  final VoidCallback onRename;
-  final VoidCallback onDelete;
-  final VoidCallback onRegenerate;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          'BATCH SELECTION',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: const Color(0xFF64748B),
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            OutlinedButton.icon(
-              onPressed: onMove,
-              icon: const Icon(Icons.drive_file_move_outlined),
-              label: const Text('Move selected'),
-            ),
-            OutlinedButton.icon(
-              onPressed: onRename,
-              icon: const Icon(Icons.drive_file_rename_outline),
-              label: const Text('Rename selected'),
-            ),
-            OutlinedButton.icon(
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('Delete selected'),
-            ),
-            OutlinedButton.icon(
-              onPressed: onRegenerate,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Regenerate batch'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (entries.isEmpty)
-          const ListTile(title: Text('No entries available'))
-        else
-          ...entries.map(
-            (entry) => CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: selectedPaths.contains(entry.path),
-              onChanged: (value) => onChanged(entry.path, value ?? false),
-              title: Text(entry.displayName),
-              subtitle: Text(entry.path),
-            ),
-          ),
       ],
     );
   }

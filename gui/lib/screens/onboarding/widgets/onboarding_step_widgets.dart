@@ -1,41 +1,48 @@
 part of '../onboarding_screen.dart';
 
-class _StepRail extends StatelessWidget {
-  const _StepRail({required this.currentStep});
+class _OnboardingProgress extends StatelessWidget {
+  const _OnboardingProgress({required this.currentStep, required this.steps});
 
   final _OnboardingStep currentStep;
+  final List<_OnboardingStep> steps;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: <Widget>[
-        for (final step in _OnboardingStep.values)
-          ChoiceChip(
-            label: Text(_shortLabel(step)),
-            selected: step == currentStep,
-            onSelected: null,
-          ),
-      ],
+    final index = steps.indexOf(currentStep).clamp(0, steps.length - 1);
+    final current = index + 1;
+    final optional =
+        currentStep == _OnboardingStep.biometrics ||
+        currentStep == _OnboardingStep.ssh;
+    final progressLabel = context.l10n.onboardingProgress(
+      current,
+      steps.length,
     );
-  }
-
-  String _shortLabel(_OnboardingStep step) {
-    switch (step) {
-      case _OnboardingStep.gesture:
-        return 'Gesture';
-      case _OnboardingStep.biometrics:
-        return 'Biometrics';
-      case _OnboardingStep.pgp:
-        return 'PGP';
-      case _OnboardingStep.ssh:
-        return 'SSH';
-      case _OnboardingStep.store:
-        return 'Store';
-      case _OnboardingStep.review:
-        return 'Review';
-    }
+    return Semantics(
+      label: progressLabel,
+      value: optional ? context.l10n.optional : context.l10n.required,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          LinearProgressIndicator(value: current / steps.length),
+          const SizedBox(height: 8),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  progressLabel,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              Chip(
+                label: Text(
+                  optional ? context.l10n.optional : context.l10n.required,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -67,8 +74,8 @@ class _BiometricSetupStep extends StatelessWidget {
                     ? Icons.fingerprint_outlined
                     : Icons.fingerprint,
               ),
-              title: const Text('Biometric unlock'),
-              subtitle: Text(_biometricSubtitle(status)),
+              title: Text(context.l10n.biometricUnlock),
+              subtitle: Text(_biometricSubtitle(context.l10n, status)),
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
@@ -86,14 +93,14 @@ class _BiometricSetupStep extends StatelessWidget {
                         }
                       },
               icon: const Icon(Icons.fingerprint),
-              label: const Text('Enable biometric unlock'),
+              label: Text(context.l10n.enableBiometricUnlock),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: onSkip,
-              child: const SizedBox(
+              child: SizedBox(
                 width: double.infinity,
-                child: Center(child: Text('Skip biometrics')),
+                child: Center(child: Text(context.l10n.skipBiometrics)),
               ),
             ),
           ],
@@ -102,15 +109,15 @@ class _BiometricSetupStep extends StatelessWidget {
     );
   }
 
-  String _biometricSubtitle(BiometricUnlockStatus status) {
-    switch (status) {
-      case BiometricUnlockStatus.available:
-        return 'Enabled on this device';
-      case BiometricUnlockStatus.disabled:
-        return 'Available on this device';
-      case BiometricUnlockStatus.unavailable:
-        return 'Unavailable on this device';
-    }
+  String _biometricSubtitle(
+    AppLocalizations localizations,
+    BiometricUnlockStatus status,
+  ) {
+    return switch (status) {
+      BiometricUnlockStatus.available => localizations.enabledOnDevice,
+      BiometricUnlockStatus.disabled => localizations.availableOnDevice,
+      BiometricUnlockStatus.unavailable => localizations.unavailableOnDevice,
+    };
   }
 }
 
@@ -170,39 +177,52 @@ class _ReviewStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = context.l10n;
     return ListView(
       children: <Widget>[
         _ReviewTile(
-          label: 'Gesture lock',
-          value: hasGestureVerifier ? 'Configured' : 'Required',
+          label: localizations.gestureLock,
+          value:
+              hasGestureVerifier
+                  ? localizations.configured
+                  : localizations.required,
           complete: hasGestureVerifier,
         ),
         _ReviewTile(
-          label: 'Biometrics',
-          value: biometricUnlockEnabled ? 'Enabled' : 'Skipped',
+          label: localizations.biometricsStep,
+          value:
+              biometricUnlockEnabled
+                  ? localizations.enabled
+                  : localizations.skipped,
           complete: true,
         ),
         _ReviewTile(
-          label: 'Password store',
+          label: localizations.passwordStore,
           value: storeStatusLabel,
           complete: storeSetupComplete,
         ),
         _ReviewTile(
-          label: 'PGP key',
-          value: pgpKeyCount == 0 ? 'Not found' : '$pgpKeyCount key(s)',
+          label: localizations.pgpKey,
+          value:
+              pgpKeyCount == 0
+                  ? localizations.notFound
+                  : localizations.keyCount(pgpKeyCount),
           complete: pgpKeyCount > 0,
         ),
         _ReviewTile(
-          label: 'SSH key',
-          value: sshKeyCount == 0 ? 'Skipped' : '$sshKeyCount key(s)',
+          label: localizations.sshKey,
+          value:
+              sshKeyCount == 0
+                  ? localizations.skipped
+                  : localizations.keyCount(sshKeyCount),
           complete: true,
         ),
         const SizedBox(height: 12),
         FilledButton(
           onPressed: storeSetupComplete ? onFinish : null,
-          child: const SizedBox(
+          child: SizedBox(
             width: double.infinity,
-            child: Center(child: Text('Finish setup')),
+            child: Center(child: Text(localizations.finishSetup)),
           ),
         ),
       ],

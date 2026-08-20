@@ -259,14 +259,10 @@ class BridgeBackedRepository
       for (final entry in entries)
         if (!entry.isDirectory) entry.path: entry,
     };
-    final recent = _metadata.recentPaths
+    return _metadata.recentPaths
         .map((path) => byPath[path])
         .whereType<PasswordEntry>()
         .toList(growable: false);
-    if (recent.isNotEmpty) {
-      return recent;
-    }
-    return entries.where((entry) => !entry.isDirectory).toList(growable: false);
   }
 
   @override
