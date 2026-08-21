@@ -6,8 +6,10 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_store_to_config`, `clone_store_inner`, `configure_pgp_backend_inner`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_remote_exists`, `import_local_store_inner`, `imported_key_kind`, `inspect_app_state_inner`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `list_keys_inner`, `list_stores_inner`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `onboarding_state`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_missing`, `pgp_key_record`, `pgp_preparation_failure`, `read_entry_inner`, `remove_store_inner`, `run_git_command_response`, `run_git`, `save_config_for_mutation`, `select_store_inner`, `simple`, `store_failure`, `store_name`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `clear_canonical_store`, `clone_git_repository`, `clone_store_inner`, `configure_pgp_backend_inner`, `configured_upstream`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `disconnect_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_failure`, `git_remote_callbacks`, `import_local_store_inner`, `imported_key_kind`, `init_git_repository`, `initialize_store_recipients_inner`, `inspect_app_state_inner`, `inspect_git_mode`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `lifecycle_state`, `list_keys_inner`, `load_config_copy`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_matches`, `pgp_key_missing`, `pgp_key_record`, `pgp_preparation_failure`, `read_entry_inner`, `require_app_managed_root`, `require_canonical_store`, `require_empty_canonical_store`, `required_remote_url`, `run_git_command_response_owned`, `run_git_command_response`, `run_system_git`, `sanitize_git_text`, `sanitize_git_token`, `sanitized_remote_url`, `save_config_for_mutation`, `set_canonical_store`, `simple`, `status_code`, `store_failure`, `store_name`, `structured_git_commit`, `structured_git_list_remotes`, `structured_git_pull`, `structured_git_push`, `structured_git_remote_mutation`, `structured_git_response`, `structured_git_status`, `structured_or_system_remote_response`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AddPgpKeyToGpgIdRequest`, `ConfiguredUpstream`, `DeletePgpKeyRequest`, `DeletePgpKeyResponse`, `ExportPgpKeyRequest`, `GitRemoteMutation`, `PgpKeyDeletionFailureKind`, `PgpKeyDeletionResultDto`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These functions are ignored (category: IgnoreBecauseExplicitAttribute): `add_pgp_key_to_gpg_id`, `delete_pgp_key`, `export_pgp_private_key`, `export_pgp_public_key`, `import_pgp_private_key_file`, `import_pgp_private_key_text`, `import_pgp_public_key`
 
 Future<ConfigResponse> loadConfig({required LoadConfigRequest request}) =>
     RustLib.instance.api.crateApiLoadConfig(request: request);
@@ -18,9 +20,6 @@ Future<UnitResponse> saveConfig({required SaveConfigRequest request}) =>
 Future<UnitResponse> configurePgpBackend({
   required ConfigurePgpBackendRequest request,
 }) => RustLib.instance.api.crateApiConfigurePgpBackend(request: request);
-
-Future<ListStoresResponse> listStores({required ListStoresRequest request}) =>
-    RustLib.instance.api.crateApiListStores(request: request);
 
 Future<ListEntriesResponse> listEntries({
   required ListEntriesRequest request,
@@ -108,15 +107,34 @@ Future<GitCommandResponse> gitPush({required GitRequest request}) =>
 Future<GitCommandResponse> gitCommit({required GitCommitRequest request}) =>
     RustLib.instance.api.crateApiGitCommit(request: request);
 
+Future<GitCommandResponse> gitListRemotes({required GitRequest request}) =>
+    RustLib.instance.api.crateApiGitListRemotes(request: request);
+
+Future<GitCommandResponse> gitAddRemote({required GitRemoteRequest request}) =>
+    RustLib.instance.api.crateApiGitAddRemote(request: request);
+
+Future<GitCommandResponse> gitSetRemoteUrl({
+  required GitRemoteRequest request,
+}) => RustLib.instance.api.crateApiGitSetRemoteUrl(request: request);
+
+Future<GitCommandResponse> gitRemoveRemote({
+  required GitRemoteRequest request,
+}) => RustLib.instance.api.crateApiGitRemoveRemote(request: request);
+
 Future<GitCommandResponse> runGitArgs({required GitArgsRequest request}) =>
     RustLib.instance.api.crateApiRunGitArgs(request: request);
+
+Future<InspectStoreGitResponse> inspectStoreGit({
+  required InspectStoreGitRequest request,
+}) => RustLib.instance.api.crateApiInspectStoreGit(request: request);
+
+Future<UnitResponse> initializeGitRepository({
+  required InitializeGitRepositoryRequest request,
+}) => RustLib.instance.api.crateApiInitializeGitRepository(request: request);
 
 Future<AppStateResponse> inspectAppState({
   required InspectAppStateRequest request,
 }) => RustLib.instance.api.crateApiInspectAppState(request: request);
-
-Future<UnitResponse> selectStore({required SelectStoreRequest request}) =>
-    RustLib.instance.api.crateApiSelectStore(request: request);
 
 Future<UnitResponse> createLocalStore({
   required CreateLocalStoreRequest request,
@@ -129,8 +147,9 @@ Future<UnitResponse> importLocalStore({
 Future<UnitResponse> cloneStore({required CloneStoreRequest request}) =>
     RustLib.instance.api.crateApiCloneStore(request: request);
 
-Future<UnitResponse> removeStore({required RemoveStoreRequest request}) =>
-    RustLib.instance.api.crateApiRemoveStore(request: request);
+Future<UnitResponse> disconnectStore({
+  required DisconnectStoreRequest request,
+}) => RustLib.instance.api.crateApiDisconnectStore(request: request);
 
 Future<UnitResponse> deleteLocalStore({
   required DeleteLocalStoreRequest request,
@@ -168,37 +187,13 @@ Future<PgpKeyImportResponse> importPgpKeyFile({
   required ImportPgpKeyFileRequest request,
 }) => RustLib.instance.api.crateApiImportPgpKeyFile(request: request);
 
-Future<KeyMutationResponse> importPgpPublicKey({
-  required ImportKeyTextRequest request,
-}) => RustLib.instance.api.crateApiImportPgpPublicKey(request: request);
-
-Future<KeyMutationResponse> importPgpPrivateKeyText({
-  required ImportKeyTextRequest request,
-}) => RustLib.instance.api.crateApiImportPgpPrivateKeyText(request: request);
-
-Future<KeyMutationResponse> importPgpPrivateKeyFile({
-  required ImportKeyFileRequest request,
-}) => RustLib.instance.api.crateApiImportPgpPrivateKeyFile(request: request);
-
-Future<KeyExportResponse> exportPgpPublicKey({
-  required ExportPgpKeyRequest request,
-}) => RustLib.instance.api.crateApiExportPgpPublicKey(request: request);
-
-Future<KeyExportResponse> exportPgpPrivateKey({
-  required ExportPgpKeyRequest request,
-}) => RustLib.instance.api.crateApiExportPgpPrivateKey(request: request);
-
 Future<PreparePgpPrivateKeyResponse> preparePgpPrivateKey({
   required PreparePgpPrivateKeyRequest request,
 }) => RustLib.instance.api.crateApiPreparePgpPrivateKey(request: request);
 
-Future<DeletePgpKeyResponse> deletePgpKey({
-  required DeletePgpKeyRequest request,
-}) => RustLib.instance.api.crateApiDeletePgpKey(request: request);
-
-Future<UnitResponse> addPgpKeyToGpgId({
-  required AddPgpKeyToGpgIdRequest request,
-}) => RustLib.instance.api.crateApiAddPgpKeyToGpgId(request: request);
+Future<UnitResponse> initializeStoreRecipients({
+  required InitializeStoreRecipientsRequest request,
+}) => RustLib.instance.api.crateApiInitializeStoreRecipients(request: request);
 
 Future<KeyMutationResponse> generateSshKey({
   required GenerateSshKeyRequest request,
@@ -227,55 +222,28 @@ Future<OpenExternalUrlResponse> openGithubSshSettings({
   required OpenGithubSshSettingsRequest request,
 }) => RustLib.instance.api.crateApiOpenGithubSshSettings(request: request);
 
-class AddPgpKeyToGpgIdRequest {
-  final String root;
-  final String fingerprint;
-
-  const AddPgpKeyToGpgIdRequest({
-    required this.root,
-    required this.fingerprint,
-  });
-
-  @override
-  int get hashCode => root.hashCode ^ fingerprint.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AddPgpKeyToGpgIdRequest &&
-          runtimeType == other.runtimeType &&
-          root == other.root &&
-          fingerprint == other.fingerprint;
-}
-
 class AppStateDto {
   final String configPath;
   final bool configExists;
-  final String? selectedStoreId;
-  final String? selectedStoreRoot;
   final String onboardingState;
   final List<String> issues;
-  final List<StoreStatusDto> stores;
+  final StoreStatusDto? store;
 
   const AppStateDto({
     required this.configPath,
     required this.configExists,
-    this.selectedStoreId,
-    this.selectedStoreRoot,
     required this.onboardingState,
     required this.issues,
-    required this.stores,
+    this.store,
   });
 
   @override
   int get hashCode =>
       configPath.hashCode ^
       configExists.hashCode ^
-      selectedStoreId.hashCode ^
-      selectedStoreRoot.hashCode ^
       onboardingState.hashCode ^
       issues.hashCode ^
-      stores.hashCode;
+      store.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -284,11 +252,9 @@ class AppStateDto {
           runtimeType == other.runtimeType &&
           configPath == other.configPath &&
           configExists == other.configExists &&
-          selectedStoreId == other.selectedStoreId &&
-          selectedStoreRoot == other.selectedStoreRoot &&
           onboardingState == other.onboardingState &&
           issues == other.issues &&
-          stores == other.stores;
+          store == other.store;
 }
 
 class AppStateResponse {
@@ -603,13 +569,15 @@ class CloneStoreRequest {
   final String configPath;
   final String remoteUrl;
   final String root;
-  final bool setDefault;
+  final String? sshPrivateKeyPath;
+  final String? sshDir;
 
   const CloneStoreRequest({
     required this.configPath,
     required this.remoteUrl,
     required this.root,
-    required this.setDefault,
+    this.sshPrivateKeyPath,
+    this.sshDir,
   });
 
   @override
@@ -617,7 +585,8 @@ class CloneStoreRequest {
       configPath.hashCode ^
       remoteUrl.hashCode ^
       root.hashCode ^
-      setDefault.hashCode;
+      sshPrivateKeyPath.hashCode ^
+      sshDir.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -627,7 +596,8 @@ class CloneStoreRequest {
           configPath == other.configPath &&
           remoteUrl == other.remoteUrl &&
           root == other.root &&
-          setDefault == other.setDefault;
+          sshPrivateKeyPath == other.sshPrivateKeyPath &&
+          sshDir == other.sshDir;
 }
 
 class ConfigResponse {
@@ -720,7 +690,6 @@ class CreateLocalStoreRequest {
   final String name;
   final String root;
   final List<String> pgpKeys;
-  final bool setDefault;
   final bool initializeGit;
 
   const CreateLocalStoreRequest({
@@ -728,7 +697,6 @@ class CreateLocalStoreRequest {
     required this.name,
     required this.root,
     required this.pgpKeys,
-    required this.setDefault,
     required this.initializeGit,
   });
 
@@ -738,7 +706,6 @@ class CreateLocalStoreRequest {
       name.hashCode ^
       root.hashCode ^
       pgpKeys.hashCode ^
-      setDefault.hashCode ^
       initializeGit.hashCode;
 
   @override
@@ -750,7 +717,6 @@ class CreateLocalStoreRequest {
           name == other.name &&
           root == other.root &&
           pgpKeys == other.pgpKeys &&
-          setDefault == other.setDefault &&
           initializeGit == other.initializeGit;
 }
 
@@ -820,17 +786,22 @@ class DeleteEntryResultDto {
 class DeleteLocalStoreRequest {
   final String configPath;
   final String root;
+  final String managedStoreBase;
   final String confirmation;
 
   const DeleteLocalStoreRequest({
     required this.configPath,
     required this.root,
+    required this.managedStoreBase,
     required this.confirmation,
   });
 
   @override
   int get hashCode =>
-      configPath.hashCode ^ root.hashCode ^ confirmation.hashCode;
+      configPath.hashCode ^
+      root.hashCode ^
+      managedStoreBase.hashCode ^
+      confirmation.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -839,52 +810,8 @@ class DeleteLocalStoreRequest {
           runtimeType == other.runtimeType &&
           configPath == other.configPath &&
           root == other.root &&
+          managedStoreBase == other.managedStoreBase &&
           confirmation == other.confirmation;
-}
-
-class DeletePgpKeyRequest {
-  final String configPath;
-  final String? pgpExecutable;
-  final String fingerprint;
-
-  const DeletePgpKeyRequest({
-    required this.configPath,
-    this.pgpExecutable,
-    required this.fingerprint,
-  });
-
-  @override
-  int get hashCode =>
-      configPath.hashCode ^ pgpExecutable.hashCode ^ fingerprint.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is DeletePgpKeyRequest &&
-          runtimeType == other.runtimeType &&
-          configPath == other.configPath &&
-          pgpExecutable == other.pgpExecutable &&
-          fingerprint == other.fingerprint;
-}
-
-class DeletePgpKeyResponse {
-  final PgpKeyDeletionResultDto? result;
-  final PgpKeyDeletionFailureKind? failureKind;
-  final BridgeFailure? error;
-
-  const DeletePgpKeyResponse({this.result, this.failureKind, this.error});
-
-  @override
-  int get hashCode => result.hashCode ^ failureKind.hashCode ^ error.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is DeletePgpKeyResponse &&
-          runtimeType == other.runtimeType &&
-          result == other.result &&
-          failureKind == other.failureKind &&
-          error == other.error;
 }
 
 class DeleteSshKeyRequest {
@@ -903,6 +830,24 @@ class DeleteSshKeyRequest {
           runtimeType == other.runtimeType &&
           sshDir == other.sshDir &&
           name == other.name;
+}
+
+class DisconnectStoreRequest {
+  final String configPath;
+  final String root;
+
+  const DisconnectStoreRequest({required this.configPath, required this.root});
+
+  @override
+  int get hashCode => configPath.hashCode ^ root.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DisconnectStoreRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          root == other.root;
 }
 
 class EditEntryRequest {
@@ -1089,37 +1034,6 @@ class EntrySummaryDto {
           parentPath == other.parentPath &&
           entryType == other.entryType &&
           childCount == other.childCount;
-}
-
-class ExportPgpKeyRequest {
-  final String configPath;
-  final String? pgpExecutable;
-  final String fingerprint;
-  final String? confirmation;
-
-  const ExportPgpKeyRequest({
-    required this.configPath,
-    this.pgpExecutable,
-    required this.fingerprint,
-    this.confirmation,
-  });
-
-  @override
-  int get hashCode =>
-      configPath.hashCode ^
-      pgpExecutable.hashCode ^
-      fingerprint.hashCode ^
-      confirmation.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ExportPgpKeyRequest &&
-          runtimeType == other.runtimeType &&
-          configPath == other.configPath &&
-          pgpExecutable == other.pgpExecutable &&
-          fingerprint == other.fingerprint &&
-          confirmation == other.confirmation;
 }
 
 class ExportSshKeyRequest {
@@ -1374,20 +1288,45 @@ class GitCommitRequest {
           message == other.message;
 }
 
-class GitRequest {
+class GitRemoteRequest {
   final String root;
+  final String name;
+  final String? url;
 
-  const GitRequest({required this.root});
+  const GitRemoteRequest({required this.root, required this.name, this.url});
 
   @override
-  int get hashCode => root.hashCode;
+  int get hashCode => root.hashCode ^ name.hashCode ^ url.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitRemoteRequest &&
+          runtimeType == other.runtimeType &&
+          root == other.root &&
+          name == other.name &&
+          url == other.url;
+}
+
+class GitRequest {
+  final String root;
+  final String? sshPrivateKeyPath;
+  final String? sshDir;
+
+  const GitRequest({required this.root, this.sshPrivateKeyPath, this.sshDir});
+
+  @override
+  int get hashCode =>
+      root.hashCode ^ sshPrivateKeyPath.hashCode ^ sshDir.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is GitRequest &&
           runtimeType == other.runtimeType &&
-          root == other.root;
+          root == other.root &&
+          sshPrivateKeyPath == other.sshPrivateKeyPath &&
+          sshDir == other.sshDir;
 }
 
 class ImportKeyFileRequest {
@@ -1463,16 +1402,11 @@ class ImportKeyTextRequest {
 class ImportLocalStoreRequest {
   final String configPath;
   final String root;
-  final bool setDefault;
 
-  const ImportLocalStoreRequest({
-    required this.configPath,
-    required this.root,
-    required this.setDefault,
-  });
+  const ImportLocalStoreRequest({required this.configPath, required this.root});
 
   @override
-  int get hashCode => configPath.hashCode ^ root.hashCode ^ setDefault.hashCode;
+  int get hashCode => configPath.hashCode ^ root.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1480,8 +1414,7 @@ class ImportLocalStoreRequest {
       other is ImportLocalStoreRequest &&
           runtimeType == other.runtimeType &&
           configPath == other.configPath &&
-          root == other.root &&
-          setDefault == other.setDefault;
+          root == other.root;
 }
 
 class ImportPgpKeyFileRequest {
@@ -1548,6 +1481,47 @@ class ImportPgpKeyTextRequest {
           pgpExecutable == other.pgpExecutable &&
           armoredText == other.armoredText &&
           passphrase == other.passphrase;
+}
+
+class InitializeGitRepositoryRequest {
+  final String root;
+
+  const InitializeGitRepositoryRequest({required this.root});
+
+  @override
+  int get hashCode => root.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InitializeGitRepositoryRequest &&
+          runtimeType == other.runtimeType &&
+          root == other.root;
+}
+
+class InitializeStoreRecipientsRequest {
+  final String configPath;
+  final String root;
+  final List<String> fingerprints;
+
+  const InitializeStoreRecipientsRequest({
+    required this.configPath,
+    required this.root,
+    required this.fingerprints,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^ root.hashCode ^ fingerprints.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InitializeStoreRecipientsRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          root == other.root &&
+          fingerprints == other.fingerprints;
 }
 
 class InsertEntryRequest {
@@ -1676,6 +1650,40 @@ class InspectPgpKeyTextRequest {
       other is InspectPgpKeyTextRequest &&
           runtimeType == other.runtimeType &&
           armoredText == other.armoredText;
+}
+
+class InspectStoreGitRequest {
+  final String root;
+
+  const InspectStoreGitRequest({required this.root});
+
+  @override
+  int get hashCode => root.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InspectStoreGitRequest &&
+          runtimeType == other.runtimeType &&
+          root == other.root;
+}
+
+class InspectStoreGitResponse {
+  final StoreGitModeDto? mode;
+  final BridgeFailure? error;
+
+  const InspectStoreGitResponse({this.mode, this.error});
+
+  @override
+  int get hashCode => mode.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InspectStoreGitResponse &&
+          runtimeType == other.runtimeType &&
+          mode == other.mode &&
+          error == other.error;
 }
 
 class KeyDetectionResponse {
@@ -1865,40 +1873,6 @@ class ListKeysResponse {
       other is ListKeysResponse &&
           runtimeType == other.runtimeType &&
           keys == other.keys &&
-          error == other.error;
-}
-
-class ListStoresRequest {
-  final String? configPath;
-
-  const ListStoresRequest({this.configPath});
-
-  @override
-  int get hashCode => configPath.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ListStoresRequest &&
-          runtimeType == other.runtimeType &&
-          configPath == other.configPath;
-}
-
-class ListStoresResponse {
-  final List<StoreInfoDto> stores;
-  final BridgeFailure? error;
-
-  const ListStoresResponse({required this.stores, this.error});
-
-  @override
-  int get hashCode => stores.hashCode ^ error.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ListStoresResponse &&
-          runtimeType == other.runtimeType &&
-          stores == other.stores &&
           error == other.error;
 }
 
@@ -2095,39 +2069,6 @@ enum PgpImportFailureKind {
   unsupportedProtection,
   reprotectionFailed,
   backendError,
-}
-
-enum PgpKeyDeletionFailureKind { privateRemovalFailed, publicCleanupFailed }
-
-class PgpKeyDeletionResultDto {
-  final String fingerprint;
-  final bool hadPrivateKey;
-  final bool privateKeyAbsent;
-  final bool publicKeyAbsent;
-
-  const PgpKeyDeletionResultDto({
-    required this.fingerprint,
-    required this.hadPrivateKey,
-    required this.privateKeyAbsent,
-    required this.publicKeyAbsent,
-  });
-
-  @override
-  int get hashCode =>
-      fingerprint.hashCode ^
-      hadPrivateKey.hashCode ^
-      privateKeyAbsent.hashCode ^
-      publicKeyAbsent.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is PgpKeyDeletionResultDto &&
-          runtimeType == other.runtimeType &&
-          fingerprint == other.fingerprint &&
-          hadPrivateKey == other.hadPrivateKey &&
-          privateKeyAbsent == other.privateKeyAbsent &&
-          publicKeyAbsent == other.publicKeyAbsent;
 }
 
 class PgpKeyImportResponse {
@@ -2359,24 +2300,6 @@ class RemoveAutofillIndexEntryRequest {
           recursive == other.recursive;
 }
 
-class RemoveStoreRequest {
-  final String configPath;
-  final String root;
-
-  const RemoveStoreRequest({required this.configPath, required this.root});
-
-  @override
-  int get hashCode => configPath.hashCode ^ root.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is RemoveStoreRequest &&
-          runtimeType == other.runtimeType &&
-          configPath == other.configPath &&
-          root == other.root;
-}
-
 class SaveConfigRequest {
   final String path;
   final String configToml;
@@ -2395,84 +2318,37 @@ class SaveConfigRequest {
           configToml == other.configToml;
 }
 
-class SelectStoreRequest {
-  final String configPath;
-  final String root;
-
-  const SelectStoreRequest({required this.configPath, required this.root});
-
-  @override
-  int get hashCode => configPath.hashCode ^ root.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is SelectStoreRequest &&
-          runtimeType == other.runtimeType &&
-          configPath == other.configPath &&
-          root == other.root;
-}
-
-class StoreInfoDto {
-  final String id;
-  final String name;
-  final String root;
-  final bool isDefault;
-
-  const StoreInfoDto({
-    required this.id,
-    required this.name,
-    required this.root,
-    required this.isDefault,
-  });
-
-  @override
-  int get hashCode =>
-      id.hashCode ^ name.hashCode ^ root.hashCode ^ isDefault.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is StoreInfoDto &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          name == other.name &&
-          root == other.root &&
-          isDefault == other.isDefault;
-}
+enum StoreGitModeDto { disabled, local, remote, invalid }
 
 class StoreStatusDto {
-  final String id;
   final String name;
   final String root;
-  final bool isDefault;
   final bool exists;
   final bool hasGpgId;
-  final bool hasGitRemote;
+  final List<String> pgpRecipients;
+  final StoreGitModeDto gitMode;
   final bool pgpKeyMissing;
   final List<String> issues;
 
   const StoreStatusDto({
-    required this.id,
     required this.name,
     required this.root,
-    required this.isDefault,
     required this.exists,
     required this.hasGpgId,
-    required this.hasGitRemote,
+    required this.pgpRecipients,
+    required this.gitMode,
     required this.pgpKeyMissing,
     required this.issues,
   });
 
   @override
   int get hashCode =>
-      id.hashCode ^
       name.hashCode ^
       root.hashCode ^
-      isDefault.hashCode ^
       exists.hashCode ^
       hasGpgId.hashCode ^
-      hasGitRemote.hashCode ^
+      pgpRecipients.hashCode ^
+      gitMode.hashCode ^
       pgpKeyMissing.hashCode ^
       issues.hashCode;
 
@@ -2481,13 +2357,12 @@ class StoreStatusDto {
       identical(this, other) ||
       other is StoreStatusDto &&
           runtimeType == other.runtimeType &&
-          id == other.id &&
           name == other.name &&
           root == other.root &&
-          isDefault == other.isDefault &&
           exists == other.exists &&
           hasGpgId == other.hasGpgId &&
-          hasGitRemote == other.hasGitRemote &&
+          pgpRecipients == other.pgpRecipients &&
+          gitMode == other.gitMode &&
           pgpKeyMissing == other.pgpKeyMissing &&
           issues == other.issues;
 }

@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 962699484;
+  int get rustContentHash => -185892966;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -76,10 +76,6 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
-  Future<UnitResponse> crateApiAddPgpKeyToGpgId({
-    required AddPgpKeyToGpgIdRequest request,
-  });
-
   Future<UnitResponse> crateApiClearAutofillIndex({
     required ClearAutofillIndexRequest request,
   });
@@ -110,10 +106,6 @@ abstract class RustLibApi extends BaseApi {
     required DeleteLocalStoreRequest request,
   });
 
-  Future<DeletePgpKeyResponse> crateApiDeletePgpKey({
-    required DeletePgpKeyRequest request,
-  });
-
   Future<UnitResponse> crateApiDeleteSshKey({
     required DeleteSshKeyRequest request,
   });
@@ -122,20 +114,16 @@ abstract class RustLibApi extends BaseApi {
     required ImportKeyTextRequest request,
   });
 
+  Future<UnitResponse> crateApiDisconnectStore({
+    required DisconnectStoreRequest request,
+  });
+
   Future<MutationResponse> crateApiEditEntry({
     required EditEntryRequest request,
   });
 
   Future<UnitResponse> crateApiEnrichAutofillIndexWebsites({
     required EnrichAutofillIndexWebsitesRequest request,
-  });
-
-  Future<KeyExportResponse> crateApiExportPgpPrivateKey({
-    required ExportPgpKeyRequest request,
-  });
-
-  Future<KeyExportResponse> crateApiExportPgpPublicKey({
-    required ExportPgpKeyRequest request,
   });
 
   Future<KeyExportResponse> crateApiExportSshPrivateKey({
@@ -158,13 +146,29 @@ abstract class RustLibApi extends BaseApi {
     required GenerateSshKeyRequest request,
   });
 
+  Future<GitCommandResponse> crateApiGitAddRemote({
+    required GitRemoteRequest request,
+  });
+
   Future<GitCommandResponse> crateApiGitCommit({
     required GitCommitRequest request,
+  });
+
+  Future<GitCommandResponse> crateApiGitListRemotes({
+    required GitRequest request,
   });
 
   Future<GitCommandResponse> crateApiGitPull({required GitRequest request});
 
   Future<GitCommandResponse> crateApiGitPush({required GitRequest request});
+
+  Future<GitCommandResponse> crateApiGitRemoveRemote({
+    required GitRemoteRequest request,
+  });
+
+  Future<GitCommandResponse> crateApiGitSetRemoteUrl({
+    required GitRemoteRequest request,
+  });
 
   Future<GitCommandResponse> crateApiGitStatus({required GitRequest request});
 
@@ -180,24 +184,20 @@ abstract class RustLibApi extends BaseApi {
     required ImportPgpKeyTextRequest request,
   });
 
-  Future<KeyMutationResponse> crateApiImportPgpPrivateKeyFile({
-    required ImportKeyFileRequest request,
-  });
-
-  Future<KeyMutationResponse> crateApiImportPgpPrivateKeyText({
-    required ImportKeyTextRequest request,
-  });
-
-  Future<KeyMutationResponse> crateApiImportPgpPublicKey({
-    required ImportKeyTextRequest request,
-  });
-
   Future<KeyMutationResponse> crateApiImportSshPrivateKeyFile({
     required ImportKeyFileRequest request,
   });
 
   Future<KeyMutationResponse> crateApiImportSshPrivateKeyText({
     required ImportKeyTextRequest request,
+  });
+
+  Future<UnitResponse> crateApiInitializeGitRepository({
+    required InitializeGitRepositoryRequest request,
+  });
+
+  Future<UnitResponse> crateApiInitializeStoreRecipients({
+    required InitializeStoreRecipientsRequest request,
   });
 
   Future<InsertEntryResponse> crateApiInsertEntry({
@@ -216,15 +216,15 @@ abstract class RustLibApi extends BaseApi {
     required InspectPgpKeyTextRequest request,
   });
 
+  Future<InspectStoreGitResponse> crateApiInspectStoreGit({
+    required InspectStoreGitRequest request,
+  });
+
   Future<ListEntriesResponse> crateApiListEntries({
     required ListEntriesRequest request,
   });
 
   Future<ListKeysResponse> crateApiListKeys({required ListKeysRequest request});
-
-  Future<ListStoresResponse> crateApiListStores({
-    required ListStoresRequest request,
-  });
 
   Future<ConfigResponse> crateApiLoadConfig({
     required LoadConfigRequest request,
@@ -270,10 +270,6 @@ abstract class RustLibApi extends BaseApi {
     required RemoveAutofillIndexEntryRequest request,
   });
 
-  Future<UnitResponse> crateApiRemoveStore({
-    required RemoveStoreRequest request,
-  });
-
   Future<AutofillCredentialResponse> crateApiResolveAutofillCredential({
     required AutofillCredentialRequest request,
   });
@@ -283,10 +279,6 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<UnitResponse> crateApiSaveConfig({required SaveConfigRequest request});
-
-  Future<UnitResponse> crateApiSelectStore({
-    required SelectStoreRequest request,
-  });
 
   Future<UnitResponse> crateApiUpsertAutofillIndexEntry({
     required UpsertAutofillIndexEntryRequest request,
@@ -300,41 +292,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required super.generalizedFrbRustBinding,
     required super.portManager,
   });
-
-  @override
-  Future<UnitResponse> crateApiAddPgpKeyToGpgId({
-    required AddPgpKeyToGpgIdRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_add_pgp_key_to_gpg_id_request(
-            request,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 1,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiAddPgpKeyToGpgIdConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiAddPgpKeyToGpgIdConstMeta => const TaskConstMeta(
-    debugName: "add_pgp_key_to_gpg_id",
-    argNames: ["request"],
-  );
 
   @override
   Future<UnitResponse> crateApiClearAutofillIndex({
@@ -351,7 +308,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 1,
             port: port_,
           );
         },
@@ -386,7 +343,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 2,
             port: port_,
           );
         },
@@ -419,7 +376,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 3,
             port: port_,
           );
         },
@@ -452,7 +409,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 4,
             port: port_,
           );
         },
@@ -485,7 +442,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 5,
             port: port_,
           );
         },
@@ -520,7 +477,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 6,
             port: port_,
           );
         },
@@ -552,7 +509,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 7,
             port: port_,
           );
         },
@@ -585,7 +542,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 8,
             port: port_,
           );
         },
@@ -606,36 +563,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<DeletePgpKeyResponse> crateApiDeletePgpKey({
-    required DeletePgpKeyRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_delete_pgp_key_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 10,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_delete_pgp_key_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiDeletePgpKeyConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiDeletePgpKeyConstMeta =>
-      const TaskConstMeta(debugName: "delete_pgp_key", argNames: ["request"]);
-
-  @override
   Future<UnitResponse> crateApiDeleteSshKey({
     required DeleteSshKeyRequest request,
   }) {
@@ -647,7 +574,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 9,
             port: port_,
           );
         },
@@ -677,7 +604,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 10,
             port: port_,
           );
         },
@@ -698,6 +625,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<UnitResponse> crateApiDisconnectStore({
+    required DisconnectStoreRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_disconnect_store_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDisconnectStoreConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDisconnectStoreConstMeta =>
+      const TaskConstMeta(debugName: "disconnect_store", argNames: ["request"]);
+
+  @override
   Future<MutationResponse> crateApiEditEntry({
     required EditEntryRequest request,
   }) {
@@ -709,7 +666,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 12,
             port: port_,
           );
         },
@@ -742,7 +699,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 13,
             port: port_,
           );
         },
@@ -764,71 +721,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<KeyExportResponse> crateApiExportPgpPrivateKey({
-    required ExportPgpKeyRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_export_pgp_key_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 15,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_key_export_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiExportPgpPrivateKeyConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiExportPgpPrivateKeyConstMeta =>
-      const TaskConstMeta(
-        debugName: "export_pgp_private_key",
-        argNames: ["request"],
-      );
-
-  @override
-  Future<KeyExportResponse> crateApiExportPgpPublicKey({
-    required ExportPgpKeyRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_export_pgp_key_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 16,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_key_export_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiExportPgpPublicKeyConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiExportPgpPublicKeyConstMeta => const TaskConstMeta(
-    debugName: "export_pgp_public_key",
-    argNames: ["request"],
-  );
-
-  @override
   Future<KeyExportResponse> crateApiExportSshPrivateKey({
     required ExportSshKeyRequest request,
   }) {
@@ -840,7 +732,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 14,
             port: port_,
           );
         },
@@ -873,7 +765,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 15,
             port: port_,
           );
         },
@@ -905,7 +797,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 16,
             port: port_,
           );
         },
@@ -935,7 +827,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 17,
             port: port_,
           );
         },
@@ -965,7 +857,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 18,
             port: port_,
           );
         },
@@ -984,6 +876,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "generate_ssh_key", argNames: ["request"]);
 
   @override
+  Future<GitCommandResponse> crateApiGitAddRemote({
+    required GitRemoteRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_remote_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 19,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_command_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitAddRemoteConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitAddRemoteConstMeta =>
+      const TaskConstMeta(debugName: "git_add_remote", argNames: ["request"]);
+
+  @override
   Future<GitCommandResponse> crateApiGitCommit({
     required GitCommitRequest request,
   }) {
@@ -995,7 +917,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 20,
             port: port_,
           );
         },
@@ -1014,6 +936,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "git_commit", argNames: ["request"]);
 
   @override
+  Future<GitCommandResponse> crateApiGitListRemotes({
+    required GitRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_command_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitListRemotesConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitListRemotesConstMeta =>
+      const TaskConstMeta(debugName: "git_list_remotes", argNames: ["request"]);
+
+  @override
   Future<GitCommandResponse> crateApiGitPull({required GitRequest request}) {
     return handler.executeNormal(
       NormalTask(
@@ -1023,7 +975,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1051,7 +1003,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1070,6 +1022,70 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "git_push", argNames: ["request"]);
 
   @override
+  Future<GitCommandResponse> crateApiGitRemoveRemote({
+    required GitRemoteRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_remote_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_command_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitRemoveRemoteConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitRemoveRemoteConstMeta => const TaskConstMeta(
+    debugName: "git_remove_remote",
+    argNames: ["request"],
+  );
+
+  @override
+  Future<GitCommandResponse> crateApiGitSetRemoteUrl({
+    required GitRemoteRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_remote_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_command_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitSetRemoteUrlConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitSetRemoteUrlConstMeta => const TaskConstMeta(
+    debugName: "git_set_remote_url",
+    argNames: ["request"],
+  );
+
+  @override
   Future<GitCommandResponse> crateApiGitStatus({required GitRequest request}) {
     return handler.executeNormal(
       NormalTask(
@@ -1079,7 +1095,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1112,7 +1128,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1147,7 +1163,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1182,7 +1198,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1203,104 +1219,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<KeyMutationResponse> crateApiImportPgpPrivateKeyFile({
-    required ImportKeyFileRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_import_key_file_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 29,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_key_mutation_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiImportPgpPrivateKeyFileConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiImportPgpPrivateKeyFileConstMeta =>
-      const TaskConstMeta(
-        debugName: "import_pgp_private_key_file",
-        argNames: ["request"],
-      );
-
-  @override
-  Future<KeyMutationResponse> crateApiImportPgpPrivateKeyText({
-    required ImportKeyTextRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_import_key_text_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 30,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_key_mutation_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiImportPgpPrivateKeyTextConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiImportPgpPrivateKeyTextConstMeta =>
-      const TaskConstMeta(
-        debugName: "import_pgp_private_key_text",
-        argNames: ["request"],
-      );
-
-  @override
-  Future<KeyMutationResponse> crateApiImportPgpPublicKey({
-    required ImportKeyTextRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_import_key_text_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 31,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_key_mutation_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiImportPgpPublicKeyConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiImportPgpPublicKeyConstMeta => const TaskConstMeta(
-    debugName: "import_pgp_public_key",
-    argNames: ["request"],
-  );
-
-  @override
   Future<KeyMutationResponse> crateApiImportSshPrivateKeyFile({
     required ImportKeyFileRequest request,
   }) {
@@ -1312,7 +1230,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1345,7 +1263,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1363,6 +1281,78 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiImportSshPrivateKeyTextConstMeta =>
       const TaskConstMeta(
         debugName: "import_ssh_private_key_text",
+        argNames: ["request"],
+      );
+
+  @override
+  Future<UnitResponse> crateApiInitializeGitRepository({
+    required InitializeGitRepositoryRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_initialize_git_repository_request(
+            request,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiInitializeGitRepositoryConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiInitializeGitRepositoryConstMeta =>
+      const TaskConstMeta(
+        debugName: "initialize_git_repository",
+        argNames: ["request"],
+      );
+
+  @override
+  Future<UnitResponse> crateApiInitializeStoreRecipients({
+    required InitializeStoreRecipientsRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_initialize_store_recipients_request(
+            request,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 33,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiInitializeStoreRecipientsConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiInitializeStoreRecipientsConstMeta =>
+      const TaskConstMeta(
+        debugName: "initialize_store_recipients",
         argNames: ["request"],
       );
 
@@ -1499,6 +1489,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<InspectStoreGitResponse> crateApiInspectStoreGit({
+    required InspectStoreGitRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_inspect_store_git_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 38,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_inspect_store_git_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiInspectStoreGitConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiInspectStoreGitConstMeta => const TaskConstMeta(
+    debugName: "inspect_store_git",
+    argNames: ["request"],
+  );
+
+  @override
   Future<ListEntriesResponse> crateApiListEntries({
     required ListEntriesRequest request,
   }) {
@@ -1510,7 +1532,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1540,7 +1562,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1557,36 +1579,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiListKeysConstMeta =>
       const TaskConstMeta(debugName: "list_keys", argNames: ["request"]);
-
-  @override
-  Future<ListStoresResponse> crateApiListStores({
-    required ListStoresRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_list_stores_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 40,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_list_stores_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiListStoresConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiListStoresConstMeta =>
-      const TaskConstMeta(debugName: "list_stores", argNames: ["request"]);
 
   @override
   Future<ConfigResponse> crateApiLoadConfig({
@@ -1964,36 +1956,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<UnitResponse> crateApiRemoveStore({
-    required RemoveStoreRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_remove_store_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 52,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiRemoveStoreConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiRemoveStoreConstMeta =>
-      const TaskConstMeta(debugName: "remove_store", argNames: ["request"]);
-
-  @override
   Future<AutofillCredentialResponse> crateApiResolveAutofillCredential({
     required AutofillCredentialRequest request,
   }) {
@@ -2008,7 +1970,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 53,
+            funcId: 52,
             port: port_,
           );
         },
@@ -2041,7 +2003,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 54,
+            funcId: 53,
             port: port_,
           );
         },
@@ -2071,7 +2033,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 55,
+            funcId: 54,
             port: port_,
           );
         },
@@ -2090,36 +2052,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "save_config", argNames: ["request"]);
 
   @override
-  Future<UnitResponse> crateApiSelectStore({
-    required SelectStoreRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_select_store_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 56,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiSelectStoreConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiSelectStoreConstMeta =>
-      const TaskConstMeta(debugName: "select_store", argNames: ["request"]);
-
-  @override
   Future<UnitResponse> crateApiUpsertAutofillIndexEntry({
     required UpsertAutofillIndexEntryRequest request,
   }) {
@@ -2134,7 +2066,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 57,
+            funcId: 55,
             port: port_,
           );
         },
@@ -2162,33 +2094,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  AddPgpKeyToGpgIdRequest dco_decode_add_pgp_key_to_gpg_id_request(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return AddPgpKeyToGpgIdRequest(
-      root: dco_decode_String(arr[0]),
-      fingerprint: dco_decode_String(arr[1]),
-    );
-  }
-
-  @protected
   AppStateDto dco_decode_app_state_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return AppStateDto(
       configPath: dco_decode_String(arr[0]),
       configExists: dco_decode_bool(arr[1]),
-      selectedStoreId: dco_decode_opt_String(arr[2]),
-      selectedStoreRoot: dco_decode_opt_String(arr[3]),
-      onboardingState: dco_decode_String(arr[4]),
-      issues: dco_decode_list_String(arr[5]),
-      stores: dco_decode_list_store_status_dto(arr[6]),
+      onboardingState: dco_decode_String(arr[2]),
+      issues: dco_decode_list_String(arr[3]),
+      store: dco_decode_opt_box_autoadd_store_status_dto(arr[4]),
     );
   }
 
@@ -2316,14 +2232,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  AddPgpKeyToGpgIdRequest dco_decode_box_autoadd_add_pgp_key_to_gpg_id_request(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_add_pgp_key_to_gpg_id_request(raw);
-  }
-
-  @protected
   AppStateDto dco_decode_box_autoadd_app_state_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_app_state_dto(raw);
@@ -2426,19 +2334,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  DeletePgpKeyRequest dco_decode_box_autoadd_delete_pgp_key_request(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_delete_pgp_key_request(raw);
-  }
-
-  @protected
   DeleteSshKeyRequest dco_decode_box_autoadd_delete_ssh_key_request(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_delete_ssh_key_request(raw);
+  }
+
+  @protected
+  DisconnectStoreRequest dco_decode_box_autoadd_disconnect_store_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_disconnect_store_request(raw);
   }
 
   @protected
@@ -2464,14 +2372,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EntrySecretDto dco_decode_box_autoadd_entry_secret_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_entry_secret_dto(raw);
-  }
-
-  @protected
-  ExportPgpKeyRequest dco_decode_box_autoadd_export_pgp_key_request(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_export_pgp_key_request(raw);
   }
 
   @protected
@@ -2535,6 +2435,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitRemoteRequest dco_decode_box_autoadd_git_remote_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_remote_request(raw);
+  }
+
+  @protected
   GitRequest dco_decode_box_autoadd_git_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_git_request(raw);
@@ -2587,6 +2493,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  InitializeGitRepositoryRequest
+  dco_decode_box_autoadd_initialize_git_repository_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_initialize_git_repository_request(raw);
+  }
+
+  @protected
+  InitializeStoreRecipientsRequest
+  dco_decode_box_autoadd_initialize_store_recipients_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_initialize_store_recipients_request(raw);
+  }
+
+  @protected
   InsertEntryRequest dco_decode_box_autoadd_insert_entry_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_insert_entry_request(raw);
@@ -2625,6 +2545,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  InspectStoreGitRequest dco_decode_box_autoadd_inspect_store_git_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_inspect_store_git_request(raw);
+  }
+
+  @protected
   KeyExportDto dco_decode_box_autoadd_key_export_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_key_export_dto(raw);
@@ -2646,12 +2574,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ListKeysRequest dco_decode_box_autoadd_list_keys_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_list_keys_request(raw);
-  }
-
-  @protected
-  ListStoresRequest dco_decode_box_autoadd_list_stores_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_list_stores_request(raw);
   }
 
   @protected
@@ -2702,21 +2624,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PgpKeyDeletionFailureKind
-  dco_decode_box_autoadd_pgp_key_deletion_failure_kind(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_pgp_key_deletion_failure_kind(raw);
-  }
-
-  @protected
-  PgpKeyDeletionResultDto dco_decode_box_autoadd_pgp_key_deletion_result_dto(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_pgp_key_deletion_result_dto(raw);
-  }
-
-  @protected
   PgpKeyInspectionDto dco_decode_box_autoadd_pgp_key_inspection_dto(
     dynamic raw,
   ) {
@@ -2753,21 +2660,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RemoveStoreRequest dco_decode_box_autoadd_remove_store_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_remove_store_request(raw);
-  }
-
-  @protected
   SaveConfigRequest dco_decode_box_autoadd_save_config_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_save_config_request(raw);
   }
 
   @protected
-  SelectStoreRequest dco_decode_box_autoadd_select_store_request(dynamic raw) {
+  StoreGitModeDto dco_decode_box_autoadd_store_git_mode_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_select_store_request(raw);
+    return dco_decode_store_git_mode_dto(raw);
+  }
+
+  @protected
+  StoreStatusDto dco_decode_box_autoadd_store_status_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_store_status_dto(raw);
   }
 
   @protected
@@ -2832,13 +2739,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CloneStoreRequest dco_decode_clone_store_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return CloneStoreRequest(
       configPath: dco_decode_String(arr[0]),
       remoteUrl: dco_decode_String(arr[1]),
       root: dco_decode_String(arr[2]),
-      setDefault: dco_decode_bool(arr[3]),
+      sshPrivateKeyPath: dco_decode_opt_String(arr[3]),
+      sshDir: dco_decode_opt_String(arr[4]),
     );
   }
 
@@ -2900,15 +2808,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CreateLocalStoreRequest dco_decode_create_local_store_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return CreateLocalStoreRequest(
       configPath: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
       root: dco_decode_String(arr[2]),
       pgpKeys: dco_decode_list_String(arr[3]),
-      setDefault: dco_decode_bool(arr[4]),
-      initializeGit: dco_decode_bool(arr[5]),
+      initializeGit: dco_decode_bool(arr[4]),
     );
   }
 
@@ -2953,40 +2860,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   DeleteLocalStoreRequest dco_decode_delete_local_store_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return DeleteLocalStoreRequest(
       configPath: dco_decode_String(arr[0]),
       root: dco_decode_String(arr[1]),
-      confirmation: dco_decode_String(arr[2]),
-    );
-  }
-
-  @protected
-  DeletePgpKeyRequest dco_decode_delete_pgp_key_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
-    return DeletePgpKeyRequest(
-      configPath: dco_decode_String(arr[0]),
-      pgpExecutable: dco_decode_opt_String(arr[1]),
-      fingerprint: dco_decode_String(arr[2]),
-    );
-  }
-
-  @protected
-  DeletePgpKeyResponse dco_decode_delete_pgp_key_response(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
-    return DeletePgpKeyResponse(
-      result: dco_decode_opt_box_autoadd_pgp_key_deletion_result_dto(arr[0]),
-      failureKind: dco_decode_opt_box_autoadd_pgp_key_deletion_failure_kind(
-        arr[1],
-      ),
-      error: dco_decode_opt_box_autoadd_bridge_failure(arr[2]),
+      managedStoreBase: dco_decode_String(arr[2]),
+      confirmation: dco_decode_String(arr[3]),
     );
   }
 
@@ -2999,6 +2879,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return DeleteSshKeyRequest(
       sshDir: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  DisconnectStoreRequest dco_decode_disconnect_store_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return DisconnectStoreRequest(
+      configPath: dco_decode_String(arr[0]),
+      root: dco_decode_String(arr[1]),
     );
   }
 
@@ -3086,20 +2978,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       parentPath: dco_decode_opt_String(arr[2]),
       entryType: dco_decode_String(arr[3]),
       childCount: dco_decode_u_32(arr[4]),
-    );
-  }
-
-  @protected
-  ExportPgpKeyRequest dco_decode_export_pgp_key_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
-    return ExportPgpKeyRequest(
-      configPath: dco_decode_String(arr[0]),
-      pgpExecutable: dco_decode_opt_String(arr[1]),
-      fingerprint: dco_decode_String(arr[2]),
-      confirmation: dco_decode_opt_String(arr[3]),
     );
   }
 
@@ -3237,12 +3115,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitRemoteRequest dco_decode_git_remote_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return GitRemoteRequest(
+      root: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      url: dco_decode_opt_String(arr[2]),
+    );
+  }
+
+  @protected
   GitRequest dco_decode_git_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 1)
-      throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
-    return GitRequest(root: dco_decode_String(arr[0]));
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return GitRequest(
+      root: dco_decode_String(arr[0]),
+      sshPrivateKeyPath: dco_decode_opt_String(arr[1]),
+      sshDir: dco_decode_opt_String(arr[2]),
+    );
   }
 
   @protected
@@ -3285,12 +3180,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ImportLocalStoreRequest dco_decode_import_local_store_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
     return ImportLocalStoreRequest(
       configPath: dco_decode_String(arr[0]),
       root: dco_decode_String(arr[1]),
-      setDefault: dco_decode_bool(arr[2]),
     );
   }
 
@@ -3319,6 +3213,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       pgpExecutable: dco_decode_opt_String(arr[1]),
       armoredText: dco_decode_String(arr[2]),
       passphrase: dco_decode_opt_String(arr[3]),
+    );
+  }
+
+  @protected
+  InitializeGitRepositoryRequest dco_decode_initialize_git_repository_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 1)
+      throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
+    return InitializeGitRepositoryRequest(root: dco_decode_String(arr[0]));
+  }
+
+  @protected
+  InitializeStoreRecipientsRequest
+  dco_decode_initialize_store_recipients_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return InitializeStoreRecipientsRequest(
+      configPath: dco_decode_String(arr[0]),
+      root: dco_decode_String(arr[1]),
+      fingerprints: dco_decode_list_String(arr[2]),
     );
   }
 
@@ -3394,6 +3313,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (arr.length != 1)
       throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
     return InspectPgpKeyTextRequest(armoredText: dco_decode_String(arr[0]));
+  }
+
+  @protected
+  InspectStoreGitRequest dco_decode_inspect_store_git_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 1)
+      throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
+    return InspectStoreGitRequest(root: dco_decode_String(arr[0]));
+  }
+
+  @protected
+  InspectStoreGitResponse dco_decode_inspect_store_git_response(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return InspectStoreGitResponse(
+      mode: dco_decode_opt_box_autoadd_store_git_mode_dto(arr[0]),
+      error: dco_decode_opt_box_autoadd_bridge_failure(arr[1]),
+    );
   }
 
   @protected
@@ -3558,39 +3498,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
-  }
-
-  @protected
-  List<StoreInfoDto> dco_decode_list_store_info_dto(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return (raw as List<dynamic>).map(dco_decode_store_info_dto).toList();
-  }
-
-  @protected
-  List<StoreStatusDto> dco_decode_list_store_status_dto(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return (raw as List<dynamic>).map(dco_decode_store_status_dto).toList();
-  }
-
-  @protected
-  ListStoresRequest dco_decode_list_stores_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 1)
-      throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
-    return ListStoresRequest(configPath: dco_decode_opt_String(arr[0]));
-  }
-
-  @protected
-  ListStoresResponse dco_decode_list_stores_response(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return ListStoresResponse(
-      stores: dco_decode_list_store_info_dto(arr[0]),
-      error: dco_decode_opt_box_autoadd_bridge_failure(arr[1]),
-    );
   }
 
   @protected
@@ -3796,24 +3703,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PgpKeyDeletionFailureKind?
-  dco_decode_opt_box_autoadd_pgp_key_deletion_failure_kind(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null
-        ? null
-        : dco_decode_box_autoadd_pgp_key_deletion_failure_kind(raw);
-  }
-
-  @protected
-  PgpKeyDeletionResultDto?
-  dco_decode_opt_box_autoadd_pgp_key_deletion_result_dto(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null
-        ? null
-        : dco_decode_box_autoadd_pgp_key_deletion_result_dto(raw);
-  }
-
-  @protected
   PgpKeyInspectionDto? dco_decode_opt_box_autoadd_pgp_key_inspection_dto(
     dynamic raw,
   ) {
@@ -3821,6 +3710,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return raw == null
         ? null
         : dco_decode_box_autoadd_pgp_key_inspection_dto(raw);
+  }
+
+  @protected
+  StoreGitModeDto? dco_decode_opt_box_autoadd_store_git_mode_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_store_git_mode_dto(raw);
+  }
+
+  @protected
+  StoreStatusDto? dco_decode_opt_box_autoadd_store_status_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_store_status_dto(raw);
   }
 
   @protected
@@ -3859,28 +3760,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PgpImportFailureKind dco_decode_pgp_import_failure_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return PgpImportFailureKind.values[raw as int];
-  }
-
-  @protected
-  PgpKeyDeletionFailureKind dco_decode_pgp_key_deletion_failure_kind(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return PgpKeyDeletionFailureKind.values[raw as int];
-  }
-
-  @protected
-  PgpKeyDeletionResultDto dco_decode_pgp_key_deletion_result_dto(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
-    return PgpKeyDeletionResultDto(
-      fingerprint: dco_decode_String(arr[0]),
-      hadPrivateKey: dco_decode_bool(arr[1]),
-      privateKeyAbsent: dco_decode_bool(arr[2]),
-      publicKeyAbsent: dco_decode_bool(arr[3]),
-    );
   }
 
   @protected
@@ -4010,18 +3889,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RemoveStoreRequest dco_decode_remove_store_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return RemoveStoreRequest(
-      configPath: dco_decode_String(arr[0]),
-      root: dco_decode_String(arr[1]),
-    );
-  }
-
-  @protected
   SaveConfigRequest dco_decode_save_config_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -4034,47 +3901,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  SelectStoreRequest dco_decode_select_store_request(dynamic raw) {
+  StoreGitModeDto dco_decode_store_git_mode_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return SelectStoreRequest(
-      configPath: dco_decode_String(arr[0]),
-      root: dco_decode_String(arr[1]),
-    );
-  }
-
-  @protected
-  StoreInfoDto dco_decode_store_info_dto(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
-    return StoreInfoDto(
-      id: dco_decode_String(arr[0]),
-      name: dco_decode_String(arr[1]),
-      root: dco_decode_String(arr[2]),
-      isDefault: dco_decode_bool(arr[3]),
-    );
+    return StoreGitModeDto.values[raw as int];
   }
 
   @protected
   StoreStatusDto dco_decode_store_status_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return StoreStatusDto(
-      id: dco_decode_String(arr[0]),
-      name: dco_decode_String(arr[1]),
-      root: dco_decode_String(arr[2]),
-      isDefault: dco_decode_bool(arr[3]),
-      exists: dco_decode_bool(arr[4]),
-      hasGpgId: dco_decode_bool(arr[5]),
-      hasGitRemote: dco_decode_bool(arr[6]),
-      pgpKeyMissing: dco_decode_bool(arr[7]),
-      issues: dco_decode_list_String(arr[8]),
+      name: dco_decode_String(arr[0]),
+      root: dco_decode_String(arr[1]),
+      exists: dco_decode_bool(arr[2]),
+      hasGpgId: dco_decode_bool(arr[3]),
+      pgpRecipients: dco_decode_list_String(arr[4]),
+      gitMode: dco_decode_store_git_mode_dto(arr[5]),
+      pgpKeyMissing: dco_decode_bool(arr[6]),
+      issues: dco_decode_list_String(arr[7]),
     );
   }
 
@@ -4128,36 +3974,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  AddPgpKeyToGpgIdRequest sse_decode_add_pgp_key_to_gpg_id_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_root = sse_decode_String(deserializer);
-    var var_fingerprint = sse_decode_String(deserializer);
-    return AddPgpKeyToGpgIdRequest(
-      root: var_root,
-      fingerprint: var_fingerprint,
-    );
-  }
-
-  @protected
   AppStateDto sse_decode_app_state_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_configPath = sse_decode_String(deserializer);
     var var_configExists = sse_decode_bool(deserializer);
-    var var_selectedStoreId = sse_decode_opt_String(deserializer);
-    var var_selectedStoreRoot = sse_decode_opt_String(deserializer);
     var var_onboardingState = sse_decode_String(deserializer);
     var var_issues = sse_decode_list_String(deserializer);
-    var var_stores = sse_decode_list_store_status_dto(deserializer);
+    var var_store = sse_decode_opt_box_autoadd_store_status_dto(deserializer);
     return AppStateDto(
       configPath: var_configPath,
       configExists: var_configExists,
-      selectedStoreId: var_selectedStoreId,
-      selectedStoreRoot: var_selectedStoreRoot,
       onboardingState: var_onboardingState,
       issues: var_issues,
-      stores: var_stores,
+      store: var_store,
     );
   }
 
@@ -4299,14 +4128,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  AddPgpKeyToGpgIdRequest sse_decode_box_autoadd_add_pgp_key_to_gpg_id_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_add_pgp_key_to_gpg_id_request(deserializer));
-  }
-
-  @protected
   AppStateDto sse_decode_box_autoadd_app_state_dto(
     SseDeserializer deserializer,
   ) {
@@ -4421,19 +4242,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  DeletePgpKeyRequest sse_decode_box_autoadd_delete_pgp_key_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_delete_pgp_key_request(deserializer));
-  }
-
-  @protected
   DeleteSshKeyRequest sse_decode_box_autoadd_delete_ssh_key_request(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_delete_ssh_key_request(deserializer));
+  }
+
+  @protected
+  DisconnectStoreRequest sse_decode_box_autoadd_disconnect_store_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_disconnect_store_request(deserializer));
   }
 
   @protected
@@ -4467,14 +4288,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_entry_secret_dto(deserializer));
-  }
-
-  @protected
-  ExportPgpKeyRequest sse_decode_box_autoadd_export_pgp_key_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_export_pgp_key_request(deserializer));
   }
 
   @protected
@@ -4542,6 +4355,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitRemoteRequest sse_decode_box_autoadd_git_remote_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_remote_request(deserializer));
+  }
+
+  @protected
   GitRequest sse_decode_box_autoadd_git_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_git_request(deserializer));
@@ -4594,6 +4415,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  InitializeGitRepositoryRequest
+  sse_decode_box_autoadd_initialize_git_repository_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_initialize_git_repository_request(deserializer));
+  }
+
+  @protected
+  InitializeStoreRecipientsRequest
+  sse_decode_box_autoadd_initialize_store_recipients_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_initialize_store_recipients_request(deserializer));
+  }
+
+  @protected
   InsertEntryRequest sse_decode_box_autoadd_insert_entry_request(
     SseDeserializer deserializer,
   ) {
@@ -4634,6 +4473,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  InspectStoreGitRequest sse_decode_box_autoadd_inspect_store_git_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_inspect_store_git_request(deserializer));
+  }
+
+  @protected
   KeyExportDto sse_decode_box_autoadd_key_export_dto(
     SseDeserializer deserializer,
   ) {
@@ -4663,14 +4510,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_list_keys_request(deserializer));
-  }
-
-  @protected
-  ListStoresRequest sse_decode_box_autoadd_list_stores_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_list_stores_request(deserializer));
   }
 
   @protected
@@ -4733,23 +4572,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PgpKeyDeletionFailureKind
-  sse_decode_box_autoadd_pgp_key_deletion_failure_kind(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_pgp_key_deletion_failure_kind(deserializer));
-  }
-
-  @protected
-  PgpKeyDeletionResultDto sse_decode_box_autoadd_pgp_key_deletion_result_dto(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_pgp_key_deletion_result_dto(deserializer));
-  }
-
-  @protected
   PgpKeyInspectionDto sse_decode_box_autoadd_pgp_key_inspection_dto(
     SseDeserializer deserializer,
   ) {
@@ -4794,14 +4616,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RemoveStoreRequest sse_decode_box_autoadd_remove_store_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_remove_store_request(deserializer));
-  }
-
-  @protected
   SaveConfigRequest sse_decode_box_autoadd_save_config_request(
     SseDeserializer deserializer,
   ) {
@@ -4810,11 +4624,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  SelectStoreRequest sse_decode_box_autoadd_select_store_request(
+  StoreGitModeDto sse_decode_box_autoadd_store_git_mode_dto(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_select_store_request(deserializer));
+    return (sse_decode_store_git_mode_dto(deserializer));
+  }
+
+  @protected
+  StoreStatusDto sse_decode_box_autoadd_store_status_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_store_status_dto(deserializer));
   }
 
   @protected
@@ -4891,12 +4713,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_configPath = sse_decode_String(deserializer);
     var var_remoteUrl = sse_decode_String(deserializer);
     var var_root = sse_decode_String(deserializer);
-    var var_setDefault = sse_decode_bool(deserializer);
+    var var_sshPrivateKeyPath = sse_decode_opt_String(deserializer);
+    var var_sshDir = sse_decode_opt_String(deserializer);
     return CloneStoreRequest(
       configPath: var_configPath,
       remoteUrl: var_remoteUrl,
       root: var_root,
-      setDefault: var_setDefault,
+      sshPrivateKeyPath: var_sshPrivateKeyPath,
+      sshDir: var_sshDir,
     );
   }
 
@@ -4956,14 +4780,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_name = sse_decode_String(deserializer);
     var var_root = sse_decode_String(deserializer);
     var var_pgpKeys = sse_decode_list_String(deserializer);
-    var var_setDefault = sse_decode_bool(deserializer);
     var var_initializeGit = sse_decode_bool(deserializer);
     return CreateLocalStoreRequest(
       configPath: var_configPath,
       name: var_name,
       root: var_root,
       pgpKeys: var_pgpKeys,
-      setDefault: var_setDefault,
       initializeGit: var_initializeGit,
     );
   }
@@ -5015,44 +4837,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_configPath = sse_decode_String(deserializer);
     var var_root = sse_decode_String(deserializer);
+    var var_managedStoreBase = sse_decode_String(deserializer);
     var var_confirmation = sse_decode_String(deserializer);
     return DeleteLocalStoreRequest(
       configPath: var_configPath,
       root: var_root,
+      managedStoreBase: var_managedStoreBase,
       confirmation: var_confirmation,
-    );
-  }
-
-  @protected
-  DeletePgpKeyRequest sse_decode_delete_pgp_key_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_configPath = sse_decode_String(deserializer);
-    var var_pgpExecutable = sse_decode_opt_String(deserializer);
-    var var_fingerprint = sse_decode_String(deserializer);
-    return DeletePgpKeyRequest(
-      configPath: var_configPath,
-      pgpExecutable: var_pgpExecutable,
-      fingerprint: var_fingerprint,
-    );
-  }
-
-  @protected
-  DeletePgpKeyResponse sse_decode_delete_pgp_key_response(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_result = sse_decode_opt_box_autoadd_pgp_key_deletion_result_dto(
-      deserializer,
-    );
-    var var_failureKind =
-        sse_decode_opt_box_autoadd_pgp_key_deletion_failure_kind(deserializer);
-    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
-    return DeletePgpKeyResponse(
-      result: var_result,
-      failureKind: var_failureKind,
-      error: var_error,
     );
   }
 
@@ -5064,6 +4855,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_sshDir = sse_decode_String(deserializer);
     var var_name = sse_decode_String(deserializer);
     return DeleteSshKeyRequest(sshDir: var_sshDir, name: var_name);
+  }
+
+  @protected
+  DisconnectStoreRequest sse_decode_disconnect_store_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_configPath = sse_decode_String(deserializer);
+    var var_root = sse_decode_String(deserializer);
+    return DisconnectStoreRequest(configPath: var_configPath, root: var_root);
   }
 
   @protected
@@ -5159,23 +4960,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       parentPath: var_parentPath,
       entryType: var_entryType,
       childCount: var_childCount,
-    );
-  }
-
-  @protected
-  ExportPgpKeyRequest sse_decode_export_pgp_key_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_configPath = sse_decode_String(deserializer);
-    var var_pgpExecutable = sse_decode_opt_String(deserializer);
-    var var_fingerprint = sse_decode_String(deserializer);
-    var var_confirmation = sse_decode_opt_String(deserializer);
-    return ExportPgpKeyRequest(
-      configPath: var_configPath,
-      pgpExecutable: var_pgpExecutable,
-      fingerprint: var_fingerprint,
-      confirmation: var_confirmation,
     );
   }
 
@@ -5321,10 +5105,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitRemoteRequest sse_decode_git_remote_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_root = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_url = sse_decode_opt_String(deserializer);
+    return GitRemoteRequest(root: var_root, name: var_name, url: var_url);
+  }
+
+  @protected
   GitRequest sse_decode_git_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_root = sse_decode_String(deserializer);
-    return GitRequest(root: var_root);
+    var var_sshPrivateKeyPath = sse_decode_opt_String(deserializer);
+    var var_sshDir = sse_decode_opt_String(deserializer);
+    return GitRequest(
+      root: var_root,
+      sshPrivateKeyPath: var_sshPrivateKeyPath,
+      sshDir: var_sshDir,
+    );
   }
 
   @protected
@@ -5378,12 +5177,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_configPath = sse_decode_String(deserializer);
     var var_root = sse_decode_String(deserializer);
-    var var_setDefault = sse_decode_bool(deserializer);
-    return ImportLocalStoreRequest(
-      configPath: var_configPath,
-      root: var_root,
-      setDefault: var_setDefault,
-    );
+    return ImportLocalStoreRequest(configPath: var_configPath, root: var_root);
   }
 
   @protected
@@ -5417,6 +5211,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       pgpExecutable: var_pgpExecutable,
       armoredText: var_armoredText,
       passphrase: var_passphrase,
+    );
+  }
+
+  @protected
+  InitializeGitRepositoryRequest sse_decode_initialize_git_repository_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_root = sse_decode_String(deserializer);
+    return InitializeGitRepositoryRequest(root: var_root);
+  }
+
+  @protected
+  InitializeStoreRecipientsRequest
+  sse_decode_initialize_store_recipients_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_configPath = sse_decode_String(deserializer);
+    var var_root = sse_decode_String(deserializer);
+    var var_fingerprints = sse_decode_list_String(deserializer);
+    return InitializeStoreRecipientsRequest(
+      configPath: var_configPath,
+      root: var_root,
+      fingerprints: var_fingerprints,
     );
   }
 
@@ -5495,6 +5312,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_armoredText = sse_decode_String(deserializer);
     return InspectPgpKeyTextRequest(armoredText: var_armoredText);
+  }
+
+  @protected
+  InspectStoreGitRequest sse_decode_inspect_store_git_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_root = sse_decode_String(deserializer);
+    return InspectStoreGitRequest(root: var_root);
+  }
+
+  @protected
+  InspectStoreGitResponse sse_decode_inspect_store_git_response(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_mode = sse_decode_opt_box_autoadd_store_git_mode_dto(deserializer);
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return InspectStoreGitResponse(mode: var_mode, error: var_error);
   }
 
   @protected
@@ -5684,53 +5520,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
-  }
-
-  @protected
-  List<StoreInfoDto> sse_decode_list_store_info_dto(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    var len_ = sse_decode_i_32(deserializer);
-    var ans_ = <StoreInfoDto>[];
-    for (var idx_ = 0; idx_ < len_; ++idx_) {
-      ans_.add(sse_decode_store_info_dto(deserializer));
-    }
-    return ans_;
-  }
-
-  @protected
-  List<StoreStatusDto> sse_decode_list_store_status_dto(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    var len_ = sse_decode_i_32(deserializer);
-    var ans_ = <StoreStatusDto>[];
-    for (var idx_ = 0; idx_ < len_; ++idx_) {
-      ans_.add(sse_decode_store_status_dto(deserializer));
-    }
-    return ans_;
-  }
-
-  @protected
-  ListStoresRequest sse_decode_list_stores_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_configPath = sse_decode_opt_String(deserializer);
-    return ListStoresRequest(configPath: var_configPath);
-  }
-
-  @protected
-  ListStoresResponse sse_decode_list_stores_response(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_stores = sse_decode_list_store_info_dto(deserializer);
-    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
-    return ListStoresResponse(stores: var_stores, error: var_error);
   }
 
   @protected
@@ -6004,36 +5793,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PgpKeyDeletionFailureKind?
-  sse_decode_opt_box_autoadd_pgp_key_deletion_failure_kind(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_pgp_key_deletion_failure_kind(
-        deserializer,
-      ));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
-  PgpKeyDeletionResultDto?
-  sse_decode_opt_box_autoadd_pgp_key_deletion_result_dto(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_pgp_key_deletion_result_dto(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
   PgpKeyInspectionDto? sse_decode_opt_box_autoadd_pgp_key_inspection_dto(
     SseDeserializer deserializer,
   ) {
@@ -6041,6 +5800,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_pgp_key_inspection_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  StoreGitModeDto? sse_decode_opt_box_autoadd_store_git_mode_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_store_git_mode_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  StoreStatusDto? sse_decode_opt_box_autoadd_store_status_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_store_status_dto(deserializer));
     } else {
       return null;
     }
@@ -6093,32 +5878,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return PgpImportFailureKind.values[inner];
-  }
-
-  @protected
-  PgpKeyDeletionFailureKind sse_decode_pgp_key_deletion_failure_kind(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var inner = sse_decode_i_32(deserializer);
-    return PgpKeyDeletionFailureKind.values[inner];
-  }
-
-  @protected
-  PgpKeyDeletionResultDto sse_decode_pgp_key_deletion_result_dto(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_fingerprint = sse_decode_String(deserializer);
-    var var_hadPrivateKey = sse_decode_bool(deserializer);
-    var var_privateKeyAbsent = sse_decode_bool(deserializer);
-    var var_publicKeyAbsent = sse_decode_bool(deserializer);
-    return PgpKeyDeletionResultDto(
-      fingerprint: var_fingerprint,
-      hadPrivateKey: var_hadPrivateKey,
-      privateKeyAbsent: var_privateKeyAbsent,
-      publicKeyAbsent: var_publicKeyAbsent,
-    );
   }
 
   @protected
@@ -6266,16 +6025,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RemoveStoreRequest sse_decode_remove_store_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_configPath = sse_decode_String(deserializer);
-    var var_root = sse_decode_String(deserializer);
-    return RemoveStoreRequest(configPath: var_configPath, root: var_root);
-  }
-
-  @protected
   SaveConfigRequest sse_decode_save_config_request(
     SseDeserializer deserializer,
   ) {
@@ -6286,50 +6035,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  SelectStoreRequest sse_decode_select_store_request(
-    SseDeserializer deserializer,
-  ) {
+  StoreGitModeDto sse_decode_store_git_mode_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_configPath = sse_decode_String(deserializer);
-    var var_root = sse_decode_String(deserializer);
-    return SelectStoreRequest(configPath: var_configPath, root: var_root);
-  }
-
-  @protected
-  StoreInfoDto sse_decode_store_info_dto(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_id = sse_decode_String(deserializer);
-    var var_name = sse_decode_String(deserializer);
-    var var_root = sse_decode_String(deserializer);
-    var var_isDefault = sse_decode_bool(deserializer);
-    return StoreInfoDto(
-      id: var_id,
-      name: var_name,
-      root: var_root,
-      isDefault: var_isDefault,
-    );
+    var inner = sse_decode_i_32(deserializer);
+    return StoreGitModeDto.values[inner];
   }
 
   @protected
   StoreStatusDto sse_decode_store_status_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_id = sse_decode_String(deserializer);
     var var_name = sse_decode_String(deserializer);
     var var_root = sse_decode_String(deserializer);
-    var var_isDefault = sse_decode_bool(deserializer);
     var var_exists = sse_decode_bool(deserializer);
     var var_hasGpgId = sse_decode_bool(deserializer);
-    var var_hasGitRemote = sse_decode_bool(deserializer);
+    var var_pgpRecipients = sse_decode_list_String(deserializer);
+    var var_gitMode = sse_decode_store_git_mode_dto(deserializer);
     var var_pgpKeyMissing = sse_decode_bool(deserializer);
     var var_issues = sse_decode_list_String(deserializer);
     return StoreStatusDto(
-      id: var_id,
       name: var_name,
       root: var_root,
-      isDefault: var_isDefault,
       exists: var_exists,
       hasGpgId: var_hasGpgId,
-      hasGitRemote: var_hasGitRemote,
+      pgpRecipients: var_pgpRecipients,
+      gitMode: var_gitMode,
       pgpKeyMissing: var_pgpKeyMissing,
       issues: var_issues,
     );
@@ -6378,25 +6107,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_add_pgp_key_to_gpg_id_request(
-    AddPgpKeyToGpgIdRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.root, serializer);
-    sse_encode_String(self.fingerprint, serializer);
-  }
-
-  @protected
   void sse_encode_app_state_dto(AppStateDto self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.configPath, serializer);
     sse_encode_bool(self.configExists, serializer);
-    sse_encode_opt_String(self.selectedStoreId, serializer);
-    sse_encode_opt_String(self.selectedStoreRoot, serializer);
     sse_encode_String(self.onboardingState, serializer);
     sse_encode_list_String(self.issues, serializer);
-    sse_encode_list_store_status_dto(self.stores, serializer);
+    sse_encode_opt_box_autoadd_store_status_dto(self.store, serializer);
   }
 
   @protected
@@ -6501,15 +6218,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_add_pgp_key_to_gpg_id_request(
-    AddPgpKeyToGpgIdRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_add_pgp_key_to_gpg_id_request(self, serializer);
   }
 
   @protected
@@ -6639,21 +6347,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_delete_pgp_key_request(
-    DeletePgpKeyRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_delete_pgp_key_request(self, serializer);
-  }
-
-  @protected
   void sse_encode_box_autoadd_delete_ssh_key_request(
     DeleteSshKeyRequest self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_delete_ssh_key_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_disconnect_store_request(
+    DisconnectStoreRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_disconnect_store_request(self, serializer);
   }
 
   @protected
@@ -6690,15 +6398,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_entry_secret_dto(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_export_pgp_key_request(
-    ExportPgpKeyRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_export_pgp_key_request(self, serializer);
   }
 
   @protected
@@ -6774,6 +6473,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_git_remote_request(
+    GitRemoteRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_remote_request(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_git_request(
     GitRequest self,
     SseSerializer serializer,
@@ -6834,6 +6542,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_initialize_git_repository_request(
+    InitializeGitRepositoryRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_initialize_git_repository_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_initialize_store_recipients_request(
+    InitializeStoreRecipientsRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_initialize_store_recipients_request(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_insert_entry_request(
     InsertEntryRequest self,
     SseSerializer serializer,
@@ -6879,6 +6605,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_inspect_store_git_request(
+    InspectStoreGitRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_inspect_store_git_request(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_key_export_dto(
     KeyExportDto self,
     SseSerializer serializer,
@@ -6912,15 +6647,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_keys_request(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_list_stores_request(
-    ListStoresRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_list_stores_request(self, serializer);
   }
 
   @protected
@@ -6987,24 +6713,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_pgp_key_deletion_failure_kind(
-    PgpKeyDeletionFailureKind self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_pgp_key_deletion_failure_kind(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_pgp_key_deletion_result_dto(
-    PgpKeyDeletionResultDto self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_pgp_key_deletion_result_dto(self, serializer);
-  }
-
-  @protected
   void sse_encode_box_autoadd_pgp_key_inspection_dto(
     PgpKeyInspectionDto self,
     SseSerializer serializer,
@@ -7050,15 +6758,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_remove_store_request(
-    RemoveStoreRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_remove_store_request(self, serializer);
-  }
-
-  @protected
   void sse_encode_box_autoadd_save_config_request(
     SaveConfigRequest self,
     SseSerializer serializer,
@@ -7068,12 +6767,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_select_store_request(
-    SelectStoreRequest self,
+  void sse_encode_box_autoadd_store_git_mode_dto(
+    StoreGitModeDto self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_select_store_request(self, serializer);
+    sse_encode_store_git_mode_dto(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_store_status_dto(
+    StoreStatusDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_store_status_dto(self, serializer);
   }
 
   @protected
@@ -7141,7 +6849,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.configPath, serializer);
     sse_encode_String(self.remoteUrl, serializer);
     sse_encode_String(self.root, serializer);
-    sse_encode_bool(self.setDefault, serializer);
+    sse_encode_opt_String(self.sshPrivateKeyPath, serializer);
+    sse_encode_opt_String(self.sshDir, serializer);
   }
 
   @protected
@@ -7199,7 +6908,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.name, serializer);
     sse_encode_String(self.root, serializer);
     sse_encode_list_String(self.pgpKeys, serializer);
-    sse_encode_bool(self.setDefault, serializer);
     sse_encode_bool(self.initializeGit, serializer);
   }
 
@@ -7242,35 +6950,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.configPath, serializer);
     sse_encode_String(self.root, serializer);
+    sse_encode_String(self.managedStoreBase, serializer);
     sse_encode_String(self.confirmation, serializer);
-  }
-
-  @protected
-  void sse_encode_delete_pgp_key_request(
-    DeletePgpKeyRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.configPath, serializer);
-    sse_encode_opt_String(self.pgpExecutable, serializer);
-    sse_encode_String(self.fingerprint, serializer);
-  }
-
-  @protected
-  void sse_encode_delete_pgp_key_response(
-    DeletePgpKeyResponse self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_opt_box_autoadd_pgp_key_deletion_result_dto(
-      self.result,
-      serializer,
-    );
-    sse_encode_opt_box_autoadd_pgp_key_deletion_failure_kind(
-      self.failureKind,
-      serializer,
-    );
-    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
   }
 
   @protected
@@ -7281,6 +6962,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.sshDir, serializer);
     sse_encode_String(self.name, serializer);
+  }
+
+  @protected
+  void sse_encode_disconnect_store_request(
+    DisconnectStoreRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.configPath, serializer);
+    sse_encode_String(self.root, serializer);
   }
 
   @protected
@@ -7352,18 +7043,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.parentPath, serializer);
     sse_encode_String(self.entryType, serializer);
     sse_encode_u_32(self.childCount, serializer);
-  }
-
-  @protected
-  void sse_encode_export_pgp_key_request(
-    ExportPgpKeyRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.configPath, serializer);
-    sse_encode_opt_String(self.pgpExecutable, serializer);
-    sse_encode_String(self.fingerprint, serializer);
-    sse_encode_opt_String(self.confirmation, serializer);
   }
 
   @protected
@@ -7483,9 +7162,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_git_remote_request(
+    GitRemoteRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.root, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_opt_String(self.url, serializer);
+  }
+
+  @protected
   void sse_encode_git_request(GitRequest self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.root, serializer);
+    sse_encode_opt_String(self.sshPrivateKeyPath, serializer);
+    sse_encode_opt_String(self.sshDir, serializer);
   }
 
   @protected
@@ -7528,7 +7220,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.configPath, serializer);
     sse_encode_String(self.root, serializer);
-    sse_encode_bool(self.setDefault, serializer);
   }
 
   @protected
@@ -7553,6 +7244,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.pgpExecutable, serializer);
     sse_encode_String(self.armoredText, serializer);
     sse_encode_opt_String(self.passphrase, serializer);
+  }
+
+  @protected
+  void sse_encode_initialize_git_repository_request(
+    InitializeGitRepositoryRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.root, serializer);
+  }
+
+  @protected
+  void sse_encode_initialize_store_recipients_request(
+    InitializeStoreRecipientsRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.configPath, serializer);
+    sse_encode_String(self.root, serializer);
+    sse_encode_list_String(self.fingerprints, serializer);
   }
 
   @protected
@@ -7615,6 +7326,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.armoredText, serializer);
+  }
+
+  @protected
+  void sse_encode_inspect_store_git_request(
+    InspectStoreGitRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.root, serializer);
+  }
+
+  @protected
+  void sse_encode_inspect_store_git_response(
+    InspectStoreGitResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_store_git_mode_dto(self.mode, serializer);
+    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
   }
 
   @protected
@@ -7782,49 +7512,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
-  }
-
-  @protected
-  void sse_encode_list_store_info_dto(
-    List<StoreInfoDto> self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_32(self.length, serializer);
-    for (final item in self) {
-      sse_encode_store_info_dto(item, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_list_store_status_dto(
-    List<StoreStatusDto> self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_32(self.length, serializer);
-    for (final item in self) {
-      sse_encode_store_status_dto(item, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_list_stores_request(
-    ListStoresRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_opt_String(self.configPath, serializer);
-  }
-
-  @protected
-  void sse_encode_list_stores_response(
-    ListStoresResponse self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_list_store_info_dto(self.stores, serializer);
-    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
   }
 
   @protected
@@ -8087,32 +7774,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_pgp_key_deletion_failure_kind(
-    PgpKeyDeletionFailureKind? self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_pgp_key_deletion_failure_kind(self, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_opt_box_autoadd_pgp_key_deletion_result_dto(
-    PgpKeyDeletionResultDto? self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_pgp_key_deletion_result_dto(self, serializer);
-    }
-  }
-
-  @protected
   void sse_encode_opt_box_autoadd_pgp_key_inspection_dto(
     PgpKeyInspectionDto? self,
     SseSerializer serializer,
@@ -8122,6 +7783,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_pgp_key_inspection_dto(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_store_git_mode_dto(
+    StoreGitModeDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_store_git_mode_dto(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_store_status_dto(
+    StoreStatusDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_store_status_dto(self, serializer);
     }
   }
 
@@ -8163,27 +7850,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
-  }
-
-  @protected
-  void sse_encode_pgp_key_deletion_failure_kind(
-    PgpKeyDeletionFailureKind self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_32(self.index, serializer);
-  }
-
-  @protected
-  void sse_encode_pgp_key_deletion_result_dto(
-    PgpKeyDeletionResultDto self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.fingerprint, serializer);
-    sse_encode_bool(self.hadPrivateKey, serializer);
-    sse_encode_bool(self.privateKeyAbsent, serializer);
-    sse_encode_bool(self.publicKeyAbsent, serializer);
   }
 
   @protected
@@ -8297,16 +7963,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_remove_store_request(
-    RemoveStoreRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.configPath, serializer);
-    sse_encode_String(self.root, serializer);
-  }
-
-  @protected
   void sse_encode_save_config_request(
     SaveConfigRequest self,
     SseSerializer serializer,
@@ -8317,22 +7973,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_select_store_request(
-    SelectStoreRequest self,
+  void sse_encode_store_git_mode_dto(
+    StoreGitModeDto self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.configPath, serializer);
-    sse_encode_String(self.root, serializer);
-  }
-
-  @protected
-  void sse_encode_store_info_dto(StoreInfoDto self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.id, serializer);
-    sse_encode_String(self.name, serializer);
-    sse_encode_String(self.root, serializer);
-    sse_encode_bool(self.isDefault, serializer);
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected
@@ -8341,13 +7987,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.id, serializer);
     sse_encode_String(self.name, serializer);
     sse_encode_String(self.root, serializer);
-    sse_encode_bool(self.isDefault, serializer);
     sse_encode_bool(self.exists, serializer);
     sse_encode_bool(self.hasGpgId, serializer);
-    sse_encode_bool(self.hasGitRemote, serializer);
+    sse_encode_list_String(self.pgpRecipients, serializer);
+    sse_encode_store_git_mode_dto(self.gitMode, serializer);
     sse_encode_bool(self.pgpKeyMissing, serializer);
     sse_encode_list_String(self.issues, serializer);
   }

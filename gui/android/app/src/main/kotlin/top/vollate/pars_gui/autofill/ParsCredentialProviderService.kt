@@ -82,12 +82,18 @@ class ParsCredentialProviderService : CredentialProviderService() {
                 .authority(packageName)
                 .appendPath("credential")
                 .appendPath(candidate.path.hashCode().toString())
+                .appendPath(candidate.generation)
                 .build()
         val pendingIntent =
             ParsAutofillUnlockActivity.pendingIntent(
                 context = this,
-                requestCode = candidate.path.hashCode(),
-                intent = ParsAutofillUnlockActivity.credentialIntent(this, candidate.path),
+                requestCode = 31 * candidate.path.hashCode() + candidate.generation.hashCode(),
+                intent =
+                    ParsAutofillUnlockActivity.credentialIntent(
+                        this,
+                        candidate.path,
+                        candidate.generation,
+                    ),
             )
         val actionSlice =
             Slice.Builder(

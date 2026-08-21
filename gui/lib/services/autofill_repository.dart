@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -238,6 +239,8 @@ class BridgeAutofillRepository implements AutofillRepository {
     this.currentStoreId,
     this.currentStoreName,
     this.currentStoreRoot,
+    this.currentStoreReady,
+    this.validatePgpPassphraseForCurrentStore,
     this.forcePlatformPublication = false,
   });
 
@@ -252,10 +255,14 @@ class BridgeAutofillRepository implements AutofillRepository {
   final String Function()? currentStoreId;
   final String Function()? currentStoreName;
   final String Function()? currentStoreRoot;
+  final bool Function()? currentStoreReady;
+  final Future<bool> Function(String fingerprint, String passphrase)?
+  validatePgpPassphraseForCurrentStore;
   final bool forcePlatformPublication;
   AutofillStatus _status = const AutofillStatus.unavailable(
     'Autofill data has not been built',
   );
+  Future<void> _platformStateTail = Future<void>.value();
 
   @override
   AutofillStatus get status => _status;
@@ -346,7 +353,19 @@ class BridgeAutofillRepository implements AutofillRepository {
         entries: _entryMetadata(entries),
       ),
     );
-    _throwIfFailure(response.error);
+    try {
+      _throwIfFailure(response.error);
+    } catch (error, stackTrace) {
+      await _serializePlatformState(_clearPlatformState);
+      _status = const AutofillStatus(
+        available: false,
+        indexedEntries: 0,
+        kind: AutofillStatusKind.needsRebuild,
+        message:
+            'Autofill data belongs to another store. Rebuild it explicitly.',
+      );
+      Error.throwWithStackTrace(error, stackTrace);
+    }
     await publishPlatformState();
     if (_status.available) {
       _status = AutofillStatus(
@@ -449,21 +468,31 @@ class BridgeAutofillRepository implements AutofillRepository {
   }
 
   @override
-  Future<void> publishPlatformState() async {
+  Future<void> publishPlatformState() => _serializePlatformState(() async {
     if (!forcePlatformPublication && !Platform.isAndroid && !Platform.isIOS) {
+      return;
+    }
+    final capturedRoot = currentStoreRoot?.call() ?? storeRoot;
+    if (!_isCapturedStoreReady(capturedRoot)) {
+      await _clearPlatformState();
+      return;
+    }
+    final passphrase = await _storedPlatformPassphrase(capturedRoot);
+    if (!_isCapturedStoreReady(capturedRoot)) {
+      await _clearPlatformState();
       return;
     }
     try {
       await _platformAutofillChannel.invokeMethod<void>('publishState', {
         'configPath': configPath,
         'indexPath': indexPath,
-        'storeRoot': currentStoreRoot?.call() ?? storeRoot,
-        'passphrase': await _storedPlatformPassphrase(),
+        'storeRoot': capturedRoot,
+        'passphrase': passphrase,
       });
     } on MissingPluginException {
       return;
     }
-  }
+  });
 
   @override
   Future<void> openPlatformSettings() async {
@@ -488,14 +517,38 @@ class BridgeAutofillRepository implements AutofillRepository {
   }
 
   @override
-  Future<void> clearIndex() async {
-    final response = await bridge.clearAutofillIndex(
-      request: frb.ClearAutofillIndexRequest(indexPath: indexPath),
-    );
-    _throwIfFailure(response.error);
-    await _clearPlatformState();
-    _status = const AutofillStatus.disabled('Autofill data is cleared');
-  }
+  Future<void> clearIndex() => _serializePlatformState(() async {
+    Object? failure;
+    StackTrace? failureStack;
+    try {
+      // Persist the native disabled tombstone before touching the shared index.
+      await _clearPlatformState();
+    } catch (error, stackTrace) {
+      failure = error;
+      failureStack = stackTrace;
+    }
+    try {
+      final response = await bridge.clearAutofillIndex(
+        request: frb.ClearAutofillIndexRequest(indexPath: indexPath),
+      );
+      _throwIfFailure(response.error);
+    } catch (error, stackTrace) {
+      failure ??= error;
+      failureStack ??= stackTrace;
+    }
+    try {
+      // This final tombstone wins over any publication queued before removal.
+      await _clearPlatformState();
+    } catch (error, stackTrace) {
+      failure ??= error;
+      failureStack ??= stackTrace;
+    } finally {
+      _status = const AutofillStatus.disabled('Autofill data is cleared');
+    }
+    if (failure != null) {
+      Error.throwWithStackTrace(failure, failureStack ?? StackTrace.current);
+    }
+  });
 
   Future<void> _completeIncremental(frb.UnitResponse response) async {
     _throwIfFailure(response.error);
@@ -514,10 +567,24 @@ class BridgeAutofillRepository implements AutofillRepository {
     return passphrase?.passphrase;
   }
 
-  Future<String?> _storedPlatformPassphrase() async {
+  Future<String?> _storedPlatformPassphrase(String capturedRoot) async {
+    if (!_isCapturedStoreReady(capturedRoot)) return null;
     final passphrase = await securityRepository?.readPgpPassphrase();
-    return passphrase?.passphrase;
+    if (!_isCapturedStoreReady(capturedRoot) || passphrase == null) return null;
+    final valid =
+        await validatePgpPassphraseForCurrentStore?.call(
+          passphrase.fingerprint,
+          passphrase.passphrase,
+        ) ==
+        true;
+    if (!_isCapturedStoreReady(capturedRoot) || !valid) return null;
+    return passphrase.passphrase;
   }
+
+  bool _isCapturedStoreReady(String capturedRoot) =>
+      capturedRoot.trim().isNotEmpty &&
+      currentStoreReady?.call() == true &&
+      (currentStoreRoot?.call() ?? storeRoot) == capturedRoot;
 
   List<frb.AutofillEntryMetadataDto> _entryMetadata(
     List<PasswordEntry> entries,
@@ -564,8 +631,26 @@ class BridgeAutofillRepository implements AutofillRepository {
     }
   }
 
+  Future<T> _serializePlatformState<T>(Future<T> Function() operation) {
+    final result = Completer<T>();
+    _platformStateTail = _platformStateTail
+        .catchError((_) {
+          // One failed native operation must not poison the serialization tail.
+        })
+        .then((_) async {
+          try {
+            result.complete(await operation());
+          } catch (error, stackTrace) {
+            result.completeError(error, stackTrace);
+          }
+        });
+    return result.future;
+  }
+
   Future<void> _clearPlatformState() async {
-    if (!Platform.isAndroid && !Platform.isIOS) return;
+    if (!forcePlatformPublication && !Platform.isAndroid && !Platform.isIOS) {
+      return;
+    }
     try {
       await _platformAutofillChannel.invokeMethod<void>('clearState');
     } on MissingPluginException {
@@ -699,6 +784,9 @@ class FakeAutofillRepository implements AutofillRepository {
   Future<void> clearIndex() async {
     _candidates.clear();
     _credentials.clear();
+    lastRebuiltEntries = const <PasswordEntry>[];
+    lastRankingEntries = const <PasswordEntry>[];
+    lastEnrichedPaths = const <String>[];
     operations.add('clear');
     cleared = true;
     _status = const AutofillStatus.disabled('Autofill data is cleared');

@@ -95,8 +95,18 @@ import UIKit
       case "publishState":
         self.publishAutofillState(call: call, result: result)
       case "clearState":
-        ParsAutofillSharedState.clear()
-        result(nil)
+        ParsAutofillSharedState.clear { clearResult in
+          switch clearResult {
+          case .success:
+            result(nil)
+          case .failure(let error):
+            result(
+              FlutterError(
+                code: "AUTOFILL_STATE_CLEAR_FAILED",
+                message: error.localizedDescription,
+                details: nil))
+          }
+        }
       case "openSettings":
         guard let url = URL(string: UIApplication.openSettingsURLString) else {
           result(

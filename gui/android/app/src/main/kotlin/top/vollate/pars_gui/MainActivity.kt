@@ -19,7 +19,7 @@ import io.flutter.plugin.common.MethodChannel
 import top.vollate.pars_gui.autofill.ParsAutofillStateStore
 
 class MainActivity : FlutterFragmentActivity() {
-    private lateinit var managedStoreImporter: ManagedStoreImporter
+    internal lateinit var managedStoreImporter: ManagedStoreImporter
     private val clipboardHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,18 +90,49 @@ class MainActivity : FlutterFragmentActivity() {
             when (call.method) {
                 "publishState" -> {
                     val args = call.arguments as? Map<*, *>
-                    ParsAutofillStateStore.publish(
-                        context = this,
-                        configPath = args?.get("configPath") as? String,
-                        indexPath = args?.get("indexPath") as? String,
-                        storeRoot = args?.get("storeRoot") as? String,
-                        passphrase = args?.get("passphrase") as? String,
-                    )
-                    result.success(null)
+                    val published =
+                        ParsAutofillStateStore.publish(
+                            context = this,
+                            configPath = args?.get("configPath") as? String,
+                            indexPath = args?.get("indexPath") as? String,
+                            storeRoot = args?.get("storeRoot") as? String,
+                            passphrase = args?.get("passphrase") as? String,
+                        )
+                    if (published) {
+                        result.success(null)
+                    } else {
+                        result.error(
+                            "AUTOFILL_STATE_INVALID",
+                            "Autofill state is disabled until an explicit rebuild succeeds.",
+                            null,
+                        )
+                    }
                 }
                 "clearState" -> {
-                    ParsAutofillStateStore.clear(this)
-                    result.success(null)
+                    if (ParsAutofillStateStore.clear(this)) {
+                        result.success(null)
+                    } else {
+                        result.error(
+                            "AUTOFILL_STATE_CLEAR_FAILED",
+                            "Autofill state could not be disabled.",
+                            null,
+                        )
+                    }
+                }
+                "inspectStateForTesting" -> {
+                    if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+                        result.notImplemented()
+                        return@setMethodCallHandler
+                    }
+                    val state = ParsAutofillStateStore.read(this)
+                    result.success(
+                        mapOf(
+                            "enabled" to state.enabled,
+                            "hasRoot" to !state.storeRoot.isNullOrBlank(),
+                            "hasPassphrase" to !state.passphrase.isNullOrEmpty(),
+                            "generation" to state.generation,
+                        ),
+                    )
                 }
                 "openSettings" -> {
                     startActivity(

@@ -11,10 +11,6 @@ abstract interface class ParsBridgeApi {
     required frb.ConfigurePgpBackendRequest request,
   });
 
-  Future<frb.ListStoresResponse> listStores({
-    required frb.ListStoresRequest request,
-  });
-
   Future<frb.ListEntriesResponse> listEntries({
     required frb.ListEntriesRequest request,
   });
@@ -57,16 +53,36 @@ abstract interface class ParsBridgeApi {
     required frb.GitCommitRequest request,
   });
 
+  Future<frb.GitCommandResponse> gitListRemotes({
+    required frb.GitRequest request,
+  });
+
+  Future<frb.GitCommandResponse> gitAddRemote({
+    required frb.GitRemoteRequest request,
+  });
+
+  Future<frb.GitCommandResponse> gitSetRemoteUrl({
+    required frb.GitRemoteRequest request,
+  });
+
+  Future<frb.GitCommandResponse> gitRemoveRemote({
+    required frb.GitRemoteRequest request,
+  });
+
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
   });
 
-  Future<frb.AppStateResponse> inspectAppState({
-    required frb.InspectAppStateRequest request,
+  Future<frb.InspectStoreGitResponse> inspectStoreGit({
+    required frb.InspectStoreGitRequest request,
   });
 
-  Future<frb.UnitResponse> selectStore({
-    required frb.SelectStoreRequest request,
+  Future<frb.UnitResponse> initializeGitRepository({
+    required frb.InitializeGitRepositoryRequest request,
+  });
+
+  Future<frb.AppStateResponse> inspectAppState({
+    required frb.InspectAppStateRequest request,
   });
 
   Future<frb.UnitResponse> createLocalStore({
@@ -79,8 +95,8 @@ abstract interface class ParsBridgeApi {
 
   Future<frb.UnitResponse> cloneStore({required frb.CloneStoreRequest request});
 
-  Future<frb.UnitResponse> removeStore({
-    required frb.RemoveStoreRequest request,
+  Future<frb.UnitResponse> disconnectStore({
+    required frb.DisconnectStoreRequest request,
   });
 
   Future<frb.UnitResponse> deleteLocalStore({
@@ -113,36 +129,12 @@ abstract interface class ParsBridgeApi {
     required frb.ImportPgpKeyFileRequest request,
   });
 
-  Future<frb.KeyMutationResponse> importPgpPublicKey({
-    required frb.ImportKeyTextRequest request,
-  });
-
-  Future<frb.KeyMutationResponse> importPgpPrivateKeyFile({
-    required frb.ImportKeyFileRequest request,
-  });
-
-  Future<frb.KeyMutationResponse> importPgpPrivateKeyText({
-    required frb.ImportKeyTextRequest request,
-  });
-
-  Future<frb.KeyExportResponse> exportPgpPublicKey({
-    required frb.ExportPgpKeyRequest request,
-  });
-
-  Future<frb.KeyExportResponse> exportPgpPrivateKey({
-    required frb.ExportPgpKeyRequest request,
-  });
-
   Future<frb.PreparePgpPrivateKeyResponse> preparePgpPrivateKey({
     required frb.PreparePgpPrivateKeyRequest request,
   });
 
-  Future<frb.DeletePgpKeyResponse> deletePgpKey({
-    required frb.DeletePgpKeyRequest request,
-  });
-
-  Future<frb.UnitResponse> addPgpKeyToGpgId({
-    required frb.AddPgpKeyToGpgIdRequest request,
+  Future<frb.UnitResponse> initializeStoreRecipients({
+    required frb.InitializeStoreRecipientsRequest request,
   });
 
   Future<frb.KeyMutationResponse> generateSshKey({
@@ -191,11 +183,6 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   Future<frb.UnitResponse> configurePgpBackend({
     required frb.ConfigurePgpBackendRequest request,
   }) => frb.configurePgpBackend(request: request);
-
-  @override
-  Future<frb.ListStoresResponse> listStores({
-    required frb.ListStoresRequest request,
-  }) => frb.listStores(request: request);
 
   @override
   Future<frb.ListEntriesResponse> listEntries({
@@ -255,19 +242,44 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   }) => frb.gitCommit(request: request);
 
   @override
+  Future<frb.GitCommandResponse> gitListRemotes({
+    required frb.GitRequest request,
+  }) => frb.gitListRemotes(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> gitAddRemote({
+    required frb.GitRemoteRequest request,
+  }) => frb.gitAddRemote(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> gitSetRemoteUrl({
+    required frb.GitRemoteRequest request,
+  }) => frb.gitSetRemoteUrl(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> gitRemoveRemote({
+    required frb.GitRemoteRequest request,
+  }) => frb.gitRemoveRemote(request: request);
+
+  @override
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
   }) => frb.runGitArgs(request: request);
 
   @override
+  Future<frb.InspectStoreGitResponse> inspectStoreGit({
+    required frb.InspectStoreGitRequest request,
+  }) => frb.inspectStoreGit(request: request);
+
+  @override
+  Future<frb.UnitResponse> initializeGitRepository({
+    required frb.InitializeGitRepositoryRequest request,
+  }) => frb.initializeGitRepository(request: request);
+
+  @override
   Future<frb.AppStateResponse> inspectAppState({
     required frb.InspectAppStateRequest request,
   }) => frb.inspectAppState(request: request);
-
-  @override
-  Future<frb.UnitResponse> selectStore({
-    required frb.SelectStoreRequest request,
-  }) => frb.selectStore(request: request);
 
   @override
   Future<frb.UnitResponse> createLocalStore({
@@ -285,9 +297,9 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   }) => frb.cloneStore(request: request);
 
   @override
-  Future<frb.UnitResponse> removeStore({
-    required frb.RemoveStoreRequest request,
-  }) => frb.removeStore(request: request);
+  Future<frb.UnitResponse> disconnectStore({
+    required frb.DisconnectStoreRequest request,
+  }) => frb.disconnectStore(request: request);
 
   @override
   Future<frb.UnitResponse> deleteLocalStore({
@@ -330,44 +342,14 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   }) => frb.importPgpKeyFile(request: request);
 
   @override
-  Future<frb.KeyMutationResponse> importPgpPublicKey({
-    required frb.ImportKeyTextRequest request,
-  }) => frb.importPgpPublicKey(request: request);
-
-  @override
-  Future<frb.KeyMutationResponse> importPgpPrivateKeyFile({
-    required frb.ImportKeyFileRequest request,
-  }) => frb.importPgpPrivateKeyFile(request: request);
-
-  @override
-  Future<frb.KeyMutationResponse> importPgpPrivateKeyText({
-    required frb.ImportKeyTextRequest request,
-  }) => frb.importPgpPrivateKeyText(request: request);
-
-  @override
-  Future<frb.KeyExportResponse> exportPgpPublicKey({
-    required frb.ExportPgpKeyRequest request,
-  }) => frb.exportPgpPublicKey(request: request);
-
-  @override
-  Future<frb.KeyExportResponse> exportPgpPrivateKey({
-    required frb.ExportPgpKeyRequest request,
-  }) => frb.exportPgpPrivateKey(request: request);
-
-  @override
   Future<frb.PreparePgpPrivateKeyResponse> preparePgpPrivateKey({
     required frb.PreparePgpPrivateKeyRequest request,
   }) => frb.preparePgpPrivateKey(request: request);
 
   @override
-  Future<frb.DeletePgpKeyResponse> deletePgpKey({
-    required frb.DeletePgpKeyRequest request,
-  }) => frb.deletePgpKey(request: request);
-
-  @override
-  Future<frb.UnitResponse> addPgpKeyToGpgId({
-    required frb.AddPgpKeyToGpgIdRequest request,
-  }) => frb.addPgpKeyToGpgId(request: request);
+  Future<frb.UnitResponse> initializeStoreRecipients({
+    required frb.InitializeStoreRecipientsRequest request,
+  }) => frb.initializeStoreRecipients(request: request);
 
   @override
   Future<frb.KeyMutationResponse> generateSshKey({

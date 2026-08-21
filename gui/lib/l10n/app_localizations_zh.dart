@@ -23,12 +23,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get managedStoreReplaceDescription => '以所选目录完整替换现有副本，并删除所选目录中不存在的旧文件。';
 
   @override
-  String get managedStoreMergeLabel => '增量覆盖';
-
-  @override
-  String get managedStoreMergeDescription => '覆盖同名文件，并保留仅存在于当前副本中的文件。';
-
-  @override
   String get noPasswordStoreConfigured => '尚未配置密码仓库。';
 
   @override
@@ -123,9 +117,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String keyDeleted(String keyName) {
     return '已删除 $keyName';
   }
-
-  @override
-  String get pgpKeyDeletePartial => '受保护的私钥已删除，但公钥列表记录清理失败。';
 
   @override
   String keyDeleteFailed(String error) {
@@ -313,18 +304,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get decryptEntryFailedTitle => '无法解密条目';
-
-  @override
-  String get openKeyImportHint => '从设置中打开密钥导入';
-
-  @override
-  String get chooseImportKey => '选择或导入密钥';
-
-  @override
-  String get openPgpKeysHint => '打开“设置 > PGP 密钥”';
-
-  @override
-  String get openKeyManagement => '打开密钥管理';
 
   @override
   String get copyPassword => '复制密码';
@@ -602,12 +581,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedSupportSection => '高级与支持';
 
   @override
-  String get keyManagementSection => '密钥管理';
-
-  @override
-  String get passwordStoresGitSection => '密码库与 Git';
-
-  @override
   String get platformSection => '平台';
 
   @override
@@ -632,19 +605,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get optionalPassphraseCacheState => '可选的加密密码缓存';
 
   @override
-  String get pgpKeysTitle => 'PGP 密钥';
-
-  @override
-  String get pgpKeyActionsDescription => '创建、导入、导出、删除';
-
-  @override
   String get sshKeysTitle => 'SSH 密钥';
 
   @override
   String get githubAccessKeysDescription => 'GitHub 访问密钥';
-
-  @override
-  String get passwordStoresTitle => '密码库';
 
   @override
   String get gitSyncTitle => 'Git 同步与远程仓库';
@@ -701,9 +665,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String cachedForKey(String keyName) {
     return '缓存密钥：$keyName';
   }
-
-  @override
-  String get selectStoreBeforeDelete => '删除本地仓库前请先选择一个密码库。';
 
   @override
   String get updatePasswordStore => '更新密码库';
@@ -904,9 +865,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get exportedKey => '已导出的密钥';
-
-  @override
-  String get noPasswordStores => '没有密码库';
 
   @override
   String get createImportCloneStore => '创建、导入或克隆密码库。';
@@ -1232,7 +1190,97 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notFound => '未找到';
 
   @override
+  String get gitMetadataNotFoundTitle => '未找到 Git 元数据';
+
+  @override
+  String get gitMetadataNotFoundMessage =>
+      '该文件夹可能仅供本地使用，也可能是 Android 隐藏了 .git 数据。初始化会创建全新历史，无法恢复原有历史。';
+
+  @override
+  String get initializeGit => '初始化 Git';
+
+  @override
+  String get continueWithoutGit => '不使用 Git 继续';
+
+  @override
   String keyCount(int count) {
     return '$count 个密钥';
   }
+
+  @override
+  String get storeFirstSetupSubtitle => '导入或克隆现有密码库；仅在没有密码库时创建新库。';
+
+  @override
+  String get createStoreRecipientSubtitle => '只为即将创建的新密码库选择私有 PGP 密钥。';
+
+  @override
+  String get contextualRepairSubtitle => '仅修复当前密码库明确需要的项目。';
+
+  @override
+  String get repairPasswordStore => '修复密码库';
+
+  @override
+  String get createStoreNeedsPgpKey => '创建新密码库前，需要先选择或导入私有 PGP 密钥。';
+
+  @override
+  String get gitOptionalForLocalStore => 'Git 为可选项；不启用 Git 也能正常使用密码库。';
+
+  @override
+  String get sshKeyRequiredForRemote => '此远端需要 SSH 密钥';
+
+  @override
+  String get sshRequiredForThisClone => '该 SSH 远端需要密钥；HTTPS 克隆不需要。';
+
+  @override
+  String get missingGpgIdTitle => '缺少加密接收者';
+
+  @override
+  String get missingGpgIdMessage =>
+      '请选择私有 PGP 密钥来创建缺失的 .gpg-id；此处绝不会替换已有接收者文件。';
+
+  @override
+  String get requiredPgpKeyMissingTitle => '缺少所需的私有 PGP 密钥';
+
+  @override
+  String requiredPgpKeyMissingMessage(String recipients) {
+    return '请导入匹配以下任一接收者的私有密钥：$recipients';
+  }
+
+  @override
+  String get requiredPrivatePgpKey => '需要匹配的私有 PGP 密钥。';
+
+  @override
+  String get pgpKeyDoesNotMatchStore => '该私有密钥与密码库接收者不匹配。';
+
+  @override
+  String get invalidGitMetadataTitle => 'Git 元数据无效';
+
+  @override
+  String get invalidGitMetadataMessage => '该密码库包含不可用的 Git 元数据。请断开后重新导入或克隆有效副本。';
+
+  @override
+  String get disconnectStore => '断开密码库';
+
+  @override
+  String get gitDisabledState => '未启用 Git · 仅本地密码库';
+
+  @override
+  String get gitLocalState => '本地 Git · 无远端';
+
+  @override
+  String get gitRemoteState => '已配置 Git 远端';
+
+  @override
+  String get storeIssues => '需要修复';
+
+  @override
+  String get sshKeysGitOnlyDescription =>
+      'SSH 密钥仅用于 SSH Git 远端；HTTPS 和仅本地密码库不需要。';
+
+  @override
+  String get storeRemovalInProgressTitle => '正在移除密码库…';
+
+  @override
+  String get storeRemovalInProgressDescription =>
+      'Pars 正在清除本地会话和自动填充数据，然后再更改已配置的密码库。';
 }

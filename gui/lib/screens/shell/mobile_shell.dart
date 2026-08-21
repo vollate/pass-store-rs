@@ -33,6 +33,7 @@ class MobileShell extends StatefulWidget {
     required this.onLock,
     this.onSecuritySettingsChanged,
     this.runDuringSystemAuthentication,
+    this.onStoreLifecycleChanged,
     this.onOnboardingReset,
   });
 
@@ -52,6 +53,7 @@ class MobileShell extends StatefulWidget {
   final VoidCallback? onSecuritySettingsChanged;
   final Future<T> Function<T>(Future<T> Function() action)?
   runDuringSystemAuthentication;
+  final Future<void> Function()? onStoreLifecycleChanged;
   final VoidCallback? onOnboardingReset;
 
   @override
@@ -85,8 +87,6 @@ class _MobileShellState extends State<MobileShell> {
         clipboardService: widget.clipboardService,
         privacyEvents: widget.privacyEvents,
         onLock: widget.onLock,
-        onChooseKey: _openSettings,
-        onOpenKeyManagement: _openSettings,
       ),
       SettingsScreen(
         key: const PageStorageKey<String>('settings-destination'),
@@ -102,6 +102,7 @@ class _MobileShellState extends State<MobileShell> {
         onLocalePreferenceChanged: widget.onLocalePreferenceChanged,
         onSecuritySettingsChanged: widget.onSecuritySettingsChanged,
         runDuringSystemAuthentication: widget.runDuringSystemAuthentication,
+        onStoreLifecycleChanged: widget.onStoreLifecycleChanged,
         onOnboardingReset: widget.onOnboardingReset,
       ),
     ];
@@ -171,9 +172,5 @@ class _MobileShellState extends State<MobileShell> {
   void _selectDestination(int value) {
     if (_index == value) return;
     setState(() => _index = value);
-  }
-
-  void _openSettings() {
-    _selectDestination(1);
   }
 }

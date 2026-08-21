@@ -24,15 +24,15 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.text('同名仓库已存在'), findsOneWidget);
     expect(find.text('彻底覆盖'), findsOneWidget);
-    expect(find.text('增量覆盖'), findsOneWidget);
+    expect(find.text('增量覆盖'), findsNothing);
     expect(find.text('取消'), findsOneWidget);
     expect(find.textContaining('pass-store'), findsOneWidget);
     expect(find.textContaining('/data/'), findsNothing);
 
-    await tester.tap(find.text('增量覆盖'));
+    await tester.tap(find.text('彻底覆盖'));
     await tester.pumpAndSettle();
 
-    expect(selectedPolicy, ManagedStoreConflictPolicy.merge);
+    expect(selectedPolicy, ManagedStoreConflictPolicy.replace);
   });
 
   testWidgets('managed store conflict resolves the English replace action', (
@@ -51,7 +51,7 @@ void main() {
 
     expect(find.text('Store already exists'), findsOneWidget);
     expect(find.text('Replace completely'), findsOneWidget);
-    expect(find.text('Merge and overwrite'), findsOneWidget);
+    expect(find.text('Merge and overwrite'), findsNothing);
     expect(find.text('Cancel'), findsOneWidget);
 
     await tester.tap(find.text('Replace completely'));

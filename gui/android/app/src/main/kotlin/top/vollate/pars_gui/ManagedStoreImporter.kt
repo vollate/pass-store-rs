@@ -25,12 +25,131 @@ import java.util.concurrent.RecursiveAction
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
+internal data class ImportDocumentEntry(
+    val documentId: String,
+    val displayName: String,
+    val mimeType: String,
+)
+
+internal data class ImportDocumentQueryResult(
+    val entries: List<ImportDocumentEntry>,
+    val loading: Boolean,
+)
+
+internal data class StagedImportRecord(
+    val handle: String,
+    val staging: File,
+    val destination: File,
+    var backup: File? = null,
+    var installed: Boolean = false,
+    var committed: Boolean = false,
+)
+
+internal fun commitStagedImportRecord(
+    record: StagedImportRecord,
+    deleteBackup: (File) -> Boolean = { it.deleteRecursively() },
+): Boolean {
+    record.committed = true
+    val backup = record.backup
+    if (backup != null && backup.exists() && !deleteBackup(backup)) return false
+    return backup?.exists() != true
+}
+
+internal fun disposeCommittedImportRecord(
+    record: StagedImportRecord,
+    deleteBackup: (File) -> Boolean = { it.deleteRecursively() },
+) {
+    if (!record.committed) return
+    record.backup?.takeIf(File::exists)?.let(deleteBackup)
+    record.staging.takeIf(File::exists)?.deleteRecursively()
+}
+
+internal fun queryImportEntriesWithRetries(
+    depth: Int,
+    rootAttempts: Int,
+    maxLoadingAttempts: Int,
+    query: (attempt: Int) -> ImportDocumentQueryResult,
+    waitBeforeRetry: () -> Unit,
+): List<ImportDocumentEntry> {
+    var attempt = 0
+    while (true) {
+        attempt += 1
+        val result = query(attempt)
+        val retryInitialEmptyRoot =
+            depth == 0 && result.entries.isEmpty() && attempt < rootAttempts
+        if (!result.loading && !retryInitialEmptyRoot) return result.entries
+        if (attempt >= maxLoadingAttempts) {
+            throw IOException("Android did not finish listing the selected folder after $attempt attempts.")
+        }
+        waitBeforeRetry()
+    }
+}
+
+internal fun safeImportChildName(name: String): String {
+    if (
+        name.isBlank() ||
+        name == "." ||
+        name == ".." ||
+        name.indexOf('/') >= 0 ||
+        name.indexOf('\\') >= 0 ||
+        name.indexOf('\u0000') >= 0
+    ) {
+        throw IOException("Selected store contains an invalid file name: '$name'.")
+    }
+    return name
+}
+
+internal fun requireStagedImportRecord(
+    handle: String,
+    stagedImports: Map<String, StagedImportRecord>,
+    filesDirectory: File,
+): StagedImportRecord {
+    val record = stagedImports[handle] ?: throw SecurityException("Refusing an unknown staged import.")
+    val root = filesDirectory.canonicalFile
+    fun within(file: File): Boolean {
+        val canonical = file.canonicalFile
+        return canonical.path == root.path || canonical.path.startsWith(root.path + File.separator)
+    }
+    if (
+        !within(record.staging) ||
+        !within(record.destination) ||
+        record.destination.canonicalFile == root ||
+        !record.staging.name.startsWith(".import-")
+    ) {
+        throw SecurityException("Refusing an unknown staged import.")
+    }
+    return record
+}
+
+internal fun cancelKnownStagedImport(
+    stagingPath: String,
+    stagedImports: MutableSet<String>,
+    filesDirectory: File,
+) {
+    val staging = File(stagingPath).canonicalFile
+    val root = filesDirectory.canonicalFile
+    val within = staging.path == root.path || staging.path.startsWith(root.path + File.separator)
+    if (
+        !stagedImports.contains(staging.path) ||
+        !within ||
+        !staging.name.startsWith(".import-") ||
+        !staging.isDirectory
+    ) {
+        throw SecurityException("Refusing an unknown staged import.")
+    }
+    if (!staging.deleteRecursively()) {
+        throw IOException("Failed to remove staged import.")
+    }
+    stagedImports.remove(staging.path)
+}
+
 /** Copies an Android document tree into app-private storage before Rust opens it as a path. */
 internal class ManagedStoreImporter(
     private val activity: FlutterFragmentActivity,
 ) {
     private val importExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val copyPool = ForkJoinPool(COPY_PARALLELISM)
+    private val stagedImports = ConcurrentHashMap<String, StagedImportRecord>()
     private val directoryPicker: ActivityResultLauncher<Intent> =
         activity.registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
@@ -43,7 +162,11 @@ internal class ManagedStoreImporter(
     fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "pickDirectory" -> startDirectoryPicker(call, result)
-            "copyDirectory" -> startDirectoryCopy(call, result)
+            "stageDirectory" -> startDirectoryStage(call, result)
+            "finalizeStagedDirectory" -> finalizeStagedDirectory(call, result)
+            "commitStagedDirectory" -> commitStagedDirectory(call, result)
+            "rollbackStagedDirectory" -> rollbackStagedDirectory(call, result)
+            "cancelStagedDirectory" -> cancelStagedDirectory(call, result)
             else -> result.notImplemented()
         }
     }
@@ -71,6 +194,10 @@ internal class ManagedStoreImporter(
                     Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
                     Intent.FLAG_GRANT_PREFIX_URI_PERMISSION,
             )
+            call.argument<String>("initialUri")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(it)) }
         }
         try {
             Log.i(TAG, "Launching managed-store directory picker")
@@ -82,14 +209,13 @@ internal class ManagedStoreImporter(
         }
     }
 
-    private fun startDirectoryCopy(call: MethodCall, result: MethodChannel.Result) {
+    private fun startDirectoryStage(call: MethodCall, result: MethodChannel.Result) {
         if (activeResult != null) {
             result.error("store_import_busy", "Another store import is already in progress.", null)
             return
         }
         val destination = call.argument<String>("destinationBaseDirectory")?.trim()
         val treeUriValue = call.argument<String>("treeUri")?.trim()
-        val policyValue = call.argument<String>("existingStorePolicy")?.trim()
         if (destination.isNullOrEmpty() || treeUriValue.isNullOrEmpty()) {
             result.error(
                 "invalid_import_selection",
@@ -98,29 +224,14 @@ internal class ManagedStoreImporter(
             )
             return
         }
-        val policy =
-            when (policyValue) {
-                "replace" -> ExistingStorePolicy.REPLACE
-                "merge" -> ExistingStorePolicy.MERGE
-                else -> {
-                    result.error(
-                        "invalid_conflict_policy",
-                        "The managed store conflict policy is invalid.",
-                        null,
-                    )
-                    return
-                }
-            }
-
         activeResult = result
         Log.i(TAG, "Copying selected document tree into app storage")
         importExecutor.execute {
             try {
-                val importedPath =
-                    copyTreeIntoManagedStorage(Uri.parse(treeUriValue), destination, policy)
+                val staged = stageTreeIntoManagedStorage(Uri.parse(treeUriValue), destination)
                 activity.runOnUiThread {
-                    Log.i(TAG, "Managed-store copy completed at $importedPath")
-                    completeWithSuccess(result, importedPath)
+                    Log.i(TAG, "Managed-store staging completed")
+                    completeWithSuccess(result, staged)
                 }
             } catch (error: Exception) {
                 activity.runOnUiThread {
@@ -131,11 +242,69 @@ internal class ManagedStoreImporter(
         }
     }
 
+    private fun finalizeStagedDirectory(call: MethodCall, result: MethodChannel.Result) {
+        if (activeResult != null) {
+            result.error("store_import_busy", "Another store import is already in progress.", null)
+            return
+        }
+        val handle = call.argument<String>("handle")?.trim()
+        if (handle.isNullOrEmpty()) {
+            result.error("invalid_import_stage", "The staged import is missing.", null)
+            return
+        }
+        activeResult = result
+        importExecutor.execute {
+            try {
+                val finalized = finalizeStagedImport(handle)
+                activity.runOnUiThread { completeWithSuccess(result, finalized) }
+            } catch (error: Exception) {
+                activity.runOnUiThread { completeWithError(result, error) }
+            }
+        }
+    }
+
+    private fun commitStagedDirectory(call: MethodCall, result: MethodChannel.Result) {
+        finishTransaction(call, result, commit = true)
+    }
+
+    private fun rollbackStagedDirectory(call: MethodCall, result: MethodChannel.Result) {
+        finishTransaction(call, result, commit = false)
+    }
+
+    private fun finishTransaction(call: MethodCall, result: MethodChannel.Result, commit: Boolean) {
+        val handle = call.argument<String>("handle")?.trim()
+        if (handle.isNullOrEmpty()) {
+            result.error("invalid_import_stage", "The staged import is missing.", null)
+            return
+        }
+        try {
+            if (commit) commitStagedImport(handle) else rollbackStagedImport(handle)
+            result.success(null)
+        } catch (error: Exception) {
+            result.error(
+                if (commit) "store_import_cleanup_failed" else "store_import_rollback_failed",
+                if (commit) "Imported store backup cleanup failed." else "Previous store restoration failed.",
+                null,
+            )
+        }
+    }
+
+    private fun cancelStagedDirectory(call: MethodCall, result: MethodChannel.Result) {
+        val handle = call.argument<String>("handle")?.trim()
+        if (handle.isNullOrEmpty()) {
+            result.error("invalid_import_stage", "The staged import is missing.", null)
+            return
+        }
+        try {
+            cancelStagedImport(handle)
+            result.success(null)
+        } catch (error: Exception) {
+            result.error("store_import_cancel_failed", "Staged import cleanup failed.", null)
+        }
+    }
+
     private fun handleDirectoryPickerResult(resultCode: Int, data: Intent?) {
-        Log.i(
-            TAG,
-            "Managed-store directory picker returned resultCode=$resultCode uri=${data?.data}",
-        )
+        Log.i(TAG, "Managed-store directory picker returned resultCode=$resultCode")
         val result = activeResult
         if (result == null) {
             Log.w(TAG, "Ignoring directory picker result because no import is active")
@@ -201,7 +370,9 @@ internal class ManagedStoreImporter(
         pickerDestinationBaseDirectory = null
         val code =
             if (error is StoreImportException) error.code else "store_import_failed"
-        result.error(code, error.message ?: error.toString(), null)
+        val message =
+            if (error is StoreImportException) error.message else "Password-store import failed."
+        result.error(code, message, null)
     }
 
     fun dispose() {
@@ -212,6 +383,22 @@ internal class ManagedStoreImporter(
         )
         activeResult = null
         pickerDestinationBaseDirectory = null
+        stagedImports.values.toList().forEach { record ->
+            if (record.committed) {
+                // Registration is irreversible. Cleanup may retry, but dispose must
+                // never restore an obsolete backup over the active store.
+                disposeCommittedImportRecord(record)
+            } else if (record.installed) {
+                try {
+                    rollbackRecord(record)
+                } catch (_: Exception) {
+                    // Leave the backup for the next bounded cleanup attempt.
+                }
+            } else {
+                record.staging.deleteRecursively()
+            }
+        }
+        stagedImports.clear()
         directoryPicker.unregister()
         importExecutor.shutdownNow()
         copyPool.shutdownNow()
@@ -238,11 +425,10 @@ internal class ManagedStoreImporter(
         return File(baseDirectory, slugPathSegment(sourceName))
     }
 
-    private fun copyTreeIntoManagedStorage(
+    private fun stageTreeIntoManagedStorage(
         treeUri: Uri,
         destinationBase: String,
-        existingStorePolicy: ExistingStorePolicy,
-    ): String {
+    ): Map<String, String> {
         val startedAt = SystemClock.elapsedRealtime()
         val destinationDirectory = managedDestination(treeUri, destinationBase)
         val baseDirectory = destinationDirectory.parentFile
@@ -254,93 +440,112 @@ internal class ManagedStoreImporter(
         }
 
         val stagingDirectory = File(baseDirectory, ".import-${UUID.randomUUID()}")
-        val backupDirectory = File(baseDirectory, ".import-backup-${UUID.randomUUID()}")
         if (!stagingDirectory.mkdir()) {
             throw IOException("Failed to create import staging directory '${stagingDirectory.path}'.")
         }
         try {
             val rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
             val copyStats = CopyStats()
-            if (
-                existingStorePolicy == ExistingStorePolicy.MERGE &&
-                destinationDirectory.exists()
-            ) {
-                copyExistingTree(destinationDirectory, stagingDirectory, 0)
-            }
-            copyDocumentTree(
-                treeUri,
-                rootDocumentId,
-                stagingDirectory,
-                copyStats,
-            )
-
+            copyDocumentTree(treeUri, rootDocumentId, stagingDirectory, copyStats)
             if (copyStats.fileCount == 0 && copyStats.directoryCount == 0) {
-                Log.w(
-                    TAG,
-                    "Import enumerated no files or directories from $treeUri; " +
-                        "destination was not changed",
-                )
                 throw StoreImportException(
                     code = "store_import_no_passwords",
                     message = "No passwords were found in the selected folder.",
                 )
             }
-
-            replaceDestination(
-                stagingDirectory = stagingDirectory,
-                destinationDirectory = destinationDirectory,
-                backupDirectory = backupDirectory,
-            )
+            val handle = UUID.randomUUID().toString()
+            val record =
+                StagedImportRecord(
+                    handle = handle,
+                    staging = stagingDirectory.canonicalFile,
+                    destination = destinationDirectory.canonicalFile,
+                )
+            stagedImports[handle] = record
             Log.i(
                 TAG,
-                "Copied ${copyStats.fileCount} files, ${copyStats.directoryCount} directories, " +
-                    "and ${copyStats.passwordCount} passwords from $treeUri in " +
-                    "${SystemClock.elapsedRealtime() - startedAt} ms using " +
-                    "$COPY_PARALLELISM workers",
+                "Staged ${copyStats.fileCount} files, ${copyStats.directoryCount} directories, " +
+                    "and ${copyStats.passwordCount} passwords in " +
+                    "${SystemClock.elapsedRealtime() - startedAt} ms",
             )
-            return destinationDirectory.canonicalPath
-        } finally {
-            if (stagingDirectory.exists()) {
-                stagingDirectory.deleteRecursively()
-            }
-            if (backupDirectory.exists() && destinationDirectory.exists()) {
-                backupDirectory.deleteRecursively()
-            }
+            return mapOf(
+                "handle" to handle,
+                "stagingPath" to record.staging.path,
+                "destinationPath" to record.destination.path,
+            )
+        } catch (error: Exception) {
+            stagingDirectory.deleteRecursively()
+            throw error
         }
     }
 
-    private fun copyExistingTree(source: File, destination: File, depth: Int) {
-        if (depth > MAX_TREE_DEPTH) {
-            throw IOException("Existing managed store exceeds the maximum directory depth.")
+    private fun validatedRecord(handle: String): StagedImportRecord =
+        requireStagedImportRecord(handle, stagedImports, activity.filesDir)
+
+    private fun finalizeStagedImport(handle: String): String {
+        val record = validatedRecord(handle)
+        if (record.installed || !record.staging.isDirectory) {
+            throw SecurityException("Refusing an invalid staged import state.")
         }
-        val sourceCanonical = source.canonicalFile
-        val children = source.listFiles()
-            ?: throw IOException("Failed to list existing managed directory '${source.path}'.")
-        for (child in children) {
-            val childCanonical = child.canonicalFile
-            if (
-                child.absoluteFile.path != childCanonical.path ||
-                !isWithin(sourceCanonical, childCanonical)
-            ) {
-                throw IOException(
-                    "Existing managed store contains an unsupported link '${child.path}'.",
-                )
+        val backup = File(record.destination.parentFile, ".import-backup-${UUID.randomUUID()}")
+        record.backup = backup
+        try {
+            replaceDestination(record.staging, record.destination, backup)
+            record.installed = true
+            return record.destination.canonicalPath
+        } catch (error: Exception) {
+            restoreBackup(record.destination, backup)
+            throw error
+        }
+    }
+
+    private fun commitStagedImport(handle: String) {
+        val record = validatedRecord(handle)
+        if (!record.installed) throw SecurityException("Import is not finalized.")
+        if (!commitStagedImportRecord(record)) {
+            throw IOException("Failed to remove import backup.")
+        }
+        stagedImports.remove(handle)
+    }
+
+    private fun rollbackStagedImport(handle: String) {
+        val record = validatedRecord(handle)
+        if (record.committed) {
+            throw SecurityException("Committed import cannot be rolled back.")
+        }
+        if (record.installed) rollbackRecord(record) else if (!record.staging.deleteRecursively()) {
+            throw IOException("Failed to remove staged import.")
+        }
+        stagedImports.remove(handle)
+    }
+
+    private fun cancelStagedImport(handle: String) {
+        val record = validatedRecord(handle)
+        if (record.installed) throw SecurityException("Finalized import requires rollback.")
+        if (!record.staging.isDirectory || !record.staging.deleteRecursively()) {
+            throw IOException("Failed to remove staged import.")
+        }
+        stagedImports.remove(handle)
+    }
+
+    private fun rollbackRecord(record: StagedImportRecord) {
+        if (record.destination.exists() && !record.destination.deleteRecursively()) {
+            throw IOException("Failed to remove imported destination during rollback.")
+        }
+        val backup = record.backup
+        if (backup != null && backup.exists()) {
+            if (!backup.renameTo(record.destination) || !record.destination.exists()) {
+                throw IOException("Failed to restore previous store.")
             }
-            val target = File(destination, child.name)
-            if (child.isDirectory) {
-                if (!target.mkdir()) {
-                    throw IOException("Failed to stage existing directory '${target.path}'.")
-                }
-                copyExistingTree(child, target, depth + 1)
-            } else if (child.isFile) {
-                child.inputStream().use { input ->
-                    FileOutputStream(target).use { output -> input.copyTo(output) }
-                }
-            } else {
-                throw IOException(
-                    "Existing managed store contains an unsupported file '${child.path}'.",
-                )
-            }
+        }
+        record.installed = false
+    }
+
+    private fun restoreBackup(destination: File, backup: File) {
+        if (destination.exists() && !destination.deleteRecursively()) {
+            throw IOException("Failed to remove incomplete destination.")
+        }
+        if (backup.exists() && (!backup.renameTo(destination) || !destination.exists())) {
+            throw IOException("Failed to restore previous store.")
         }
     }
 
@@ -351,21 +556,17 @@ internal class ManagedStoreImporter(
     ) {
         val hadDestination = destinationDirectory.exists()
         if (hadDestination && !destinationDirectory.renameTo(backupDirectory)) {
-            throw IOException(
-                "Failed to prepare the existing managed store '${destinationDirectory.path}' for replacement.",
-            )
+            throw IOException("Failed to prepare the existing managed store for replacement.")
         }
 
-        if (stagingDirectory.renameTo(destinationDirectory)) {
-            return
-        }
+        if (stagingDirectory.renameTo(destinationDirectory)) return
 
         if (hadDestination && !destinationDirectory.exists()) {
-            backupDirectory.renameTo(destinationDirectory)
+            if (!backupDirectory.renameTo(destinationDirectory) || !destinationDirectory.exists()) {
+                throw IOException("Failed to restore the existing managed store.")
+            }
         }
-        throw IOException(
-            "Failed to finalize imported store at '${destinationDirectory.path}'.",
-        )
+        throw IOException("Failed to finalize the imported store.")
     }
 
     private fun copyDocumentTree(
@@ -436,7 +637,7 @@ internal class ManagedStoreImporter(
         val childTasks = mutableListOf<RecursiveAction>()
 
         for (entry in entries) {
-            val safeName = safeChildName(entry.displayName)
+            val safeName = safeImportChildName(entry.displayName)
             if (!childNames.add(safeName)) {
                 throw IOException(
                     "Selected store contains duplicate entries named '$safeName' in " +
@@ -483,7 +684,7 @@ internal class ManagedStoreImporter(
 
     private fun copyDocumentFile(
         treeUri: Uri,
-        entry: DocumentEntry,
+        entry: ImportDocumentEntry,
         safeName: String,
         target: File,
         copyStats: CopyStats,
@@ -491,9 +692,7 @@ internal class ManagedStoreImporter(
         val documentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, entry.documentId)
         val input =
             activity.contentResolver.openInputStream(documentUri)
-                ?: throw IOException(
-                    "Failed to open selected file '${entry.displayName}' ($documentUri).",
-                )
+                ?: throw IOException("Failed to open a selected file.")
         input.use { source ->
             FileOutputStream(target).use { output -> source.copyTo(output, COPY_BUFFER_BYTES) }
         }
@@ -523,45 +722,38 @@ internal class ManagedStoreImporter(
         treeUri: Uri,
         parentDocumentId: String,
         depth: Int,
-    ): List<DocumentEntry> {
+    ): List<ImportDocumentEntry> {
         val treeChildrenUri =
             DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)
-        var attempt = 0
-        while (true) {
-            attempt += 1
-            val treeQuery = queryDocumentEntries(treeChildrenUri, parentDocumentId)
-            val entries = treeQuery.entries
-            val loading = treeQuery.loading
-            Log.i(
-                TAG,
-                "Listed ${entries.size} children for $parentDocumentId " +
-                    "(attempt=$attempt loading=$loading uri=$treeChildrenUri)",
-            )
-
-            val retryInitialEmptyRoot = depth == 0 && entries.isEmpty() && attempt < ROOT_QUERY_ATTEMPTS
-            if (!loading && !retryInitialEmptyRoot) {
-                return entries
-            }
-            if (attempt >= MAX_LOADING_QUERY_ATTEMPTS) {
-                throw IOException(
-                    "Android did not finish listing selected folder '$parentDocumentId' " +
-                        "after $attempt attempts ($treeChildrenUri).",
+        return queryImportEntriesWithRetries(
+            depth = depth,
+            rootAttempts = ROOT_QUERY_ATTEMPTS,
+            maxLoadingAttempts = MAX_LOADING_QUERY_ATTEMPTS,
+            query = { attempt ->
+                val treeQuery = queryDocumentEntries(treeChildrenUri, parentDocumentId)
+                Log.i(
+                    TAG,
+                    "Listed ${treeQuery.entries.size} children " +
+                        "(attempt=$attempt loading=${treeQuery.loading})",
                 )
-            }
-            try {
-                Thread.sleep(QUERY_RETRY_DELAY_MS)
-            } catch (error: InterruptedException) {
-                Thread.currentThread().interrupt()
-                throw IOException("Store import was interrupted while listing '$parentDocumentId'.", error)
-            }
-        }
+                treeQuery
+            },
+            waitBeforeRetry = {
+                try {
+                    Thread.sleep(QUERY_RETRY_DELAY_MS)
+                } catch (error: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw IOException("Store import was interrupted while listing.", error)
+                }
+            },
+        )
     }
 
     private fun queryDocumentEntries(
         childrenUri: Uri,
         parentDocumentId: String,
-    ): DocumentQueryResult {
-        val entries = mutableListOf<DocumentEntry>()
+    ): ImportDocumentQueryResult {
+        val entries = mutableListOf<ImportDocumentEntry>()
         var loading = false
         val cursor =
             activity.contentResolver.query(
@@ -574,20 +766,20 @@ internal class ManagedStoreImporter(
                 null,
                 null,
                 null,
-            ) ?: throw IOException("Failed to list selected folder '$parentDocumentId'.")
+            ) ?: throw IOException("Failed to list the selected folder.")
         cursor.use {
             loading =
                 it.extras?.getBoolean(DocumentsContract.EXTRA_LOADING, false) == true
             while (it.moveToNext()) {
                 entries +=
-                    DocumentEntry(
+                    ImportDocumentEntry(
                         documentId = it.getString(0),
                         displayName = it.getString(1),
                         mimeType = it.getString(2),
                     )
             }
         }
-        return DocumentQueryResult(entries = entries, loading = loading)
+        return ImportDocumentQueryResult(entries = entries, loading = loading)
     }
 
     private fun queryDisplayName(documentUri: Uri): String? {
@@ -604,20 +796,6 @@ internal class ManagedStoreImporter(
         }
     }
 
-    private fun safeChildName(name: String): String {
-        if (
-            name.isBlank() ||
-            name == "." ||
-            name == ".." ||
-            name.indexOf('/') >= 0 ||
-            name.indexOf('\\') >= 0 ||
-            name.indexOf('\u0000') >= 0
-        ) {
-            throw IOException("Selected store contains an invalid file name: '$name'.")
-        }
-        return name
-    }
-
     private fun slugPathSegment(value: String): String {
         val slug =
             value
@@ -631,17 +809,6 @@ internal class ManagedStoreImporter(
     private fun isWithin(parent: File, child: File): Boolean {
         return child.path == parent.path || child.path.startsWith(parent.path + File.separator)
     }
-
-    private data class DocumentEntry(
-        val documentId: String,
-        val displayName: String,
-        val mimeType: String,
-    )
-
-    private data class DocumentQueryResult(
-        val entries: List<DocumentEntry>,
-        val loading: Boolean,
-    )
 
     private class CopyStats {
         private val files = AtomicInteger()
@@ -668,11 +835,6 @@ internal class ManagedStoreImporter(
         val code: String,
         message: String,
     ) : IOException(message)
-
-    private enum class ExistingStorePolicy {
-        REPLACE,
-        MERGE,
-    }
 
     companion object {
         const val CHANNEL_NAME = "top.vollate.pars_gui/store_import"

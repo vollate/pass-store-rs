@@ -22,9 +22,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
-  AddPgpKeyToGpgIdRequest dco_decode_add_pgp_key_to_gpg_id_request(dynamic raw);
-
-  @protected
   AppStateDto dco_decode_app_state_dto(dynamic raw);
 
   @protected
@@ -57,11 +54,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   bool dco_decode_bool(dynamic raw);
-
-  @protected
-  AddPgpKeyToGpgIdRequest dco_decode_box_autoadd_add_pgp_key_to_gpg_id_request(
-    dynamic raw,
-  );
 
   @protected
   AppStateDto dco_decode_box_autoadd_app_state_dto(dynamic raw);
@@ -124,12 +116,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  DeletePgpKeyRequest dco_decode_box_autoadd_delete_pgp_key_request(
+  DeleteSshKeyRequest dco_decode_box_autoadd_delete_ssh_key_request(
     dynamic raw,
   );
 
   @protected
-  DeleteSshKeyRequest dco_decode_box_autoadd_delete_ssh_key_request(
+  DisconnectStoreRequest dco_decode_box_autoadd_disconnect_store_request(
     dynamic raw,
   );
 
@@ -145,11 +137,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   EntrySecretDto dco_decode_box_autoadd_entry_secret_dto(dynamic raw);
-
-  @protected
-  ExportPgpKeyRequest dco_decode_box_autoadd_export_pgp_key_request(
-    dynamic raw,
-  );
 
   @protected
   ExportSshKeyRequest dco_decode_box_autoadd_export_ssh_key_request(
@@ -188,6 +175,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GitCommitRequest dco_decode_box_autoadd_git_commit_request(dynamic raw);
 
   @protected
+  GitRemoteRequest dco_decode_box_autoadd_git_remote_request(dynamic raw);
+
+  @protected
   GitRequest dco_decode_box_autoadd_git_request(dynamic raw);
 
   @protected
@@ -219,6 +209,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  InitializeGitRepositoryRequest
+  dco_decode_box_autoadd_initialize_git_repository_request(dynamic raw);
+
+  @protected
+  InitializeStoreRecipientsRequest
+  dco_decode_box_autoadd_initialize_store_recipients_request(dynamic raw);
+
+  @protected
   InsertEntryRequest dco_decode_box_autoadd_insert_entry_request(dynamic raw);
 
   @protected
@@ -242,6 +240,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  InspectStoreGitRequest dco_decode_box_autoadd_inspect_store_git_request(
+    dynamic raw,
+  );
+
+  @protected
   KeyExportDto dco_decode_box_autoadd_key_export_dto(dynamic raw);
 
   @protected
@@ -252,9 +255,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ListKeysRequest dco_decode_box_autoadd_list_keys_request(dynamic raw);
-
-  @protected
-  ListStoresRequest dco_decode_box_autoadd_list_stores_request(dynamic raw);
 
   @protected
   LoadConfigRequest dco_decode_box_autoadd_load_config_request(dynamic raw);
@@ -283,15 +283,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PgpKeyDeletionFailureKind
-  dco_decode_box_autoadd_pgp_key_deletion_failure_kind(dynamic raw);
-
-  @protected
-  PgpKeyDeletionResultDto dco_decode_box_autoadd_pgp_key_deletion_result_dto(
-    dynamic raw,
-  );
-
-  @protected
   PgpKeyInspectionDto dco_decode_box_autoadd_pgp_key_inspection_dto(
     dynamic raw,
   );
@@ -313,13 +304,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_box_autoadd_remove_autofill_index_entry_request(dynamic raw);
 
   @protected
-  RemoveStoreRequest dco_decode_box_autoadd_remove_store_request(dynamic raw);
-
-  @protected
   SaveConfigRequest dco_decode_box_autoadd_save_config_request(dynamic raw);
 
   @protected
-  SelectStoreRequest dco_decode_box_autoadd_select_store_request(dynamic raw);
+  StoreGitModeDto dco_decode_box_autoadd_store_git_mode_dto(dynamic raw);
+
+  @protected
+  StoreStatusDto dco_decode_box_autoadd_store_status_dto(dynamic raw);
 
   @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
@@ -378,13 +369,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DeleteLocalStoreRequest dco_decode_delete_local_store_request(dynamic raw);
 
   @protected
-  DeletePgpKeyRequest dco_decode_delete_pgp_key_request(dynamic raw);
-
-  @protected
-  DeletePgpKeyResponse dco_decode_delete_pgp_key_response(dynamic raw);
-
-  @protected
   DeleteSshKeyRequest dco_decode_delete_ssh_key_request(dynamic raw);
+
+  @protected
+  DisconnectStoreRequest dco_decode_disconnect_store_request(dynamic raw);
 
   @protected
   EditEntryRequest dco_decode_edit_entry_request(dynamic raw);
@@ -404,9 +392,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   EntrySummaryDto dco_decode_entry_summary_dto(dynamic raw);
-
-  @protected
-  ExportPgpKeyRequest dco_decode_export_pgp_key_request(dynamic raw);
 
   @protected
   ExportSshKeyRequest dco_decode_export_ssh_key_request(dynamic raw);
@@ -439,6 +424,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GitCommitRequest dco_decode_git_commit_request(dynamic raw);
 
   @protected
+  GitRemoteRequest dco_decode_git_remote_request(dynamic raw);
+
+  @protected
   GitRequest dco_decode_git_request(dynamic raw);
 
   @protected
@@ -460,6 +448,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ImportPgpKeyTextRequest dco_decode_import_pgp_key_text_request(dynamic raw);
 
   @protected
+  InitializeGitRepositoryRequest dco_decode_initialize_git_repository_request(
+    dynamic raw,
+  );
+
+  @protected
+  InitializeStoreRecipientsRequest
+  dco_decode_initialize_store_recipients_request(dynamic raw);
+
+  @protected
   InsertEntryRequest dco_decode_insert_entry_request(dynamic raw);
 
   @protected
@@ -476,6 +473,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InspectPgpKeyTextRequest dco_decode_inspect_pgp_key_text_request(dynamic raw);
+
+  @protected
+  InspectStoreGitRequest dco_decode_inspect_store_git_request(dynamic raw);
+
+  @protected
+  InspectStoreGitResponse dco_decode_inspect_store_git_response(dynamic raw);
 
   @protected
   KeyDetectionResponse dco_decode_key_detection_response(dynamic raw);
@@ -528,18 +531,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
-
-  @protected
-  List<StoreInfoDto> dco_decode_list_store_info_dto(dynamic raw);
-
-  @protected
-  List<StoreStatusDto> dco_decode_list_store_status_dto(dynamic raw);
-
-  @protected
-  ListStoresRequest dco_decode_list_stores_request(dynamic raw);
-
-  @protected
-  ListStoresResponse dco_decode_list_stores_response(dynamic raw);
 
   @protected
   LoadConfigRequest dco_decode_load_config_request(dynamic raw);
@@ -627,17 +618,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PgpKeyDeletionFailureKind?
-  dco_decode_opt_box_autoadd_pgp_key_deletion_failure_kind(dynamic raw);
-
-  @protected
-  PgpKeyDeletionResultDto?
-  dco_decode_opt_box_autoadd_pgp_key_deletion_result_dto(dynamic raw);
-
-  @protected
   PgpKeyInspectionDto? dco_decode_opt_box_autoadd_pgp_key_inspection_dto(
     dynamic raw,
   );
+
+  @protected
+  StoreGitModeDto? dco_decode_opt_box_autoadd_store_git_mode_dto(dynamic raw);
+
+  @protected
+  StoreStatusDto? dco_decode_opt_box_autoadd_store_status_dto(dynamic raw);
 
   @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
@@ -651,14 +640,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PgpImportFailureKind dco_decode_pgp_import_failure_kind(dynamic raw);
-
-  @protected
-  PgpKeyDeletionFailureKind dco_decode_pgp_key_deletion_failure_kind(
-    dynamic raw,
-  );
-
-  @protected
-  PgpKeyDeletionResultDto dco_decode_pgp_key_deletion_result_dto(dynamic raw);
 
   @protected
   PgpKeyImportResponse dco_decode_pgp_key_import_response(dynamic raw);
@@ -697,16 +678,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_remove_autofill_index_entry_request(dynamic raw);
 
   @protected
-  RemoveStoreRequest dco_decode_remove_store_request(dynamic raw);
-
-  @protected
   SaveConfigRequest dco_decode_save_config_request(dynamic raw);
 
   @protected
-  SelectStoreRequest dco_decode_select_store_request(dynamic raw);
-
-  @protected
-  StoreInfoDto dco_decode_store_info_dto(dynamic raw);
+  StoreGitModeDto dco_decode_store_git_mode_dto(dynamic raw);
 
   @protected
   StoreStatusDto dco_decode_store_status_dto(dynamic raw);
@@ -729,11 +704,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
-
-  @protected
-  AddPgpKeyToGpgIdRequest sse_decode_add_pgp_key_to_gpg_id_request(
-    SseDeserializer deserializer,
-  );
 
   @protected
   AppStateDto sse_decode_app_state_dto(SseDeserializer deserializer);
@@ -778,11 +748,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
-
-  @protected
-  AddPgpKeyToGpgIdRequest sse_decode_box_autoadd_add_pgp_key_to_gpg_id_request(
-    SseDeserializer deserializer,
-  );
 
   @protected
   AppStateDto sse_decode_box_autoadd_app_state_dto(
@@ -857,12 +822,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  DeletePgpKeyRequest sse_decode_box_autoadd_delete_pgp_key_request(
+  DeleteSshKeyRequest sse_decode_box_autoadd_delete_ssh_key_request(
     SseDeserializer deserializer,
   );
 
   @protected
-  DeleteSshKeyRequest sse_decode_box_autoadd_delete_ssh_key_request(
+  DisconnectStoreRequest sse_decode_box_autoadd_disconnect_store_request(
     SseDeserializer deserializer,
   );
 
@@ -884,11 +849,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   EntrySecretDto sse_decode_box_autoadd_entry_secret_dto(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  ExportPgpKeyRequest sse_decode_box_autoadd_export_pgp_key_request(
     SseDeserializer deserializer,
   );
 
@@ -933,6 +893,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  GitRemoteRequest sse_decode_box_autoadd_git_remote_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   GitRequest sse_decode_box_autoadd_git_request(SseDeserializer deserializer);
 
   @protected
@@ -964,6 +929,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  InitializeGitRepositoryRequest
+  sse_decode_box_autoadd_initialize_git_repository_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InitializeStoreRecipientsRequest
+  sse_decode_box_autoadd_initialize_store_recipients_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   InsertEntryRequest sse_decode_box_autoadd_insert_entry_request(
     SseDeserializer deserializer,
   );
@@ -989,6 +966,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  InspectStoreGitRequest sse_decode_box_autoadd_inspect_store_git_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   KeyExportDto sse_decode_box_autoadd_key_export_dto(
     SseDeserializer deserializer,
   );
@@ -1005,11 +987,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ListKeysRequest sse_decode_box_autoadd_list_keys_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  ListStoresRequest sse_decode_box_autoadd_list_stores_request(
     SseDeserializer deserializer,
   );
 
@@ -1052,17 +1029,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PgpKeyDeletionFailureKind
-  sse_decode_box_autoadd_pgp_key_deletion_failure_kind(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PgpKeyDeletionResultDto sse_decode_box_autoadd_pgp_key_deletion_result_dto(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   PgpKeyInspectionDto sse_decode_box_autoadd_pgp_key_inspection_dto(
     SseDeserializer deserializer,
   );
@@ -1092,17 +1058,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  RemoveStoreRequest sse_decode_box_autoadd_remove_store_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   SaveConfigRequest sse_decode_box_autoadd_save_config_request(
     SseDeserializer deserializer,
   );
 
   @protected
-  SelectStoreRequest sse_decode_box_autoadd_select_store_request(
+  StoreGitModeDto sse_decode_box_autoadd_store_git_mode_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  StoreStatusDto sse_decode_box_autoadd_store_status_dto(
     SseDeserializer deserializer,
   );
 
@@ -1183,17 +1149,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  DeletePgpKeyRequest sse_decode_delete_pgp_key_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  DeletePgpKeyResponse sse_decode_delete_pgp_key_response(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   DeleteSshKeyRequest sse_decode_delete_ssh_key_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DisconnectStoreRequest sse_decode_disconnect_store_request(
     SseDeserializer deserializer,
   );
 
@@ -1219,11 +1180,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   EntrySummaryDto sse_decode_entry_summary_dto(SseDeserializer deserializer);
-
-  @protected
-  ExportPgpKeyRequest sse_decode_export_pgp_key_request(
-    SseDeserializer deserializer,
-  );
 
   @protected
   ExportSshKeyRequest sse_decode_export_ssh_key_request(
@@ -1272,6 +1228,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GitCommitRequest sse_decode_git_commit_request(SseDeserializer deserializer);
 
   @protected
+  GitRemoteRequest sse_decode_git_remote_request(SseDeserializer deserializer);
+
+  @protected
   GitRequest sse_decode_git_request(SseDeserializer deserializer);
 
   @protected
@@ -1303,6 +1262,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  InitializeGitRepositoryRequest sse_decode_initialize_git_repository_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InitializeStoreRecipientsRequest
+  sse_decode_initialize_store_recipients_request(SseDeserializer deserializer);
+
+  @protected
   InsertEntryRequest sse_decode_insert_entry_request(
     SseDeserializer deserializer,
   );
@@ -1329,6 +1297,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   InspectPgpKeyTextRequest sse_decode_inspect_pgp_key_text_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InspectStoreGitRequest sse_decode_inspect_store_git_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  InspectStoreGitResponse sse_decode_inspect_store_git_response(
     SseDeserializer deserializer,
   );
 
@@ -1399,26 +1377,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
-
-  @protected
-  List<StoreInfoDto> sse_decode_list_store_info_dto(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  List<StoreStatusDto> sse_decode_list_store_status_dto(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  ListStoresRequest sse_decode_list_stores_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  ListStoresResponse sse_decode_list_stores_response(
-    SseDeserializer deserializer,
-  );
 
   @protected
   LoadConfigRequest sse_decode_load_config_request(
@@ -1524,19 +1482,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PgpKeyDeletionFailureKind?
-  sse_decode_opt_box_autoadd_pgp_key_deletion_failure_kind(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PgpKeyDeletionResultDto?
-  sse_decode_opt_box_autoadd_pgp_key_deletion_result_dto(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   PgpKeyInspectionDto? sse_decode_opt_box_autoadd_pgp_key_inspection_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  StoreGitModeDto? sse_decode_opt_box_autoadd_store_git_mode_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  StoreStatusDto? sse_decode_opt_box_autoadd_store_status_dto(
     SseDeserializer deserializer,
   );
 
@@ -1554,16 +1510,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PgpImportFailureKind sse_decode_pgp_import_failure_kind(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PgpKeyDeletionFailureKind sse_decode_pgp_key_deletion_failure_kind(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PgpKeyDeletionResultDto sse_decode_pgp_key_deletion_result_dto(
     SseDeserializer deserializer,
   );
 
@@ -1610,22 +1556,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   sse_decode_remove_autofill_index_entry_request(SseDeserializer deserializer);
 
   @protected
-  RemoveStoreRequest sse_decode_remove_store_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   SaveConfigRequest sse_decode_save_config_request(
     SseDeserializer deserializer,
   );
 
   @protected
-  SelectStoreRequest sse_decode_select_store_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  StoreInfoDto sse_decode_store_info_dto(SseDeserializer deserializer);
+  StoreGitModeDto sse_decode_store_git_mode_dto(SseDeserializer deserializer);
 
   @protected
   StoreStatusDto sse_decode_store_status_dto(SseDeserializer deserializer);
@@ -1648,12 +1584,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_add_pgp_key_to_gpg_id_request(
-    AddPgpKeyToGpgIdRequest self,
-    SseSerializer serializer,
-  );
 
   @protected
   void sse_encode_app_state_dto(AppStateDto self, SseSerializer serializer);
@@ -1708,12 +1638,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_box_autoadd_add_pgp_key_to_gpg_id_request(
-    AddPgpKeyToGpgIdRequest self,
-    SseSerializer serializer,
-  );
 
   @protected
   void sse_encode_box_autoadd_app_state_dto(
@@ -1800,14 +1724,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_delete_pgp_key_request(
-    DeletePgpKeyRequest self,
+  void sse_encode_box_autoadd_delete_ssh_key_request(
+    DeleteSshKeyRequest self,
     SseSerializer serializer,
   );
 
   @protected
-  void sse_encode_box_autoadd_delete_ssh_key_request(
-    DeleteSshKeyRequest self,
+  void sse_encode_box_autoadd_disconnect_store_request(
+    DisconnectStoreRequest self,
     SseSerializer serializer,
   );
 
@@ -1832,12 +1756,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_entry_secret_dto(
     EntrySecretDto self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_box_autoadd_export_pgp_key_request(
-    ExportPgpKeyRequest self,
     SseSerializer serializer,
   );
 
@@ -1890,6 +1808,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_git_remote_request(
+    GitRemoteRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_git_request(
     GitRequest self,
     SseSerializer serializer,
@@ -1929,6 +1853,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_initialize_git_repository_request(
+    InitializeGitRepositoryRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_initialize_store_recipients_request(
+    InitializeStoreRecipientsRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_insert_entry_request(
     InsertEntryRequest self,
     SseSerializer serializer,
@@ -1959,6 +1895,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_inspect_store_git_request(
+    InspectStoreGitRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_key_export_dto(
     KeyExportDto self,
     SseSerializer serializer,
@@ -1979,12 +1921,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_list_keys_request(
     ListKeysRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_box_autoadd_list_stores_request(
-    ListStoresRequest self,
     SseSerializer serializer,
   );
 
@@ -2031,18 +1967,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_pgp_key_deletion_failure_kind(
-    PgpKeyDeletionFailureKind self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_box_autoadd_pgp_key_deletion_result_dto(
-    PgpKeyDeletionResultDto self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_box_autoadd_pgp_key_inspection_dto(
     PgpKeyInspectionDto self,
     SseSerializer serializer,
@@ -2073,20 +1997,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_remove_store_request(
-    RemoveStoreRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_box_autoadd_save_config_request(
     SaveConfigRequest self,
     SseSerializer serializer,
   );
 
   @protected
-  void sse_encode_box_autoadd_select_store_request(
-    SelectStoreRequest self,
+  void sse_encode_box_autoadd_store_git_mode_dto(
+    StoreGitModeDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_store_status_dto(
+    StoreStatusDto self,
     SseSerializer serializer,
   );
 
@@ -2181,20 +2105,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_delete_pgp_key_request(
-    DeletePgpKeyRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_delete_pgp_key_response(
-    DeletePgpKeyResponse self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_delete_ssh_key_request(
     DeleteSshKeyRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_disconnect_store_request(
+    DisconnectStoreRequest self,
     SseSerializer serializer,
   );
 
@@ -2228,12 +2146,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_entry_summary_dto(
     EntrySummaryDto self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_export_pgp_key_request(
-    ExportPgpKeyRequest self,
     SseSerializer serializer,
   );
 
@@ -2298,6 +2210,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_git_remote_request(
+    GitRemoteRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_git_request(GitRequest self, SseSerializer serializer);
 
   @protected
@@ -2334,6 +2252,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_initialize_git_repository_request(
+    InitializeGitRepositoryRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_initialize_store_recipients_request(
+    InitializeStoreRecipientsRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_insert_entry_request(
     InsertEntryRequest self,
     SseSerializer serializer,
@@ -2366,6 +2296,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_inspect_pgp_key_text_request(
     InspectPgpKeyTextRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_inspect_store_git_request(
+    InspectStoreGitRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_inspect_store_git_response(
+    InspectStoreGitResponse self,
     SseSerializer serializer,
   );
 
@@ -2453,30 +2395,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_list_store_info_dto(
-    List<StoreInfoDto> self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_list_store_status_dto(
-    List<StoreStatusDto> self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_list_stores_request(
-    ListStoresRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_list_stores_response(
-    ListStoresResponse self,
     SseSerializer serializer,
   );
 
@@ -2607,20 +2525,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_opt_box_autoadd_pgp_key_deletion_failure_kind(
-    PgpKeyDeletionFailureKind? self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_opt_box_autoadd_pgp_key_deletion_result_dto(
-    PgpKeyDeletionResultDto? self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_opt_box_autoadd_pgp_key_inspection_dto(
     PgpKeyInspectionDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_store_git_mode_dto(
+    StoreGitModeDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_store_status_dto(
+    StoreStatusDto? self,
     SseSerializer serializer,
   );
 
@@ -2642,18 +2560,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_pgp_import_failure_kind(
     PgpImportFailureKind self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_pgp_key_deletion_failure_kind(
-    PgpKeyDeletionFailureKind self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_pgp_key_deletion_result_dto(
-    PgpKeyDeletionResultDto self,
     SseSerializer serializer,
   );
 
@@ -2712,25 +2618,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_remove_store_request(
-    RemoveStoreRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_save_config_request(
     SaveConfigRequest self,
     SseSerializer serializer,
   );
 
   @protected
-  void sse_encode_select_store_request(
-    SelectStoreRequest self,
+  void sse_encode_store_git_mode_dto(
+    StoreGitModeDto self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_store_info_dto(StoreInfoDto self, SseSerializer serializer);
 
   @protected
   void sse_encode_store_status_dto(

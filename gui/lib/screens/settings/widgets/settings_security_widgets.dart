@@ -83,8 +83,20 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
   }
 
   void _showPgpPassphraseStorageSheet(BuildContext context) {
+    final recipients =
+        settingsRepository.store?.pgpRecipients ?? const <String>[];
     final privatePgpKeys = keyRepository.keys
-        .where((key) => key.type == KeyRecordType.pgp && key.hasPrivateKey)
+        .where(
+          (key) =>
+              key.type == KeyRecordType.pgp &&
+              key.hasPrivateKey &&
+              key.hasLocalKeyMaterial &&
+              pgpIdentityMatchesAnyRecipient(
+                fingerprint: key.fingerprint,
+                identity: key.name,
+                recipients: recipients,
+              ),
+        )
         .toList(growable: false);
     showModalBottomSheet<void>(
       context: context,
@@ -92,6 +104,7 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
       builder:
           (context) => _PgpPassphraseStorageSheetBody(
             securityRepository: securityRepository,
+            keyRepository: keyRepository,
             privatePgpKeys: privatePgpKeys,
             autofillRepository: autofillRepository,
             entries: vaultRepository?.entries ?? const <PasswordEntry>[],
@@ -476,6 +489,7 @@ class _PgpSessionTimeoutSheetBodyState
 class _PgpPassphraseStorageSheetBody extends StatefulWidget {
   const _PgpPassphraseStorageSheetBody({
     required this.securityRepository,
+    required this.keyRepository,
     required this.privatePgpKeys,
     required this.entries,
     this.autofillRepository,
@@ -483,6 +497,7 @@ class _PgpPassphraseStorageSheetBody extends StatefulWidget {
   });
 
   final SecurityRepository securityRepository;
+  final KeyRepository keyRepository;
   final List<KeyRecord> privatePgpKeys;
   final List<PasswordEntry> entries;
   final AutofillRepository? autofillRepository;
@@ -603,9 +618,25 @@ class _PgpPassphraseStorageSheetBodyState
                       widget.securityRepository.pgpPassphraseStorageEnabled &&
                               _selectedFingerprint != null
                           ? () async {
+                            final keyMismatchMessage =
+                                context.l10n.pgpKeyDoesNotMatchStore;
                             try {
+                              final selectedFingerprint = _selectedFingerprint!;
+                              final prepared = await widget.keyRepository
+                                  .preparePgpPrivateKey(
+                                    fingerprint: selectedFingerprint,
+                                    passphrase: _passphrase.text,
+                                  );
+                              if (prepared.fingerprint
+                                      .replaceAll(' ', '')
+                                      .toUpperCase() !=
+                                  selectedFingerprint
+                                      .replaceAll(' ', '')
+                                      .toUpperCase()) {
+                                throw StateError(keyMismatchMessage);
+                              }
                               await widget.securityRepository.savePgpPassphrase(
-                                fingerprint: _selectedFingerprint!,
+                                fingerprint: selectedFingerprint,
                                 passphrase: _passphrase.text,
                               );
                               await widget.autofillRepository

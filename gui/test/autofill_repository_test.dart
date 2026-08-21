@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
@@ -11,10 +13,13 @@ void main() {
   test('native publication never persists a session-only passphrase', () async {
     const channel = MethodChannel('top.vollate.pars_gui/autofill');
     final published = <Map<Object?, Object?>>[];
+    var clearCalls = 0;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           if (call.method == 'publishState') {
             published.add((call.arguments as Map).cast<Object?, Object?>());
+          } else if (call.method == 'clearState') {
+            clearCalls += 1;
           }
           return null;
         });
@@ -27,6 +32,10 @@ void main() {
       fingerprint: 'ABC',
       passphrase: 'session-only',
     );
+    var currentRoot = '/tmp/store';
+    var fingerprintUsable = true;
+    String? validatedFingerprint;
+    String? validatedPassphrase;
     final repository = BridgeAutofillRepository(
       bridge: _RecordingAutofillBridge(),
       configPath: '/tmp/pars.toml',
@@ -34,6 +43,13 @@ void main() {
       storeId: 'store-0',
       storeName: 'Personal',
       storeRoot: '/tmp/store',
+      currentStoreRoot: () => currentRoot,
+      currentStoreReady: () => currentRoot.isNotEmpty,
+      validatePgpPassphraseForCurrentStore: (fingerprint, passphrase) async {
+        validatedFingerprint = fingerprint;
+        validatedPassphrase = passphrase;
+        return fingerprintUsable;
+      },
       securityRepository: security,
       forcePlatformPublication: true,
     );
@@ -47,11 +63,97 @@ void main() {
     );
     await repository.publishPlatformState();
     expect(published.last['passphrase'], 'explicitly-remembered');
+    expect(validatedFingerprint, 'ABC');
+    expect(validatedPassphrase, 'explicitly-remembered');
+
+    fingerprintUsable = false;
+    await repository.publishPlatformState();
+    expect(published.last['passphrase'], isNull);
+    expect(
+      (await security.readPgpPassphrase())?.passphrase,
+      'explicitly-remembered',
+    );
+
+    currentRoot = '';
+    await repository.publishPlatformState();
+    expect(clearCalls, 1);
+    expect(
+      (await security.readPgpPassphrase())?.passphrase,
+      'explicitly-remembered',
+    );
 
     await security.clearPgpPassphrase();
     await repository.publishPlatformState();
-    expect(published.last['passphrase'], isNull);
+    expect(clearCalls, 2);
   });
+
+  test(
+    'native clear wins over an in-flight publication and leaves no stale state',
+    () async {
+      const channel = MethodChannel('top.vollate.pars_gui/autofill');
+      final nativeOperations = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            nativeOperations.add(call.method);
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+
+      final validationStarted = Completer<void>();
+      final validationGate = Completer<void>();
+      final security = InMemorySecurityRepository();
+      await security.savePgpPassphrase(
+        fingerprint: 'ABC',
+        passphrase: 'remembered',
+      );
+      var currentRoot = '/tmp/store';
+      var currentReady = true;
+      final bridge = _RecordingAutofillBridge();
+      final repository = BridgeAutofillRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars.toml',
+        indexPath: '/tmp/autofill.json',
+        storeId: 'canonical-store',
+        storeName: 'Personal',
+        storeRoot: '/tmp/store',
+        currentStoreRoot: () => currentRoot,
+        currentStoreReady: () => currentReady,
+        validatePgpPassphraseForCurrentStore: (fingerprint, passphrase) async {
+          if (!validationStarted.isCompleted) validationStarted.complete();
+          await validationGate.future;
+          return true;
+        },
+        securityRepository: security,
+        forcePlatformPublication: true,
+      );
+
+      final publication = repository.publishPlatformState();
+      await validationStarted.future;
+      currentReady = false;
+      currentRoot = '';
+      final clear = repository.clearIndex();
+      final publicationQueuedAfterRemoval = repository.publishPlatformState();
+      validationGate.complete();
+      await Future.wait<void>(<Future<void>>[
+        publication,
+        clear,
+        publicationQueuedAfterRemoval,
+      ]);
+
+      expect(nativeOperations, isNot(contains('publishState')));
+      expect(nativeOperations.last, 'clearState');
+      expect(
+        bridge.calledMethods.where(
+          (method) => method == 'clear_autofill_index',
+        ),
+        hasLength(1),
+      );
+      expect(repository.status.kind, AutofillStatusKind.disabled);
+    },
+  );
 
   test('path rebuild sends ranking metadata without secret inputs', () async {
     final bridge = _RecordingAutofillBridge();
@@ -205,6 +307,58 @@ void main() {
     expect(credential?.password, 'secret');
   });
 
+  test(
+    'root-mismatched reconcile disables native state and requires rebuild',
+    () async {
+      const channel = MethodChannel('top.vollate.pars_gui/autofill');
+      final methods = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            methods.add(call.method);
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+      final bridge =
+          _RecordingAutofillBridge()
+            ..reconcileResponse = const frb.UnitResponse(
+              error: frb.BridgeFailure(
+                category: frb.BridgeFailureCategory.validationError,
+                message:
+                    'autofill index belongs to another store; rebuild required',
+              ),
+            );
+      final repository = BridgeAutofillRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars.toml',
+        indexPath: '/tmp/autofill.json',
+        storeId: 'canonical-store',
+        storeName: 'Replacement',
+        storeRoot: '/tmp/replacement',
+        currentStoreReady: () => true,
+        validatePgpPassphraseForCurrentStore: (_, _) async => false,
+        forcePlatformPublication: true,
+      );
+
+      await expectLater(
+        repository.reconcileIndex(const <PasswordEntry>[
+          PasswordEntry(
+            path: 'example.com/alice',
+            displayName: 'alice',
+            repoName: 'Replacement',
+            encryptedContent: '',
+          ),
+        ]),
+        throwsA(isA<AutofillRepositoryException>()),
+      );
+
+      expect(methods, <String>['clearState']);
+      expect(repository.status.kind, AutofillStatusKind.needsRebuild);
+    },
+  );
+
   test('fake repository records path operations and clear', () async {
     final repository = FakeAutofillRepository(
       candidates: const <AutofillCandidate>[
@@ -284,6 +438,7 @@ class _RecordingAutofillBridge implements AutofillBridgeApi {
   frb.AutofillQueryRequest? lastQueryRequest;
   frb.AutofillCredentialRequest? lastCredentialRequest;
   frb.ClearAutofillIndexRequest? lastClearRequest;
+  frb.UnitResponse reconcileResponse = const frb.UnitResponse();
   frb.AutofillCandidatesResponse queryResponse =
       const frb.AutofillCandidatesResponse(
         candidates: <frb.AutofillCandidateDto>[],
@@ -342,7 +497,7 @@ class _RecordingAutofillBridge implements AutofillBridgeApi {
   }) async {
     calledMethods.add('reconcile_autofill_index');
     lastReconcileRequest = request;
-    return const frb.UnitResponse();
+    return reconcileResponse;
   }
 
   @override

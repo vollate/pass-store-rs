@@ -1,0 +1,407 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:pars_gui/app/pars_gui_app.dart';
+import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
+import 'package:pars_gui/bridge/frb_generated/frb_generated.dart';
+import 'package:pars_gui/bridge/pars_bridge_api.dart';
+import 'package:pars_gui/l10n/app_localizations.dart';
+import 'package:pars_gui/l10n/l10n.dart';
+import 'package:pars_gui/services/autofill_repository.dart';
+import 'package:pars_gui/services/bridge_backed_repository.dart';
+import 'package:pars_gui/services/path_picker_service.dart';
+import 'package:pars_gui/services/security_repository.dart';
+import 'package:pars_gui/services/store_lifecycle.dart';
+import 'package:pars_gui/services/vault_metadata_store.dart';
+import 'package:path_provider/path_provider.dart';
+
+const _autofillChannel = MethodChannel('top.vollate.pars_gui/autofill');
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    await RustLib.init(
+      externalLibrary:
+          Platform.isIOS
+              ? ExternalLibrary.process(iKnowHowToUseIt: true)
+              : null,
+    );
+  });
+
+  testWidgets(
+    'production store lifecycle strings resolve in English and Chinese',
+    (tester) async {
+      Widget localizedApp(Locale locale) => MaterialApp(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder:
+              (context) => Column(
+                children: <Widget>[
+                  Text(context.l10n.setupPasswordStore),
+                  Text(context.l10n.storeRemovalInProgressTitle),
+                  Text(context.l10n.repairPasswordStore),
+                ],
+              ),
+        ),
+      );
+
+      await tester.pumpWidget(localizedApp(const Locale('en')));
+      await tester.pumpAndSettle();
+      expect(find.text('Set up password store'), findsOneWidget);
+      expect(find.text('Removing password store…'), findsOneWidget);
+      expect(find.text('Repair password store'), findsOneWidget);
+
+      await tester.pumpWidget(localizedApp(const Locale('zh')));
+      await tester.pumpAndSettle();
+      expect(find.text('设置密码库'), findsOneWidget);
+      expect(find.text('正在移除密码库…'), findsOneWidget);
+      expect(find.text('修复密码库'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Android embedded git initializes an absent-Git staged import', (
+    tester,
+  ) async {
+    if (!Platform.isAndroid) return;
+    final support = await getApplicationSupportDirectory();
+    final fixture = Directory('${support.path}/integration-init-fixture');
+    final managedBase = Directory('${support.path}/integration-init-stores');
+    final config = File('${support.path}/integration-init-config.toml');
+    await _deleteIfExists(fixture);
+    await _deleteIfExists(managedBase);
+    await _deleteIfExists(config);
+    await fixture.create(recursive: true);
+    await File('${fixture.path}/.gpg-id').writeAsString('SYNTHETIC\n');
+    await File('${fixture.path}/example.gpg').writeAsBytes(<int>[1, 2, 3, 4]);
+    final before = base64Encode(
+      await File('${fixture.path}/example.gpg').readAsBytes(),
+    );
+
+    var initializeDecisionCount = 0;
+    final destination = await copyFolderToManagedStorageForTesting(
+      sourcePath: fixture.path,
+      destinationBaseDirectory: managedBase.path,
+      resolveMissingGit: (state) async {
+        expect(state, ManagedStoreGitState.absent);
+        initializeDecisionCount += 1;
+        return ManagedStoreGitDecision.initialize;
+      },
+    );
+    final destinationPath = destination!;
+    expect(initializeDecisionCount, 1);
+    expect(Directory('$destinationPath/.git').existsSync(), isTrue);
+    final registered = await frb.importLocalStore(
+      request: frb.ImportLocalStoreRequest(
+        configPath: config.path,
+        root: destinationPath,
+      ),
+    );
+    expect(registered.error, isNull);
+    final state = await frb.inspectAppState(
+      request: frb.InspectAppStateRequest(
+        configPath: config.path,
+        pgpExecutable: null,
+      ),
+    );
+    expect(state.state?.store?.root, destinationPath);
+    expect(state.state?.store?.gitMode, frb.StoreGitModeDto.local);
+    expect(Directory('${fixture.path}/.git').existsSync(), isFalse);
+    expect(
+      base64Encode(await File('${fixture.path}/example.gpg').readAsBytes()),
+      before,
+    );
+
+    await fixture.delete(recursive: true);
+    await managedBase.delete(recursive: true);
+    await _deleteIfExists(config);
+  });
+
+  testWidgets('confirmed Delete local copy clears production state in order', (
+    tester,
+  ) async {
+    if (!Platform.isAndroid) return;
+    final support = await getApplicationSupportDirectory();
+    final rootBase = Directory('${support.path}/integration-delete-stores');
+    final root = Directory('${rootBase.path}/integration-delete-store');
+    final config = File('${support.path}/integration-delete-config.toml');
+    final keyring = Directory('${support.path}/integration-delete-pgp');
+    final ssh = Directory('${support.path}/integration-delete-ssh');
+    final index = File('${support.path}/integration-delete-autofill.json');
+    for (final directory in <Directory>[rootBase, keyring, ssh]) {
+      await _deleteIfExists(directory);
+      await directory.create(recursive: true);
+    }
+    await _deleteIfExists(config);
+    await _deleteIfExists(index);
+
+    const bridge = FrbParsBridgeApi();
+    final configured = await bridge.configurePgpBackend(
+      request: frb.ConfigurePgpBackendRequest(
+        configPath: config.path,
+        backend: 'pure_rust',
+        keyringHome: keyring.path,
+      ),
+    );
+    expect(configured.error, isNull);
+    final security = InMemorySecurityRepository.withPattern(
+      const <int>[0, 1, 2, 5],
+      onboardingComplete: true,
+      lastUnlockedAt: DateTime.now(),
+    );
+    final metadata = InMemoryVaultMetadataStore();
+    late BridgeBackedRepository repository;
+    final autofill = BridgeAutofillRepository(
+      bridge: const FrbAutofillBridgeApi(),
+      configPath: config.path,
+      indexPath: index.path,
+      storeId: 'canonical-store',
+      storeName: 'Integration',
+      storeRoot: root.path,
+      securityRepository: security,
+      currentStoreRoot: () => repository.store?.root ?? '',
+      currentStoreReady:
+          () =>
+              repository.lifecycle.onboardingState ==
+              StoreOnboardingState.ready,
+      validatePgpPassphraseForCurrentStore: (_, _) async => true,
+      forcePlatformPublication: true,
+    );
+    repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: config.path,
+      sshDir: ssh.path,
+      managedStoreBaseDir: rootBase.path,
+      securityRepository: security,
+      autofillRepository: autofill,
+      metadataStore: metadata,
+    );
+    final key = await repository.generatePgpKey(
+      name: 'Integration',
+      email: 'integration@example.invalid',
+      passphrase: 'synthetic-passphrase',
+    );
+    await repository.createLocalStore(
+      name: 'Integration',
+      root: root.path,
+      pgpKeys: <String>[key.fingerprint],
+      initializeGit: false,
+    );
+    await security.startPgpSession(
+      fingerprint: key.fingerprint,
+      passphrase: 'synthetic-passphrase',
+    );
+    final saved = await repository.saveEntry(
+      path: 'alice',
+      content: 'synthetic-password\nurl: https://example.invalid/login',
+      overwrite: false,
+    );
+    expect(saved.path, 'alice');
+    await repository.refresh();
+    await metadata.save(
+      VaultMetadata(
+        storeRoot: root.path,
+        recentPaths: const <String>['alice'],
+        favoritePaths: const <String>{'alice'},
+      ),
+    );
+    await security.startPgpSession(
+      fingerprint: key.fingerprint,
+      passphrase: 'synthetic-passphrase',
+    );
+    await security.savePgpPassphrase(
+      fingerprint: key.fingerprint,
+      passphrase: 'synthetic-passphrase',
+    );
+    await autofill.rebuildIndex(repository.entries);
+    final before = await _autofillChannel.invokeMapMethod<String, Object?>(
+      'inspectStateForTesting',
+    );
+    expect(before?['enabled'], isTrue);
+    expect(before?['hasPassphrase'], isTrue);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: security,
+        autofillRepository: autofill,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Vault'), findsWidgets);
+    final credential = repository.entries.singleWhere(
+      (entry) => !entry.isDirectory,
+    );
+    await tester.tap(find.text(credential.displayName).first);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Reveal'), findsOneWidget);
+    await tester.tap(find.byTooltip('Reveal'));
+    await tester.pumpAndSettle();
+    expect(find.text('synthetic-password'), findsOneWidget);
+    Navigator.of(tester.element(find.text('synthetic-password'))).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('synthetic-password'), findsNothing);
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Password store'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Delete app copy'));
+    await tester.tap(find.text('Delete app copy'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField).last,
+      'integration-delete-store',
+    );
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up password store'), findsOneWidget);
+    expect(find.text('Vault'), findsNothing);
+    expect(root.existsSync(), isFalse);
+    expect(repository.store, isNull);
+    expect((await metadata.load()).recentPaths, isEmpty);
+    expect((await metadata.load()).favoritePaths, isEmpty);
+    expect(await security.readActivePgpPassphrase(), isNull);
+    expect(
+      (await security.readPgpPassphrase())?.passphrase,
+      'synthetic-passphrase',
+    );
+    final after = await _autofillChannel.invokeMapMethod<String, Object?>(
+      'inspectStateForTesting',
+    );
+    expect(after?['enabled'], isFalse);
+    expect(after?['hasRoot'], isFalse);
+    expect(after?['hasPassphrase'], isFalse);
+    final inspected = await frb.inspectAppState(
+      request: frb.InspectAppStateRequest(
+        configPath: config.path,
+        pgpExecutable: null,
+      ),
+    );
+    expect(inspected.state?.store, isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _deleteIfExists(config);
+    await _deleteIfExists(index);
+    await _deleteIfExists(rootBase);
+    await _deleteIfExists(keyring);
+    await _deleteIfExists(ssh);
+  });
+
+  testWidgets('live decrypted detail closes during canonical removal', (
+    tester,
+  ) async {
+    if (!Platform.isAndroid) return;
+    final support = await getApplicationSupportDirectory();
+    final rootBase = Directory('${support.path}/integration-live-stores');
+    final root = Directory('${rootBase.path}/integration-live-store');
+    final config = File('${support.path}/integration-live-config.toml');
+    final keyring = Directory('${support.path}/integration-live-pgp');
+    final ssh = Directory('${support.path}/integration-live-ssh');
+    for (final directory in <Directory>[rootBase, keyring, ssh]) {
+      await _deleteIfExists(directory);
+      await directory.create(recursive: true);
+    }
+    await _deleteIfExists(config);
+
+    const bridge = FrbParsBridgeApi();
+    final configured = await bridge.configurePgpBackend(
+      request: frb.ConfigurePgpBackendRequest(
+        configPath: config.path,
+        backend: 'pure_rust',
+        keyringHome: keyring.path,
+      ),
+    );
+    expect(configured.error, isNull);
+    final security = InMemorySecurityRepository.withPattern(
+      const <int>[0, 1, 2, 5],
+      onboardingComplete: true,
+      lastUnlockedAt: DateTime.now(),
+    );
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: config.path,
+      sshDir: ssh.path,
+      managedStoreBaseDir: rootBase.path,
+      securityRepository: security,
+      metadataStore: InMemoryVaultMetadataStore(),
+    );
+    final key = await repository.generatePgpKey(
+      name: 'Live detail',
+      email: 'live-detail@example.invalid',
+      passphrase: 'synthetic-passphrase',
+    );
+    await repository.createLocalStore(
+      name: 'Live detail',
+      root: root.path,
+      pgpKeys: <String>[key.fingerprint],
+      initializeGit: false,
+    );
+    await security.startPgpSession(
+      fingerprint: key.fingerprint,
+      passphrase: 'synthetic-passphrase',
+    );
+    await repository.saveEntry(
+      path: 'live-alice',
+      content: 'live-decrypted-password\nurl: https://live.example/login',
+      overwrite: false,
+    );
+    await repository.refresh();
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: security,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final credential = repository.entries.singleWhere(
+      (entry) => !entry.isDirectory,
+    );
+    await tester.tap(find.text(credential.displayName).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Reveal'));
+    await tester.pumpAndSettle();
+    expect(find.text('live-decrypted-password'), findsOneWidget);
+
+    await repository.deleteLocalStore(
+      root: root.path,
+      confirmation: 'integration-live-store',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('live-decrypted-password'), findsNothing);
+    expect(find.text('Copy password'), findsNothing);
+    expect(find.text('Set up password store'), findsOneWidget);
+    expect(root.existsSync(), isFalse);
+    expect(await security.readActivePgpPassphrase(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _deleteIfExists(config);
+    await _deleteIfExists(rootBase);
+    await _deleteIfExists(keyring);
+    await _deleteIfExists(ssh);
+  });
+}
+
+Future<void> _deleteIfExists(FileSystemEntity entity) async {
+  try {
+    if (await entity.exists()) await entity.delete(recursive: true);
+  } on FileSystemException {
+    // Test cleanup is best effort; assertions verify production deletion.
+  }
+}

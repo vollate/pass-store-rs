@@ -9,6 +9,7 @@ import '../../services/git_repository.dart';
 import '../../services/key_repository.dart';
 import '../../services/security_repository.dart';
 import '../../services/sensitive_clipboard_service.dart';
+import '../../services/store_lifecycle.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/app_section.dart';
@@ -36,8 +37,6 @@ class VaultScreen extends StatefulWidget {
     this.clipboardService,
     this.privacyEvents,
     this.onLock,
-    this.onChooseKey,
-    this.onOpenKeyManagement,
   });
 
   final VaultRepository vaultRepository;
@@ -49,8 +48,6 @@ class VaultScreen extends StatefulWidget {
   final SensitiveClipboardService? clipboardService;
   final ValueListenable<int>? privacyEvents;
   final VoidCallback? onLock;
-  final VoidCallback? onChooseKey;
-  final VoidCallback? onOpenKeyManagement;
 
   @override
   State<VaultScreen> createState() => _VaultScreenState();
@@ -543,8 +540,6 @@ class _VaultScreenState extends State<VaultScreen> {
                     : () => Navigator.of(
                       sheetContext,
                     ).pop(_EntryDetailAction.delete),
-            onChooseKey: widget.onChooseKey,
-            onOpenKeyManagement: widget.onOpenKeyManagement,
           ),
     );
     if (!mounted || action == null || manageRepository == null) {
@@ -625,32 +620,55 @@ class _VaultScreenState extends State<VaultScreen> {
     );
   }
 
+  StoreGitMode get _storeGitMode {
+    final repository = widget.gitRepository;
+    if (repository is GitModeRepository) {
+      return (repository as GitModeRepository).gitMode;
+    }
+    return repository.gitStatus == RepoGitStatus.disabled
+        ? StoreGitMode.disabled
+        : StoreGitMode.remote;
+  }
+
   String _gitStatusLabel(BuildContext context) {
     if (_isLoading) return context.l10n.storeActionInProgress;
-    return switch (widget.gitRepository.gitStatus) {
+    final operational = switch (widget.gitRepository.gitStatus) {
+      RepoGitStatus.disabled => context.l10n.gitDisabledState,
       RepoGitStatus.clean => context.l10n.gitClean,
       RepoGitStatus.needPull => context.l10n.gitNeedPull,
       RepoGitStatus.uncommitted => context.l10n.gitUncommitted,
+      RepoGitStatus.invalid => context.l10n.invalidGitMetadataTitle,
       RepoGitStatus.syncFailed => context.l10n.gitSyncFailed,
+    };
+    return switch (_storeGitMode) {
+      StoreGitMode.disabled => context.l10n.gitDisabledState,
+      StoreGitMode.invalid => context.l10n.invalidGitMetadataTitle,
+      StoreGitMode.local =>
+        widget.gitRepository.gitStatus == RepoGitStatus.clean
+            ? context.l10n.gitLocalState
+            : '${context.l10n.gitLocalState} · $operational',
+      StoreGitMode.remote =>
+        widget.gitRepository.gitStatus == RepoGitStatus.clean
+            ? '${context.l10n.gitRemoteState} · ${context.l10n.gitClean}'
+            : operational,
     };
   }
 
   ParsStatusKind get _gitStatusKind {
     if (_isLoading) return ParsStatusKind.busy;
+    if (_storeGitMode == StoreGitMode.disabled) return ParsStatusKind.neutral;
+    if (_storeGitMode == StoreGitMode.invalid) return ParsStatusKind.error;
     return switch (widget.gitRepository.gitStatus) {
+      RepoGitStatus.disabled => ParsStatusKind.neutral,
       RepoGitStatus.clean => ParsStatusKind.success,
       RepoGitStatus.needPull => ParsStatusKind.warning,
       RepoGitStatus.uncommitted => ParsStatusKind.warning,
+      RepoGitStatus.invalid => ParsStatusKind.error,
       RepoGitStatus.syncFailed => ParsStatusKind.error,
     };
   }
 
   void _handleGitStatus() {
-    if (widget.gitRepository.gitStatus == RepoGitStatus.syncFailed &&
-        widget.onOpenKeyManagement != null) {
-      widget.onOpenKeyManagement!.call();
-      return;
-    }
     AppNotification.show(context, _gitStatusLabel(context));
   }
 

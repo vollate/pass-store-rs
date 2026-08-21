@@ -7,6 +7,121 @@ const _initialRawErrorBaseline = 6;
 const _initialDirectClipboardBaseline = 0;
 
 void main() {
+  test('mobile advanced Git args remain unavailable instead of emulated', () {
+    final settings =
+        File('lib/screens/settings/settings_screen.dart').readAsStringSync();
+    final repository =
+        File('lib/services/bridge_backed_repository.dart').readAsStringSync();
+
+    expect(settings, contains('if (!Platform.isAndroid && !Platform.isIOS)'));
+    expect(
+      repository,
+      contains('Advanced Git arguments are unavailable on mobile.'),
+    );
+    expect(repository, isNot(contains("args.first == 'remote'")));
+  });
+
+  test('store removal clears native Autofill identity and passphrase state', () {
+    final autofill =
+        File('lib/services/autofill_repository.dart').readAsStringSync();
+    final androidActivity =
+        File(
+          'android/app/src/main/kotlin/top/vollate/pars_gui/MainActivity.kt',
+        ).readAsStringSync();
+    final androidState =
+        File(
+          'android/app/src/main/kotlin/top/vollate/pars_gui/autofill/ParsAutofillStateStore.kt',
+        ).readAsStringSync();
+    final ios =
+        File('ios/Shared/ParsAutofillSharedState.swift').readAsStringSync();
+
+    expect(autofill, contains("invokeMethod<void>('clearState')"));
+    expect(autofill, contains('_serializePlatformState'));
+    expect(autofill, contains('_isCapturedStoreReady(capturedRoot)'));
+    expect(autofill, contains('This final tombstone wins'));
+    expect(androidActivity, contains('ParsAutofillStateStore.clear(this)'));
+    expect(androidState, contains('putBoolean(KEY_ENABLED, false)'));
+    expect(androidState, contains('.commit()'));
+    expect(ios, contains('enabled: false'));
+    expect(ios, contains('removeAllCredentialIdentities'));
+    expect(ios, contains('deletePassphrase()'));
+  });
+
+  test('device evidence harness stays out of production packaging', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final productionManifest =
+        File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+    expect(pubspec, isNot(contains('integration_test:')));
+    expect(
+      productionManifest,
+      isNot(contains('SyntheticStoreDocumentsProvider')),
+    );
+    expect(
+      File('tool/run_single_store_device_evidence.sh').existsSync(),
+      isTrue,
+    );
+  });
+
+  test(
+    'permanent PGP settings and onboarding recipient append stay removed',
+    () {
+      final settings =
+          File('lib/screens/settings/settings_screen.dart').readAsStringSync();
+      final onboarding =
+          File(
+            'lib/screens/onboarding/onboarding_screen.dart',
+          ).readAsStringSync();
+
+      expect(
+        settings,
+        isNot(contains('_showKeys(context, KeyRecordType.pgp)')),
+      );
+      expect(onboarding, isNot(contains('addPgpKeyToSelectedStore')));
+      expect(onboarding, isNot(contains('_OnboardingStep.ssh')));
+      expect(onboarding, isNot(contains('_OnboardingStep.review')));
+    },
+  );
+
+  test('single-store and contextual-key contracts cannot regress', () {
+    final lifecycle =
+        File('lib/services/store_lifecycle.dart').readAsStringSync();
+    final settings =
+        File('lib/screens/settings/settings_screen.dart').readAsStringSync();
+    final storeUi =
+        File(
+          'lib/screens/settings/widgets/settings_store_widgets.dart',
+        ).readAsStringSync();
+    final keys = File('lib/services/key_repository.dart').readAsStringSync();
+
+    for (final forbidden in <String>[
+      'selectedStore',
+      'List<StoreStatus> get stores',
+      'selectStore',
+      'isDefault',
+      'hasGitRemote',
+      'StoreOnboardingStateLabel',
+      "return 'No config'",
+      "return 'Store missing'",
+    ]) {
+      expect(lifecycle, isNot(contains(forbidden)));
+    }
+    expect(settings, isNot(contains('passwordStoresTitle')));
+    final entryDetail =
+        File('lib/screens/vault/entry_detail_sheet.dart').readAsStringSync();
+    expect(entryDetail, isNot(contains('openPgpKeysHint')));
+    expect(entryDetail, isNot(contains('openKeyManagement')));
+    expect(storeUi, isNot(contains('_PasswordStoresSheetBody')));
+    expect(storeUi, isNot(contains('Set default')));
+    for (final forbidden in <String>[
+      'exportPgpPublicKey',
+      'exportPgpPrivateKey',
+      'deletePgpKey',
+      'addPgpKeyToSelectedStore',
+    ]) {
+      expect(keys, isNot(contains(forbidden)));
+    }
+  });
+
   test('GUI source debt does not exceed the recorded redesign baseline', () {
     final audit = _auditProductionGui();
 

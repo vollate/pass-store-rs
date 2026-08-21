@@ -116,13 +116,14 @@ class ParsAutofillService : AutofillService() {
             ParsAutofillUnlockActivity.autofillIntent(
                 context = this,
                 path = candidate.path,
+                generation = candidate.generation,
                 usernameId = parsed.usernameId,
                 passwordId = parsed.passwordId,
             )
         val auth: IntentSender =
             ParsAutofillUnlockActivity.pendingIntent(
                 context = this,
-                requestCode = candidate.path.hashCode(),
+                requestCode = 31 * candidate.path.hashCode() + candidate.generation.hashCode(),
                 intent = intent,
             ).intentSender
         val builder = Dataset.Builder(presentation)

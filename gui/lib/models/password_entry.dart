@@ -1,20 +1,12 @@
 import 'package:flutter/widgets.dart';
 
-enum RepoGitStatus { clean, needPull, uncommitted, syncFailed }
-
-extension RepoGitStatusLabel on RepoGitStatus {
-  String get label {
-    switch (this) {
-      case RepoGitStatus.clean:
-        return 'Clean';
-      case RepoGitStatus.needPull:
-        return 'Need pull';
-      case RepoGitStatus.uncommitted:
-        return 'Uncommitted';
-      case RepoGitStatus.syncFailed:
-        return 'Sync failed';
-    }
-  }
+enum RepoGitStatus {
+  disabled,
+  clean,
+  needPull,
+  uncommitted,
+  invalid,
+  syncFailed,
 }
 
 class PasswordEntry {

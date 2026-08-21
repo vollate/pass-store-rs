@@ -34,8 +34,6 @@ class EntryDetailSheet extends StatefulWidget {
     this.onRename,
     this.onRegenerate,
     this.onDelete,
-    this.onChooseKey,
-    this.onOpenKeyManagement,
     this.keys = const <KeyRecord>[],
     this.clipboardClearDelay = const Duration(seconds: 45),
   });
@@ -55,8 +53,6 @@ class EntryDetailSheet extends StatefulWidget {
   final VoidCallback? onRename;
   final VoidCallback? onRegenerate;
   final VoidCallback? onDelete;
-  final VoidCallback? onChooseKey;
-  final VoidCallback? onOpenKeyManagement;
   final List<KeyRecord> keys;
   final Duration clipboardClearDelay;
 
@@ -248,20 +244,6 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                     onPressed: _loadSecret,
                     icon: const Icon(Icons.refresh),
                     label: Text(localizations.retry),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed:
-                        widget.onChooseKey ??
-                        () => _showMessage(localizations.openKeyImportHint),
-                    icon: const Icon(Icons.key_outlined),
-                    label: Text(localizations.chooseImportKey),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed:
-                        widget.onOpenKeyManagement ??
-                        () => _showMessage(localizations.openPgpKeysHint),
-                    icon: const Icon(Icons.settings_outlined),
-                    label: Text(localizations.openKeyManagement),
                   ),
                 ],
               ),

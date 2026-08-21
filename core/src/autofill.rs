@@ -292,6 +292,14 @@ pub fn reconcile_autofill_index(
         return Ok(None);
     };
     validate_store_root(&request.store_root)?;
+    let requested_root = fs::canonicalize(&request.store_root)?;
+    let indexed_root = fs::canonicalize(Path::new(&index.store_root)).ok();
+    if index.store_id != request.store_id || indexed_root.as_ref() != Some(&requested_root) {
+        clear_autofill_index(&request.index_path)?;
+        return Err(CoreError::ValidationError(
+            "autofill index belongs to a different password store; rebuild required".to_string(),
+        ));
+    }
     let metadata = metadata_by_path(request.entries)?;
     let existing = index
         .entries

@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 962699484;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -185892966;
 
 // Section: executor
 
@@ -46,44 +46,6 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
-fn wire__crate__api__add_pgp_key_to_gpg_id_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "add_pgp_key_to_gpg_id",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::AddPgpKeyToGpgIdRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok = Result::<_, ()>::Ok(
-                            crate::api::add_pgp_key_to_gpg_id(api_request).await,
-                        )?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
 fn wire__crate__api__clear_autofill_index_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -387,43 +349,6 @@ fn wire__crate__api__delete_local_store_impl(
         },
     )
 }
-fn wire__crate__api__delete_pgp_key_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "delete_pgp_key",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::DeletePgpKeyRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok =
-                            Result::<_, ()>::Ok(crate::api::delete_pgp_key(api_request).await)?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
 fn wire__crate__api__delete_ssh_key_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -499,6 +424,43 @@ fn wire__crate__api__detect_imported_key_impl(
         },
     )
 }
+fn wire__crate__api__disconnect_store_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "disconnect_store",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::api::DisconnectStoreRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok =
+                            Result::<_, ()>::Ok(crate::api::disconnect_store(api_request).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__edit_entry_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -566,82 +528,6 @@ fn wire__crate__api__enrich_autofill_index_websites_impl(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
                             crate::api::enrich_autofill_index_websites(api_request).await,
-                        )?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
-fn wire__crate__api__export_pgp_private_key_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "export_pgp_private_key",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::ExportPgpKeyRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok = Result::<_, ()>::Ok(
-                            crate::api::export_pgp_private_key(api_request).await,
-                        )?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
-fn wire__crate__api__export_pgp_public_key_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "export_pgp_public_key",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::ExportPgpKeyRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok = Result::<_, ()>::Ok(
-                            crate::api::export_pgp_public_key(api_request).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -838,6 +724,43 @@ fn wire__crate__api__generate_ssh_key_impl(
         },
     )
 }
+fn wire__crate__api__git_add_remote_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "git_add_remote",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::api::GitRemoteRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok =
+                            Result::<_, ()>::Ok(crate::api::git_add_remote(api_request).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__git_commit_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -867,6 +790,43 @@ fn wire__crate__api__git_commit_impl(
                     (move || async move {
                         let output_ok =
                             Result::<_, ()>::Ok(crate::api::git_commit(api_request).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__git_list_remotes_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "git_list_remotes",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::api::GitRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok =
+                            Result::<_, ()>::Ok(crate::api::git_list_remotes(api_request).await)?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -941,6 +901,80 @@ fn wire__crate__api__git_push_impl(
                     (move || async move {
                         let output_ok =
                             Result::<_, ()>::Ok(crate::api::git_push(api_request).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__git_remove_remote_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "git_remove_remote",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::api::GitRemoteRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok =
+                            Result::<_, ()>::Ok(crate::api::git_remove_remote(api_request).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__git_set_remote_url_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "git_set_remote_url",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::api::GitRemoteRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok =
+                            Result::<_, ()>::Ok(crate::api::git_set_remote_url(api_request).await)?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1099,120 +1133,6 @@ fn wire__crate__api__import_pgp_key_text_impl(
         },
     )
 }
-fn wire__crate__api__import_pgp_private_key_file_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "import_pgp_private_key_file",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::ImportKeyFileRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok = Result::<_, ()>::Ok(
-                            crate::api::import_pgp_private_key_file(api_request).await,
-                        )?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
-fn wire__crate__api__import_pgp_private_key_text_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "import_pgp_private_key_text",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::ImportKeyTextRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok = Result::<_, ()>::Ok(
-                            crate::api::import_pgp_private_key_text(api_request).await,
-                        )?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
-fn wire__crate__api__import_pgp_public_key_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "import_pgp_public_key",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::ImportKeyTextRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok = Result::<_, ()>::Ok(
-                            crate::api::import_pgp_public_key(api_request).await,
-                        )?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
 fn wire__crate__api__import_ssh_private_key_file_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1280,6 +1200,84 @@ fn wire__crate__api__import_ssh_private_key_text_impl(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
                             crate::api::import_ssh_private_key_text(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__initialize_git_repository_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "initialize_git_repository",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::InitializeGitRepositoryRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::initialize_git_repository(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__initialize_store_recipients_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "initialize_store_recipients",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::api::InitializeStoreRecipientsRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::initialize_store_recipients(api_request).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -1439,6 +1437,43 @@ fn wire__crate__api__inspect_pgp_key_text_impl(
         },
     )
 }
+fn wire__crate__api__inspect_store_git_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "inspect_store_git",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::api::InspectStoreGitRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok =
+                            Result::<_, ()>::Ok(crate::api::inspect_store_git(api_request).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__list_entries_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1505,43 +1540,6 @@ fn wire__crate__api__list_keys_impl(
                     (move || async move {
                         let output_ok =
                             Result::<_, ()>::Ok(crate::api::list_keys(api_request).await)?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
-fn wire__crate__api__list_stores_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "list_stores",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::ListStoresRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok =
-                            Result::<_, ()>::Ok(crate::api::list_stores(api_request).await)?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1972,43 +1970,6 @@ fn wire__crate__api__remove_autofill_index_entry_impl(
         },
     )
 }
-fn wire__crate__api__remove_store_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "remove_store",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::RemoveStoreRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok =
-                            Result::<_, ()>::Ok(crate::api::remove_store(api_request).await)?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
 fn wire__crate__api__resolve_autofill_credential_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2122,43 +2083,6 @@ fn wire__crate__api__save_config_impl(
         },
     )
 }
-fn wire__crate__api__select_store_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "select_store",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_request = <crate::api::SelectStoreRequest>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let output_ok =
-                            Result::<_, ()>::Ok(crate::api::select_store(api_request).await)?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
 fn wire__crate__api__upsert_autofill_index_entry_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2209,36 +2133,20 @@ impl SseDecode for String {
     }
 }
 
-impl SseDecode for crate::api::AddPgpKeyToGpgIdRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_root = <String>::sse_decode(deserializer);
-        let mut var_fingerprint = <String>::sse_decode(deserializer);
-        return crate::api::AddPgpKeyToGpgIdRequest {
-            root: var_root,
-            fingerprint: var_fingerprint,
-        };
-    }
-}
-
 impl SseDecode for crate::api::AppStateDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_configExists = <bool>::sse_decode(deserializer);
-        let mut var_selectedStoreId = <Option<String>>::sse_decode(deserializer);
-        let mut var_selectedStoreRoot = <Option<String>>::sse_decode(deserializer);
         let mut var_onboardingState = <String>::sse_decode(deserializer);
         let mut var_issues = <Vec<String>>::sse_decode(deserializer);
-        let mut var_stores = <Vec<crate::api::StoreStatusDto>>::sse_decode(deserializer);
+        let mut var_store = <Option<crate::api::StoreStatusDto>>::sse_decode(deserializer);
         return crate::api::AppStateDto {
             config_path: var_configPath,
             config_exists: var_configExists,
-            selected_store_id: var_selectedStoreId,
-            selected_store_root: var_selectedStoreRoot,
             onboarding_state: var_onboardingState,
             issues: var_issues,
-            stores: var_stores,
+            store: var_store,
         };
     }
 }
@@ -2437,12 +2345,14 @@ impl SseDecode for crate::api::CloneStoreRequest {
         let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_remoteUrl = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
-        let mut var_setDefault = <bool>::sse_decode(deserializer);
+        let mut var_sshPrivateKeyPath = <Option<String>>::sse_decode(deserializer);
+        let mut var_sshDir = <Option<String>>::sse_decode(deserializer);
         return crate::api::CloneStoreRequest {
             config_path: var_configPath,
             remote_url: var_remoteUrl,
             root: var_root,
-            set_default: var_setDefault,
+            ssh_private_key_path: var_sshPrivateKeyPath,
+            ssh_dir: var_sshDir,
         };
     }
 }
@@ -2498,14 +2408,12 @@ impl SseDecode for crate::api::CreateLocalStoreRequest {
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
         let mut var_pgpKeys = <Vec<String>>::sse_decode(deserializer);
-        let mut var_setDefault = <bool>::sse_decode(deserializer);
         let mut var_initializeGit = <bool>::sse_decode(deserializer);
         return crate::api::CreateLocalStoreRequest {
             config_path: var_configPath,
             name: var_name,
             root: var_root,
             pgp_keys: var_pgpKeys,
-            set_default: var_setDefault,
             initialize_git: var_initializeGit,
         };
     }
@@ -2551,41 +2459,13 @@ impl SseDecode for crate::api::DeleteLocalStoreRequest {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
+        let mut var_managedStoreBase = <String>::sse_decode(deserializer);
         let mut var_confirmation = <String>::sse_decode(deserializer);
         return crate::api::DeleteLocalStoreRequest {
             config_path: var_configPath,
             root: var_root,
+            managed_store_base: var_managedStoreBase,
             confirmation: var_confirmation,
-        };
-    }
-}
-
-impl SseDecode for crate::api::DeletePgpKeyRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_configPath = <String>::sse_decode(deserializer);
-        let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
-        let mut var_fingerprint = <String>::sse_decode(deserializer);
-        return crate::api::DeletePgpKeyRequest {
-            config_path: var_configPath,
-            pgp_executable: var_pgpExecutable,
-            fingerprint: var_fingerprint,
-        };
-    }
-}
-
-impl SseDecode for crate::api::DeletePgpKeyResponse {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_result =
-            <Option<crate::api::PgpKeyDeletionResultDto>>::sse_decode(deserializer);
-        let mut var_failureKind =
-            <Option<crate::api::PgpKeyDeletionFailureKind>>::sse_decode(deserializer);
-        let mut var_error = <Option<crate::api::BridgeFailure>>::sse_decode(deserializer);
-        return crate::api::DeletePgpKeyResponse {
-            result: var_result,
-            failure_kind: var_failureKind,
-            error: var_error,
         };
     }
 }
@@ -2596,6 +2476,15 @@ impl SseDecode for crate::api::DeleteSshKeyRequest {
         let mut var_sshDir = <String>::sse_decode(deserializer);
         let mut var_name = <String>::sse_decode(deserializer);
         return crate::api::DeleteSshKeyRequest { ssh_dir: var_sshDir, name: var_name };
+    }
+}
+
+impl SseDecode for crate::api::DisconnectStoreRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
+        let mut var_root = <String>::sse_decode(deserializer);
+        return crate::api::DisconnectStoreRequest { config_path: var_configPath, root: var_root };
     }
 }
 
@@ -2692,22 +2581,6 @@ impl SseDecode for crate::api::EntrySummaryDto {
             parent_path: var_parentPath,
             entry_type: var_entryType,
             child_count: var_childCount,
-        };
-    }
-}
-
-impl SseDecode for crate::api::ExportPgpKeyRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_configPath = <String>::sse_decode(deserializer);
-        let mut var_pgpExecutable = <Option<String>>::sse_decode(deserializer);
-        let mut var_fingerprint = <String>::sse_decode(deserializer);
-        let mut var_confirmation = <Option<String>>::sse_decode(deserializer);
-        return crate::api::ExportPgpKeyRequest {
-            config_path: var_configPath,
-            pgp_executable: var_pgpExecutable,
-            fingerprint: var_fingerprint,
-            confirmation: var_confirmation,
         };
     }
 }
@@ -2843,11 +2716,27 @@ impl SseDecode for crate::api::GitCommitRequest {
     }
 }
 
+impl SseDecode for crate::api::GitRemoteRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_root = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_url = <Option<String>>::sse_decode(deserializer);
+        return crate::api::GitRemoteRequest { root: var_root, name: var_name, url: var_url };
+    }
+}
+
 impl SseDecode for crate::api::GitRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_root = <String>::sse_decode(deserializer);
-        return crate::api::GitRequest { root: var_root };
+        let mut var_sshPrivateKeyPath = <Option<String>>::sse_decode(deserializer);
+        let mut var_sshDir = <Option<String>>::sse_decode(deserializer);
+        return crate::api::GitRequest {
+            root: var_root,
+            ssh_private_key_path: var_sshPrivateKeyPath,
+            ssh_dir: var_sshDir,
+        };
     }
 }
 
@@ -2899,12 +2788,7 @@ impl SseDecode for crate::api::ImportLocalStoreRequest {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_configPath = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
-        let mut var_setDefault = <bool>::sse_decode(deserializer);
-        return crate::api::ImportLocalStoreRequest {
-            config_path: var_configPath,
-            root: var_root,
-            set_default: var_setDefault,
-        };
+        return crate::api::ImportLocalStoreRequest { config_path: var_configPath, root: var_root };
     }
 }
 
@@ -2936,6 +2820,28 @@ impl SseDecode for crate::api::ImportPgpKeyTextRequest {
             pgp_executable: var_pgpExecutable,
             armored_text: var_armoredText,
             passphrase: var_passphrase,
+        };
+    }
+}
+
+impl SseDecode for crate::api::InitializeGitRepositoryRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_root = <String>::sse_decode(deserializer);
+        return crate::api::InitializeGitRepositoryRequest { root: var_root };
+    }
+}
+
+impl SseDecode for crate::api::InitializeStoreRecipientsRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_configPath = <String>::sse_decode(deserializer);
+        let mut var_root = <String>::sse_decode(deserializer);
+        let mut var_fingerprints = <Vec<String>>::sse_decode(deserializer);
+        return crate::api::InitializeStoreRecipientsRequest {
+            config_path: var_configPath,
+            root: var_root,
+            fingerprints: var_fingerprints,
         };
     }
 }
@@ -3006,6 +2912,23 @@ impl SseDecode for crate::api::InspectPgpKeyTextRequest {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_armoredText = <String>::sse_decode(deserializer);
         return crate::api::InspectPgpKeyTextRequest { armored_text: var_armoredText };
+    }
+}
+
+impl SseDecode for crate::api::InspectStoreGitRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_root = <String>::sse_decode(deserializer);
+        return crate::api::InspectStoreGitRequest { root: var_root };
+    }
+}
+
+impl SseDecode for crate::api::InspectStoreGitResponse {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_mode = <Option<crate::api::StoreGitModeDto>>::sse_decode(deserializer);
+        let mut var_error = <Option<crate::api::BridgeFailure>>::sse_decode(deserializer);
+        return crate::api::InspectStoreGitResponse { mode: var_mode, error: var_error };
     }
 }
 
@@ -3189,47 +3112,6 @@ impl SseDecode for Vec<u8> {
             ans_.push(<u8>::sse_decode(deserializer));
         }
         return ans_;
-    }
-}
-
-impl SseDecode for Vec<crate::api::StoreInfoDto> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut len_ = <i32>::sse_decode(deserializer);
-        let mut ans_ = Vec::with_capacity(len_ as usize);
-        for idx_ in 0..len_ {
-            ans_.push(<crate::api::StoreInfoDto>::sse_decode(deserializer));
-        }
-        return ans_;
-    }
-}
-
-impl SseDecode for Vec<crate::api::StoreStatusDto> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut len_ = <i32>::sse_decode(deserializer);
-        let mut ans_ = Vec::with_capacity(len_ as usize);
-        for idx_ in 0..len_ {
-            ans_.push(<crate::api::StoreStatusDto>::sse_decode(deserializer));
-        }
-        return ans_;
-    }
-}
-
-impl SseDecode for crate::api::ListStoresRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_configPath = <Option<String>>::sse_decode(deserializer);
-        return crate::api::ListStoresRequest { config_path: var_configPath };
-    }
-}
-
-impl SseDecode for crate::api::ListStoresResponse {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_stores = <Vec<crate::api::StoreInfoDto>>::sse_decode(deserializer);
-        let mut var_error = <Option<crate::api::BridgeFailure>>::sse_decode(deserializer);
-        return crate::api::ListStoresResponse { stores: var_stores, error: var_error };
     }
 }
 
@@ -3471,33 +3353,33 @@ impl SseDecode for Option<crate::api::PgpImportFailureKind> {
     }
 }
 
-impl SseDecode for Option<crate::api::PgpKeyDeletionFailureKind> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<crate::api::PgpKeyDeletionFailureKind>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
-impl SseDecode for Option<crate::api::PgpKeyDeletionResultDto> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<crate::api::PgpKeyDeletionResultDto>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl SseDecode for Option<crate::api::PgpKeyInspectionDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::api::PgpKeyInspectionDto>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::StoreGitModeDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::StoreGitModeDto>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::StoreStatusDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::StoreStatusDto>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -3554,34 +3436,6 @@ impl SseDecode for crate::api::PgpImportFailureKind {
             5 => crate::api::PgpImportFailureKind::ReprotectionFailed,
             6 => crate::api::PgpImportFailureKind::BackendError,
             _ => unreachable!("Invalid variant for PgpImportFailureKind: {}", inner),
-        };
-    }
-}
-
-impl SseDecode for crate::api::PgpKeyDeletionFailureKind {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut inner = <i32>::sse_decode(deserializer);
-        return match inner {
-            0 => crate::api::PgpKeyDeletionFailureKind::PrivateRemovalFailed,
-            1 => crate::api::PgpKeyDeletionFailureKind::PublicCleanupFailed,
-            _ => unreachable!("Invalid variant for PgpKeyDeletionFailureKind: {}", inner),
-        };
-    }
-}
-
-impl SseDecode for crate::api::PgpKeyDeletionResultDto {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_fingerprint = <String>::sse_decode(deserializer);
-        let mut var_hadPrivateKey = <bool>::sse_decode(deserializer);
-        let mut var_privateKeyAbsent = <bool>::sse_decode(deserializer);
-        let mut var_publicKeyAbsent = <bool>::sse_decode(deserializer);
-        return crate::api::PgpKeyDeletionResultDto {
-            fingerprint: var_fingerprint,
-            had_private_key: var_hadPrivateKey,
-            private_key_absent: var_privateKeyAbsent,
-            public_key_absent: var_publicKeyAbsent,
         };
     }
 }
@@ -3726,15 +3580,6 @@ impl SseDecode for crate::api::RemoveAutofillIndexEntryRequest {
     }
 }
 
-impl SseDecode for crate::api::RemoveStoreRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_configPath = <String>::sse_decode(deserializer);
-        let mut var_root = <String>::sse_decode(deserializer);
-        return crate::api::RemoveStoreRequest { config_path: var_configPath, root: var_root };
-    }
-}
-
 impl SseDecode for crate::api::SaveConfigRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3744,27 +3589,16 @@ impl SseDecode for crate::api::SaveConfigRequest {
     }
 }
 
-impl SseDecode for crate::api::SelectStoreRequest {
+impl SseDecode for crate::api::StoreGitModeDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_configPath = <String>::sse_decode(deserializer);
-        let mut var_root = <String>::sse_decode(deserializer);
-        return crate::api::SelectStoreRequest { config_path: var_configPath, root: var_root };
-    }
-}
-
-impl SseDecode for crate::api::StoreInfoDto {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_id = <String>::sse_decode(deserializer);
-        let mut var_name = <String>::sse_decode(deserializer);
-        let mut var_root = <String>::sse_decode(deserializer);
-        let mut var_isDefault = <bool>::sse_decode(deserializer);
-        return crate::api::StoreInfoDto {
-            id: var_id,
-            name: var_name,
-            root: var_root,
-            is_default: var_isDefault,
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::StoreGitModeDto::Disabled,
+            1 => crate::api::StoreGitModeDto::Local,
+            2 => crate::api::StoreGitModeDto::Remote,
+            3 => crate::api::StoreGitModeDto::Invalid,
+            _ => unreachable!("Invalid variant for StoreGitModeDto: {}", inner),
         };
     }
 }
@@ -3772,23 +3606,21 @@ impl SseDecode for crate::api::StoreInfoDto {
 impl SseDecode for crate::api::StoreStatusDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_id = <String>::sse_decode(deserializer);
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_root = <String>::sse_decode(deserializer);
-        let mut var_isDefault = <bool>::sse_decode(deserializer);
         let mut var_exists = <bool>::sse_decode(deserializer);
         let mut var_hasGpgId = <bool>::sse_decode(deserializer);
-        let mut var_hasGitRemote = <bool>::sse_decode(deserializer);
+        let mut var_pgpRecipients = <Vec<String>>::sse_decode(deserializer);
+        let mut var_gitMode = <crate::api::StoreGitModeDto>::sse_decode(deserializer);
         let mut var_pgpKeyMissing = <bool>::sse_decode(deserializer);
         let mut var_issues = <Vec<String>>::sse_decode(deserializer);
         return crate::api::StoreStatusDto {
-            id: var_id,
             name: var_name,
             root: var_root,
-            is_default: var_isDefault,
             exists: var_exists,
             has_gpg_id: var_hasGpgId,
-            has_git_remote: var_hasGitRemote,
+            pgp_recipients: var_pgpRecipients,
+            git_mode: var_gitMode,
             pgp_key_missing: var_pgpKeyMissing,
             issues: var_issues,
         };
@@ -3843,50 +3675,50 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        1 => wire__crate__api__add_pgp_key_to_gpg_id_impl(port, ptr, rust_vec_len, data_len),
-        2 => wire__crate__api__clear_autofill_index_impl(port, ptr, rust_vec_len, data_len),
-        3 => {
+        1 => wire__crate__api__clear_autofill_index_impl(port, ptr, rust_vec_len, data_len),
+        2 => {
             wire__crate__api__clear_autofill_index_websites_impl(port, ptr, rust_vec_len, data_len)
         }
-        4 => wire__crate__api__clone_store_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__configure_pgp_backend_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__copy_entry_password_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__create_local_store_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__delete_entry_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__delete_local_store_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__delete_pgp_key_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__delete_ssh_key_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__detect_imported_key_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__edit_entry_impl(port, ptr, rust_vec_len, data_len),
-        14 => {
+        3 => wire__crate__api__clone_store_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire__crate__api__configure_pgp_backend_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__copy_entry_password_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__create_local_store_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__delete_entry_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__delete_local_store_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__delete_ssh_key_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__detect_imported_key_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__disconnect_store_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__edit_entry_impl(port, ptr, rust_vec_len, data_len),
+        13 => {
             wire__crate__api__enrich_autofill_index_websites_impl(port, ptr, rust_vec_len, data_len)
         }
-        15 => wire__crate__api__export_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__export_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__export_ssh_private_key_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__export_ssh_public_key_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__generate_entry_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__generate_pgp_key_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__generate_ssh_key_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__git_commit_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__git_pull_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__git_push_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__git_status_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__import_local_store_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__import_pgp_key_file_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__import_pgp_key_text_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__import_pgp_private_key_file_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__import_pgp_private_key_text_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__import_pgp_public_key_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__import_ssh_private_key_file_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__import_ssh_private_key_text_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__export_ssh_private_key_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__export_ssh_public_key_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__generate_entry_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__generate_pgp_key_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__generate_ssh_key_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__git_add_remote_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__git_commit_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__git_list_remotes_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__git_pull_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__git_push_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__git_remove_remote_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__git_set_remote_url_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__git_status_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__import_local_store_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__import_pgp_key_file_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__import_pgp_key_text_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__import_ssh_private_key_file_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__import_ssh_private_key_text_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__initialize_git_repository_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__initialize_store_recipients_impl(port, ptr, rust_vec_len, data_len),
         34 => wire__crate__api__insert_entry_impl(port, ptr, rust_vec_len, data_len),
         35 => wire__crate__api__inspect_app_state_impl(port, ptr, rust_vec_len, data_len),
         36 => wire__crate__api__inspect_pgp_key_file_impl(port, ptr, rust_vec_len, data_len),
         37 => wire__crate__api__inspect_pgp_key_text_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__list_entries_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__list_keys_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__list_stores_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__inspect_store_git_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__list_entries_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__list_keys_impl(port, ptr, rust_vec_len, data_len),
         41 => wire__crate__api__load_config_impl(port, ptr, rust_vec_len, data_len),
         42 => wire__crate__api__move_autofill_index_entry_impl(port, ptr, rust_vec_len, data_len),
         43 => wire__crate__api__move_entry_impl(port, ptr, rust_vec_len, data_len),
@@ -3900,12 +3732,10 @@ fn pde_ffi_dispatcher_primary_impl(
         49 => wire__crate__api__rebuild_autofill_index_impl(port, ptr, rust_vec_len, data_len),
         50 => wire__crate__api__reconcile_autofill_index_impl(port, ptr, rust_vec_len, data_len),
         51 => wire__crate__api__remove_autofill_index_entry_impl(port, ptr, rust_vec_len, data_len),
-        52 => wire__crate__api__remove_store_impl(port, ptr, rust_vec_len, data_len),
-        53 => wire__crate__api__resolve_autofill_credential_impl(port, ptr, rust_vec_len, data_len),
-        54 => wire__crate__api__run_git_args_impl(port, ptr, rust_vec_len, data_len),
-        55 => wire__crate__api__save_config_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__select_store_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__api__upsert_autofill_index_entry_impl(port, ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__resolve_autofill_credential_impl(port, ptr, rust_vec_len, data_len),
+        53 => wire__crate__api__run_git_args_impl(port, ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__save_config_impl(port, ptr, rust_vec_len, data_len),
+        55 => wire__crate__api__upsert_autofill_index_entry_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3925,34 +3755,14 @@ fn pde_ffi_dispatcher_sync_impl(
 // Section: rust2dart
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::AddPgpKeyToGpgIdRequest {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [self.root.into_into_dart().into_dart(), self.fingerprint.into_into_dart().into_dart()]
-            .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::AddPgpKeyToGpgIdRequest
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::AddPgpKeyToGpgIdRequest>
-    for crate::api::AddPgpKeyToGpgIdRequest
-{
-    fn into_into_dart(self) -> crate::api::AddPgpKeyToGpgIdRequest {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::AppStateDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.config_path.into_into_dart().into_dart(),
             self.config_exists.into_into_dart().into_dart(),
-            self.selected_store_id.into_into_dart().into_dart(),
-            self.selected_store_root.into_into_dart().into_dart(),
             self.onboarding_state.into_into_dart().into_dart(),
             self.issues.into_into_dart().into_dart(),
-            self.stores.into_into_dart().into_dart(),
+            self.store.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4222,7 +4032,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::CloneStoreRequest {
             self.config_path.into_into_dart().into_dart(),
             self.remote_url.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
-            self.set_default.into_into_dart().into_dart(),
+            self.ssh_private_key_path.into_into_dart().into_dart(),
+            self.ssh_dir.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4315,7 +4126,6 @@ impl flutter_rust_bridge::IntoDart for crate::api::CreateLocalStoreRequest {
             self.name.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
             self.pgp_keys.into_into_dart().into_dart(),
-            self.set_default.into_into_dart().into_dart(),
             self.initialize_git.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -4399,6 +4209,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::DeleteLocalStoreRequest {
         [
             self.config_path.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
+            self.managed_store_base.into_into_dart().into_dart(),
             self.confirmation.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -4412,50 +4223,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::DeleteLocalStoreRequest>
     for crate::api::DeleteLocalStoreRequest
 {
     fn into_into_dart(self) -> crate::api::DeleteLocalStoreRequest {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::DeletePgpKeyRequest {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.config_path.into_into_dart().into_dart(),
-            self.pgp_executable.into_into_dart().into_dart(),
-            self.fingerprint.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::DeletePgpKeyRequest
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::DeletePgpKeyRequest>
-    for crate::api::DeletePgpKeyRequest
-{
-    fn into_into_dart(self) -> crate::api::DeletePgpKeyRequest {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::DeletePgpKeyResponse {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.result.into_into_dart().into_dart(),
-            self.failure_kind.into_into_dart().into_dart(),
-            self.error.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::DeletePgpKeyResponse
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::DeletePgpKeyResponse>
-    for crate::api::DeletePgpKeyResponse
-{
-    fn into_into_dart(self) -> crate::api::DeletePgpKeyResponse {
         self
     }
 }
@@ -4474,6 +4241,24 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::DeleteSshKeyRequest>
     for crate::api::DeleteSshKeyRequest
 {
     fn into_into_dart(self) -> crate::api::DeleteSshKeyRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::DisconnectStoreRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.config_path.into_into_dart().into_dart(), self.root.into_into_dart().into_dart()]
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::DisconnectStoreRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::DisconnectStoreRequest>
+    for crate::api::DisconnectStoreRequest
+{
+    fn into_into_dart(self) -> crate::api::DisconnectStoreRequest {
         self
     }
 }
@@ -4595,29 +4380,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::EntrySummaryDto>
     for crate::api::EntrySummaryDto
 {
     fn into_into_dart(self) -> crate::api::EntrySummaryDto {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::ExportPgpKeyRequest {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.config_path.into_into_dart().into_dart(),
-            self.pgp_executable.into_into_dart().into_dart(),
-            self.fingerprint.into_into_dart().into_dart(),
-            self.confirmation.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::ExportPgpKeyRequest
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::ExportPgpKeyRequest>
-    for crate::api::ExportPgpKeyRequest
-{
-    fn into_into_dart(self) -> crate::api::ExportPgpKeyRequest {
         self
     }
 }
@@ -4821,9 +4583,33 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::GitCommitRequest>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::GitRemoteRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.root.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.url.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::GitRemoteRequest {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::GitRemoteRequest>
+    for crate::api::GitRemoteRequest
+{
+    fn into_into_dart(self) -> crate::api::GitRemoteRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::GitRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [self.root.into_into_dart().into_dart()].into_dart()
+        [
+            self.root.into_into_dart().into_dart(),
+            self.ssh_private_key_path.into_into_dart().into_dart(),
+            self.ssh_dir.into_into_dart().into_dart(),
+        ]
+        .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::GitRequest {}
@@ -4883,12 +4669,8 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ImportKeyTextRequest>
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::ImportLocalStoreRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.config_path.into_into_dart().into_dart(),
-            self.root.into_into_dart().into_dart(),
-            self.set_default.into_into_dart().into_dart(),
-        ]
-        .into_dart()
+        [self.config_path.into_into_dart().into_dart(), self.root.into_into_dart().into_dart()]
+            .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
@@ -4945,6 +4727,45 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ImportPgpKeyTextRequest>
     for crate::api::ImportPgpKeyTextRequest
 {
     fn into_into_dart(self) -> crate::api::ImportPgpKeyTextRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::InitializeGitRepositoryRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.root.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::InitializeGitRepositoryRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::InitializeGitRepositoryRequest>
+    for crate::api::InitializeGitRepositoryRequest
+{
+    fn into_into_dart(self) -> crate::api::InitializeGitRepositoryRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::InitializeStoreRecipientsRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.config_path.into_into_dart().into_dart(),
+            self.root.into_into_dart().into_dart(),
+            self.fingerprints.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::InitializeStoreRecipientsRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::InitializeStoreRecipientsRequest>
+    for crate::api::InitializeStoreRecipientsRequest
+{
+    fn into_into_dart(self) -> crate::api::InitializeStoreRecipientsRequest {
         self
     }
 }
@@ -5064,6 +4885,41 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::InspectPgpKeyTextRequest>
     for crate::api::InspectPgpKeyTextRequest
 {
     fn into_into_dart(self) -> crate::api::InspectPgpKeyTextRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::InspectStoreGitRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.root.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::InspectStoreGitRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::InspectStoreGitRequest>
+    for crate::api::InspectStoreGitRequest
+{
+    fn into_into_dart(self) -> crate::api::InspectStoreGitRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::InspectStoreGitResponse {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.mode.into_into_dart().into_dart(), self.error.into_into_dart().into_dart()]
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::InspectStoreGitResponse
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::InspectStoreGitResponse>
+    for crate::api::InspectStoreGitResponse
+{
+    fn into_into_dart(self) -> crate::api::InspectStoreGitResponse {
         self
     }
 }
@@ -5219,38 +5075,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ListKeysResponse>
     for crate::api::ListKeysResponse
 {
     fn into_into_dart(self) -> crate::api::ListKeysResponse {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::ListStoresRequest {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [self.config_path.into_into_dart().into_dart()].into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::ListStoresRequest {}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::ListStoresRequest>
-    for crate::api::ListStoresRequest
-{
-    fn into_into_dart(self) -> crate::api::ListStoresRequest {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::ListStoresResponse {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [self.stores.into_into_dart().into_dart(), self.error.into_into_dart().into_dart()]
-            .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::ListStoresResponse
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::ListStoresResponse>
-    for crate::api::ListStoresResponse
-{
-    fn into_into_dart(self) -> crate::api::ListStoresResponse {
         self
     }
 }
@@ -5437,50 +5261,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::PgpImportFailureKind>
     for crate::api::PgpImportFailureKind
 {
     fn into_into_dart(self) -> crate::api::PgpImportFailureKind {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::PgpKeyDeletionFailureKind {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        match self {
-            Self::PrivateRemovalFailed => 0.into_dart(),
-            Self::PublicCleanupFailed => 1.into_dart(),
-            _ => unreachable!(),
-        }
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::PgpKeyDeletionFailureKind
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::PgpKeyDeletionFailureKind>
-    for crate::api::PgpKeyDeletionFailureKind
-{
-    fn into_into_dart(self) -> crate::api::PgpKeyDeletionFailureKind {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::PgpKeyDeletionResultDto {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.fingerprint.into_into_dart().into_dart(),
-            self.had_private_key.into_into_dart().into_dart(),
-            self.private_key_absent.into_into_dart().into_dart(),
-            self.public_key_absent.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::PgpKeyDeletionResultDto
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::PgpKeyDeletionResultDto>
-    for crate::api::PgpKeyDeletionResultDto
-{
-    fn into_into_dart(self) -> crate::api::PgpKeyDeletionResultDto {
         self
     }
 }
@@ -5681,24 +5461,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::RemoveAutofillIndexEntryReque
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::RemoveStoreRequest {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [self.config_path.into_into_dart().into_dart(), self.root.into_into_dart().into_dart()]
-            .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::RemoveStoreRequest
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::RemoveStoreRequest>
-    for crate::api::RemoveStoreRequest
-{
-    fn into_into_dart(self) -> crate::api::RemoveStoreRequest {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::SaveConfigRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [self.path.into_into_dart().into_dart(), self.config_toml.into_into_dart().into_dart()]
@@ -5714,38 +5476,22 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::SaveConfigRequest>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::SelectStoreRequest {
+impl flutter_rust_bridge::IntoDart for crate::api::StoreGitModeDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [self.config_path.into_into_dart().into_dart(), self.root.into_into_dart().into_dart()]
-            .into_dart()
+        match self {
+            Self::Disabled => 0.into_dart(),
+            Self::Local => 1.into_dart(),
+            Self::Remote => 2.into_dart(),
+            Self::Invalid => 3.into_dart(),
+            _ => unreachable!(),
+        }
     }
 }
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::SelectStoreRequest
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::StoreGitModeDto {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::StoreGitModeDto>
+    for crate::api::StoreGitModeDto
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::SelectStoreRequest>
-    for crate::api::SelectStoreRequest
-{
-    fn into_into_dart(self) -> crate::api::SelectStoreRequest {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::StoreInfoDto {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.id.into_into_dart().into_dart(),
-            self.name.into_into_dart().into_dart(),
-            self.root.into_into_dart().into_dart(),
-            self.is_default.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::StoreInfoDto {}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::StoreInfoDto> for crate::api::StoreInfoDto {
-    fn into_into_dart(self) -> crate::api::StoreInfoDto {
+    fn into_into_dart(self) -> crate::api::StoreGitModeDto {
         self
     }
 }
@@ -5753,13 +5499,12 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::StoreInfoDto> for crate::api:
 impl flutter_rust_bridge::IntoDart for crate::api::StoreStatusDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.id.into_into_dart().into_dart(),
             self.name.into_into_dart().into_dart(),
             self.root.into_into_dart().into_dart(),
-            self.is_default.into_into_dart().into_dart(),
             self.exists.into_into_dart().into_dart(),
             self.has_gpg_id.into_into_dart().into_dart(),
-            self.has_git_remote.into_into_dart().into_dart(),
+            self.pgp_recipients.into_into_dart().into_dart(),
+            self.git_mode.into_into_dart().into_dart(),
             self.pgp_key_missing.into_into_dart().into_dart(),
             self.issues.into_into_dart().into_dart(),
         ]
@@ -5810,24 +5555,14 @@ impl SseEncode for String {
     }
 }
 
-impl SseEncode for crate::api::AddPgpKeyToGpgIdRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.root, serializer);
-        <String>::sse_encode(self.fingerprint, serializer);
-    }
-}
-
 impl SseEncode for crate::api::AppStateDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.config_path, serializer);
         <bool>::sse_encode(self.config_exists, serializer);
-        <Option<String>>::sse_encode(self.selected_store_id, serializer);
-        <Option<String>>::sse_encode(self.selected_store_root, serializer);
         <String>::sse_encode(self.onboarding_state, serializer);
         <Vec<String>>::sse_encode(self.issues, serializer);
-        <Vec<crate::api::StoreStatusDto>>::sse_encode(self.stores, serializer);
+        <Option<crate::api::StoreStatusDto>>::sse_encode(self.store, serializer);
     }
 }
 
@@ -5971,7 +5706,8 @@ impl SseEncode for crate::api::CloneStoreRequest {
         <String>::sse_encode(self.config_path, serializer);
         <String>::sse_encode(self.remote_url, serializer);
         <String>::sse_encode(self.root, serializer);
-        <bool>::sse_encode(self.set_default, serializer);
+        <Option<String>>::sse_encode(self.ssh_private_key_path, serializer);
+        <Option<String>>::sse_encode(self.ssh_dir, serializer);
     }
 }
 
@@ -6016,7 +5752,6 @@ impl SseEncode for crate::api::CreateLocalStoreRequest {
         <String>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.root, serializer);
         <Vec<String>>::sse_encode(self.pgp_keys, serializer);
-        <bool>::sse_encode(self.set_default, serializer);
         <bool>::sse_encode(self.initialize_git, serializer);
     }
 }
@@ -6051,25 +5786,8 @@ impl SseEncode for crate::api::DeleteLocalStoreRequest {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.config_path, serializer);
         <String>::sse_encode(self.root, serializer);
+        <String>::sse_encode(self.managed_store_base, serializer);
         <String>::sse_encode(self.confirmation, serializer);
-    }
-}
-
-impl SseEncode for crate::api::DeletePgpKeyRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.config_path, serializer);
-        <Option<String>>::sse_encode(self.pgp_executable, serializer);
-        <String>::sse_encode(self.fingerprint, serializer);
-    }
-}
-
-impl SseEncode for crate::api::DeletePgpKeyResponse {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <Option<crate::api::PgpKeyDeletionResultDto>>::sse_encode(self.result, serializer);
-        <Option<crate::api::PgpKeyDeletionFailureKind>>::sse_encode(self.failure_kind, serializer);
-        <Option<crate::api::BridgeFailure>>::sse_encode(self.error, serializer);
     }
 }
 
@@ -6078,6 +5796,14 @@ impl SseEncode for crate::api::DeleteSshKeyRequest {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.ssh_dir, serializer);
         <String>::sse_encode(self.name, serializer);
+    }
+}
+
+impl SseEncode for crate::api::DisconnectStoreRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
+        <String>::sse_encode(self.root, serializer);
     }
 }
 
@@ -6140,16 +5866,6 @@ impl SseEncode for crate::api::EntrySummaryDto {
         <Option<String>>::sse_encode(self.parent_path, serializer);
         <String>::sse_encode(self.entry_type, serializer);
         <u32>::sse_encode(self.child_count, serializer);
-    }
-}
-
-impl SseEncode for crate::api::ExportPgpKeyRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.config_path, serializer);
-        <Option<String>>::sse_encode(self.pgp_executable, serializer);
-        <String>::sse_encode(self.fingerprint, serializer);
-        <Option<String>>::sse_encode(self.confirmation, serializer);
     }
 }
 
@@ -6246,10 +5962,21 @@ impl SseEncode for crate::api::GitCommitRequest {
     }
 }
 
+impl SseEncode for crate::api::GitRemoteRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.root, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <Option<String>>::sse_encode(self.url, serializer);
+    }
+}
+
 impl SseEncode for crate::api::GitRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.root, serializer);
+        <Option<String>>::sse_encode(self.ssh_private_key_path, serializer);
+        <Option<String>>::sse_encode(self.ssh_dir, serializer);
     }
 }
 
@@ -6287,7 +6014,6 @@ impl SseEncode for crate::api::ImportLocalStoreRequest {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.config_path, serializer);
         <String>::sse_encode(self.root, serializer);
-        <bool>::sse_encode(self.set_default, serializer);
     }
 }
 
@@ -6308,6 +6034,22 @@ impl SseEncode for crate::api::ImportPgpKeyTextRequest {
         <Option<String>>::sse_encode(self.pgp_executable, serializer);
         <String>::sse_encode(self.armored_text, serializer);
         <Option<String>>::sse_encode(self.passphrase, serializer);
+    }
+}
+
+impl SseEncode for crate::api::InitializeGitRepositoryRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.root, serializer);
+    }
+}
+
+impl SseEncode for crate::api::InitializeStoreRecipientsRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.config_path, serializer);
+        <String>::sse_encode(self.root, serializer);
+        <Vec<String>>::sse_encode(self.fingerprints, serializer);
     }
 }
 
@@ -6358,6 +6100,21 @@ impl SseEncode for crate::api::InspectPgpKeyTextRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.armored_text, serializer);
+    }
+}
+
+impl SseEncode for crate::api::InspectStoreGitRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.root, serializer);
+    }
+}
+
+impl SseEncode for crate::api::InspectStoreGitResponse {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<crate::api::StoreGitModeDto>>::sse_encode(self.mode, serializer);
+        <Option<crate::api::BridgeFailure>>::sse_encode(self.error, serializer);
     }
 }
 
@@ -6504,41 +6261,6 @@ impl SseEncode for Vec<u8> {
         for item in self {
             <u8>::sse_encode(item, serializer);
         }
-    }
-}
-
-impl SseEncode for Vec<crate::api::StoreInfoDto> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <i32>::sse_encode(self.len() as _, serializer);
-        for item in self {
-            <crate::api::StoreInfoDto>::sse_encode(item, serializer);
-        }
-    }
-}
-
-impl SseEncode for Vec<crate::api::StoreStatusDto> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <i32>::sse_encode(self.len() as _, serializer);
-        for item in self {
-            <crate::api::StoreStatusDto>::sse_encode(item, serializer);
-        }
-    }
-}
-
-impl SseEncode for crate::api::ListStoresRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <Option<String>>::sse_encode(self.config_path, serializer);
-    }
-}
-
-impl SseEncode for crate::api::ListStoresResponse {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <Vec<crate::api::StoreInfoDto>>::sse_encode(self.stores, serializer);
-        <Option<crate::api::BridgeFailure>>::sse_encode(self.error, serializer);
     }
 }
 
@@ -6747,32 +6469,32 @@ impl SseEncode for Option<crate::api::PgpImportFailureKind> {
     }
 }
 
-impl SseEncode for Option<crate::api::PgpKeyDeletionFailureKind> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <crate::api::PgpKeyDeletionFailureKind>::sse_encode(value, serializer);
-        }
-    }
-}
-
-impl SseEncode for Option<crate::api::PgpKeyDeletionResultDto> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <crate::api::PgpKeyDeletionResultDto>::sse_encode(value, serializer);
-        }
-    }
-}
-
 impl SseEncode for Option<crate::api::PgpKeyInspectionDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::PgpKeyInspectionDto>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::StoreGitModeDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::StoreGitModeDto>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::StoreStatusDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::StoreStatusDto>::sse_encode(value, serializer);
         }
     }
 }
@@ -6822,32 +6544,6 @@ impl SseEncode for crate::api::PgpImportFailureKind {
             },
             serializer,
         );
-    }
-}
-
-impl SseEncode for crate::api::PgpKeyDeletionFailureKind {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <i32>::sse_encode(
-            match self {
-                crate::api::PgpKeyDeletionFailureKind::PrivateRemovalFailed => 0,
-                crate::api::PgpKeyDeletionFailureKind::PublicCleanupFailed => 1,
-                _ => {
-                    unimplemented!("");
-                }
-            },
-            serializer,
-        );
-    }
-}
-
-impl SseEncode for crate::api::PgpKeyDeletionResultDto {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.fingerprint, serializer);
-        <bool>::sse_encode(self.had_private_key, serializer);
-        <bool>::sse_encode(self.private_key_absent, serializer);
-        <bool>::sse_encode(self.public_key_absent, serializer);
     }
 }
 
@@ -6946,14 +6642,6 @@ impl SseEncode for crate::api::RemoveAutofillIndexEntryRequest {
     }
 }
 
-impl SseEncode for crate::api::RemoveStoreRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.config_path, serializer);
-        <String>::sse_encode(self.root, serializer);
-    }
-}
-
 impl SseEncode for crate::api::SaveConfigRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6962,34 +6650,33 @@ impl SseEncode for crate::api::SaveConfigRequest {
     }
 }
 
-impl SseEncode for crate::api::SelectStoreRequest {
+impl SseEncode for crate::api::StoreGitModeDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.config_path, serializer);
-        <String>::sse_encode(self.root, serializer);
-    }
-}
-
-impl SseEncode for crate::api::StoreInfoDto {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.id, serializer);
-        <String>::sse_encode(self.name, serializer);
-        <String>::sse_encode(self.root, serializer);
-        <bool>::sse_encode(self.is_default, serializer);
+        <i32>::sse_encode(
+            match self {
+                crate::api::StoreGitModeDto::Disabled => 0,
+                crate::api::StoreGitModeDto::Local => 1,
+                crate::api::StoreGitModeDto::Remote => 2,
+                crate::api::StoreGitModeDto::Invalid => 3,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 
 impl SseEncode for crate::api::StoreStatusDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.root, serializer);
-        <bool>::sse_encode(self.is_default, serializer);
         <bool>::sse_encode(self.exists, serializer);
         <bool>::sse_encode(self.has_gpg_id, serializer);
-        <bool>::sse_encode(self.has_git_remote, serializer);
+        <Vec<String>>::sse_encode(self.pgp_recipients, serializer);
+        <crate::api::StoreGitModeDto>::sse_encode(self.git_mode, serializer);
         <bool>::sse_encode(self.pgp_key_missing, serializer);
         <Vec<String>>::sse_encode(self.issues, serializer);
     }

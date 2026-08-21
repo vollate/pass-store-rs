@@ -94,7 +94,10 @@ class ParsAutofillUnlockActivity : Activity() {
 
     private fun resolveAndReturn() {
         val path = intent.getStringExtra(EXTRA_PATH) ?: return finishCanceled()
-        val credential = ParsAutofillNativeBridge.resolveCredential(this, path) ?: return finishCanceled()
+        val generation = intent.getStringExtra(EXTRA_GENERATION) ?: return finishCanceled()
+        val credential =
+            ParsAutofillNativeBridge.resolveCredential(this, path, generation)
+                ?: return finishCanceled()
         when (intent.getStringExtra(EXTRA_MODE)) {
             MODE_AUTOFILL -> finishAutofill(credential)
             MODE_CREDENTIAL -> finishCredentialManager(credential)
@@ -162,6 +165,7 @@ class ParsAutofillUnlockActivity : Activity() {
     companion object {
         private const val EXTRA_MODE = "top.vollate.pars_gui.autofill.MODE"
         private const val EXTRA_PATH = "top.vollate.pars_gui.autofill.PATH"
+        private const val EXTRA_GENERATION = "top.vollate.pars_gui.autofill.GENERATION"
         private const val EXTRA_USERNAME_ID = "top.vollate.pars_gui.autofill.USERNAME_ID"
         private const val EXTRA_PASSWORD_ID = "top.vollate.pars_gui.autofill.PASSWORD_ID"
         private const val MODE_AUTOFILL = "autofill"
@@ -171,19 +175,22 @@ class ParsAutofillUnlockActivity : Activity() {
         fun autofillIntent(
             context: Context,
             path: String,
+            generation: String,
             usernameId: AutofillId?,
             passwordId: AutofillId?,
         ): Intent =
             Intent(context, ParsAutofillUnlockActivity::class.java)
                 .putExtra(EXTRA_MODE, MODE_AUTOFILL)
                 .putExtra(EXTRA_PATH, path)
+                .putExtra(EXTRA_GENERATION, generation)
                 .putExtra(EXTRA_USERNAME_ID, usernameId)
                 .putExtra(EXTRA_PASSWORD_ID, passwordId)
 
-        fun credentialIntent(context: Context, path: String): Intent =
+        fun credentialIntent(context: Context, path: String, generation: String): Intent =
             Intent(context, ParsAutofillUnlockActivity::class.java)
                 .putExtra(EXTRA_MODE, MODE_CREDENTIAL)
                 .putExtra(EXTRA_PATH, path)
+                .putExtra(EXTRA_GENERATION, generation)
 
         fun noMatchesIntent(context: Context): Intent =
             Intent(context, ParsAutofillUnlockActivity::class.java)

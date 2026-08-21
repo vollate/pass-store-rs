@@ -20,13 +20,13 @@ class FakeParsRepository
   const FakeParsRepository();
 
   static const StoreStatus _store = StoreStatus(
-    id: 'fake-store',
     name: '~/.password-store',
     root: '~/.password-store',
-    isDefault: true,
     exists: true,
     hasGpgId: true,
-    hasGitRemote: true,
+    pgpRecipients: <String>[
+      '3A8E 9C12 77FA 22D1 90BD 48AA A991 D3B4 A702 91EF',
+    ],
     pgpKeyMissing: false,
     issues: <String>[],
   );
@@ -35,21 +35,22 @@ class FakeParsRepository
   StoreLifecycleSnapshot get lifecycle => const StoreLifecycleSnapshot(
     configPath: '~/.config/pars/pars_config.toml',
     configExists: true,
-    selectedStoreId: 'fake-store',
-    selectedStoreRoot: '~/.password-store',
     onboardingState: StoreOnboardingState.ready,
     issues: <String>[],
-    stores: <StoreStatus>[_store],
+    store: _store,
   );
 
   @override
-  List<StoreStatus> get stores => const <StoreStatus>[_store];
+  StoreStatus? get store => _store;
 
   @override
   String get currentRepoName => '~/.password-store';
 
   @override
   RepoGitStatus get gitStatus => RepoGitStatus.clean;
+
+  @override
+  StoreGitMode get gitMode => StoreGitMode.remote;
 
   @override
   RuntimeDiagnostics runtimeDiagnostics(SecurityRepository securityRepository) {
@@ -60,6 +61,17 @@ class FakeParsRepository
       gitBackend: 'Mock git command',
       keyStorageBackend: keyStorageBackendLabel(securityRepository),
       nativeLibrary: 'mock pars_bridge',
+    );
+  }
+
+  @override
+  Future<GitOperationResult> initializeRepository() async {
+    return const GitOperationResult(
+      command: 'git init',
+      stdout: 'Initialized an empty Git repository.',
+      stderr: '',
+      exitCode: 0,
+      success: true,
     );
   }
 
@@ -176,19 +188,6 @@ class FakeParsRepository
 
   @override
   Future<GitOperationResult> recoverByPull() => pull();
-
-  @override
-  Future<GitOperationResult> deleteLocalRepo({
-    required String confirmation,
-  }) async {
-    return const GitOperationResult(
-      command: 'delete local repo',
-      stdout: 'Deleted local repository.',
-      stderr: '',
-      exitCode: 0,
-      success: true,
-    );
-  }
 
   @override
   List<PasswordEntry> get entries => const <PasswordEntry>[
@@ -424,28 +423,20 @@ class FakeParsRepository
   }
 
   @override
-  Future<void> selectStore(String root) async {}
-
-  @override
   Future<void> createLocalStore({
     required String name,
     required String root,
     required List<String> pgpKeys,
-    required bool setDefault,
     required bool initializeGit,
   }) async {}
 
   @override
-  Future<void> importLocalStore({
-    required String root,
-    required bool setDefault,
-  }) async {}
+  Future<void> importLocalStore({required String root}) async {}
 
   @override
   Future<void> cloneStore({
     required String remoteUrl,
     required String root,
-    required bool setDefault,
   }) async {}
 
   @override
@@ -491,29 +482,6 @@ class FakeParsRepository
   );
 
   @override
-  Future<KeyRecord> importPgpPublicKeyText(String armoredText) async =>
-      keys.firstWhere((key) => key.type == KeyRecordType.pgp);
-
-  @override
-  Future<KeyRecord> importPgpPrivateKeyText(String armoredText) async =>
-      keys.firstWhere((key) => key.type == KeyRecordType.pgp);
-
-  @override
-  Future<KeyRecord> importPgpPrivateKeyFile(String path) async =>
-      keys.firstWhere((key) => key.type == KeyRecordType.pgp);
-
-  @override
-  Future<String> exportPgpPublicKey(String fingerprint) async =>
-      '-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----';
-
-  @override
-  Future<String> exportPgpPrivateKey({
-    required String fingerprint,
-    required String confirmation,
-  }) async =>
-      '-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----';
-
-  @override
   Future<PgpPrivateKeyPreparation> preparePgpPrivateKey({
     required String fingerprint,
     required String passphrase,
@@ -521,17 +489,7 @@ class FakeParsRepository
       PgpPrivateKeyPreparation(fingerprint: fingerprint, migrated: false);
 
   @override
-  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint) async =>
-      PgpKeyDeletionOutcome(
-        fingerprint: fingerprint,
-        hadPrivateKey: true,
-        privateKeyAbsent: true,
-        publicKeyAbsent: true,
-        publicCleanupFailed: false,
-      );
-
-  @override
-  Future<void> addPgpKeyToSelectedStore(String fingerprint) async {}
+  Future<void> initializeStoreRecipients(List<String> fingerprints) async {}
 
   @override
   Future<KeyRecord> generateSshKey(String name) async =>

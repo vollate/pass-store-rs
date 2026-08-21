@@ -248,6 +248,51 @@ fn reconciliation_updates_only_path_metadata_and_preserves_enrichment() {
 }
 
 #[test]
+fn reconciliation_rejects_replacement_store_and_removes_stale_enrichment() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let old_root = temp.path().join("old-store");
+    let old_entry = write_entry(&old_root, "example.com/alice");
+    let index_path = temp.path().join("autofill.json");
+    rebuild_autofill_index(RebuildAutofillIndexRequest {
+        index_path: index_path.clone(),
+        store_id: "canonical-store".to_string(),
+        store_name: "Old".to_string(),
+        store_root: old_root.clone(),
+        entries: vec![metadata("example.com/alice", true, Some(0))],
+    })
+    .expect("rebuild old store");
+    let backend = RecordingBackend::with_entries([(
+        old_entry,
+        "secret\nwebsite: https://old-alias.example.net/login",
+    )]);
+    enrich_autofill_index_websites_with_backend(
+        EnrichAutofillIndexWebsitesRequest {
+            index_path: index_path.clone(),
+            store_root: old_root,
+            pgp_executable: String::new(),
+            passphrase: None,
+            paths: vec!["example.com/alice".to_string()],
+        },
+        &backend,
+    )
+    .expect("enrich old store");
+
+    let replacement_root = temp.path().join("replacement-store");
+    write_entry(&replacement_root, "example.com/alice");
+    let error = reconcile_autofill_index(ReconcileAutofillIndexRequest {
+        index_path: index_path.clone(),
+        store_id: "canonical-store".to_string(),
+        store_name: "Replacement".to_string(),
+        store_root: replacement_root,
+        entries: vec![metadata("example.com/alice", false, None)],
+    })
+    .expect_err("replacement must require rebuild");
+
+    assert!(error.to_string().contains("rebuild required"));
+    assert!(!index_path.exists(), "stale index must be removed");
+}
+
+#[test]
 fn matching_prefers_path_website_app_name_and_enriched_alias_over_fallback() {
     let temp = tempfile::tempdir().expect("tempdir");
     let root = temp.path().join("store");

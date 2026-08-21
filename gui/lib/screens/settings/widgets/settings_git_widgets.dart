@@ -14,8 +14,9 @@ extension _SettingsScreenGitSheets on SettingsScreen {
           (context) => _GitSyncSheetBody(
             git: git,
             gitRepository: gitRepository,
-            deleteConfirmationLabel: _gitDeleteConfirmationLabel(),
+            gitMode: settingsRepository.store?.gitMode ?? StoreGitMode.disabled,
             combineGitOutput: _combineGitOutput,
+            onManageSshKeys: () => _showSshKeys(context),
           ),
     );
   }
@@ -30,29 +31,23 @@ extension _SettingsScreenGitSheets on SettingsScreen {
           ),
     );
   }
-
-  String _gitDeleteConfirmationLabel() {
-    final selectedRoot = settingsRepository.lifecycle.selectedStoreRoot;
-    if (selectedRoot == null || selectedRoot.trim().isEmpty) {
-      return '';
-    }
-    return _storeNameFromRoot(selectedRoot);
-  }
 }
 
 class _GitSyncSheetBody extends StatefulWidget {
   const _GitSyncSheetBody({
     required this.git,
     required this.gitRepository,
-    required this.deleteConfirmationLabel,
+    required this.gitMode,
     required this.combineGitOutput,
+    required this.onManageSshKeys,
   });
 
   final GitOperationsRepository git;
   final GitRepository gitRepository;
-  final String deleteConfirmationLabel;
+  final StoreGitMode gitMode;
   final GitOperationResult Function(GitOperationResult, GitOperationResult)
   combineGitOutput;
+  final VoidCallback onManageSshKeys;
 
   @override
   State<_GitSyncSheetBody> createState() => _GitSyncSheetBodyState();
@@ -63,12 +58,20 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
   var _messageInitialized = false;
   var _remoteName = 'origin';
   var _remoteUrl = '';
-  var _deleteConfirmation = '';
   var _pushAfterCommit = false;
   var _running = false;
   GitOperationResult? _output;
   List<GitRemote> _remotes = const <GitRemote>[];
   String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.gitMode == StoreGitMode.local ||
+        widget.gitMode == StoreGitMode.remote) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshRemotes());
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -81,6 +84,10 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
 
   @override
   Widget build(BuildContext context) {
+    final hasGit =
+        widget.gitMode == StoreGitMode.local ||
+        widget.gitMode == StoreGitMode.remote;
+    final hasRemote = widget.gitMode == StoreGitMode.remote;
     return SafeArea(
       child: SingleChildScrollView(
         child: Padding(
@@ -101,175 +108,182 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
-              Chip(label: Text(widget.gitRepository.gitStatus.label)),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: <Widget>[
-                  FilledButton.icon(
-                    onPressed:
-                        _running
-                            ? null
-                            : () => _run(widget.git.refreshGitStatus),
-                    icon: const Icon(Icons.info_outline),
-                    label: Text(context.l10n.status),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _running ? null : () => _run(widget.git.pull),
-                    icon: const Icon(Icons.download_outlined),
-                    label: Text(context.l10n.pull),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _running ? null : () => _run(widget.git.push),
-                    icon: const Icon(Icons.upload_outlined),
-                    label: Text(context.l10n.push),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed:
-                        _running ? null : () => _run(widget.git.recoverByPull),
-                    icon: const Icon(Icons.healing_outlined),
-                    label: Text(context.l10n.recoverPull),
-                  ),
-                ],
+              Semantics(
+                label: context.l10n.gitSyncTitle,
+                value: _gitModeLabel(context),
+                child: Chip(label: Text(_gitModeLabel(context))),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: context.l10n.commitMessageField,
+              if (widget.gitMode == StoreGitMode.invalid) ...<Widget>[
+                const SizedBox(height: 8),
+                Text(context.l10n.invalidGitMetadataMessage),
+              ],
+              if (widget.gitRepository.gitStatus ==
+                  RepoGitStatus.disabled) ...<Widget>[
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed:
+                      _running
+                          ? null
+                          : () => _run(widget.git.initializeRepository),
+                  icon: const Icon(Icons.account_tree_outlined),
+                  label: Text(context.l10n.initializeGit),
                 ),
-                onChanged: (value) => _message = value,
-              ),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _pushAfterCommit,
-                onChanged:
-                    _running
-                        ? null
-                        : (value) =>
-                            setState(() => _pushAfterCommit = value ?? false),
-                title: Text(context.l10n.pushAfterCommit),
-              ),
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                onPressed:
-                    _running
-                        ? null
-                        : () => _run(() async {
-                          final commit = await widget.git.commit(_message);
-                          if (!_pushAfterCommit) {
-                            return commit;
-                          }
-                          final push = await widget.git.push();
-                          return widget.combineGitOutput(commit, push);
-                        }),
-                icon: const Icon(Icons.add_task_outlined),
-                label: Text(context.l10n.commit),
-              ),
-              const Divider(height: 28),
-              _RemoteList(remotes: _remotes),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: <Widget>[
-                  OutlinedButton.icon(
-                    onPressed: _running ? null : _refreshRemotes,
-                    icon: const Icon(Icons.list_alt_outlined),
-                    label: Text(context.l10n.listRemotes),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: context.l10n.remoteNameField,
-                ),
-                onChanged: (value) => _remoteName = value,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: context.l10n.remoteUrlField,
-                ),
-                onChanged: (value) => _remoteUrl = value,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: <Widget>[
-                  FilledButton(
-                    onPressed:
-                        _running
-                            ? null
-                            : () => _run(
-                              () => widget.git.addRemote(
-                                name: _remoteName,
-                                url: _remoteUrl,
-                              ),
-                            ),
-                    child: Text(context.l10n.addRemote),
-                  ),
-                  OutlinedButton(
-                    onPressed:
-                        _running
-                            ? null
-                            : () => _run(
-                              () => widget.git.editRemote(
-                                name: _remoteName,
-                                url: _remoteUrl,
-                              ),
-                            ),
-                    child: Text(context.l10n.updateRemote),
-                  ),
-                  OutlinedButton(
-                    onPressed:
-                        _running
-                            ? null
-                            : () => _run(
-                              () => widget.git.removeRemote(_remoteName),
-                            ),
-                    child: Text(context.l10n.removeRemote),
-                  ),
-                ],
-              ),
-              const Divider(height: 28),
-              Text(
-                widget.deleteConfirmationLabel.isEmpty
-                    ? context.l10n.selectStoreBeforeDelete
-                    : context.l10n.typeToConfirm(
-                      widget.deleteConfirmationLabel,
+              ],
+              if (hasGit) ...<Widget>[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    FilledButton.icon(
+                      onPressed:
+                          _running || !hasGit
+                              ? null
+                              : () => _run(widget.git.refreshGitStatus),
+                      icon: const Icon(Icons.info_outline),
+                      label: Text(context.l10n.status),
                     ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                decoration: InputDecoration(
-                  labelText:
-                      widget.deleteConfirmationLabel.isEmpty
-                          ? context.l10n.confirmation
-                          : context.l10n.typeToConfirm(
-                            widget.deleteConfirmationLabel,
-                          ),
+                    OutlinedButton.icon(
+                      onPressed:
+                          _running || !hasRemote
+                              ? null
+                              : () => _run(widget.git.pull),
+                      icon: const Icon(Icons.download_outlined),
+                      label: Text(context.l10n.pull),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed:
+                          _running || !hasRemote
+                              ? null
+                              : () => _run(widget.git.push),
+                      icon: const Icon(Icons.upload_outlined),
+                      label: Text(context.l10n.push),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed:
+                          _running || !hasRemote
+                              ? null
+                              : () => _run(widget.git.recoverByPull),
+                      icon: const Icon(Icons.healing_outlined),
+                      label: Text(context.l10n.recoverPull),
+                    ),
+                  ],
                 ),
-                onChanged:
-                    (value) => setState(() => _deleteConfirmation = value),
-              ),
-              const SizedBox(height: 8),
-              FilledButton.tonalIcon(
-                onPressed:
-                    _running ||
-                            widget.deleteConfirmationLabel.isEmpty ||
-                            _deleteConfirmation !=
-                                widget.deleteConfirmationLabel
-                        ? null
-                        : () => _run(
-                          () => widget.git.deleteLocalRepo(
-                            confirmation: _deleteConfirmation,
-                          ),
-                        ),
-                icon: const Icon(Icons.delete_outline),
-                label: Text(context.l10n.deleteLocalRepo),
-              ),
+                const SizedBox(height: 12),
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: context.l10n.commitMessageField,
+                  ),
+                  onChanged: (value) => _message = value,
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _pushAfterCommit,
+                  onChanged:
+                      _running || !hasRemote
+                          ? null
+                          : (value) =>
+                              setState(() => _pushAfterCommit = value ?? false),
+                  title: Text(context.l10n.pushAfterCommit),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed:
+                      _running || !hasGit
+                          ? null
+                          : () => _run(() async {
+                            final commit = await widget.git.commit(_message);
+                            if (!_pushAfterCommit) {
+                              return commit;
+                            }
+                            final push = await widget.git.push();
+                            return widget.combineGitOutput(commit, push);
+                          }),
+                  icon: const Icon(Icons.add_task_outlined),
+                  label: Text(context.l10n.commit),
+                ),
+                const Divider(height: 28),
+                _RemoteList(remotes: _remotes),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    OutlinedButton.icon(
+                      onPressed: _running ? null : _refreshRemotes,
+                      icon: const Icon(Icons.list_alt_outlined),
+                      label: Text(context.l10n.listRemotes),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: context.l10n.remoteNameField,
+                  ),
+                  onChanged: (value) => _remoteName = value,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: context.l10n.remoteUrlField,
+                  ),
+                  onChanged: (value) => setState(() => _remoteUrl = value),
+                ),
+                if (_usesSshRemote) ...<Widget>[
+                  const SizedBox(height: 8),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.vpn_key_outlined),
+                    title: Text(context.l10n.sshKeyRequiredForRemote),
+                    subtitle: Text(context.l10n.sshKeysGitOnlyDescription),
+                    trailing: TextButton(
+                      onPressed: widget.onManageSshKeys,
+                      child: Text(context.l10n.sshKeysTitle),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    FilledButton(
+                      onPressed:
+                          _running || !hasGit
+                              ? null
+                              : () => _run(
+                                () => widget.git.addRemote(
+                                  name: _remoteName,
+                                  url: _remoteUrl,
+                                ),
+                              ),
+                      child: Text(context.l10n.addRemote),
+                    ),
+                    OutlinedButton(
+                      onPressed:
+                          _running || !_hasNamedRemote
+                              ? null
+                              : () => _run(
+                                () => widget.git.editRemote(
+                                  name: _remoteName,
+                                  url: _remoteUrl,
+                                ),
+                              ),
+                      child: Text(context.l10n.updateRemote),
+                    ),
+                    OutlinedButton(
+                      onPressed:
+                          _running || !_hasNamedRemote
+                              ? null
+                              : () => _run(
+                                () => widget.git.removeRemote(_remoteName),
+                              ),
+                      child: Text(context.l10n.removeRemote),
+                    ),
+                  ],
+                ),
+              ],
+              const Divider(height: 28),
               if (_running) ...const <Widget>[
                 SizedBox(height: 12),
                 LinearProgressIndicator(),
@@ -291,6 +305,24 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
       ),
     );
   }
+
+  bool get _hasNamedRemote =>
+      _remotes.any((remote) => remote.name == _remoteName.trim());
+
+  bool get _usesSshRemote =>
+      remoteUrlUsesSsh(_remoteUrl) ||
+      _remotes.any(
+        (remote) =>
+            remoteUrlUsesSsh(remote.fetchUrl) ||
+            remoteUrlUsesSsh(remote.pushUrl),
+      );
+
+  String _gitModeLabel(BuildContext context) => switch (widget.gitMode) {
+    StoreGitMode.disabled => context.l10n.gitDisabledState,
+    StoreGitMode.local => context.l10n.gitLocalState,
+    StoreGitMode.remote => context.l10n.gitRemoteState,
+    StoreGitMode.invalid => context.l10n.invalidGitMetadataTitle,
+  };
 
   Future<void> _refreshRemotes() async {
     try {

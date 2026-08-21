@@ -4,70 +4,47 @@ enum StoreOnboardingState {
   noConfig,
   storeMissing,
   missingGpgId,
-  gitRemoteMissing,
+  gitInvalid,
   pgpKeyMissing,
   ready,
 }
 
-extension StoreOnboardingStateLabel on StoreOnboardingState {
-  String get label {
-    switch (this) {
-      case StoreOnboardingState.noConfig:
-        return 'No config';
-      case StoreOnboardingState.storeMissing:
-        return 'Store missing';
-      case StoreOnboardingState.missingGpgId:
-        return 'Missing .gpg-id';
-      case StoreOnboardingState.gitRemoteMissing:
-        return 'Git remote missing';
-      case StoreOnboardingState.pgpKeyMissing:
-        return 'PGP key missing';
-      case StoreOnboardingState.ready:
-        return 'Ready';
-    }
-  }
-
-  bool get requiresSetup =>
-      this == StoreOnboardingState.noConfig ||
-      this == StoreOnboardingState.storeMissing;
-}
+enum StoreGitMode { disabled, local, remote, invalid }
 
 class StoreStatus {
   const StoreStatus({
-    required this.id,
     required this.name,
     required this.root,
-    required this.isDefault,
     required this.exists,
     required this.hasGpgId,
-    required this.hasGitRemote,
+    this.pgpRecipients = const <String>[],
     required this.pgpKeyMissing,
     required this.issues,
+    this.gitMode = StoreGitMode.remote,
   });
 
   factory StoreStatus.fromBridge(frb.StoreStatusDto dto) {
+    final gitMode = _gitModeFromBridge(dto.gitMode);
     return StoreStatus(
-      id: dto.id,
       name: dto.name,
       root: dto.root,
-      isDefault: dto.isDefault,
       exists: dto.exists,
       hasGpgId: dto.hasGpgId,
-      hasGitRemote: dto.hasGitRemote,
+      pgpRecipients: dto.pgpRecipients,
       pgpKeyMissing: dto.pgpKeyMissing,
       issues: dto.issues,
+      gitMode: gitMode,
     );
   }
 
-  final String id;
   final String name;
   final String root;
-  final bool isDefault;
   final bool exists;
   final bool hasGpgId;
-  final bool hasGitRemote;
+  final List<String> pgpRecipients;
   final bool pgpKeyMissing;
   final List<String> issues;
+  final StoreGitMode gitMode;
 }
 
 class StoreLifecycleSnapshot {
@@ -76,9 +53,7 @@ class StoreLifecycleSnapshot {
     required this.configExists,
     required this.onboardingState,
     required this.issues,
-    required this.stores,
-    this.selectedStoreId,
-    this.selectedStoreRoot,
+    required this.store,
   });
 
   factory StoreLifecycleSnapshot.empty(String configPath) {
@@ -87,54 +62,74 @@ class StoreLifecycleSnapshot {
       configExists: false,
       onboardingState: StoreOnboardingState.noConfig,
       issues: const <String>['no_config'],
-      stores: const <StoreStatus>[],
+      store: null,
+    );
+  }
+
+  factory StoreLifecycleSnapshot.withoutStore({
+    required String configPath,
+    required bool configExists,
+  }) {
+    return StoreLifecycleSnapshot(
+      configPath: configPath,
+      configExists: configExists,
+      onboardingState:
+          configExists
+              ? StoreOnboardingState.storeMissing
+              : StoreOnboardingState.noConfig,
+      issues: <String>[configExists ? 'store_missing' : 'no_config'],
+      store: null,
     );
   }
 
   factory StoreLifecycleSnapshot.fromBridge(frb.AppStateDto dto) {
+    final store = dto.store == null ? null : StoreStatus.fromBridge(dto.store!);
     return StoreLifecycleSnapshot(
       configPath: dto.configPath,
       configExists: dto.configExists,
-      selectedStoreId: dto.selectedStoreId,
-      selectedStoreRoot: dto.selectedStoreRoot,
       onboardingState: _onboardingStateFromBridge(dto.onboardingState),
       issues: dto.issues,
-      stores: dto.stores.map(StoreStatus.fromBridge).toList(growable: false),
+      store: store,
     );
   }
 
   final String configPath;
   final bool configExists;
-  final String? selectedStoreId;
-  final String? selectedStoreRoot;
   final StoreOnboardingState onboardingState;
   final List<String> issues;
-  final List<StoreStatus> stores;
+  final StoreStatus? store;
 
-  StoreStatus? get selectedStore {
-    for (final store in stores) {
-      if (store.id == selectedStoreId || store.root == selectedStoreRoot) {
-        return store;
-      }
-    }
-    return stores.isEmpty ? null : stores.first;
-  }
-
-  /// Whether onboarding still needs the user to create, import, or clone a
-  /// store. Missing PGP recipients and Git remotes are diagnostics for an
-  /// existing store, not evidence that the store itself is absent.
-  bool get requiresStoreSetup {
-    final selected = selectedStore;
-    return selected == null || !selected.exists;
-  }
+  bool get requiresStoreSetup => store == null || !store!.exists;
 
   bool get requiresKeyRepair {
-    final selected = selectedStore;
-    return selected != null &&
-        selected.exists &&
-        (selected.pgpKeyMissing ||
-            selected.issues.contains('pgp_key_missing') ||
+    final current = store;
+    return current != null &&
+        current.exists &&
+        (current.pgpKeyMissing ||
+            current.issues.contains('pgp_key_missing') ||
             onboardingState == StoreOnboardingState.pgpKeyMissing);
+  }
+
+  bool get requiresStoreRepair {
+    final current = store;
+    return current != null &&
+        current.exists &&
+        (!current.hasGpgId ||
+            current.gitMode == StoreGitMode.invalid ||
+            requiresKeyRepair);
+  }
+}
+
+StoreGitMode _gitModeFromBridge(frb.StoreGitModeDto value) {
+  switch (value) {
+    case frb.StoreGitModeDto.disabled:
+      return StoreGitMode.disabled;
+    case frb.StoreGitModeDto.local:
+      return StoreGitMode.local;
+    case frb.StoreGitModeDto.remote:
+      return StoreGitMode.remote;
+    case frb.StoreGitModeDto.invalid:
+      return StoreGitMode.invalid;
   }
 }
 
@@ -146,8 +141,8 @@ StoreOnboardingState _onboardingStateFromBridge(String value) {
       return StoreOnboardingState.storeMissing;
     case 'missing_gpg_id':
       return StoreOnboardingState.missingGpgId;
-    case 'git_remote_missing':
-      return StoreOnboardingState.gitRemoteMissing;
+    case 'git_invalid':
+      return StoreOnboardingState.gitInvalid;
     case 'pgp_key_missing':
       return StoreOnboardingState.pgpKeyMissing;
     case 'ready':

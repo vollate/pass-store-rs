@@ -3,9 +3,11 @@ import Foundation
 import Security
 
 struct ParsAutofillStoredState: Codable {
+  let enabled: Bool
   let configPath: String
   let indexPath: String
   let storeRoot: String?
+  let generation: String?
 }
 
 struct ParsAutofillIndex: Codable {
@@ -64,66 +66,168 @@ enum ParsAutofillSharedState {
     passphrase: String?
   ) throws {
     guard let containerURL = containerURL() else {
-      throw NSError(
-        domain: "ParsAutofill",
-        code: 2,
-        userInfo: [NSLocalizedDescriptionKey: "App group container is unavailable"])
+      throw autofillError(code: 2, message: "App group container is unavailable")
+    }
+    guard let storeRoot, !storeRoot.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw autofillError(code: 3, message: "A ready password store is required")
+    }
+    let sourceIndexURL = URL(fileURLWithPath: indexPath)
+    guard FileManager.default.fileExists(atPath: sourceIndexURL.path) else {
+      throw autofillError(code: 4, message: "An explicit Autofill rebuild is required")
     }
     try FileManager.default.createDirectory(
       at: containerURL,
       withIntermediateDirectories: true)
 
     let sharedIndexURL = containerURL.appendingPathComponent(indexFileName)
-    let sourceIndexURL = URL(fileURLWithPath: indexPath)
-    if FileManager.default.fileExists(atPath: sourceIndexURL.path) {
-      if FileManager.default.fileExists(atPath: sharedIndexURL.path) {
-        try FileManager.default.removeItem(at: sharedIndexURL)
-      }
-      try FileManager.default.copyItem(at: sourceIndexURL, to: sharedIndexURL)
-    } else if FileManager.default.fileExists(atPath: sharedIndexURL.path) {
+    if FileManager.default.fileExists(atPath: sharedIndexURL.path) {
       try FileManager.default.removeItem(at: sharedIndexURL)
     }
+    try FileManager.default.copyItem(at: sourceIndexURL, to: sharedIndexURL)
 
     let state = ParsAutofillStoredState(
+      enabled: true,
       configPath: configPath,
       indexPath: sharedIndexURL.path,
-      storeRoot: storeRoot)
+      storeRoot: storeRoot,
+      generation: UUID().uuidString)
     let stateData = try JSONEncoder().encode(state)
     try stateData.write(
       to: containerURL.appendingPathComponent(stateFileName),
       options: .atomic)
 
     if let passphrase, !passphrase.isEmpty {
-      savePassphrase(passphrase)
+      try savePassphrase(passphrase)
     } else {
-      deletePassphrase()
+      let status = deletePassphrase()
+      guard status == errSecSuccess || status == errSecItemNotFound else {
+        throw autofillError(code: 5, message: "Autofill authorization could not be cleared")
+      }
     }
   }
 
-  static func clear() {
-    guard let containerURL = containerURL() else { return }
-    try? FileManager.default.removeItem(at: containerURL.appendingPathComponent(stateFileName))
-    try? FileManager.default.removeItem(at: containerURL.appendingPathComponent(indexFileName))
-    deletePassphrase()
-    ASCredentialIdentityStore.shared.removeAllCredentialIdentities { _, _ in }
+  typealias IdentityRemoval = (@escaping (Bool, Error?) -> Void) -> Void
+
+  static func clear(completion: @escaping (Result<Void, Error>) -> Void) {
+    performClear(
+      containerURL: containerURL(),
+      deleteAuthorization: { deletePassphrase() },
+      removeIdentities: { callback in
+        ASCredentialIdentityStore.shared.removeAllCredentialIdentities(callback)
+      },
+      completion: completion)
+  }
+
+  static func performClear(
+    containerURL: URL?,
+    deleteAuthorization: () -> OSStatus,
+    removeIdentities: @escaping IdentityRemoval,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
+    var firstFailure: Error?
+    if let containerURL {
+      do {
+        try FileManager.default.createDirectory(
+          at: containerURL,
+          withIntermediateDirectories: true)
+      } catch {
+        firstFailure = error
+      }
+      let stateURL = containerURL.appendingPathComponent(stateFileName)
+      let indexURL = containerURL.appendingPathComponent(indexFileName)
+      do {
+        try persistDisabledState(containerURL: containerURL)
+      } catch {
+        firstFailure = firstFailure ?? error
+        // A missing state is also disabled; try it even when tombstone persistence failed.
+        do {
+          if FileManager.default.fileExists(atPath: stateURL.path) {
+            try FileManager.default.removeItem(at: stateURL)
+          }
+        } catch {
+          firstFailure = firstFailure ?? error
+        }
+      }
+      do {
+        if FileManager.default.fileExists(atPath: indexURL.path) {
+          try FileManager.default.removeItem(at: indexURL)
+        }
+      } catch {
+        firstFailure = firstFailure ?? error
+      }
+    } else {
+      firstFailure = autofillError(code: 6, message: "App group container is unavailable")
+    }
+
+    let keychainStatus = deleteAuthorization()
+    if keychainStatus != errSecSuccess && keychainStatus != errSecItemNotFound,
+      firstFailure == nil
+    {
+      firstFailure = autofillError(
+        code: 7,
+        message: "Autofill authorization could not be cleared")
+    }
+
+    removeIdentities { success, error in
+      var failure = firstFailure
+      if !success && failure == nil {
+        failure = error ?? autofillError(
+          code: 8,
+          message: "Credential identities could not be removed")
+      }
+      if let containerURL {
+        do {
+          // Defense in depth: this must be the final shared-state write.
+          try persistDisabledState(containerURL: containerURL)
+        } catch {
+          failure = failure ?? error
+        }
+      }
+      DispatchQueue.main.async {
+        if let failure {
+          completion(.failure(failure))
+        } else {
+          completion(.success(()))
+        }
+      }
+    }
+  }
+
+  private static func persistDisabledState(containerURL: URL) throws {
+    let indexURL = containerURL.appendingPathComponent(indexFileName)
+    let tombstone = ParsAutofillStoredState(
+      enabled: false,
+      configPath: "",
+      indexPath: indexURL.path,
+      storeRoot: nil,
+      generation: nil)
+    try JSONEncoder().encode(tombstone).write(
+      to: containerURL.appendingPathComponent(stateFileName),
+      options: .atomic)
   }
 
   static func loadState() -> ParsAutofillStoredState? {
     guard let containerURL = containerURL() else { return nil }
     let url = containerURL.appendingPathComponent(stateFileName)
-    guard let data = try? Data(contentsOf: url) else { return nil }
-    return try? JSONDecoder().decode(ParsAutofillStoredState.self, from: data)
+    guard let data = try? Data(contentsOf: url),
+      let state = try? JSONDecoder().decode(ParsAutofillStoredState.self, from: data),
+      state.enabled,
+      state.generation?.isEmpty == false
+    else { return nil }
+    return state
   }
 
   static func loadIndex() -> ParsAutofillIndex? {
-    let path = loadState()?.indexPath ?? containerURL()?.appendingPathComponent(indexFileName).path
-    guard let path, let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+    guard let state = loadState(),
+      let data = try? Data(contentsOf: URL(fileURLWithPath: state.indexPath))
+    else {
       return nil
     }
     return try? JSONDecoder().decode(ParsAutofillIndex.self, from: data)
   }
 
   static func loadPassphrase() -> String? {
+    guard loadState() != nil else { return nil }
     var query = keychainQuery()
     query[kSecReturnData as String] = true
     query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -138,7 +242,10 @@ enum ParsAutofillSharedState {
   }
 
   static func syncCredentialIdentities(completion: ((Bool) -> Void)? = nil) {
-    guard let index = loadIndex() else {
+    guard let state = loadState(),
+      let data = try? Data(contentsOf: URL(fileURLWithPath: state.indexPath)),
+      let index = try? JSONDecoder().decode(ParsAutofillIndex.self, from: data)
+    else {
       ASCredentialIdentityStore.shared.removeAllCredentialIdentities { success, _ in
         completion?(success)
       }
@@ -160,7 +267,9 @@ enum ParsAutofillSharedState {
               identifier: website,
               type: .domain),
             user: entry.username,
-            recordIdentifier: entry.path))
+            recordIdentifier: recordIdentifier(
+              path: entry.path,
+              generation: state.generation!)))
       }
     }
     ASCredentialIdentityStore.shared.replaceCredentialIdentities(with: identities) { success, _ in
@@ -168,20 +277,61 @@ enum ParsAutofillSharedState {
     }
   }
 
+  static func recordIdentifier(path: String, generation: String) -> String {
+    "\(generation)\u{0}\(path)"
+  }
+
+  static func parseRecordIdentifier(_ value: String) -> (generation: String, path: String)? {
+    guard let separator = value.firstIndex(of: "\u{0}"), separator != value.startIndex else {
+      return nil
+    }
+    let pathStart = value.index(after: separator)
+    guard pathStart < value.endIndex else { return nil }
+    return (String(value[..<separator]), String(value[pathStart...]))
+  }
+
+  static func samePublication(
+    _ expected: ParsAutofillStoredState,
+    _ current: ParsAutofillStoredState?
+  ) -> Bool {
+    guard let current else { return false }
+    return current.enabled
+      && current.generation == expected.generation
+      && current.storeRoot == expected.storeRoot
+      && current.indexPath == expected.indexPath
+  }
+
+  static func performIfCurrent<T>(
+    generation: String,
+    load: () -> ParsAutofillStoredState?,
+    operation: () -> T?
+  ) -> T? {
+    guard let before = load(), before.generation == generation else { return nil }
+    guard let result = operation(), samePublication(before, load()) else { return nil }
+    return result
+  }
+
   private static func isHostLike(_ value: String) -> Bool {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.contains(".") && !trimmed.contains(where: { $0.isWhitespace })
   }
 
-  private static func savePassphrase(_ passphrase: String) {
-    deletePassphrase()
+  private static func savePassphrase(_ passphrase: String) throws {
+    let deleteStatus = deletePassphrase()
+    guard deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound else {
+      throw autofillError(code: 9, message: "Existing Autofill authorization could not be replaced")
+    }
     var query = keychainQuery()
     query[kSecValueData as String] = Data(passphrase.utf8)
     query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    SecItemAdd(query as CFDictionary, nil)
+    let addStatus = SecItemAdd(query as CFDictionary, nil)
+    guard addStatus == errSecSuccess else {
+      throw autofillError(code: 10, message: "Autofill authorization could not be saved")
+    }
   }
 
-  private static func deletePassphrase() {
+  @discardableResult
+  private static func deletePassphrase() -> OSStatus {
     SecItemDelete(keychainQuery() as CFDictionary)
   }
 
@@ -206,5 +356,12 @@ enum ParsAutofillSharedState {
       return nil
     }
     return value
+  }
+
+  private static func autofillError(code: Int, message: String) -> NSError {
+    NSError(
+      domain: "ParsAutofill",
+      code: code,
+      userInfo: [NSLocalizedDescriptionKey: message])
   }
 }

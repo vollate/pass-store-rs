@@ -5,6 +5,7 @@ import UIKit
 final class CredentialProviderViewController: ASCredentialProviderViewController {
   private let tableView = UITableView(frame: .zero, style: .insetGrouped)
   private var candidates: [ParsAutofillIosCandidate] = []
+  private var candidateGenerations: [String: String] = [:]
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -37,34 +38,45 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
   override func prepareInterfaceToProvideCredential(
     for credentialIdentity: ASPasswordCredentialIdentity
   ) {
-    guard let path = credentialIdentity.recordIdentifier else {
+    guard let identifier = credentialIdentity.recordIdentifier,
+      let parsed = ParsAutofillSharedState.parseRecordIdentifier(identifier)
+    else {
       cancel(code: .credentialIdentityNotFound)
       return
     }
-    authenticateAndComplete(path: path)
+    authenticateAndComplete(path: parsed.path, generation: parsed.generation)
   }
 
   private func candidatesFor(
     serviceIdentifiers: [ASCredentialServiceIdentifier]
   ) -> [ParsAutofillIosCandidate] {
-    guard let state = ParsAutofillSharedState.loadState() else { return [] }
+    guard let state = ParsAutofillSharedState.loadState(),
+      let generation = state.generation
+    else { return [] }
+    candidateGenerations.removeAll()
     var seen = Set<String>()
     var result: [ParsAutofillIosCandidate] = []
     for service in serviceIdentifiers {
       let website = service.type == .domain || service.type == .URL ? service.identifier : nil
-      let candidates = ParsAutofillNative.queryCandidates(
-        indexPath: state.indexPath,
-        website: website,
-        query: service.identifier,
-        limit: 10)
+      let candidates = ParsAutofillSharedState.performIfCurrent(
+        generation: generation,
+        load: { ParsAutofillSharedState.loadState() },
+        operation: {
+          ParsAutofillNative.queryCandidates(
+            indexPath: state.indexPath,
+            website: website,
+            query: service.identifier,
+            limit: 10)
+        }) ?? []
       for candidate in candidates where seen.insert(candidate.path).inserted {
+        candidateGenerations[candidate.path] = generation
         result.append(candidate)
       }
     }
     return result
   }
 
-  private func authenticateAndComplete(path: String) {
+  private func authenticateAndComplete(path: String, generation: String) {
     let context = LAContext()
     var error: NSError?
     guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
@@ -82,20 +94,26 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
           self?.cancel(code: .userCanceled)
           return
         }
-        self?.complete(path: path)
+        self?.complete(path: path, generation: generation)
       }
     }
   }
 
-  private func complete(path: String) {
-    guard let state = ParsAutofillSharedState.loadState(),
-      let root = state.storeRoot,
-      let credential = ParsAutofillNative.resolveCredential(
-        configPath: state.configPath,
-        indexPath: state.indexPath,
-        root: root,
-        path: path,
-        passphrase: ParsAutofillSharedState.loadPassphrase())
+  private func complete(path: String, generation: String) {
+    guard let credential: ParsAutofillIosCredential = ParsAutofillSharedState.performIfCurrent(
+      generation: generation,
+      load: { ParsAutofillSharedState.loadState() },
+      operation: {
+        guard let state = ParsAutofillSharedState.loadState(), let root = state.storeRoot else {
+          return nil
+        }
+        return ParsAutofillNative.resolveCredential(
+          configPath: state.configPath,
+          indexPath: state.indexPath,
+          root: root,
+          path: path,
+          passphrase: ParsAutofillSharedState.loadPassphrase())
+      })
     else {
       cancel(code: .credentialIdentityNotFound)
       return
@@ -135,6 +153,11 @@ extension CredentialProviderViewController: UITableViewDataSource, UITableViewDe
 
   func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
     tableView.deselectRow(at: indexPath, animated: true)
-    authenticateAndComplete(path: candidates[indexPath.row].path)
+    let path = candidates[indexPath.row].path
+    guard let generation = candidateGenerations[path] else {
+      cancel(code: .credentialIdentityNotFound)
+      return
+    }
+    authenticateAndComplete(path: path, generation: generation)
   }
 }

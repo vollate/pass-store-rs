@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -27,7 +28,7 @@ void main() {
 
       expect(repository.currentRepoName, 'Personal');
       expect(repository.lifecycle.onboardingState, StoreOnboardingState.ready);
-      expect(repository.gitStatus.label, 'Uncommitted');
+      expect(repository.gitStatus, RepoGitStatus.uncommitted);
       expect(
         repository.entries.map((entry) => entry.path),
         contains('work/github'),
@@ -242,7 +243,303 @@ void main() {
     },
   );
 
-  test('removing an app-managed store deletes its private copy', () async {
+  test(
+    'canonical removal clears metadata session and Autofill before replacement',
+    () async {
+      final operations = <String>[];
+      final bridge = _LifecycleBridge();
+      final metadataStore = _RecordingMetadataStore(
+        operations,
+        const VaultMetadata(
+          recentPaths: <String>['work/github'],
+          favoritePaths: <String>{'work/github'},
+        ),
+      );
+      final security = _RecordingSecurityRepository(operations);
+      await security.savePgpPassphrase(
+        fingerprint: 'ABCD 1234',
+        passphrase: 'durable',
+      );
+      await security.startPgpSession(
+        fingerprint: 'ABCD 1234',
+        passphrase: 'session',
+      );
+      final autofill = _RecordingAutofillRepository(operations);
+      await autofill.enrichWebsites(<String>['work/github']);
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        securityRepository: security,
+        autofillRepository: autofill,
+        metadataStore: metadataStore,
+      );
+      await repository.refresh();
+      operations.clear();
+      autofill.operations.clear();
+      repository.lifecycleRevision.addListener(
+        () => operations.add('lifecycle-published'),
+      );
+
+      await repository.removeStore(root: '/tmp/personal-store');
+
+      expect(repository.lifecycle.requiresStoreSetup, isTrue);
+      expect(repository.entries, isEmpty);
+      expect(repository.recentEntries(), isEmpty);
+      expect(repository.entries.where((entry) => entry.isFavorite), isEmpty);
+      expect(operations, <String>[
+        'lifecycle-published',
+        'metadata-removal-marker',
+        'metadata-clear',
+        'session-clear',
+        'autofill-clear',
+        'lifecycle-published',
+      ]);
+      expect(await security.readActivePgpPassphrase(), isNull);
+      expect((await security.readPgpPassphrase())?.passphrase, 'durable');
+      expect((await metadataStore.load()).recentPaths, isEmpty);
+      expect(autofill.lastEnrichedPaths, isEmpty);
+
+      bridge
+        ..storePresent = true
+        ..storeRoot = '/tmp/replacement-store';
+      operations.clear();
+      autofill.operations.clear();
+      await repository.refresh();
+
+      expect(repository.store?.root, '/tmp/replacement-store');
+      expect(repository.recentEntries(), isEmpty);
+      expect(repository.entries.where((entry) => entry.isFavorite), isEmpty);
+      expect(autofill.operations, isNot(contains('reconcile')));
+      expect(autofill.operations, isNot(contains('rebuild')));
+      expect(autofill.status.kind, AutofillStatusKind.needsRebuild);
+      expect(autofill.lastEnrichedPaths, isEmpty);
+    },
+  );
+
+  test('one durable metadata sentinel is sufficient for removal', () async {
+    final operations = <String>[];
+    final bridge = _LifecycleBridge();
+    final metadataStore = _RecordingMetadataStore(
+      operations,
+      const VaultMetadata(
+        recentPaths: <String>['work/github'],
+        favoritePaths: <String>{'work/github'},
+      ),
+      failClear: true,
+    );
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      autofillRepository: _RecordingAutofillRepository(operations),
+      metadataStore: metadataStore,
+    );
+    await repository.refresh();
+    bridge.calledMethods.clear();
+
+    await repository.removeStore(root: '/tmp/personal-store');
+
+    expect(metadataStore.removalMarked, isTrue);
+    expect(bridge.calledMethods, contains('disconnect_store'));
+    expect(repository.lifecycle.requiresStoreSetup, isTrue);
+  });
+
+  test(
+    'both metadata sentinel failures cancel removal before bridge',
+    () async {
+      final operations = <String>[];
+      final bridge = _LifecycleBridge();
+      final metadataStore = _RecordingMetadataStore(
+        operations,
+        const VaultMetadata(
+          recentPaths: <String>['work/github'],
+          favoritePaths: <String>{'work/github'},
+        ),
+        failClear: true,
+        failMarker: true,
+      );
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        autofillRepository: _RecordingAutofillRepository(operations),
+        metadataStore: metadataStore,
+      );
+      await repository.refresh();
+      bridge.calledMethods.clear();
+
+      await expectLater(
+        repository.removeStore(root: '/tmp/personal-store'),
+        throwsA(
+          isA<BridgeRepositoryException>().having(
+            (error) => error.message,
+            'message',
+            contains('privacy cleanup could not be saved'),
+          ),
+        ),
+      );
+
+      expect(bridge.calledMethods, isNot(contains('disconnect_store')));
+      expect(bridge.storePresent, isTrue);
+      expect(bridge.storeRoot, '/tmp/personal-store');
+      expect(repository.store?.root, '/tmp/personal-store');
+      expect(repository.storeRemovalInProgress, isFalse);
+      expect(repository.entries, isEmpty);
+      expect(repository.recentEntries(), isEmpty);
+
+      final restarted = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+        metadataStore: metadataStore,
+      );
+      await restarted.refresh();
+      expect(restarted.store?.root, '/tmp/personal-store');
+      expect(restarted.store?.root, isNot('/tmp/replacement-store'));
+    },
+  );
+
+  test('Autofill cleanup failure cancels disconnect fail-closed', () async {
+    final operations = <String>[];
+    final bridge = _LifecycleBridge();
+    final metadataStore = _RecordingMetadataStore(
+      operations,
+      const VaultMetadata(
+        recentPaths: <String>['work/github'],
+        favoritePaths: <String>{'work/github'},
+      ),
+      failClear: true,
+    );
+    final security = _RecordingSecurityRepository(operations);
+    await security.startPgpSession(
+      fingerprint: 'ABCD 1234',
+      passphrase: 'session',
+    );
+    final autofill = _RecordingAutofillRepository(operations, failClear: true);
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      securityRepository: security,
+      autofillRepository: autofill,
+      metadataStore: metadataStore,
+    );
+    await repository.refresh();
+    operations.clear();
+
+    await expectLater(
+      repository.removeStore(root: '/tmp/personal-store'),
+      throwsA(isA<AutofillRepositoryException>()),
+    );
+
+    expect(bridge.storePresent, isTrue);
+    expect(repository.store?.root, '/tmp/personal-store');
+    expect(repository.storeRemovalInProgress, isFalse);
+    expect(repository.recentEntries(), isEmpty);
+    expect(await security.readActivePgpPassphrase(), isNull);
+    expect(autofill.cleared, isTrue);
+    expect(autofill.status.kind, AutofillStatusKind.needsRebuild);
+    expect(
+      operations,
+      containsAllInOrder(<String>[
+        'metadata-removal-marker',
+        'metadata-clear',
+        'session-clear',
+        'autofill-clear',
+      ]),
+    );
+
+    final restarted = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      metadataStore: metadataStore,
+    );
+    await restarted.refresh();
+    expect(restarted.recentEntries(), isEmpty);
+    expect(restarted.entries.where((entry) => entry.isFavorite), isEmpty);
+  });
+
+  test('failed disconnect remounts only after fail-closed cleanup', () async {
+    final operations = <String>[];
+    final bridge = _LifecycleBridge()..failDisconnect = true;
+    final security = _RecordingSecurityRepository(operations);
+    await security.startPgpSession(
+      fingerprint: 'ABCD 1234',
+      passphrase: 'session',
+    );
+    final autofill = _RecordingAutofillRepository(operations);
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      securityRepository: security,
+      autofillRepository: autofill,
+      metadataStore: _RecordingMetadataStore(
+        operations,
+        const VaultMetadata(
+          recentPaths: <String>['work/github'],
+          favoritePaths: <String>{'work/github'},
+        ),
+      ),
+    );
+    await repository.refresh();
+    operations.clear();
+    autofill.operations.clear();
+
+    await expectLater(
+      repository.removeStore(root: '/tmp/personal-store'),
+      throwsA(isA<BridgeRepositoryException>()),
+    );
+
+    expect(bridge.storePresent, isTrue);
+    expect(repository.store?.root, '/tmp/personal-store');
+    expect(repository.storeRemovalInProgress, isFalse);
+    expect(await security.readActivePgpPassphrase(), isNull);
+    expect(autofill.cleared, isTrue);
+    expect(autofill.operations, isNot(contains('reconcile')));
+    expect(autofill.status.kind, AutofillStatusKind.needsRebuild);
+    expect(repository.recentEntries(), isEmpty);
+  });
+
+  test('removal clear is serialized after an in-flight reconcile', () async {
+    final operations = <String>[];
+    final bridge = _LifecycleBridge();
+    final autofill = _RecordingAutofillRepository(operations);
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      autofillRepository: autofill,
+    );
+    await repository.refresh();
+    operations.clear();
+    autofill.operations.clear();
+
+    final gate = Completer<void>();
+    final started = Completer<void>();
+    autofill
+      ..reconcileGate = gate
+      ..reconcileStarted = started;
+    final refresh = repository.refresh();
+    await started.future;
+    final removal = repository.removeStore(root: '/tmp/personal-store');
+    await Future<void>.delayed(Duration.zero);
+    expect(bridge.storePresent, isTrue, reason: 'removal waits for reconcile');
+
+    gate.complete();
+    await refresh;
+    await removal;
+
+    expect(repository.lifecycle.requiresStoreSetup, isTrue);
+    expect(repository.store, isNull);
+    expect(repository.entries, isEmpty);
+    expect(autofill.cleared, isTrue);
+    expect(
+      operations,
+      containsAllInOrder(<String>[
+        'autofill-reconcile-start',
+        'autofill-reconcile-finish',
+        'autofill-clear',
+      ]),
+    );
+    expect(operations.last, 'autofill-clear');
+  });
+
+  test('generic remove disconnects even an app-managed store', () async {
     final bridge = _LifecycleBridge();
     final repository = BridgeBackedRepository(
       bridge: bridge,
@@ -254,8 +551,8 @@ void main() {
     bridge.calledMethods.clear();
     await repository.removeStore(root: '/tmp/personal-store');
 
-    expect(bridge.calledMethods, contains('delete_local_store'));
-    expect(bridge.calledMethods, isNot(contains('remove_store')));
+    expect(bridge.calledMethods, contains('disconnect_store'));
+    expect(bridge.calledMethods, isNot(contains('delete_local_store')));
   });
 
   test(
@@ -475,23 +772,174 @@ void main() {
     expect(push.command, 'git push');
     expect(commit.command, 'git commit -m "Sync passwords"');
     expect(remotes.single.name, 'origin');
-    expect(remotes.single.fetchUrl, 'git@example.com:org/pass.git');
+    expect(remotes.single.fetchUrl, '***@example.com:org/pass.git');
     expect(
       added.command,
-      'git remote add backup git@example.com:backup/pass.git',
+      'git remote add backup ***@example.com:backup/pass.git',
     );
     expect(
       edited.command,
-      'git remote set-url origin git@example.com:new/pass.git',
+      'git remote set-url origin ***@example.com:new/pass.git',
     );
     expect(removed.command, 'git remote remove backup');
     expect(bridge.lastGitCommitRequest?.message, 'Sync passwords');
-    expect(bridge.lastGitArgsRequest?.args, <String>[
-      'remote',
-      'remove',
-      'backup',
-    ]);
+    expect(bridge.lastGitArgsRequest, isNull);
+    expect(
+      bridge.calledMethods,
+      containsAll(<String>[
+        'git_list_remotes',
+        'git_add_remote',
+        'git_set_remote_url',
+        'git_remove_remote',
+      ]),
+    );
   });
+
+  test('remote mutation results redact credential-bearing URLs', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+    await repository.refresh();
+
+    final added = await repository.addRemote(
+      name: 'backup',
+      url: 'https://token@example.com/pass.git?access_token=secret#fragment',
+    );
+    final edited = await repository.editRemote(
+      name: 'origin',
+      url: 'ssh://password@example.com/pass.git?secret=value',
+    );
+    final scp = await repository.addRemote(
+      name: 'scp',
+      url: 'token-123@example.com:org/pass.git?secret=value',
+    );
+
+    final disabledRepository = BridgeBackedRepository(
+      bridge: _LifecycleBridge(gitMode: frb.StoreGitModeDto.disabled),
+      configPath: '/tmp/disabled.toml',
+    );
+    await disabledRepository.refresh();
+    final disabled = await disabledRepository.addRemote(
+      name: 'backup',
+      url: 'https://disabled-secret@example.com/pass.git?token=x',
+    );
+    final invalidRepository = BridgeBackedRepository(
+      bridge: _LifecycleBridge(gitMode: frb.StoreGitModeDto.invalid),
+      configPath: '/tmp/invalid.toml',
+    );
+    await invalidRepository.refresh();
+    final invalid = await invalidRepository.editRemote(
+      name: 'origin',
+      url: 'https://invalid-secret@example.com/pass.git#token',
+    );
+
+    for (final result in <GitOperationResult>[
+      added,
+      edited,
+      scp,
+      disabled,
+      invalid,
+    ]) {
+      expect(result.command, isNot(contains('token@example')));
+      expect(result.command, isNot(contains('password@example')));
+      expect(result.command, isNot(contains('token-123@example')));
+      expect(result.command, isNot(contains('disabled-secret')));
+      expect(result.command, isNot(contains('invalid-secret')));
+      expect(result.command, isNot(contains('access_token')));
+      expect(result.command, isNot(contains('secret=value')));
+      expect(result.command, contains('***@example.com'));
+    }
+  });
+
+  test(
+    'Git-disabled store skips commands and can initialize locally',
+    () async {
+      final bridge = _LifecycleBridge(gitMode: frb.StoreGitModeDto.disabled);
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+      );
+
+      await repository.refresh();
+      expect(repository.gitStatus, RepoGitStatus.disabled);
+      expect(bridge.calledMethods, isNot(contains('git_status')));
+
+      final skippedStatus = await repository.refreshGitStatus();
+      final skippedCommit = await repository.commit('No Git commit');
+      expect(skippedStatus.success, isTrue);
+      expect(skippedCommit.success, isTrue);
+      expect(bridge.calledMethods, isNot(contains('git_commit')));
+
+      final initialized = await repository.initializeRepository();
+      expect(initialized.command, 'git init');
+      expect(bridge.calledMethods, contains('initialize_git_repository'));
+      expect(repository.lifecycle.store?.gitMode, StoreGitMode.local);
+      expect(repository.gitStatus, isNot(RepoGitStatus.syncFailed));
+    },
+  );
+
+  test('failed Git initialization leaves local-only store usable', () async {
+    final bridge = _LifecycleBridge(
+      gitMode: frb.StoreGitModeDto.disabled,
+      failGitInitialization: true,
+    );
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+    await repository.refresh();
+
+    await expectLater(
+      repository.initializeRepository(),
+      throwsA(isA<BridgeRepositoryException>()),
+    );
+    expect(repository.lifecycle.store?.gitMode, StoreGitMode.disabled);
+    expect(repository.entries, isNotEmpty);
+    expect((await repository.refreshGitStatus()).success, isTrue);
+  });
+
+  test(
+    'local Git without remote keeps status but skips pull and push',
+    () async {
+      final bridge = _LifecycleBridge(gitMode: frb.StoreGitModeDto.local);
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+      );
+
+      await repository.refresh();
+      expect(repository.lifecycle.store?.gitMode, StoreGitMode.local);
+      expect(bridge.calledMethods, contains('git_status'));
+      bridge.calledMethods.clear();
+
+      final pull = await repository.pull();
+      final push = await repository.push();
+      expect(pull.stdout, contains('no Git remote'));
+      expect(push.stdout, contains('no Git remote'));
+      expect(bridge.calledMethods, isNot(contains('git_pull')));
+      expect(bridge.calledMethods, isNot(contains('git_push')));
+    },
+  );
+
+  test(
+    'invalid Git remains distinct from disabled and dispatches no status',
+    () async {
+      final bridge = _LifecycleBridge(gitMode: frb.StoreGitModeDto.invalid);
+      final repository = BridgeBackedRepository(
+        bridge: bridge,
+        configPath: '/tmp/pars_config.toml',
+      );
+
+      await repository.refresh();
+      expect(repository.gitStatus, RepoGitStatus.invalid);
+      final result = await repository.refreshGitStatus();
+      expect(result.success, isFalse);
+      expect(result.stderr, contains('invalid Git metadata'));
+      expect(bridge.calledMethods, isNot(contains('git_status')));
+    },
+  );
 
   test('bridge-backed repository exposes store lifecycle operations', () async {
     final bridge = _LifecycleBridge();
@@ -504,39 +952,38 @@ void main() {
       name: 'Work',
       root: '/tmp/work-store',
       pgpKeys: const <String>['alice@example.com'],
-      setDefault: true,
       initializeGit: true,
     );
-    await repository.selectStore('/tmp/work-store');
-    await repository.importLocalStore(
-      root: '/tmp/existing-store',
-      setDefault: false,
-    );
+    await repository.importLocalStore(root: '/tmp/existing-store');
     await repository.cloneStore(
       remoteUrl: 'git@example.com:org/pass.git',
       root: '/tmp/cloned-store',
-      setDefault: true,
     );
-    await repository.removeStore(root: '/tmp/old-store');
-    await repository.deleteLocalStore(
-      root: '/tmp/old-store',
-      confirmation: 'old-store',
+    await repository.removeStore(root: '/tmp/personal-store');
+    final deleteRepository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      managedStoreBaseDir: '/tmp',
+    );
+    await deleteRepository.refresh();
+    await deleteRepository.deleteLocalStore(
+      root: '/tmp/personal-store',
+      confirmation: 'personal-store',
     );
 
     expect(
       bridge.calledMethods,
       containsAll(<String>[
         'create_local_store',
-        'select_store',
         'import_local_store',
         'clone_store',
-        'remove_store',
+        'disconnect_store',
         'delete_local_store',
       ]),
     );
   });
 
-  test('app-managed repository skips local git initialization', () async {
+  test('app-managed repository honors explicit git initialization', () async {
     final bridge = _LifecycleBridge();
     final repository = BridgeBackedRepository(
       bridge: bridge,
@@ -548,76 +995,53 @@ void main() {
       name: 'Work',
       root: '/app/support/stores/work',
       pgpKeys: const <String>['alice@example.com'],
-      setDefault: true,
       initializeGit: true,
     );
 
-    expect(bridge.lastCreateLocalStoreRequest?.initializeGit, isFalse);
-  });
-
-  test('bridge-backed repository exposes key management operations', () async {
-    final bridge = _LifecycleBridge();
-    final repository = BridgeBackedRepository(
-      bridge: bridge,
-      configPath: '/tmp/pars_config.toml',
-      sshDir: '/tmp/pars-ssh',
-    );
-
-    final key = await repository.generateSshKey('github-mobile');
-    final publicKey = await repository.exportSshPublicKey('github-mobile');
-    final prepared = await repository.preparePgpPrivateKey(
-      fingerprint: 'ABCD 1234',
-      passphrase: 'test passphrase',
-    );
-    await repository.deleteSshKey('github-mobile');
-    final deleted = await repository.deletePgpKey('ABCD 1234');
-    final github = await repository.githubSshSettingsUri();
-
-    expect(key.type, KeyRecordType.ssh);
-    expect(publicKey, startsWith('ssh-ed25519 '));
-    expect(bridge.lastDeleteSshKeyRequest?.name, 'github-mobile');
-    expect(bridge.lastDeleteSshKeyRequest?.sshDir, '/tmp/pars-ssh');
-    expect(bridge.lastDeletePgpKeyRequest?.fingerprint, 'ABCD 1234');
-    expect(bridge.lastDeletePgpKeyRequest?.configPath, '/tmp/pars_config.toml');
-    expect(bridge.lastPreparePgpPrivateKeyRequest?.fingerprint, 'ABCD 1234');
-    expect(
-      bridge.lastPreparePgpPrivateKeyRequest?.passphrase,
-      'test passphrase',
-    );
-    expect(prepared.fingerprint, 'ABCD 1234');
-    expect(prepared.migrated, isFalse);
-    expect(deleted.privateKeyAbsent, isTrue);
-    expect(deleted.publicKeyAbsent, isTrue);
-    expect(deleted.publicCleanupFailed, isFalse);
-    expect(github.toString(), 'https://github.com/settings/keys');
-    expect(
-      bridge.calledMethods,
-      containsAll(<String>[
-        'generate_ssh_key',
-        'export_ssh_public_key',
-        'delete_ssh_key',
-        'prepare_pgp_private_key',
-        'delete_pgp_key',
-        'open_github_ssh_settings',
-      ]),
-    );
+    expect(bridge.lastCreateLocalStoreRequest?.initializeGit, isTrue);
   });
 
   test(
-    'bridge-backed repository preserves a partial PGP deletion outcome',
+    'bridge-backed repository exposes contextual PGP and SSH operations',
     () async {
-      final bridge = _LifecycleBridge(partialPgpDeletion: true);
+      final bridge = _LifecycleBridge();
       final repository = BridgeBackedRepository(
         bridge: bridge,
         configPath: '/tmp/pars_config.toml',
+        sshDir: '/tmp/pars-ssh',
       );
 
-      final deleted = await repository.deletePgpKey('ABCD 1234');
+      final key = await repository.generateSshKey('github-mobile');
+      final publicKey = await repository.exportSshPublicKey('github-mobile');
+      final prepared = await repository.preparePgpPrivateKey(
+        fingerprint: 'ABCD 1234',
+        passphrase: 'test passphrase',
+      );
+      await repository.deleteSshKey('github-mobile');
+      final github = await repository.githubSshSettingsUri();
 
-      expect(deleted.hadPrivateKey, isTrue);
-      expect(deleted.privateKeyAbsent, isTrue);
-      expect(deleted.publicKeyAbsent, isFalse);
-      expect(deleted.publicCleanupFailed, isTrue);
+      expect(key.type, KeyRecordType.ssh);
+      expect(publicKey, startsWith('ssh-ed25519 '));
+      expect(bridge.lastDeleteSshKeyRequest?.name, 'github-mobile');
+      expect(bridge.lastDeleteSshKeyRequest?.sshDir, '/tmp/pars-ssh');
+      expect(bridge.lastPreparePgpPrivateKeyRequest?.fingerprint, 'ABCD 1234');
+      expect(
+        bridge.lastPreparePgpPrivateKeyRequest?.passphrase,
+        'test passphrase',
+      );
+      expect(prepared.fingerprint, 'ABCD 1234');
+      expect(prepared.migrated, isFalse);
+      expect(github.toString(), 'https://github.com/settings/keys');
+      expect(
+        bridge.calledMethods,
+        containsAll(<String>[
+          'generate_ssh_key',
+          'export_ssh_public_key',
+          'delete_ssh_key',
+          'prepare_pgp_private_key',
+          'open_github_ssh_settings',
+        ]),
+      );
     },
   );
 
@@ -801,10 +1225,99 @@ void main() {
   );
 }
 
+class _RecordingMetadataStore implements VaultMetadataStore {
+  _RecordingMetadataStore(
+    this.operations,
+    this.metadata, {
+    this.failClear = false,
+    this.failMarker = false,
+  });
+
+  final List<String> operations;
+  final bool failClear;
+  final bool failMarker;
+  VaultMetadata metadata;
+  bool removalMarked = false;
+
+  @override
+  Future<VaultMetadata> load() async => metadata;
+
+  @override
+  Future<void> save(VaultMetadata value) async {
+    if (value.recentPaths.isEmpty && value.favoritePaths.isEmpty) {
+      operations.add('metadata-clear');
+      if (failClear) throw StateError('metadata cleanup failed');
+    }
+    metadata = value;
+  }
+
+  @override
+  Future<void> markStoreRemoved() async {
+    operations.add('metadata-removal-marker');
+    if (failMarker) throw StateError('metadata marker failed');
+    removalMarked = true;
+  }
+
+  @override
+  Future<bool> wasStoreRemoved() async => removalMarked;
+
+  @override
+  Future<void> clearStoreRemovedMarker() async {
+    removalMarked = false;
+  }
+}
+
+class _RecordingSecurityRepository extends InMemorySecurityRepository {
+  _RecordingSecurityRepository(this.operations);
+
+  final List<String> operations;
+
+  @override
+  Future<void> clearPgpSession() async {
+    operations.add('session-clear');
+    await super.clearPgpSession();
+  }
+}
+
+class _RecordingAutofillRepository extends FakeAutofillRepository {
+  _RecordingAutofillRepository(
+    this.cleanupOperations, {
+    this.failClear = false,
+  });
+
+  final List<String> cleanupOperations;
+  final bool failClear;
+  Completer<void>? reconcileGate;
+  Completer<void>? reconcileStarted;
+
+  @override
+  Future<void> reconcileIndex(List<PasswordEntry> entries) async {
+    cleanupOperations.add('autofill-reconcile-start');
+    reconcileStarted?.complete();
+    await reconcileGate?.future;
+    await super.reconcileIndex(entries);
+    cleanupOperations.add('autofill-reconcile-finish');
+  }
+
+  @override
+  Future<void> clearIndex() async {
+    cleanupOperations.add('autofill-clear');
+    await super.clearIndex();
+    if (failClear) throw StateError('autofill file cleanup failed');
+  }
+
+  @override
+  Future<void> publishPlatformState() async {
+    cleanupOperations.add('autofill-publish');
+    await super.publishPlatformState();
+  }
+}
+
 class _LifecycleBridge implements ParsBridgeApi {
   _LifecycleBridge({
     this.storeRoot = '/tmp/personal-store',
-    this.partialPgpDeletion = false,
+    this.gitMode = frb.StoreGitModeDto.remote,
+    this.failGitInitialization = false,
     this.listedKeys = const <frb.KeyRecordDto>[
       frb.KeyRecordDto(
         keyType: 'ssh',
@@ -816,10 +1329,14 @@ class _LifecycleBridge implements ParsBridgeApi {
     ],
   });
 
-  final String storeRoot;
-  final bool partialPgpDeletion;
+  String storeRoot;
+  bool storePresent = true;
+  bool failDisconnect = false;
+  frb.StoreGitModeDto gitMode;
+  final bool failGitInitialization;
   final List<frb.KeyRecordDto> listedKeys;
   final List<String> calledMethods = <String>[];
+  Completer<void>? inspectGate;
   frb.InspectAppStateRequest? lastInspectAppStateRequest;
   frb.ConfigurePgpBackendRequest? lastConfigurePgpBackendRequest;
   frb.ListKeysRequest? lastListKeysRequest;
@@ -829,7 +1346,6 @@ class _LifecycleBridge implements ParsBridgeApi {
   frb.EditEntryRequest? lastEditRequest;
   frb.MoveEntryRequest? lastMoveRequest;
   frb.DeleteEntryRequest? lastDeleteRequest;
-  frb.DeletePgpKeyRequest? lastDeletePgpKeyRequest;
   frb.PreparePgpPrivateKeyRequest? lastPreparePgpPrivateKeyRequest;
   frb.DeleteSshKeyRequest? lastDeleteSshKeyRequest;
   frb.CreateLocalStoreRequest? lastCreateLocalStoreRequest;
@@ -905,34 +1421,61 @@ class _LifecycleBridge implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.InspectStoreGitResponse> inspectStoreGit({
+    required frb.InspectStoreGitRequest request,
+  }) async => frb.InspectStoreGitResponse(mode: gitMode);
+
+  @override
+  Future<frb.UnitResponse> initializeGitRepository({
+    required frb.InitializeGitRepositoryRequest request,
+  }) async {
+    calledMethods.add('initialize_git_repository');
+    if (failGitInitialization) {
+      return const frb.UnitResponse(
+        error: frb.BridgeFailure(
+          category: frb.BridgeFailureCategory.gitError,
+          message: 'Git initialization failed',
+        ),
+      );
+    }
+    gitMode = frb.StoreGitModeDto.local;
+    return const frb.UnitResponse();
+  }
+
+  @override
   Future<frb.AppStateResponse> inspectAppState({
     required frb.InspectAppStateRequest request,
   }) async {
     calledMethods.add('inspect_app_state');
     lastInspectAppStateRequest = request;
-    return frb.AppStateResponse(
+    final response = frb.AppStateResponse(
       state: frb.AppStateDto(
         configPath: '/tmp/pars_config.toml',
         configExists: true,
-        selectedStoreId: 'store-0',
-        selectedStoreRoot: storeRoot,
-        onboardingState: 'ready',
-        issues: const <String>[],
-        stores: <frb.StoreStatusDto>[
-          frb.StoreStatusDto(
-            id: 'store-0',
-            name: 'Personal',
-            root: storeRoot,
-            isDefault: true,
-            exists: true,
-            hasGpgId: true,
-            hasGitRemote: true,
-            pgpKeyMissing: false,
-            issues: const <String>[],
-          ),
-        ],
+        onboardingState: storePresent ? 'ready' : 'store_missing',
+        issues:
+            storePresent ? const <String>[] : const <String>['store_missing'],
+        store:
+            storePresent
+                ? frb.StoreStatusDto(
+                  name: 'Personal',
+                  root: storeRoot,
+                  exists: true,
+                  hasGpgId: true,
+                  pgpRecipients: const <String>['ABCD 1234'],
+                  gitMode: gitMode,
+                  pgpKeyMissing: false,
+                  issues: const <String>[],
+                )
+                : null,
       ),
     );
+    final gate = inspectGate;
+    if (gate != null) {
+      inspectGate = null;
+      await gate.future;
+    }
+    return response;
   }
 
   @override
@@ -992,14 +1535,6 @@ class _LifecycleBridge implements ParsBridgeApi {
   }
 
   @override
-  Future<frb.UnitResponse> selectStore({
-    required frb.SelectStoreRequest request,
-  }) async {
-    calledMethods.add('select_store');
-    return const frb.UnitResponse();
-  }
-
-  @override
   Future<frb.UnitResponse> importLocalStore({
     required frb.ImportLocalStoreRequest request,
   }) async {
@@ -1016,10 +1551,19 @@ class _LifecycleBridge implements ParsBridgeApi {
   }
 
   @override
-  Future<frb.UnitResponse> removeStore({
-    required frb.RemoveStoreRequest request,
+  Future<frb.UnitResponse> disconnectStore({
+    required frb.DisconnectStoreRequest request,
   }) async {
-    calledMethods.add('remove_store');
+    calledMethods.add('disconnect_store');
+    if (failDisconnect) {
+      return const frb.UnitResponse(
+        error: frb.BridgeFailure(
+          category: frb.BridgeFailureCategory.storeError,
+          message: 'disconnect failed',
+        ),
+      );
+    }
+    storePresent = false;
     return const frb.UnitResponse();
   }
 
@@ -1028,6 +1572,15 @@ class _LifecycleBridge implements ParsBridgeApi {
     required frb.DeleteLocalStoreRequest request,
   }) async {
     calledMethods.add('delete_local_store');
+    storePresent = false;
+    return const frb.UnitResponse();
+  }
+
+  @override
+  Future<frb.UnitResponse> initializeStoreRecipients({
+    required frb.InitializeStoreRecipientsRequest request,
+  }) async {
+    calledMethods.add('initialize_store_recipients');
     return const frb.UnitResponse();
   }
 
@@ -1079,37 +1632,6 @@ class _LifecycleBridge implements ParsBridgeApi {
   }
 
   @override
-  Future<frb.DeletePgpKeyResponse> deletePgpKey({
-    required frb.DeletePgpKeyRequest request,
-  }) async {
-    calledMethods.add('delete_pgp_key');
-    lastDeletePgpKeyRequest = request;
-    if (partialPgpDeletion) {
-      return frb.DeletePgpKeyResponse(
-        result: frb.PgpKeyDeletionResultDto(
-          fingerprint: request.fingerprint,
-          hadPrivateKey: true,
-          privateKeyAbsent: true,
-          publicKeyAbsent: false,
-        ),
-        failureKind: frb.PgpKeyDeletionFailureKind.publicCleanupFailed,
-        error: const frb.BridgeFailure(
-          category: frb.BridgeFailureCategory.pgpError,
-          message: 'public cleanup failed',
-        ),
-      );
-    }
-    return frb.DeletePgpKeyResponse(
-      result: frb.PgpKeyDeletionResultDto(
-        fingerprint: request.fingerprint,
-        hadPrivateKey: true,
-        privateKeyAbsent: true,
-        publicKeyAbsent: true,
-      ),
-    );
-  }
-
-  @override
   Future<frb.OpenExternalUrlResponse> openGithubSshSettings({
     required frb.OpenGithubSshSettingsRequest request,
   }) async {
@@ -1140,13 +1662,6 @@ class _LifecycleBridge implements ParsBridgeApi {
     calledMethods.add('configure_pgp_backend');
     lastConfigurePgpBackendRequest = request;
     return const frb.UnitResponse();
-  }
-
-  @override
-  Future<frb.ListStoresResponse> listStores({
-    required frb.ListStoresRequest request,
-  }) {
-    throw UnimplementedError();
   }
 
   @override
@@ -1304,6 +1819,67 @@ class _LifecycleBridge implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.GitCommandResponse> gitListRemotes({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_list_remotes');
+    return const frb.GitCommandResponse(
+      output: frb.GitCommandOutputDto(
+        command: 'git remote -v',
+        stdout:
+            'origin\tgit@example.com:org/pass.git (fetch)\norigin\tgit@example.com:org/pass.git (push)\n',
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      ),
+    );
+  }
+
+  @override
+  Future<frb.GitCommandResponse> gitAddRemote({
+    required frb.GitRemoteRequest request,
+  }) async {
+    calledMethods.add('git_add_remote');
+    return _successfulGitRemoteMutation('add', request);
+  }
+
+  @override
+  Future<frb.GitCommandResponse> gitSetRemoteUrl({
+    required frb.GitRemoteRequest request,
+  }) async {
+    calledMethods.add('git_set_remote_url');
+    return _successfulGitRemoteMutation('set-url', request);
+  }
+
+  @override
+  Future<frb.GitCommandResponse> gitRemoveRemote({
+    required frb.GitRemoteRequest request,
+  }) async {
+    calledMethods.add('git_remove_remote');
+    return _successfulGitRemoteMutation('remove', request);
+  }
+
+  frb.GitCommandResponse _successfulGitRemoteMutation(
+    String action,
+    frb.GitRemoteRequest request,
+  ) {
+    return frb.GitCommandResponse(
+      output: frb.GitCommandOutputDto(
+        command: [
+          'git remote',
+          action,
+          request.name,
+          if (request.url != null) request.url!,
+        ].join(' '),
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      ),
+    );
+  }
+
+  @override
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
   }) async {
@@ -1346,48 +1922,6 @@ class _LifecycleBridge implements ParsBridgeApi {
         hasPrivateKey: true,
       ),
     );
-  }
-
-  @override
-  Future<frb.KeyMutationResponse> importPgpPublicKey({
-    required frb.ImportKeyTextRequest request,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<frb.KeyMutationResponse> importPgpPrivateKeyFile({
-    required frb.ImportKeyFileRequest request,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<frb.KeyMutationResponse> importPgpPrivateKeyText({
-    required frb.ImportKeyTextRequest request,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<frb.KeyExportResponse> exportPgpPublicKey({
-    required frb.ExportPgpKeyRequest request,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<frb.KeyExportResponse> exportPgpPrivateKey({
-    required frb.ExportPgpKeyRequest request,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<frb.UnitResponse> addPgpKeyToGpgId({
-    required frb.AddPgpKeyToGpgIdRequest request,
-  }) {
-    throw UnimplementedError();
   }
 
   @override

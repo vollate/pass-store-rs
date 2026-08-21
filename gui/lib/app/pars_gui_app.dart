@@ -61,10 +61,18 @@ class ParsGuiApp extends StatefulWidget {
   State<ParsGuiApp> createState() => _ParsGuiAppState();
 }
 
+enum _RootPresentationState {
+  securitySetup,
+  locked,
+  storeRemoving,
+  storeSetup,
+  storeRepair,
+  ready,
+}
+
 class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   static const _systemAuthLifecycleGracePeriod = Duration(seconds: 2);
 
-  late bool _isOnboardingComplete;
   late bool _isLocked;
   Timer? _lockTimer;
   DateTime? _backgroundedAt;
@@ -76,29 +84,45 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   late final bool _ownsClipboardService;
   AppLocalePreference _localePreference = AppLocalePreference.system;
   final ValueNotifier<int> _privacyEpoch = ValueNotifier<int>(0);
+  GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _lifecycleSource?.lifecycleRevision.addListener(_onStoreLifecycleRevision);
     _autofillRepository = widget.autofillRepository ?? FakeAutofillRepository();
     _uiPreferencesStore =
         widget.uiPreferencesStore ?? InMemoryUiPreferencesStore();
     _ownsClipboardService = widget.clipboardService == null;
     _clipboardService = widget.clipboardService ?? SensitiveClipboardService();
     unawaited(_loadLocalePreference());
-    _isOnboardingComplete = _isOnboardingSatisfied;
     _isLocked =
-        _isOnboardingComplete &&
+        _isLocalSecurityConfigured &&
         widget.securityRepository.shouldLock(widget.now());
-    if (_isOnboardingComplete && !_isLocked) {
+    if (_isLocalSecurityConfigured && !_isLocked) {
       _scheduleAutoLock();
     }
   }
 
   @override
+  void didUpdateWidget(covariant ParsGuiApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.settingsRepository == widget.settingsRepository) return;
+    if (oldWidget.settingsRepository is StoreLifecycleChangeSource) {
+      (oldWidget.settingsRepository as StoreLifecycleChangeSource)
+          .lifecycleRevision
+          .removeListener(_onStoreLifecycleRevision);
+    }
+    _lifecycleSource?.lifecycleRevision.addListener(_onStoreLifecycleRevision);
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _lifecycleSource?.lifecycleRevision.removeListener(
+      _onStoreLifecycleRevision,
+    );
     _lockTimer?.cancel();
     if (_ownsClipboardService) _clipboardService.dispose();
     _privacyEpoch.dispose();
@@ -107,7 +131,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_isOnboardingComplete) {
+    if (!_isLocalSecurityConfigured) {
       return;
     }
     final now = widget.now();
@@ -149,6 +173,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Pars',
       debugShowCheckedModeBanner: false,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -157,54 +182,85 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
       theme: ParsTheme.light(),
       darkTheme: ParsTheme.dark(),
       themeMode: ThemeMode.system,
-      home:
-          !_isOnboardingComplete
-              ? OnboardingScreen(
-                settingsRepository: widget.settingsRepository,
-                keyRepository: widget.keyRepository,
-                securityRepository: widget.securityRepository,
-                pathPickerService: widget.pathPickerService,
-                onComplete: () {
-                  setState(() {
-                    _isOnboardingComplete = true;
-                    _isLocked = false;
-                  });
-                  _scheduleAutoLock();
-                },
-              )
-              : _isLocked
-              ? LockScreen(
-                securityRepository: widget.securityRepository,
-                unlockWithBiometrics: _unlockWithBiometrics,
-                onUnlocked: () {
-                  setState(() => _isLocked = false);
-                  _scheduleAutoLock();
-                },
-              )
-              : MobileShell(
-                vaultRepository: widget.vaultRepository,
-                settingsRepository: widget.settingsRepository,
-                keyRepository: widget.keyRepository,
-                gitRepository: widget.gitRepository,
-                securityRepository: widget.securityRepository,
-                autofillRepository: _autofillRepository,
-                pathPickerService: widget.pathPickerService,
-                localePreference: _localePreference,
-                onLocalePreferenceChanged: _setLocalePreference,
-                clipboardService: _clipboardService,
-                privacyEvents: _privacyEpoch,
-                onLock: _lock,
-                onSecuritySettingsChanged: _scheduleAutoLock,
-                runDuringSystemAuthentication: _runDuringSystemAuthentication,
-                onOnboardingReset: () {
-                  _lockTimer?.cancel();
-                  setState(() {
-                    _isOnboardingComplete = false;
-                    _isLocked = false;
-                  });
-                },
-              ),
+      home: _buildHome(),
     );
+  }
+
+  Widget _buildHome() {
+    switch (_presentationState) {
+      case _RootPresentationState.securitySetup:
+      case _RootPresentationState.storeSetup:
+      case _RootPresentationState.storeRepair:
+        return OnboardingScreen(
+          settingsRepository: widget.settingsRepository,
+          keyRepository: widget.keyRepository,
+          securityRepository: widget.securityRepository,
+          pathPickerService: widget.pathPickerService,
+          onComplete: _handleOnboardingComplete,
+        );
+      case _RootPresentationState.locked:
+        return LockScreen(
+          securityRepository: widget.securityRepository,
+          unlockWithBiometrics: _unlockWithBiometrics,
+          onUnlocked: () {
+            setState(() => _isLocked = false);
+            _scheduleAutoLock();
+          },
+        );
+      case _RootPresentationState.storeRemoving:
+        return const _StoreRemovingScreen();
+      case _RootPresentationState.ready:
+        return MobileShell(
+          vaultRepository: widget.vaultRepository,
+          settingsRepository: widget.settingsRepository,
+          keyRepository: widget.keyRepository,
+          gitRepository: widget.gitRepository,
+          securityRepository: widget.securityRepository,
+          autofillRepository: _autofillRepository,
+          pathPickerService: widget.pathPickerService,
+          localePreference: _localePreference,
+          onLocalePreferenceChanged: _setLocalePreference,
+          clipboardService: _clipboardService,
+          privacyEvents: _privacyEpoch,
+          onLock: _lock,
+          onSecuritySettingsChanged: _scheduleAutoLock,
+          runDuringSystemAuthentication: _runDuringSystemAuthentication,
+          onStoreLifecycleChanged:
+              _lifecycleSource == null ? _handleStoreLifecycleChanged : null,
+          onOnboardingReset: () {
+            _lockTimer?.cancel();
+            setState(() => _isLocked = false);
+          },
+        );
+    }
+  }
+
+  void _handleOnboardingComplete() {
+    if (!mounted) return;
+    setState(() => _isLocked = false);
+    _scheduleAutoLock();
+  }
+
+  StoreLifecycleChangeSource? get _lifecycleSource =>
+      widget.settingsRepository is StoreLifecycleChangeSource
+          ? widget.settingsRepository as StoreLifecycleChangeSource
+          : null;
+
+  void _onStoreLifecycleRevision() {
+    unawaited(_handleStoreLifecycleChanged());
+  }
+
+  Future<void> _handleStoreLifecycleChanged() async {
+    // Invalidate and close secret-bearing routes before presenting no-store UI.
+    _privacyEpoch.value += 1;
+    if (mounted) {
+      setState(() => _navigatorKey = GlobalKey<NavigatorState>());
+    }
+    await _clearClipboardAfterLock();
+    if (!mounted) return;
+    if (_isLocalSecurityConfigured && !_isLocked) {
+      _scheduleAutoLock();
+    }
   }
 
   Future<void> _loadLocalePreference() async {
@@ -250,8 +306,11 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     _lockTimer?.cancel();
     await widget.securityRepository.markLocked();
     _privacyEpoch.value += 1;
-    if (mounted && _isOnboardingComplete) {
-      setState(() => _isLocked = true);
+    if (mounted && _isLocalSecurityConfigured) {
+      setState(() {
+        _navigatorKey = GlobalKey<NavigatorState>();
+        _isLocked = true;
+      });
     }
     unawaited(_clearClipboardAfterLock());
     unawaited(_refreshNativeAutofillSecurityState());
@@ -273,11 +332,29 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     }
   }
 
-  bool get _isOnboardingSatisfied =>
+  bool get _isLocalSecurityConfigured =>
       widget.securityRepository.onboardingComplete &&
-      widget.securityRepository.hasGestureVerifier &&
-      !widget.settingsRepository.lifecycle.requiresStoreSetup &&
-      !widget.settingsRepository.lifecycle.requiresKeyRepair;
+      widget.securityRepository.hasGestureVerifier;
+
+  _RootPresentationState get _presentationState {
+    if (!_isLocalSecurityConfigured) {
+      return _RootPresentationState.securitySetup;
+    }
+    if (_isLocked) {
+      return _RootPresentationState.locked;
+    }
+    if (_lifecycleSource?.storeRemovalInProgress ?? false) {
+      return _RootPresentationState.storeRemoving;
+    }
+    final lifecycle = widget.settingsRepository.lifecycle;
+    if (lifecycle.requiresStoreSetup) {
+      return _RootPresentationState.storeSetup;
+    }
+    if (lifecycle.requiresStoreRepair) {
+      return _RootPresentationState.storeRepair;
+    }
+    return _RootPresentationState.ready;
+  }
 
   Future<bool> _unlockWithBiometrics() async {
     final unlocked = await _runDuringSystemAuthentication(
@@ -340,5 +417,46 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
       return false;
     }
     return now.difference(backgroundedAt) >= timeout;
+  }
+}
+
+class _StoreRemovingScreen extends StatelessWidget {
+  const _StoreRemovingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Semantics(
+                liveRegion: true,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 24),
+                    Text(
+                      localizations.storeRemovalInProgressTitle,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      localizations.storeRemovalInProgressDescription,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

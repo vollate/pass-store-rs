@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 
 import '../bridge/frb_generated/api.dart' as frb;
 import '../bridge/pars_bridge_api.dart';
@@ -32,7 +35,8 @@ class BridgeBackedRepository
         KeyRepository,
         RuntimeDiagnosticsRepository,
         GitOperationsRepository,
-        AppManagedPathRepository {
+        AppManagedPathRepository,
+        StoreLifecycleChangeSource {
   BridgeBackedRepository({
     required this.bridge,
     required this.configPath,
@@ -80,26 +84,42 @@ class BridgeBackedRepository
   StoreLifecycleSnapshot _lifecycle;
   List<PasswordEntry> _entries = const <PasswordEntry>[];
   List<KeyRecord> _keys = const <KeyRecord>[];
-  RepoGitStatus _gitStatus = RepoGitStatus.syncFailed;
+  RepoGitStatus _gitStatus = RepoGitStatus.disabled;
   VaultMetadata _metadata = const VaultMetadata.empty();
+  int _refreshEpoch = 0;
+  Future<void> _storeSideEffectTail = Future<void>.value();
+  bool _storeRemovalInProgress = false;
+  bool _autofillRebuildRequired = false;
+  final ValueNotifier<int> _lifecycleRevision = ValueNotifier<int>(0);
+  String? _publishedLifecycleIdentity;
 
   @override
   StoreLifecycleSnapshot get lifecycle => _lifecycle;
 
   @override
-  List<StoreStatus> get stores => _lifecycle.stores;
+  ValueListenable<int> get lifecycleRevision => _lifecycleRevision;
+
+  @override
+  bool get storeRemovalInProgress => _storeRemovalInProgress;
+
+  @override
+  StoreStatus? get store => _lifecycle.store;
 
   @override
   String get currentRepoName {
-    final store = _lifecycle.selectedStore;
+    final store = _lifecycle.store;
     if (store == null) {
-      return 'No store selected';
+      return 'No password store configured';
     }
     return store.name;
   }
 
   @override
   RepoGitStatus get gitStatus => _gitStatus;
+
+  @override
+  StoreGitMode get gitMode =>
+      _lifecycle.store?.gitMode ?? StoreGitMode.disabled;
 
   @override
   List<PasswordEntry> get entries => _entries;
@@ -161,16 +181,39 @@ class BridgeBackedRepository
       bridgeLoaded: true,
       coreVersion: 'pars-core 0.2.5',
       pgpBackend: pgpBackendLabel ?? _pgpBackendLabel(),
-      gitBackend: 'System git command',
+      gitBackend:
+          Platform.isAndroid || Platform.isIOS
+              ? 'Embedded libgit2'
+              : 'System git command',
       keyStorageBackend: keyStorageBackendLabel(securityRepository),
       nativeLibrary: 'pars_bridge',
     );
   }
 
   @override
-  Future<void> refresh() => _refreshState(reconcileAutofill: true);
+  Future<void> refresh() => _serializeStoreSideEffects(() async {
+    if (_storeRemovalInProgress) return;
+    await _refreshState(reconcileAutofill: true);
+  });
+
+  Future<T> _serializeStoreSideEffects<T>(Future<T> Function() operation) {
+    final result = Completer<T>();
+    _storeSideEffectTail = _storeSideEffectTail
+        .catchError((_) {
+          // A failed operation must not poison the serialization barrier.
+        })
+        .then((_) async {
+          try {
+            result.complete(await operation());
+          } catch (error, stackTrace) {
+            result.completeError(error, stackTrace);
+          }
+        });
+    return result.future;
+  }
 
   Future<void> _refreshState({required bool reconcileAutofill}) async {
+    final refreshEpoch = ++_refreshEpoch;
     final stateResponse = await bridge.inspectAppState(
       request: frb.InspectAppStateRequest(
         configPath: configPath,
@@ -182,6 +225,7 @@ class BridgeBackedRepository
     if (state == null) {
       throw const BridgeRepositoryException('Bridge did not return app state.');
     }
+    if (refreshEpoch != _refreshEpoch) return;
     _lifecycle = StoreLifecycleSnapshot.fromBridge(state);
 
     final keyResponse = await bridge.listKeys(
@@ -192,41 +236,70 @@ class BridgeBackedRepository
       ),
     );
     _throwIfFailure(keyResponse.error);
+    if (refreshEpoch != _refreshEpoch) return;
     final localKeys = keyResponse.keys
         .map(_keyRecordFromBridge)
         .toList(growable: false);
     _keys = await _withStorePgpReferences(localKeys);
+    if (refreshEpoch != _refreshEpoch) return;
 
-    final selected = _lifecycle.selectedStore;
-    if (selected == null || !selected.exists) {
-      _entries = const <PasswordEntry>[];
-      _gitStatus = RepoGitStatus.syncFailed;
-      await _clearAutofillIndex();
+    final currentStore = _lifecycle.store;
+    if (currentStore == null || !currentStore.exists) {
+      await _clearStoreScopedState();
+      if (refreshEpoch == _refreshEpoch) _publishLifecycle();
       return;
     }
 
-    _metadata = await _metadataStore.load();
+    _metadata = await _loadMetadataForStore(currentStore.root);
+    if (refreshEpoch != _refreshEpoch) return;
     final entriesResponse = await bridge.listEntries(
       request: frb.ListEntriesRequest(
-        root: selected.root,
+        root: currentStore.root,
         target: null,
         recursive: true,
       ),
     );
     _throwIfFailure(entriesResponse.error);
+    if (refreshEpoch != _refreshEpoch) return;
     _entries = entriesResponse.entries
-        .map((entry) => _passwordEntryFromBridge(entry, selected))
+        .map((entry) => _passwordEntryFromBridge(entry, currentStore))
         .toList(growable: false);
 
-    final gitResponse = await bridge.gitStatus(
-      request: frb.GitRequest(root: selected.root),
-    );
-    _gitStatus = _gitStatusFromBridge(gitResponse);
-    if (reconcileAutofill) {
-      await _runAutofillUpdate(
-        (repository) => repository.reconcileIndex(_entries),
-      );
+    switch (currentStore.gitMode) {
+      case StoreGitMode.disabled:
+        _gitStatus = RepoGitStatus.disabled;
+      case StoreGitMode.invalid:
+        _gitStatus = RepoGitStatus.invalid;
+      case StoreGitMode.local:
+      case StoreGitMode.remote:
+        final gitResponse = await bridge.gitStatus(
+          request: frb.GitRequest(
+            root: currentStore.root,
+            sshPrivateKeyPath: null,
+            sshDir: sshDir,
+          ),
+        );
+        if (refreshEpoch != _refreshEpoch) return;
+        _gitStatus = _gitStatusFromBridge(gitResponse);
     }
+    if (reconcileAutofill) {
+      final repository = autofillRepository;
+      if (_autofillRebuildRequired && repository?.status.available == true) {
+        _autofillRebuildRequired = false;
+      }
+      if (_autofillRebuildRequired) {
+        repository?.recordSyncFailure(
+          const AutofillRepositoryException(
+            'A replacement password store requires an explicit Autofill rebuild.',
+          ),
+        );
+      } else {
+        await _runAutofillUpdate(
+          (repository) => repository.reconcileIndex(_entries),
+        );
+      }
+    }
+    if (refreshEpoch == _refreshEpoch) _publishLifecycle();
   }
 
   @override
@@ -543,20 +616,10 @@ class BridgeBackedRepository
   }
 
   @override
-  Future<void> selectStore(String root) async {
-    final response = await bridge.selectStore(
-      request: frb.SelectStoreRequest(configPath: configPath, root: root),
-    );
-    _throwIfFailure(response.error);
-    await refresh();
-  }
-
-  @override
   Future<void> createLocalStore({
     required String name,
     required String root,
     required List<String> pgpKeys,
-    required bool setDefault,
     required bool initializeGit,
   }) async {
     final response = await bridge.createLocalStore(
@@ -565,8 +628,7 @@ class BridgeBackedRepository
         name: name,
         root: root,
         pgpKeys: pgpKeys,
-        setDefault: setDefault,
-        initializeGit: initializeGit && !usesAppManagedPaths,
+        initializeGit: initializeGit,
       ),
     );
     _throwIfFailure(response.error);
@@ -574,33 +636,25 @@ class BridgeBackedRepository
   }
 
   @override
-  Future<void> importLocalStore({
-    required String root,
-    required bool setDefault,
-  }) async {
+  Future<void> importLocalStore({required String root}) async {
     final response = await bridge.importLocalStore(
-      request: frb.ImportLocalStoreRequest(
-        configPath: configPath,
-        root: root,
-        setDefault: setDefault,
-      ),
+      request: frb.ImportLocalStoreRequest(configPath: configPath, root: root),
     );
     _throwIfFailure(response.error);
-    await refresh();
   }
 
   @override
   Future<void> cloneStore({
     required String remoteUrl,
     required String root,
-    required bool setDefault,
   }) async {
     final response = await bridge.cloneStore(
       request: frb.CloneStoreRequest(
         configPath: configPath,
         remoteUrl: remoteUrl,
         root: root,
-        setDefault: setDefault,
+        sshPrivateKeyPath: _sshPrivateKeyPathForRemote(remoteUrl),
+        sshDir: sshDir,
       ),
     );
     _throwIfFailure(response.error);
@@ -608,38 +662,119 @@ class BridgeBackedRepository
   }
 
   @override
-  Future<void> removeStore({required String root}) async {
-    if (isAppManagedStoreRoot(root)) {
-      final confirmation =
-          root.replaceAll(RegExp(r'[/\\]+$'), '').split(RegExp(r'[/\\]')).last;
-      await deleteLocalStore(root: root, confirmation: confirmation);
-      return;
-    }
-    final wasSelected = _isSelectedStoreRoot(root);
-    final response = await bridge.removeStore(
-      request: frb.RemoveStoreRequest(configPath: configPath, root: root),
-    );
-    _throwIfFailure(response.error);
-    await _refreshState(reconcileAutofill: !wasSelected);
-    if (wasSelected) await _clearAutofillIndex();
-  }
+  Future<void> removeStore({required String root}) =>
+      _serializeStoreSideEffects(() async {
+        final wasCanonical = _isCanonicalStoreRoot(root);
+        var cleanupCompleted = false;
+        try {
+          if (wasCanonical) {
+            await _beginCanonicalStoreRemoval();
+            cleanupCompleted = true;
+          }
+          final response = await bridge.disconnectStore(
+            request: frb.DisconnectStoreRequest(
+              configPath: configPath,
+              root: root,
+            ),
+          );
+          _throwIfFailure(response.error);
+        } catch (error, stackTrace) {
+          if (wasCanonical) {
+            if (cleanupCompleted) {
+              await _recoverFailedCanonicalStoreRemoval();
+            } else {
+              _finishFailedCanonicalStoreCleanup();
+            }
+          }
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+        if (wasCanonical) {
+          _completeCanonicalStoreRemoval();
+        } else {
+          await _refreshState(reconcileAutofill: false);
+        }
+      });
 
   @override
   Future<void> deleteLocalStore({
     required String root,
     required String confirmation,
-  }) async {
-    final wasSelected = _isSelectedStoreRoot(root);
-    final response = await bridge.deleteLocalStore(
-      request: frb.DeleteLocalStoreRequest(
-        configPath: configPath,
-        root: root,
-        confirmation: confirmation,
+  }) => _serializeStoreSideEffects(() async {
+    final wasCanonical = _isCanonicalStoreRoot(root);
+    var cleanupCompleted = false;
+    try {
+      if (wasCanonical) {
+        await _beginCanonicalStoreRemoval();
+        cleanupCompleted = true;
+      }
+      final response = await bridge.deleteLocalStore(
+        request: frb.DeleteLocalStoreRequest(
+          configPath: configPath,
+          root: root,
+          managedStoreBase: _requiredManagedStoreBaseDir(),
+          confirmation: confirmation,
+        ),
+      );
+      _throwIfFailure(response.error);
+    } catch (error, stackTrace) {
+      if (wasCanonical) {
+        if (cleanupCompleted) {
+          await _recoverFailedCanonicalStoreRemoval();
+        } else {
+          _finishFailedCanonicalStoreCleanup();
+        }
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+    if (wasCanonical) {
+      _completeCanonicalStoreRemoval();
+    } else {
+      await _refreshState(reconcileAutofill: false);
+    }
+  });
+
+  Future<void> _beginCanonicalStoreRemoval() async {
+    ++_refreshEpoch;
+    _storeRemovalInProgress = true;
+    _autofillRebuildRequired = true;
+    _clearStoreScopedPresentation();
+    _publishLifecycle();
+    await _clearStoreScopedDurableState();
+  }
+
+  void _finishFailedCanonicalStoreCleanup() {
+    _storeRemovalInProgress = false;
+    autofillRepository?.recordSyncFailure(
+      const AutofillRepositoryException(
+        'Autofill cleanup failed. The store remains configured and locked down.',
       ),
     );
-    _throwIfFailure(response.error);
-    await _refreshState(reconcileAutofill: !wasSelected);
-    if (wasSelected) await _clearAutofillIndex();
+    _publishLifecycle();
+  }
+
+  Future<void> _recoverFailedCanonicalStoreRemoval() async {
+    try {
+      await _refreshState(reconcileAutofill: false);
+    } catch (_) {
+      // Preserve the original removal failure and the prior canonical lifecycle.
+    } finally {
+      _storeRemovalInProgress = false;
+      autofillRepository?.recordSyncFailure(
+        const AutofillRepositoryException(
+          'Autofill data was cleared for privacy. Rebuild it explicitly.',
+        ),
+      );
+      _publishLifecycle();
+    }
+  }
+
+  void _completeCanonicalStoreRemoval() {
+    _lifecycle = StoreLifecycleSnapshot.withoutStore(
+      configPath: configPath,
+      configExists: true,
+    );
+    _storeRemovalInProgress = false;
+    _publishLifecycle();
   }
 
   @override
@@ -710,73 +845,6 @@ class BridgeBackedRepository
   }
 
   @override
-  Future<KeyRecord> importPgpPublicKeyText(String armoredText) async {
-    final response = await bridge.importPgpPublicKey(
-      request: frb.ImportKeyTextRequest(
-        configPath: configPath,
-        pgpExecutable: _optionalPgpExecutable(),
-        sshDir: sshDir,
-        armoredText: armoredText,
-      ),
-    );
-    return _recordKeyMutation(response);
-  }
-
-  @override
-  Future<KeyRecord> importPgpPrivateKeyText(String armoredText) async {
-    final response = await bridge.importPgpPrivateKeyText(
-      request: frb.ImportKeyTextRequest(
-        configPath: configPath,
-        pgpExecutable: _optionalPgpExecutable(),
-        sshDir: sshDir,
-        armoredText: armoredText,
-      ),
-    );
-    return _recordKeyMutation(response);
-  }
-
-  @override
-  Future<KeyRecord> importPgpPrivateKeyFile(String path) async {
-    final response = await bridge.importPgpPrivateKeyFile(
-      request: frb.ImportKeyFileRequest(
-        configPath: configPath,
-        pgpExecutable: _optionalPgpExecutable(),
-        sshDir: sshDir,
-        path: path,
-      ),
-    );
-    return _recordKeyMutation(response);
-  }
-
-  @override
-  Future<String> exportPgpPublicKey(String fingerprint) async {
-    final response = await bridge.exportPgpPublicKey(
-      request: frb.ExportPgpKeyRequest(
-        configPath: configPath,
-        pgpExecutable: _optionalPgpExecutable(),
-        fingerprint: fingerprint,
-      ),
-    );
-    return _exportText(response);
-  }
-
-  @override
-  Future<String> exportPgpPrivateKey({
-    required String fingerprint,
-    required String confirmation,
-  }) async {
-    final response = await bridge.exportPgpPrivateKey(
-      request: frb.ExportPgpKeyRequest(
-        configPath: configPath,
-        pgpExecutable: _optionalPgpExecutable(),
-        fingerprint: fingerprint,
-        confirmation: confirmation,
-      ),
-    );
-    return _exportText(response);
-  }
-
-  @override
   Future<PgpPrivateKeyPreparation> preparePgpPrivateKey({
     required String fingerprint,
     required String passphrase,
@@ -804,46 +872,16 @@ class BridgeBackedRepository
   }
 
   @override
-  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint) async {
-    final response = await bridge.deletePgpKey(
-      request: frb.DeletePgpKeyRequest(
+  Future<void> initializeStoreRecipients(List<String> fingerprints) async {
+    final response = await bridge.initializeStoreRecipients(
+      request: frb.InitializeStoreRecipientsRequest(
         configPath: configPath,
-        pgpExecutable: _optionalPgpExecutable(),
-        fingerprint: fingerprint,
-      ),
-    );
-    final result = response.result;
-    if (result == null) {
-      _throwIfFailure(response.error);
-      throw const BridgeRepositoryException(
-        'The bridge returned no PGP deletion result.',
-      );
-    }
-    await refresh();
-    return PgpKeyDeletionOutcome(
-      fingerprint: result.fingerprint,
-      hadPrivateKey: result.hadPrivateKey,
-      privateKeyAbsent: result.privateKeyAbsent,
-      publicKeyAbsent: result.publicKeyAbsent,
-      publicCleanupFailed:
-          response.failureKind ==
-          frb.PgpKeyDeletionFailureKind.publicCleanupFailed,
-    );
-  }
-
-  @override
-  Future<void> addPgpKeyToSelectedStore(String fingerprint) async {
-    final root = _lifecycle.selectedStoreRoot;
-    if (root == null) {
-      throw const BridgeRepositoryException('No selected password store.');
-    }
-    final response = await bridge.addPgpKeyToGpgId(
-      request: frb.AddPgpKeyToGpgIdRequest(
-        root: root,
-        fingerprint: fingerprint,
+        root: _requiredStoreRoot(),
+        fingerprints: fingerprints,
       ),
     );
     _throwIfFailure(response.error);
+    await refresh();
   }
 
   @override
@@ -932,9 +970,53 @@ class BridgeBackedRepository
   }
 
   @override
+  Future<GitOperationResult> initializeRepository() async {
+    final store = _lifecycle.store;
+    if (store == null || !store.exists) {
+      throw const BridgeRepositoryException(
+        'A password store is required before Git can be initialized.',
+      );
+    }
+    if (store.gitMode != StoreGitMode.disabled) {
+      return const GitOperationResult(
+        command: 'git init',
+        stdout: 'Git is already enabled.',
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      );
+    }
+    final response = await bridge.initializeGitRepository(
+      request: frb.InitializeGitRepositoryRequest(root: store.root),
+    );
+    _throwIfFailure(response.error);
+    await refresh();
+    return const GitOperationResult(
+      command: 'git init',
+      stdout: 'Initialized an empty Git repository.',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
   Future<GitOperationResult> refreshGitStatus() async {
+    final mode = _lifecycle.store?.gitMode;
+    if (mode == null || mode == StoreGitMode.disabled) {
+      _gitStatus = RepoGitStatus.disabled;
+      return _gitDisabledResult('git status');
+    }
+    if (mode == StoreGitMode.invalid) {
+      _gitStatus = RepoGitStatus.invalid;
+      return _gitInvalidResult('git status');
+    }
     final response = await bridge.gitStatus(
-      request: frb.GitRequest(root: _requiredStoreRoot()),
+      request: frb.GitRequest(
+        root: _requiredStoreRoot(),
+        sshPrivateKeyPath: null,
+        sshDir: sshDir,
+      ),
     );
     _gitStatus = _gitStatusFromBridge(response);
     return _gitResultFromBridge(response);
@@ -942,8 +1024,15 @@ class BridgeBackedRepository
 
   @override
   Future<GitOperationResult> pull() async {
+    if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
+      return _gitDisabledResult('git pull', message: 'Skipped: no Git remote.');
+    }
     final response = await bridge.gitPull(
-      request: frb.GitRequest(root: _requiredStoreRoot()),
+      request: frb.GitRequest(
+        root: _requiredStoreRoot(),
+        sshPrivateKeyPath: await _sshPrivateKeyPathForConfiguredRemote(),
+        sshDir: sshDir,
+      ),
     );
     final result = _gitResultFromBridge(response);
     await refresh();
@@ -952,8 +1041,15 @@ class BridgeBackedRepository
 
   @override
   Future<GitOperationResult> push() async {
+    if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
+      return _gitDisabledResult('git push', message: 'Skipped: no Git remote.');
+    }
     final response = await bridge.gitPush(
-      request: frb.GitRequest(root: _requiredStoreRoot()),
+      request: frb.GitRequest(
+        root: _requiredStoreRoot(),
+        sshPrivateKeyPath: await _sshPrivateKeyPathForConfiguredRemote(),
+        sshDir: sshDir,
+      ),
     );
     final result = _gitResultFromBridge(response);
     await refresh();
@@ -962,6 +1058,13 @@ class BridgeBackedRepository
 
   @override
   Future<GitOperationResult> commit(String message) async {
+    final mode = _lifecycle.store?.gitMode;
+    if (mode == null || mode == StoreGitMode.disabled) {
+      return _gitDisabledResult('git commit');
+    }
+    if (mode == StoreGitMode.invalid) {
+      return _gitInvalidResult('git commit');
+    }
     final response = await bridge.gitCommit(
       request: frb.GitCommitRequest(
         root: _requiredStoreRoot(),
@@ -975,6 +1078,22 @@ class BridgeBackedRepository
 
   @override
   Future<GitOperationResult> runArgs(List<String> args) async {
+    final mode = _lifecycle.store?.gitMode;
+    if (mode == null || mode == StoreGitMode.disabled) {
+      return _gitDisabledResult('git ${args.join(' ')}');
+    }
+    if (mode == StoreGitMode.invalid) {
+      return _gitInvalidResult('git ${args.join(' ')}');
+    }
+    if (Platform.isAndroid || Platform.isIOS) {
+      return GitOperationResult(
+        command: 'git ${args.join(' ')}',
+        stdout: '',
+        stderr: 'Advanced Git arguments are unavailable on mobile.',
+        exitCode: 1,
+        success: false,
+      );
+    }
     final response = await bridge.runGitArgs(
       request: frb.GitArgsRequest(root: _requiredStoreRoot(), args: args),
     );
@@ -983,38 +1102,102 @@ class BridgeBackedRepository
 
   @override
   Future<List<GitRemote>> listRemotes() async {
-    final result = await runArgs(const <String>['remote', '-v']);
-    return _parseRemotes(result.stdout);
+    final mode = _lifecycle.store?.gitMode;
+    if (mode == null ||
+        mode == StoreGitMode.disabled ||
+        mode == StoreGitMode.invalid) {
+      return const <GitRemote>[];
+    }
+    final response = await bridge.gitListRemotes(
+      request: frb.GitRequest(
+        root: _requiredStoreRoot(),
+        sshPrivateKeyPath: null,
+        sshDir: sshDir,
+      ),
+    );
+    return _parseRemotes(_gitResultFromBridge(response).stdout);
   }
 
   @override
   Future<GitOperationResult> addRemote({
     required String name,
     required String url,
-  }) {
-    return runArgs(<String>['remote', 'add', name.trim(), url.trim()]);
+  }) async {
+    final mode = _lifecycle.store?.gitMode;
+    final command =
+        'git remote add ${name.trim()} ${_sanitizedRemoteUrl(url.trim())}';
+    if (mode == null || mode == StoreGitMode.disabled) {
+      return _gitDisabledResult(command);
+    }
+    if (mode == StoreGitMode.invalid) {
+      return _gitInvalidResult(command);
+    }
+    final response = await bridge.gitAddRemote(
+      request: frb.GitRemoteRequest(
+        root: _requiredStoreRoot(),
+        name: name.trim(),
+        url: url.trim(),
+      ),
+    );
+    final result = _gitResultFromBridge(response);
+    await refresh();
+    return result;
   }
 
   @override
   Future<GitOperationResult> editRemote({
     required String name,
     required String url,
-  }) {
-    return runArgs(<String>['remote', 'set-url', name.trim(), url.trim()]);
+  }) async {
+    final mode = _lifecycle.store?.gitMode;
+    final command =
+        'git remote set-url ${name.trim()} ${_sanitizedRemoteUrl(url.trim())}';
+    if (mode == null || mode == StoreGitMode.disabled) {
+      return _gitDisabledResult(command);
+    }
+    if (mode == StoreGitMode.invalid) {
+      return _gitInvalidResult(command);
+    }
+    final response = await bridge.gitSetRemoteUrl(
+      request: frb.GitRemoteRequest(
+        root: _requiredStoreRoot(),
+        name: name.trim(),
+        url: url.trim(),
+      ),
+    );
+    final result = _gitResultFromBridge(response);
+    await refresh();
+    return result;
   }
 
   @override
-  Future<GitOperationResult> removeRemote(String name) {
-    return runArgs(<String>['remote', 'remove', name.trim()]);
+  Future<GitOperationResult> removeRemote(String name) async {
+    final mode = _lifecycle.store?.gitMode;
+    if (mode == null || mode == StoreGitMode.disabled) {
+      return _gitDisabledResult('git remote remove ${name.trim()}');
+    }
+    if (mode == StoreGitMode.invalid) {
+      return _gitInvalidResult('git remote remove ${name.trim()}');
+    }
+    final response = await bridge.gitRemoveRemote(
+      request: frb.GitRemoteRequest(
+        root: _requiredStoreRoot(),
+        name: name.trim(),
+        url: null,
+      ),
+    );
+    final result = _gitResultFromBridge(response);
+    await refresh();
+    return result;
   }
 
   @override
   Future<GitOperationResult> autoPullOnOpen() async {
-    final store = _lifecycle.selectedStore;
-    if (store == null || !store.hasGitRemote) {
+    final store = _lifecycle.store;
+    if (store == null || store.gitMode != StoreGitMode.remote) {
       return const GitOperationResult(
         command: 'git pull',
-        stdout: 'Skipped: no selected git remote.',
+        stdout: 'Skipped: no canonical Git remote.',
         stderr: '',
         exitCode: 0,
         success: true,
@@ -1026,21 +1209,6 @@ class BridgeBackedRepository
   @override
   Future<GitOperationResult> recoverByPull() {
     return pull();
-  }
-
-  @override
-  Future<GitOperationResult> deleteLocalRepo({
-    required String confirmation,
-  }) async {
-    final root = _requiredStoreRoot();
-    await deleteLocalStore(root: root, confirmation: confirmation);
-    return const GitOperationResult(
-      command: 'delete local repo',
-      stdout: 'Deleted local repository.',
-      stderr: '',
-      exitCode: 0,
-      success: true,
-    );
   }
 
   static String defaultConfigPath() {
@@ -1179,10 +1347,8 @@ class BridgeBackedRepository
     final identifiers = <String, String>{};
     final storesByIdentifier = <String, Set<String>>{};
 
-    for (final store in _lifecycle.stores) {
-      if (!store.exists) {
-        continue;
-      }
+    final store = _lifecycle.store;
+    if (store != null && store.exists) {
       for (final identifier in await _readStorePgpIdentifiers(store.root)) {
         final normalized = identifier.toLowerCase();
         identifiers.putIfAbsent(normalized, () => identifier);
@@ -1404,9 +1570,9 @@ class BridgeBackedRepository
   }
 
   String _requiredStoreRoot() {
-    final root = _lifecycle.selectedStoreRoot;
+    final root = _lifecycle.store?.root;
     if (root == null) {
-      throw const BridgeRepositoryException('No selected password store.');
+      throw const BridgeRepositoryException('No canonical password store.');
     }
     return root;
   }
@@ -1468,15 +1634,20 @@ class BridgeBackedRepository
 
   Future<void> _saveMetadata(VaultMetadata metadata) async {
     final previous = _metadata;
-    await _metadataStore.save(metadata);
-    _metadata = metadata;
+    final scoped = metadata.copyWith(
+      storeRoot: _lifecycle.store?.root,
+      removalTombstone: false,
+    );
+    await _metadataStore.save(scoped);
+    await _metadataStore.clearStoreRemovedMarker();
+    _metadata = scoped;
     _entries = _entries.map(_decorateEntry).toList(growable: false);
 
     final changedPaths = <String>{
       ...previous.favoritePaths,
-      ...metadata.favoritePaths,
+      ...scoped.favoritePaths,
       ...previous.recentPaths,
-      ...metadata.recentPaths,
+      ...scoped.recentPaths,
     };
     final changedEntries = _entries
         .where(
@@ -1510,10 +1681,7 @@ class BridgeBackedRepository
     await _runAutofillUpdate((repository) => repository.upsertEntry(entry));
   }
 
-  bool _isSelectedStoreRoot(String root) {
-    return _lifecycle.selectedStoreRoot == root ||
-        _lifecycle.selectedStore?.root == root;
-  }
+  bool _isCanonicalStoreRoot(String root) => _lifecycle.store?.root == root;
 
   Future<void> _runAutofillUpdate(
     Future<void> Function(AutofillRepository repository) update,
@@ -1527,13 +1695,107 @@ class BridgeBackedRepository
     }
   }
 
-  Future<void> _clearAutofillIndex() async {
+  void _publishLifecycle() {
+    final store = _lifecycle.store;
+    final identity = <Object?>[
+      _lifecycle.configExists,
+      _lifecycle.onboardingState,
+      _storeRemovalInProgress,
+      ..._lifecycle.issues,
+      store?.root,
+      store?.exists,
+      store?.hasGpgId,
+      store?.pgpKeyMissing,
+      store?.gitMode,
+      ...?store?.issues,
+    ].join('|');
+    if (identity == _publishedLifecycleIdentity) return;
+    _publishedLifecycleIdentity = identity;
+    _lifecycleRevision.value += 1;
+  }
+
+  Future<VaultMetadata> _loadMetadataForStore(String root) async {
+    final loaded = await _metadataStore.load();
+    final removalWasPersisted = await _metadataStore.wasStoreRemoved();
+    if (!removalWasPersisted &&
+        !loaded.removalTombstone &&
+        loaded.storeRoot == root) {
+      return loaded;
+    }
+    if (!removalWasPersisted &&
+        !loaded.removalTombstone &&
+        loaded.storeRoot == null) {
+      final migrated = loaded.copyWith(storeRoot: root);
+      try {
+        await _metadataStore.save(migrated);
+        return migrated;
+      } catch (_) {
+        return VaultMetadata.empty(storeRoot: root);
+      }
+    }
+    final empty = VaultMetadata.empty(storeRoot: root);
+    try {
+      await _metadataStore.save(empty);
+    } catch (_) {
+      // Keep replacement metadata empty even when durable cleanup needs retry.
+    }
+    return empty;
+  }
+
+  void _clearStoreScopedPresentation() {
+    _entries = const <PasswordEntry>[];
+    _gitStatus = RepoGitStatus.disabled;
+    _metadata = const VaultMetadata.removed();
+  }
+
+  Future<void> _clearStoreScopedDurableState() async {
+    var removalMarkerPersisted = false;
+    var metadataTombstonePersisted = false;
+    try {
+      await _metadataStore.markStoreRemoved();
+      removalMarkerPersisted = true;
+    } catch (_) {
+      // The independent metadata tombstone may still make replacement fail-closed.
+    }
+    try {
+      await _metadataStore.save(const VaultMetadata.removed());
+      metadataTombstonePersisted = true;
+    } catch (_) {
+      // The independent removal marker may still make replacement fail-closed.
+    }
+    try {
+      await securityRepository?.clearPgpSession();
+    } catch (_) {
+      // Store removal remains fail-closed even if session cleanup reports an error.
+    }
+    final autofillCleared = await _clearAutofillIndex();
+    if (!removalMarkerPersisted && !metadataTombstonePersisted) {
+      throw const BridgeRepositoryException(
+        'Store removal was cancelled because privacy cleanup could not be saved. '
+        'The store remains configured; fix storage access and retry.',
+      );
+    }
+    if (!autofillCleared) {
+      throw const AutofillRepositoryException(
+        'Store removal was cancelled because Autofill could not be disabled.',
+      );
+    }
+  }
+
+  Future<void> _clearStoreScopedState() async {
+    _clearStoreScopedPresentation();
+    await _clearStoreScopedDurableState();
+  }
+
+  Future<bool> _clearAutofillIndex() async {
     final repository = autofillRepository;
-    if (repository == null) return;
+    if (repository == null) return true;
     try {
       await repository.clearIndex();
+      return true;
     } catch (error) {
       repository.recordSyncFailure(error);
+      return false;
     }
   }
 
@@ -1568,6 +1830,28 @@ class BridgeBackedRepository
     return export.armoredText;
   }
 
+  String? _sshPrivateKeyPathForRemote(String remoteUrl) {
+    final value = remoteUrl.trim().toLowerCase();
+    final usesSsh =
+        value.startsWith('ssh://') ||
+        (!value.contains('://') && value.contains('@') && value.contains(':'));
+    if (!usesSsh || sshDir == null || sshDir!.trim().isEmpty) return null;
+    for (final key in _keys) {
+      if (key.type == KeyRecordType.ssh && key.hasPrivateKey) {
+        return _joinFilesystemPath(sshDir!, key.name);
+      }
+    }
+    return null;
+  }
+
+  Future<String?> _sshPrivateKeyPathForConfiguredRemote() async {
+    for (final remote in await listRemotes()) {
+      final path = _sshPrivateKeyPathForRemote(remote.pushUrl);
+      if (path != null) return path;
+    }
+    return null;
+  }
+
   String _requiredSshDir() {
     final dir = sshDir;
     if (dir == null || dir.trim().isEmpty) {
@@ -1586,6 +1870,29 @@ class BridgeBackedRepository
       );
     }
     return dir;
+  }
+
+  GitOperationResult _gitDisabledResult(
+    String command, {
+    String message = 'Skipped: Git is disabled for this password store.',
+  }) {
+    return GitOperationResult(
+      command: _sanitizeGitText(command),
+      stdout: _sanitizeGitText(message),
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  GitOperationResult _gitInvalidResult(String command) {
+    return GitOperationResult(
+      command: _sanitizeGitText(command),
+      stdout: '',
+      stderr: 'The password store contains invalid Git metadata.',
+      exitCode: 1,
+      success: false,
+    );
   }
 
   RepoGitStatus _gitStatusFromBridge(frb.GitCommandResponse response) {
@@ -1619,12 +1926,41 @@ class BridgeBackedRepository
       );
     }
     return GitOperationResult(
-      command: output.command,
-      stdout: output.stdout,
-      stderr: output.stderr,
+      command: _sanitizeGitText(output.command),
+      stdout: _sanitizeGitText(output.stdout),
+      stderr: _sanitizeGitText(output.stderr),
       exitCode: output.exitCode,
       success: output.success,
     );
+  }
+
+  String _sanitizeGitText(String raw) {
+    return raw.splitMapJoin(
+      RegExp(r'\s+'),
+      onMatch: (match) => match.group(0)!,
+      onNonMatch: _sanitizeGitToken,
+    );
+  }
+
+  String _sanitizeGitToken(String token) {
+    final leading =
+        RegExp(r'''^[\'"(\[{]+''').firstMatch(token)?.group(0) ?? '';
+    final trailing =
+        RegExp(r'''[\'"),\]};]+$''').firstMatch(token)?.group(0) ?? '';
+    if (leading.length + trailing.length > token.length) return token;
+    final core = token.substring(
+      leading.length,
+      token.length - trailing.length,
+    );
+    final sanitized =
+        core.startsWith('content://') || core.startsWith('file://')
+            ? '[uri]'
+            : core.contains('://')
+            ? _sanitizedRemoteUrl(core)
+            : core.startsWith('/') || RegExp(r'^[A-Za-z]:[\\/]').hasMatch(core)
+            ? '[path]'
+            : _sanitizedRemoteUrl(core);
+    return '$leading$sanitized$trailing';
   }
 
   List<GitRemote> _parseRemotes(String stdout) {
@@ -1639,7 +1975,7 @@ class BridgeBackedRepository
         continue;
       }
       final name = parts[0];
-      final url = parts[1];
+      final url = _sanitizedRemoteUrl(parts[1]);
       final kind = parts[2];
       final existing = byName[name] ?? (fetchUrl: '', pushUrl: '');
       byName[name] =
@@ -1659,6 +1995,35 @@ class BridgeBackedRepository
           ),
         )
         .toList(growable: false);
+  }
+
+  String _sanitizedRemoteUrl(String input) {
+    var value = input.split(RegExp(r'[?#]')).first;
+    final scheme = value.indexOf('://');
+    if (scheme >= 0) {
+      final authorityStart = scheme + 3;
+      final slash = value.indexOf('/', authorityStart);
+      final authorityEnd = slash < 0 ? value.length : slash;
+      final at = value.lastIndexOf('@', authorityEnd);
+      if (at >= authorityStart) {
+        value =
+            '${value.substring(0, authorityStart)}***@${value.substring(at + 1)}';
+      }
+    } else {
+      final at = value.lastIndexOf('@');
+      if (at > 0) {
+        final userinfo = value.substring(0, at);
+        final hostPath = value.substring(at + 1);
+        final colon = hostPath.indexOf(':');
+        if (!userinfo.contains(RegExp(r'[/\\]')) &&
+            colon > 0 &&
+            colon < hostPath.length - 1 &&
+            !hostPath.substring(0, colon).contains(RegExp(r'[/\\]'))) {
+          value = '***@${value.substring(at + 1)}';
+        }
+      }
+    }
+    return value;
   }
 
   void _throwIfFailure(frb.BridgeFailure? failure) {

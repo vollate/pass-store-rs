@@ -2,27 +2,46 @@ import 'dart:convert';
 import 'dart:io';
 
 class VaultMetadata {
-  const VaultMetadata({required this.recentPaths, required this.favoritePaths});
+  const VaultMetadata({
+    required this.recentPaths,
+    required this.favoritePaths,
+    this.storeRoot,
+    this.removalTombstone = false,
+  });
 
-  const VaultMetadata.empty()
+  const VaultMetadata.empty({this.storeRoot, this.removalTombstone = false})
     : recentPaths = const <String>[],
       favoritePaths = const <String>{};
 
+  const VaultMetadata.removed()
+    : recentPaths = const <String>[],
+      favoritePaths = const <String>{},
+      storeRoot = '',
+      removalTombstone = true;
+
   final List<String> recentPaths;
   final Set<String> favoritePaths;
+  final String? storeRoot;
+  final bool removalTombstone;
 
   VaultMetadata copyWith({
     List<String>? recentPaths,
     Set<String>? favoritePaths,
+    String? storeRoot,
+    bool? removalTombstone,
   }) {
     return VaultMetadata(
       recentPaths: recentPaths ?? this.recentPaths,
       favoritePaths: favoritePaths ?? this.favoritePaths,
+      storeRoot: storeRoot ?? this.storeRoot,
+      removalTombstone: removalTombstone ?? this.removalTombstone,
     );
   }
 
-  Map<String, Object> toJson() {
-    return <String, Object>{
+  Map<String, Object?> toJson() {
+    return <String, Object?>{
+      'storeRoot': storeRoot,
+      'removalTombstone': removalTombstone,
       'recentPaths': recentPaths,
       'favoritePaths': favoritePaths.toList()..sort(),
     };
@@ -35,6 +54,9 @@ class VaultMetadata {
     final recent = value['recentPaths'];
     final favorites = value['favoritePaths'];
     return VaultMetadata(
+      storeRoot:
+          value['storeRoot'] is String ? value['storeRoot'] as String : null,
+      removalTombstone: value['removalTombstone'] == true,
       recentPaths:
           recent is List
               ? recent.whereType<String>().toList(growable: false)
@@ -51,10 +73,17 @@ abstract interface class VaultMetadataStore {
   Future<VaultMetadata> load();
 
   Future<void> save(VaultMetadata metadata);
+
+  Future<void> markStoreRemoved();
+
+  Future<bool> wasStoreRemoved();
+
+  Future<void> clearStoreRemovedMarker();
 }
 
 class InMemoryVaultMetadataStore implements VaultMetadataStore {
   VaultMetadata _metadata;
+  bool _storeRemoved = false;
 
   InMemoryVaultMetadataStore([VaultMetadata? metadata])
     : _metadata = metadata ?? const VaultMetadata.empty();
@@ -66,6 +95,19 @@ class InMemoryVaultMetadataStore implements VaultMetadataStore {
   Future<void> save(VaultMetadata metadata) async {
     _metadata = metadata;
   }
+
+  @override
+  Future<void> markStoreRemoved() async {
+    _storeRemoved = true;
+  }
+
+  @override
+  Future<bool> wasStoreRemoved() async => _storeRemoved;
+
+  @override
+  Future<void> clearStoreRemovedMarker() async {
+    _storeRemoved = false;
+  }
 }
 
 class FileVaultMetadataStore implements VaultMetadataStore {
@@ -76,6 +118,8 @@ class FileVaultMetadataStore implements VaultMetadataStore {
   }
 
   final File file;
+
+  File get _removalMarker => File('${file.path}.store-removed');
 
   @override
   Future<VaultMetadata> load() async {
@@ -96,5 +140,20 @@ class FileVaultMetadataStore implements VaultMetadataStore {
       await parent.create(recursive: true);
     }
     await file.writeAsString(jsonEncode(metadata.toJson()));
+  }
+
+  @override
+  Future<void> markStoreRemoved() async {
+    final parent = _removalMarker.parent;
+    if (!await parent.exists()) await parent.create(recursive: true);
+    await _removalMarker.writeAsString('removed');
+  }
+
+  @override
+  Future<bool> wasStoreRemoved() => _removalMarker.exists();
+
+  @override
+  Future<void> clearStoreRemovedMarker() async {
+    if (await _removalMarker.exists()) await _removalMarker.delete();
   }
 }

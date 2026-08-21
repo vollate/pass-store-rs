@@ -7,8 +7,9 @@ use pars_bridge::api::{
     self, AddPgpKeyToGpgIdRequest, AutofillCredentialRequest, AutofillEntryMetadataDto,
     AutofillQueryRequest, ClearAutofillIndexRequest, ConfigurePgpBackendRequest,
     CreateLocalStoreRequest, DeleteLocalStoreRequest, DeletePgpKeyRequest, DeleteSshKeyRequest,
-    EntryRequest, ExportPgpKeyRequest, ExportSshKeyRequest, GeneratePgpKeyRequest,
-    GenerateSshKeyRequest, ImportKeyTextRequest, ImportPgpKeyFileRequest, ImportPgpKeyTextRequest,
+    DisconnectStoreRequest, EntryRequest, ExportPgpKeyRequest, ExportSshKeyRequest,
+    GeneratePgpKeyRequest, GenerateSshKeyRequest, ImportKeyTextRequest, ImportLocalStoreRequest,
+    ImportPgpKeyFileRequest, ImportPgpKeyTextRequest, InitializeStoreRecipientsRequest,
     InsertEntryRequest, InspectAppStateRequest, InspectPgpKeyFileRequest, InspectPgpKeyTextRequest,
     ListEntriesRequest, ListKeysRequest, OpenGithubSshSettingsRequest, PgpImportFailureKind,
     PgpKeyDeletionFailureKind, PgpKeyKindDto, PreparePgpPrivateKeyRequest,
@@ -36,7 +37,6 @@ fn bridge_method_table_matches_generated_api_surface() {
         "load_config",
         "save_config",
         "configure_pgp_backend",
-        "list_stores",
         "list_entries",
         "read_entry",
         "copy_entry_password",
@@ -49,13 +49,18 @@ fn bridge_method_table_matches_generated_api_surface() {
         "git_pull",
         "git_push",
         "git_commit",
+        "git_list_remotes",
+        "git_add_remote",
+        "git_set_remote_url",
+        "git_remove_remote",
         "run_git_args",
+        "inspect_store_git",
+        "initialize_git_repository",
         "inspect_app_state",
-        "select_store",
         "create_local_store",
         "import_local_store",
         "clone_store",
-        "remove_store",
+        "disconnect_store",
         "delete_local_store",
         "list_keys",
         "detect_imported_key",
@@ -64,14 +69,8 @@ fn bridge_method_table_matches_generated_api_surface() {
         "inspect_pgp_key_file",
         "import_pgp_key_text",
         "import_pgp_key_file",
-        "import_pgp_public_key",
-        "import_pgp_private_key_file",
-        "import_pgp_private_key_text",
-        "export_pgp_public_key",
-        "export_pgp_private_key",
         "prepare_pgp_private_key",
-        "delete_pgp_key",
-        "add_pgp_key_to_gpg_id",
+        "initialize_store_recipients",
         "generate_ssh_key",
         "import_ssh_private_key_file",
         "import_ssh_private_key_text",
@@ -475,7 +474,6 @@ fn inspect_app_state_reports_first_run_recovery_branches() {
         name: "Personal".to_string(),
         root: store_root.display().to_string(),
         pgp_keys: vec!["missing@example.com".to_string()],
-        set_default: true,
         initialize_git: true,
     }));
     assert!(created.error.is_none(), "{:?}", created.error);
@@ -485,7 +483,8 @@ fn inspect_app_state_reports_first_run_recovery_branches() {
         config_path: config_path.display().to_string(),
         pgp_executable: None,
     }));
-    let missing_gpg_store = &missing_gpg.state.expect("state response").stores[0];
+    let missing_gpg_state = missing_gpg.state.expect("state response");
+    let missing_gpg_store = missing_gpg_state.store.as_ref().expect("canonical store");
     assert!(missing_gpg_store.issues.contains(&"missing_gpg_id".to_string()));
 
     std::fs::write(store_root.join(".gpg-id"), "missing@example.com").unwrap();
@@ -493,8 +492,9 @@ fn inspect_app_state_reports_first_run_recovery_branches() {
         config_path: config_path.display().to_string(),
         pgp_executable: Some("/bin/false".to_string()),
     }));
-    let store = &missing_remote_and_key.state.expect("state response").stores[0];
-    assert!(store.issues.contains(&"git_remote_missing".to_string()));
+    let missing_key_state = missing_remote_and_key.state.expect("state response");
+    let store = missing_key_state.store.as_ref().expect("canonical store");
+    assert_eq!(store.git_mode, api::StoreGitModeDto::Local);
     assert!(store.issues.contains(&"pgp_key_missing".to_string()));
 
     std::fs::remove_dir_all(&store_root).unwrap();
@@ -504,7 +504,11 @@ fn inspect_app_state_reports_first_run_recovery_branches() {
     }));
     let missing_store_state = missing_store.state.expect("state response");
     assert_eq!(missing_store_state.onboarding_state, "store_missing");
-    assert!(missing_store_state.stores[0].issues.contains(&"store_missing".to_string()));
+    assert!(missing_store_state
+        .store
+        .expect("canonical store")
+        .issues
+        .contains(&"store_missing".to_string()));
 }
 
 #[test]
@@ -535,7 +539,6 @@ fn inspect_app_state_treats_non_git_local_store_as_ready() {
         name: "Local".to_string(),
         root: store_root.display().to_string(),
         pgp_keys: vec![fingerprint],
-        set_default: true,
         initialize_git: false,
     }));
     assert!(created.error.is_none(), "{:?}", created.error);
@@ -560,7 +563,6 @@ fn delete_local_store_confirms_with_store_name_and_rejects_mismatch() {
         name: "Local".to_string(),
         root: store_root.display().to_string(),
         pgp_keys: vec!["local@example.com".to_string()],
-        set_default: true,
         initialize_git: false,
     }));
     assert!(created.error.is_none(), "{:?}", created.error);
@@ -568,6 +570,7 @@ fn delete_local_store_confirms_with_store_name_and_rejects_mismatch() {
     let mismatch = block_on(api::delete_local_store(DeleteLocalStoreRequest {
         config_path: config_path.display().to_string(),
         root: store_root.display().to_string(),
+        managed_store_base: temp.path().display().to_string(),
         confirmation: store_root.display().to_string(),
     }));
     let mismatch_error = mismatch.error.expect("mismatched confirmation should fail");
@@ -577,10 +580,87 @@ fn delete_local_store_confirms_with_store_name_and_rejects_mismatch() {
     let deleted = block_on(api::delete_local_store(DeleteLocalStoreRequest {
         config_path: config_path.display().to_string(),
         root: store_root.display().to_string(),
+        managed_store_base: temp.path().display().to_string(),
         confirmation: "local-store".to_string(),
     }));
     assert!(deleted.error.is_none(), "{:?}", deleted.error);
     assert!(!store_root.exists(), "store-name confirmation should delete the store");
+}
+
+#[test]
+fn delete_missing_app_managed_store_clears_retryable_config() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let store_root = temp.path().join("missing-store");
+    let created = block_on(api::create_local_store(CreateLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        name: "Missing".to_string(),
+        root: store_root.display().to_string(),
+        pgp_keys: vec!["local@example.com".to_string()],
+        initialize_git: false,
+    }));
+    assert!(created.error.is_none(), "{:?}", created.error);
+    std::fs::remove_dir_all(&store_root).unwrap();
+
+    let deleted = block_on(api::delete_local_store(DeleteLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        root: store_root.display().to_string(),
+        managed_store_base: temp.path().display().to_string(),
+        confirmation: "missing-store".to_string(),
+    }));
+    assert!(deleted.error.is_none(), "{:?}", deleted.error);
+    let inspected = block_on(api::inspect_app_state(InspectAppStateRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: None,
+    }));
+    assert!(inspected.state.unwrap().store.is_none());
+}
+
+#[test]
+fn legacy_multi_store_config_uses_only_default_and_never_falls_back() {
+    let temp = tempfile::tempdir().unwrap();
+    let selected = temp.path().join("selected");
+    let ignored = temp.path().join("ignored");
+    std::fs::create_dir_all(&selected).unwrap();
+    std::fs::create_dir_all(&ignored).unwrap();
+    std::fs::write(selected.join(".gpg-id"), "alice@example.com\n").unwrap();
+    std::fs::write(ignored.join(".gpg-id"), "bob@example.com\n").unwrap();
+    let config_path = temp.path().join("pars_config.toml");
+    let config = format!(
+        "[path_config]\ndefault_repo = {:?}\nrepos = [{:?}, {:?}]\n",
+        selected.display().to_string(),
+        ignored.display().to_string(),
+        selected.display().to_string(),
+    );
+    std::fs::write(&config_path, config).unwrap();
+
+    let inspected = block_on(api::inspect_app_state(InspectAppStateRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: Some("/bin/true".to_string()),
+    }));
+    let state = inspected.state.expect("state");
+    assert_eq!(state.store.expect("canonical store").root, selected.display().to_string());
+
+    let disconnected = block_on(api::disconnect_store(DisconnectStoreRequest {
+        config_path: config_path.display().to_string(),
+        root: selected.display().to_string(),
+    }));
+    assert!(disconnected.error.is_none(), "{:?}", disconnected.error);
+    let after = block_on(api::inspect_app_state(InspectAppStateRequest {
+        config_path: config_path.display().to_string(),
+        pgp_executable: Some("/bin/true".to_string()),
+    }))
+    .state
+    .expect("state after disconnect");
+    assert!(after.store.is_none());
+    assert_eq!(after.onboarding_state, "store_missing");
+    assert!(selected.is_dir(), "disconnect must preserve external canonical root");
+    assert!(ignored.is_dir(), "ignored legacy root must remain untouched");
+
+    let saved = std::fs::read_to_string(config_path).unwrap();
+    assert!(saved.contains("default_repo = \"\""));
+    assert!(saved.contains("repos = []"));
+    assert!(!saved.contains(&ignored.display().to_string()));
 }
 
 #[test]
@@ -817,6 +897,106 @@ fn legacy_pgp_import_methods_stay_kind_specific_and_return_canonical_fingerprint
     }));
     let error = mismatched.error.expect("public material must not satisfy a private import");
     assert_eq!(error.pgp_import_kind, Some(PgpImportFailureKind::KindMismatch));
+}
+
+#[test]
+fn contextual_recipient_initialization_only_repairs_missing_gpg_id() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("config.toml");
+    let root = temp.path().join("imported");
+    std::fs::create_dir_all(&root).unwrap();
+
+    let imported = block_on(api::import_local_store(ImportLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        root: root.display().to_string(),
+    }));
+    assert!(imported.error.is_none(), "{:?}", imported.error);
+
+    let initialized =
+        block_on(api::initialize_store_recipients(InitializeStoreRecipientsRequest {
+            config_path: config_path.display().to_string(),
+            root: root.display().to_string(),
+            fingerprints: vec!["ABCD 1234".to_string()],
+        }));
+    assert!(initialized.error.is_none(), "{:?}", initialized.error);
+    assert_eq!(std::fs::read_to_string(root.join(".gpg-id")).unwrap(), "ABCD 1234");
+
+    let second = block_on(api::initialize_store_recipients(InitializeStoreRecipientsRequest {
+        config_path: config_path.display().to_string(),
+        root: root.display().to_string(),
+        fingerprints: vec!["DIFFERENT".to_string()],
+    }));
+    assert!(second.error.is_some());
+    assert_eq!(std::fs::read_to_string(root.join(".gpg-id")).unwrap(), "ABCD 1234");
+}
+
+#[test]
+fn contextual_recipient_initialization_rejects_line_breaks_before_creation() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_path = temp.path().join("config.toml");
+    let root = temp.path().join("imported");
+    std::fs::create_dir_all(&root).unwrap();
+    assert!(block_on(api::import_local_store(ImportLocalStoreRequest {
+        config_path: config_path.display().to_string(),
+        root: root.display().to_string(),
+    }))
+    .error
+    .is_none());
+
+    let response = block_on(api::initialize_store_recipients(InitializeStoreRecipientsRequest {
+        config_path: config_path.display().to_string(),
+        root: root.display().to_string(),
+        fingerprints: vec!["ABCD\nINJECTED".to_string()],
+    }));
+    assert!(response.error.is_some());
+    assert!(!root.join(".gpg-id").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn contextual_recipient_initialization_rejects_regular_and_dangling_symlinks() {
+    use std::os::unix::fs::symlink;
+
+    for dangling in [false, true] {
+        let temp = tempfile::tempdir().unwrap();
+        let config_path = temp.path().join("config.toml");
+        let root = temp.path().join("imported");
+        let external = temp.path().join("external-gpg-id");
+        std::fs::create_dir_all(&root).unwrap();
+        if !dangling {
+            std::fs::write(&external, "UNCHANGED").unwrap();
+        }
+        symlink(&external, root.join(".gpg-id")).unwrap();
+        assert!(block_on(api::import_local_store(ImportLocalStoreRequest {
+            config_path: config_path.display().to_string(),
+            root: root.display().to_string(),
+        }))
+        .error
+        .is_none());
+
+        let inspected = block_on(api::inspect_app_state(InspectAppStateRequest {
+            config_path: config_path.display().to_string(),
+            pgp_executable: None,
+        }))
+        .state
+        .unwrap();
+        let store = inspected.store.unwrap();
+        assert!(!store.has_gpg_id);
+        assert!(store.pgp_recipients.is_empty());
+
+        let response =
+            block_on(api::initialize_store_recipients(InitializeStoreRecipientsRequest {
+                config_path: config_path.display().to_string(),
+                root: root.display().to_string(),
+                fingerprints: vec!["ABCD".to_string()],
+            }));
+        assert!(response.error.is_some());
+        if dangling {
+            assert!(!external.exists());
+        } else {
+            assert_eq!(std::fs::read_to_string(&external).unwrap(), "UNCHANGED");
+        }
+    }
 }
 
 /// Writes a config selecting the pure-Rust backend with its own keyring, so each test starts empty.

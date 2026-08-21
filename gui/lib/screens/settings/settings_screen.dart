@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -8,7 +10,6 @@ import '../../services/autofill_repository.dart';
 import '../../services/git_repository.dart';
 import '../../services/key_repository.dart';
 import '../../services/path_picker_service.dart';
-import '../../services/pgp_import_service.dart';
 import '../../services/runtime_diagnostics.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
@@ -18,9 +19,7 @@ import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/gesture_setup_panel.dart';
-import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/path_picker_row.dart';
-import '../../widgets/pgp_key_import_body.dart';
 import '../../widgets/pars_adaptive_surface.dart';
 
 part 'widgets/settings_security_widgets.dart';
@@ -45,6 +44,7 @@ class SettingsScreen extends StatelessWidget {
     this.onLocalePreferenceChanged,
     this.onSecuritySettingsChanged,
     this.runDuringSystemAuthentication,
+    this.onStoreLifecycleChanged,
     this.onOnboardingReset,
   });
 
@@ -62,6 +62,7 @@ class SettingsScreen extends StatelessWidget {
   final VoidCallback? onSecuritySettingsChanged;
   final Future<T> Function<T>(Future<T> Function() action)?
   runDuringSystemAuthentication;
+  final Future<void> Function()? onStoreLifecycleChanged;
   final VoidCallback? onOnboardingReset;
 
   @override
@@ -130,14 +131,14 @@ class SettingsScreen extends StatelessWidget {
                 title: localizations.vaultSyncSection,
                 children: <Widget>[
                   _SettingsTile(
-                    title: localizations.passwordStoresTitle,
-                    subtitle: settingsRepository.currentRepoName,
+                    title: localizations.passwordStore,
+                    subtitle: _passwordStoreSubtitle(localizations),
                     icon: Icons.folder_outlined,
-                    onTap: () => _showPasswordStores(context),
+                    onTap: () => _showPasswordStore(context),
                   ),
                   _SettingsTile(
                     title: localizations.gitSyncTitle,
-                    subtitle: localizations.gitSyncDescription,
+                    subtitle: _gitModeSubtitle(localizations),
                     icon: Icons.sync,
                     onTap: () => _showGitSync(context),
                   ),
@@ -155,31 +156,15 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
               _SettingsSection(
-                title: localizations.keyManagementSection,
-                children: <Widget>[
-                  _SettingsTile(
-                    title: localizations.pgpKeysTitle,
-                    subtitle: localizations.pgpKeyActionsDescription,
-                    icon: Icons.enhanced_encryption_outlined,
-                    onTap: () => _showKeys(context, KeyRecordType.pgp),
-                  ),
-                  _SettingsTile(
-                    title: localizations.sshKeysTitle,
-                    subtitle: localizations.githubAccessKeysDescription,
-                    icon: Icons.vpn_key_outlined,
-                    onTap: () => _showKeys(context, KeyRecordType.ssh),
-                  ),
-                ],
-              ),
-              _SettingsSection(
                 title: localizations.advancedSupportSection,
                 children: <Widget>[
-                  _SettingsTile(
-                    title: localizations.advancedGitArgsTitle,
-                    subtitle: localizations.advancedGitArgsDescription,
-                    icon: Icons.terminal,
-                    onTap: () => _showGitArgs(context),
-                  ),
+                  if (!Platform.isAndroid && !Platform.isIOS)
+                    _SettingsTile(
+                      title: localizations.advancedGitArgsTitle,
+                      subtitle: localizations.advancedGitArgsDescription,
+                      icon: Icons.terminal,
+                      onTap: () => _showGitArgs(context),
+                    ),
                   _SettingsTile(
                     title: localizations.runtimeDiagnosticsTitle,
                     subtitle: localizations.runtimeDiagnosticsDescription,
@@ -256,6 +241,27 @@ class SettingsScreen extends StatelessWidget {
       settingsRepository is RuntimeDiagnosticsRepository
           ? settingsRepository as RuntimeDiagnosticsRepository
           : null;
+
+  String _gitModeSubtitle(AppLocalizations localizations) {
+    return switch (settingsRepository.store?.gitMode) {
+      null || StoreGitMode.disabled => localizations.gitDisabledState,
+      StoreGitMode.local => localizations.gitLocalState,
+      StoreGitMode.remote => localizations.gitRemoteState,
+      StoreGitMode.invalid => localizations.invalidGitMetadataTitle,
+    };
+  }
+
+  String _passwordStoreSubtitle(AppLocalizations localizations) {
+    final store = settingsRepository.store;
+    if (store == null) return localizations.noPasswordStoreConfigured;
+    if (!store.exists) return localizations.passwordStoreFolderNotFound;
+    if (!store.hasGpgId) return localizations.missingGpgIdTitle;
+    if (store.pgpKeyMissing) return localizations.requiredPgpKeyMissingTitle;
+    if (store.gitMode == StoreGitMode.invalid) {
+      return localizations.invalidGitMetadataTitle;
+    }
+    return store.name;
+  }
 
   String _autofillSubtitle(AppLocalizations localizations) {
     final status = autofillRepository?.status;

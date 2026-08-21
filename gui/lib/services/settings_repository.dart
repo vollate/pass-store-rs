@@ -1,34 +1,24 @@
+import 'package:flutter/foundation.dart';
+
 import 'store_lifecycle.dart';
 
 abstract interface class SettingsRepository {
-  String get currentRepoName;
-
   StoreLifecycleSnapshot get lifecycle;
 
-  List<StoreStatus> get stores;
+  StoreStatus? get store;
 
   Future<void> refresh();
-
-  Future<void> selectStore(String root);
 
   Future<void> createLocalStore({
     required String name,
     required String root,
     required List<String> pgpKeys,
-    required bool setDefault,
     required bool initializeGit,
   });
 
-  Future<void> importLocalStore({
-    required String root,
-    required bool setDefault,
-  });
+  Future<void> importLocalStore({required String root});
 
-  Future<void> cloneStore({
-    required String remoteUrl,
-    required String root,
-    required bool setDefault,
-  });
+  Future<void> cloneStore({required String remoteUrl, required String root});
 
   Future<void> removeStore({required String root});
 
@@ -36,6 +26,12 @@ abstract interface class SettingsRepository {
     required String root,
     required String confirmation,
   });
+}
+
+abstract interface class StoreLifecycleChangeSource {
+  ValueListenable<int> get lifecycleRevision;
+
+  bool get storeRemovalInProgress;
 }
 
 abstract interface class AppManagedPathRepository {

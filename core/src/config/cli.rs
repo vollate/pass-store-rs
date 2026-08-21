@@ -1,16 +1,18 @@
 use std::error::Error;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 #[allow(dead_code)]
 use std::{env, path};
 
 use log::warn;
 use serde::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
 
 use crate::constants::default_constants::{EDITOR, GIT_EXECUTABLE, PGP_EXECUTABLE};
 use crate::pgp::backend::PgpBackendConfig;
 
-#[derive(Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Eq, PartialEq)]
 #[serde(default)]
 pub struct ParsConfig {
     #[serde(default = "PrintConfig::default")]
@@ -35,13 +37,13 @@ pub struct PrintConfig {
     pub grep_match_color: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PathConfig {
     pub default_repo: String,
     pub repos: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ExecutableConfig {
     pub pgp_executable: String,
     pub editor_executable: String,
@@ -57,7 +59,7 @@ pub enum PgpBackendKind {
     PureRust,
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct FeatureConfig {
     pub clip_time: Option<usize>,
     pub fuzzy_search: bool,
@@ -107,6 +109,32 @@ impl Default for ExecutableConfig {
     }
 }
 
+impl PathConfig {
+    /// Collapse the legacy GUI repository registry to one canonical store.
+    ///
+    /// `default_repo` remains authoritative. Only when it is empty do we
+    /// recover the first non-empty legacy `repos` entry. The compatibility
+    /// mirror is then kept at zero or one element so older CLI builds can
+    /// still resolve the selected store without reintroducing GUI switching.
+    pub fn normalize_canonical_store(&mut self) {
+        let canonical = if self.default_repo.trim().is_empty() {
+            self.repos.iter().find(|repo| !repo.trim().is_empty()).cloned()
+        } else {
+            Some(self.default_repo.clone())
+        };
+        match canonical {
+            Some(root) => {
+                self.default_repo = root.clone();
+                self.repos = vec![root];
+            }
+            None => {
+                self.default_repo.clear();
+                self.repos.clear();
+            }
+        }
+    }
+}
+
 impl Default for PathConfig {
     fn default() -> Self {
         let default_path = match dirs::home_dir() {
@@ -148,13 +176,26 @@ impl Default for FeatureConfig {
 
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<ParsConfig, Box<dyn Error>> {
     let content = fs::read_to_string(path)?;
-    let config: ParsConfig = toml::from_str(&content)?;
+    let mut config: ParsConfig = toml::from_str(&content)?;
+    config.path_config.normalize_canonical_store();
     Ok(config)
 }
 
 pub fn save_config<P: AsRef<Path>>(config: &ParsConfig, path: P) -> Result<(), Box<dyn Error>> {
-    let toml_str = toml::to_string_pretty(config)?;
-    fs::write(path, toml_str)?;
+    let path = path.as_ref();
+    let parent =
+        path.parent().filter(|value| !value.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let mut normalized = config.clone();
+    normalized.path_config.normalize_canonical_store();
+    let toml_str = toml::to_string_pretty(&normalized)?;
+
+    // NamedTempFile::persist uses replace-existing semantics on every supported
+    // platform (MoveFileExW on Windows and rename on Unix) while keeping the
+    // temporary file on the same filesystem as the destination.
+    let mut temporary = NamedTempFile::new_in(parent)?;
+    temporary.write_all(toml_str.as_bytes())?;
+    temporary.as_file().sync_all()?;
+    temporary.persist(path).map_err(|error| error.error)?;
     Ok(())
 }
 
@@ -222,6 +263,44 @@ mod tests {
         save_config(&test_config, &config_path).unwrap();
         let loaded_config = load_config(&config_path).unwrap();
         assert_eq!(test_config, loaded_config);
+    }
+
+    #[test]
+    fn legacy_multi_store_config_keeps_default_only() {
+        let (_temp_dir, root) = gen_unique_temp_dir();
+        let config_path = root.join("legacy.toml");
+        fs::write(
+            &config_path,
+            "[path_config]\ndefault_repo = \"/vault/personal\"\nrepos = [\"/vault/work\", \"/vault/personal\"]\n",
+        )
+        .unwrap();
+
+        let loaded = load_config(&config_path).unwrap();
+        assert_eq!(loaded.path_config.default_repo, "/vault/personal");
+        assert_eq!(loaded.path_config.repos, vec!["/vault/personal"]);
+    }
+
+    #[test]
+    fn legacy_empty_default_recovers_first_non_empty_store() {
+        let (_temp_dir, root) = gen_unique_temp_dir();
+        let config_path = root.join("legacy-empty.toml");
+        fs::write(
+            &config_path,
+            "[path_config]\ndefault_repo = \"\"\nrepos = [\"\", \"/vault/recovered\", \"/vault/ignored\"]\n",
+        )
+        .unwrap();
+
+        let loaded = load_config(&config_path).unwrap();
+        assert_eq!(loaded.path_config.default_repo, "/vault/recovered");
+        assert_eq!(loaded.path_config.repos, vec!["/vault/recovered"]);
+    }
+
+    #[test]
+    fn empty_store_config_remains_empty() {
+        let mut path_config = PathConfig { default_repo: String::new(), repos: vec![] };
+        path_config.normalize_canonical_store();
+        assert!(path_config.default_repo.is_empty());
+        assert!(path_config.repos.is_empty());
     }
 
     #[test]

@@ -40,6 +40,7 @@ data class ParsAutofillCandidate(
     val score: Int,
     val isFavorite: Boolean,
     val recentRank: Int?,
+    val generation: String,
 )
 
 data class ParsAutofillCredential(
@@ -55,11 +56,26 @@ object ParsAutofillNativeBridge {
         appName: String?,
         query: String?,
         limit: Int,
+    ): List<ParsAutofillCandidate> =
+        queryCandidatesWith(
+            website = website,
+            appName = appName,
+            query = query,
+            limit = limit,
+            stateReader = { ParsAutofillStateStore.read(context) },
+            nativeQuery = ParsAutofillNative::queryCandidates,
+        )
+
+    internal fun queryCandidatesWith(
+        website: String?,
+        appName: String?,
+        query: String?,
+        limit: Int,
+        stateReader: () -> ParsAutofillState,
+        nativeQuery: (String) -> String,
     ): List<ParsAutofillCandidate> {
-        val state = ParsAutofillStateStore.read(context)
-        if (!File(state.indexPath).isFile) {
-            return emptyList()
-        }
+        val state = stateReader()
+        if (!ParsAutofillStateStore.canServe(state, File(state.indexPath).isFile)) return emptyList()
         val request =
             JSONObject()
                 .put("indexPath", state.indexPath)
@@ -67,11 +83,11 @@ object ParsAutofillNativeBridge {
                 .put("appName", appName)
                 .put("query", query)
                 .put("limit", limit)
-        val response = JSONObject(ParsAutofillNative.queryCandidates(request.toString()))
-        if (!response.isNull("error")) {
-            return emptyList()
-        }
+        val response = JSONObject(nativeQuery(request.toString()))
+        if (!response.isNull("error")) return emptyList()
         val candidates = response.optJSONArray("candidates") ?: return emptyList()
+        if (!ParsAutofillStateStore.samePublication(state, stateReader())) return emptyList()
+        val generation = state.generation ?: return emptyList()
         return buildList {
             for (index in 0 until candidates.length()) {
                 val candidate = candidates.optJSONObject(index) ?: continue
@@ -85,23 +101,37 @@ object ParsAutofillNativeBridge {
                         score = candidate.optInt("score"),
                         isFavorite = candidate.optBoolean("isFavorite"),
                         recentRank =
-                            if (candidate.isNull("recentRank")) {
-                                null
-                            } else {
-                                candidate.optInt("recentRank")
-                            },
+                            if (candidate.isNull("recentRank")) null else candidate.optInt("recentRank"),
+                        generation = generation,
                     ),
                 )
             }
         }
     }
 
-    fun resolveCredential(context: Context, path: String): ParsAutofillCredential? {
-        val state = ParsAutofillStateStore.read(context)
+    fun resolveCredential(
+        context: Context,
+        path: String,
+        generation: String,
+    ): ParsAutofillCredential? =
+        resolveCredentialWith(
+            path = path,
+            generation = generation,
+            stateReader = { ParsAutofillStateStore.read(context) },
+            nativeResolve = ParsAutofillNative::resolveCredential,
+        )
+
+    internal fun resolveCredentialWith(
+        path: String,
+        generation: String,
+        stateReader: () -> ParsAutofillState,
+        nativeResolve: (String) -> String,
+    ): ParsAutofillCredential? {
+        val state = stateReader()
+        if (state.generation != generation ||
+            !ParsAutofillStateStore.canServe(state, File(state.indexPath).isFile)
+        ) return null
         val storeRoot = state.storeRoot ?: return null
-        if (!File(state.indexPath).isFile) {
-            return null
-        }
         val request =
             JSONObject()
                 .put("configPath", state.configPath)
@@ -110,11 +140,10 @@ object ParsAutofillNativeBridge {
                 .put("path", path)
                 .put("pgpExecutable", JSONObject.NULL)
                 .put("passphrase", state.passphrase ?: JSONObject.NULL)
-        val response = JSONObject(ParsAutofillNative.resolveCredential(request.toString()))
-        if (!response.isNull("error") || response.isNull("credential")) {
-            return null
-        }
+        val response = JSONObject(nativeResolve(request.toString()))
+        if (!response.isNull("error") || response.isNull("credential")) return null
         val credential = response.getJSONObject("credential")
+        if (!ParsAutofillStateStore.samePublication(state, stateReader())) return null
         return ParsAutofillCredential(
             path = credential.getString("path"),
             username = credential.getString("username"),

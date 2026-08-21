@@ -28,18 +28,10 @@ void main() {
         r'${_kindLabel(context.l10n, inspection.kind)}\n',
       ],
       'lib/widgets/path_picker_row.dart': <String>[r'$pathPrefix: $path'],
-      'lib/screens/onboarding/widgets/onboarding_key_setup_widgets.dart':
-          <String>[
-            r'${key.fingerprint}\n${key.source}',
-            r'${key.fingerprint}\n${key.source}',
-          ],
       'lib/screens/settings/widgets/settings_git_widgets.dart': <String>[
         'git',
         r'git ${_argsText.trim()}',
         r'${remote.fetchUrl}\n${remote.pushUrl}',
-      ],
-      'lib/screens/settings/widgets/settings_store_widgets.dart': <String>[
-        r'${store.root}\n${store.exists ? localizations.storeAvailable : localizations.storeFolderNotFound}',
       ],
     };
     final found = <String, List<String>>{};

@@ -61,14 +61,6 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
-  Future<frb.ListStoresResponse> listStores({
-    required frb.ListStoresRequest request,
-  }) async {
-    calledMethods.add('list_stores');
-    return const frb.ListStoresResponse(stores: <frb.StoreInfoDto>[]);
-  }
-
-  @override
   Future<frb.ListEntriesResponse> listEntries({
     required frb.ListEntriesRequest request,
   }) async {
@@ -180,6 +172,26 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.GitCommandResponse> gitListRemotes({
+    required frb.GitRequest request,
+  }) async => const frb.GitCommandResponse();
+
+  @override
+  Future<frb.GitCommandResponse> gitAddRemote({
+    required frb.GitRemoteRequest request,
+  }) async => const frb.GitCommandResponse();
+
+  @override
+  Future<frb.GitCommandResponse> gitSetRemoteUrl({
+    required frb.GitRemoteRequest request,
+  }) async => const frb.GitCommandResponse();
+
+  @override
+  Future<frb.GitCommandResponse> gitRemoveRemote({
+    required frb.GitRemoteRequest request,
+  }) async => const frb.GitCommandResponse();
+
+  @override
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
   }) async {
@@ -188,19 +200,22 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.InspectStoreGitResponse> inspectStoreGit({
+    required frb.InspectStoreGitRequest request,
+  }) async =>
+      const frb.InspectStoreGitResponse(mode: frb.StoreGitModeDto.disabled);
+
+  @override
+  Future<frb.UnitResponse> initializeGitRepository({
+    required frb.InitializeGitRepositoryRequest request,
+  }) async => const frb.UnitResponse();
+
+  @override
   Future<frb.AppStateResponse> inspectAppState({
     required frb.InspectAppStateRequest request,
   }) async {
     calledMethods.add('inspect_app_state');
     return const frb.AppStateResponse();
-  }
-
-  @override
-  Future<frb.UnitResponse> selectStore({
-    required frb.SelectStoreRequest request,
-  }) async {
-    calledMethods.add('select_store');
-    return const frb.UnitResponse();
   }
 
   @override
@@ -228,10 +243,10 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
-  Future<frb.UnitResponse> removeStore({
-    required frb.RemoveStoreRequest request,
+  Future<frb.UnitResponse> disconnectStore({
+    required frb.DisconnectStoreRequest request,
   }) async {
-    calledMethods.add('remove_store');
+    calledMethods.add('disconnect_store');
     return const frb.UnitResponse();
   }
 
@@ -300,46 +315,6 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
-  Future<frb.KeyMutationResponse> importPgpPublicKey({
-    required frb.ImportKeyTextRequest request,
-  }) async {
-    calledMethods.add('import_pgp_public_key');
-    return const frb.KeyMutationResponse();
-  }
-
-  @override
-  Future<frb.KeyMutationResponse> importPgpPrivateKeyFile({
-    required frb.ImportKeyFileRequest request,
-  }) async {
-    calledMethods.add('import_pgp_private_key_file');
-    return const frb.KeyMutationResponse();
-  }
-
-  @override
-  Future<frb.KeyMutationResponse> importPgpPrivateKeyText({
-    required frb.ImportKeyTextRequest request,
-  }) async {
-    calledMethods.add('import_pgp_private_key_text');
-    return const frb.KeyMutationResponse();
-  }
-
-  @override
-  Future<frb.KeyExportResponse> exportPgpPublicKey({
-    required frb.ExportPgpKeyRequest request,
-  }) async {
-    calledMethods.add('export_pgp_public_key');
-    return const frb.KeyExportResponse();
-  }
-
-  @override
-  Future<frb.KeyExportResponse> exportPgpPrivateKey({
-    required frb.ExportPgpKeyRequest request,
-  }) async {
-    calledMethods.add('export_pgp_private_key');
-    return const frb.KeyExportResponse();
-  }
-
-  @override
   Future<frb.PreparePgpPrivateKeyResponse> preparePgpPrivateKey({
     required frb.PreparePgpPrivateKeyRequest request,
   }) async {
@@ -351,25 +326,10 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
-  Future<frb.DeletePgpKeyResponse> deletePgpKey({
-    required frb.DeletePgpKeyRequest request,
+  Future<frb.UnitResponse> initializeStoreRecipients({
+    required frb.InitializeStoreRecipientsRequest request,
   }) async {
-    calledMethods.add('delete_pgp_key');
-    return frb.DeletePgpKeyResponse(
-      result: frb.PgpKeyDeletionResultDto(
-        fingerprint: request.fingerprint,
-        hadPrivateKey: true,
-        privateKeyAbsent: true,
-        publicKeyAbsent: true,
-      ),
-    );
-  }
-
-  @override
-  Future<frb.UnitResponse> addPgpKeyToGpgId({
-    required frb.AddPgpKeyToGpgIdRequest request,
-  }) async {
-    calledMethods.add('add_pgp_key_to_gpg_id');
+    calledMethods.add('initialize_store_recipients');
     return const frb.UnitResponse();
   }
 

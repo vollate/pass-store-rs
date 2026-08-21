@@ -1,6 +1,39 @@
 import '../models/key_record.dart';
 import '../models/pgp_key_import.dart';
 
+bool pgpIdentityMatchesRecipient({
+  required String fingerprint,
+  required String identity,
+  required String recipient,
+}) {
+  final requiredCompact =
+      recipient.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+  final fingerprintCompact =
+      fingerprint.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+  if (requiredCompact.isEmpty) return false;
+  if (fingerprintCompact == requiredCompact ||
+      fingerprintCompact.endsWith(requiredCompact)) {
+    return true;
+  }
+  final normalizedIdentity = identity.trim();
+  return normalizedIdentity.toLowerCase() == recipient.trim().toLowerCase() ||
+      normalizedIdentity.toLowerCase().contains(
+        '<${recipient.trim().toLowerCase()}>',
+      );
+}
+
+bool pgpIdentityMatchesAnyRecipient({
+  required String fingerprint,
+  required String identity,
+  required Iterable<String> recipients,
+}) => recipients.any(
+  (recipient) => pgpIdentityMatchesRecipient(
+    fingerprint: fingerprint,
+    identity: identity,
+    recipient: recipient,
+  ),
+);
+
 /// Result of a completed PGP import: the imported key plus what inspection found.
 class PgpImportResult {
   const PgpImportResult({required this.key, required this.inspection});
@@ -17,22 +50,6 @@ class PgpPrivateKeyPreparation {
 
   final String fingerprint;
   final bool migrated;
-}
-
-class PgpKeyDeletionOutcome {
-  const PgpKeyDeletionOutcome({
-    required this.fingerprint,
-    required this.hadPrivateKey,
-    required this.privateKeyAbsent,
-    required this.publicKeyAbsent,
-    required this.publicCleanupFailed,
-  });
-
-  final String fingerprint;
-  final bool hadPrivateKey;
-  final bool privateKeyAbsent;
-  final bool publicKeyAbsent;
-  final bool publicCleanupFailed;
 }
 
 abstract interface class KeyRepository {
@@ -62,27 +79,12 @@ abstract interface class KeyRepository {
   /// Imports a PGP key file of either kind, including binary OpenPGP exports.
   Future<PgpImportResult> importPgpKeyFile(String path, {String? passphrase});
 
-  Future<KeyRecord> importPgpPublicKeyText(String armoredText);
-
-  Future<KeyRecord> importPgpPrivateKeyText(String armoredText);
-
-  Future<KeyRecord> importPgpPrivateKeyFile(String path);
-
-  Future<String> exportPgpPublicKey(String fingerprint);
-
-  Future<String> exportPgpPrivateKey({
-    required String fingerprint,
-    required String confirmation,
-  });
-
   Future<PgpPrivateKeyPreparation> preparePgpPrivateKey({
     required String fingerprint,
     required String passphrase,
   });
 
-  Future<PgpKeyDeletionOutcome> deletePgpKey(String fingerprint);
-
-  Future<void> addPgpKeyToSelectedStore(String fingerprint);
+  Future<void> initializeStoreRecipients(List<String> fingerprints);
 
   Future<KeyRecord> generateSshKey(String name);
 

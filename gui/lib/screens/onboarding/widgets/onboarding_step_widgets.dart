@@ -8,14 +8,14 @@ class _OnboardingProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final index = steps.indexOf(currentStep).clamp(0, steps.length - 1);
+    final safeSteps = steps.isEmpty ? <_OnboardingStep>[currentStep] : steps;
+    final rawIndex = safeSteps.indexOf(currentStep);
+    final index = rawIndex < 0 ? safeSteps.length - 1 : rawIndex;
     final current = index + 1;
-    final optional =
-        currentStep == _OnboardingStep.biometrics ||
-        currentStep == _OnboardingStep.ssh;
+    final optional = currentStep == _OnboardingStep.biometrics;
     final progressLabel = context.l10n.onboardingProgress(
       current,
-      steps.length,
+      safeSteps.length,
     );
     return Semantics(
       label: progressLabel,
@@ -23,7 +23,7 @@ class _OnboardingProgress extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          LinearProgressIndicator(value: current / steps.length),
+          LinearProgressIndicator(value: current / safeSteps.length),
           const SizedBox(height: 8),
           Row(
             children: <Widget>[
@@ -112,13 +112,11 @@ class _BiometricSetupStep extends StatelessWidget {
   String _biometricSubtitle(
     AppLocalizations localizations,
     BiometricUnlockStatus status,
-  ) {
-    return switch (status) {
-      BiometricUnlockStatus.available => localizations.enabledOnDevice,
-      BiometricUnlockStatus.disabled => localizations.availableOnDevice,
-      BiometricUnlockStatus.unavailable => localizations.unavailableOnDevice,
-    };
-  }
+  ) => switch (status) {
+    BiometricUnlockStatus.available => localizations.enabledOnDevice,
+    BiometricUnlockStatus.disabled => localizations.availableOnDevice,
+    BiometricUnlockStatus.unavailable => localizations.unavailableOnDevice,
+  };
 }
 
 class _EmptyOnboardingStep extends StatelessWidget {
@@ -152,105 +150,6 @@ class _EmptyOnboardingStep extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ReviewStep extends StatelessWidget {
-  const _ReviewStep({
-    required this.hasGestureVerifier,
-    required this.biometricUnlockEnabled,
-    required this.storeStatusLabel,
-    required this.storeSetupComplete,
-    required this.pgpKeyCount,
-    required this.sshKeyCount,
-    required this.onFinish,
-  });
-
-  final bool hasGestureVerifier;
-  final bool biometricUnlockEnabled;
-  final String storeStatusLabel;
-  final bool storeSetupComplete;
-  final int pgpKeyCount;
-  final int sshKeyCount;
-  final VoidCallback onFinish;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = context.l10n;
-    return ListView(
-      children: <Widget>[
-        _ReviewTile(
-          label: localizations.gestureLock,
-          value:
-              hasGestureVerifier
-                  ? localizations.configured
-                  : localizations.required,
-          complete: hasGestureVerifier,
-        ),
-        _ReviewTile(
-          label: localizations.biometricsStep,
-          value:
-              biometricUnlockEnabled
-                  ? localizations.enabled
-                  : localizations.skipped,
-          complete: true,
-        ),
-        _ReviewTile(
-          label: localizations.passwordStore,
-          value: storeStatusLabel,
-          complete: storeSetupComplete,
-        ),
-        _ReviewTile(
-          label: localizations.pgpKey,
-          value:
-              pgpKeyCount == 0
-                  ? localizations.notFound
-                  : localizations.keyCount(pgpKeyCount),
-          complete: pgpKeyCount > 0,
-        ),
-        _ReviewTile(
-          label: localizations.sshKey,
-          value:
-              sshKeyCount == 0
-                  ? localizations.skipped
-                  : localizations.keyCount(sshKeyCount),
-          complete: true,
-        ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: storeSetupComplete ? onFinish : null,
-          child: SizedBox(
-            width: double.infinity,
-            child: Center(child: Text(localizations.finishSetup)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReviewTile extends StatelessWidget {
-  const _ReviewTile({
-    required this.label,
-    required this.value,
-    required this.complete,
-  });
-
-  final String label;
-  final String value;
-  final bool complete;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        complete ? Icons.check_circle_outline : Icons.error_outline,
-        color: complete ? null : Theme.of(context).colorScheme.error,
-      ),
-      title: Text(label),
-      subtitle: Text(value),
     );
   }
 }

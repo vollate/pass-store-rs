@@ -38,13 +38,14 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-enum _OnboardingStep { gesture, biometrics, pgp, ssh, store, review }
+enum _OnboardingStep { gesture, biometrics, store, createRecipients, repair }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late _OnboardingStep _step;
   final List<_OnboardingStep> _stepHistory = <_OnboardingStep>[];
   String? _error;
   String? _selectedPgpFingerprint;
+  bool _finishing = false;
 
   StoreLifecycleSnapshot? get _lifecycle =>
       widget.settingsRepository?.lifecycle;
@@ -52,9 +53,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   KeyRepository? get _keyRepository => widget.keyRepository;
 
   bool get _needsStoreSetup => _lifecycle?.requiresStoreSetup ?? false;
-  bool get _needsKeyRepair => _lifecycle?.requiresKeyRepair ?? false;
+  bool get _needsStoreRepair => _lifecycle?.requiresStoreRepair ?? false;
 
-  List<KeyRecord> get _pgpKeys =>
+  List<KeyRecord> get _privatePgpKeys =>
       _keyRepository?.keys
           .where(
             (key) =>
@@ -67,73 +68,162 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   List<KeyRecord> get _sshKeys =>
       _keyRepository?.keys
-          .where((key) => key.type == KeyRecordType.ssh)
+          .where(
+            (key) => key.type == KeyRecordType.ssh && key.hasLocalKeyMaterial,
+          )
           .toList(growable: false) ??
       const <KeyRecord>[];
 
-  String? get _effectivePgpFingerprint =>
-      _selectedPgpFingerprint ??
-      (_pgpKeys.length == 1 ? _pgpKeys.single.fingerprint : null);
+  List<String> get _requiredRecipients =>
+      _lifecycle?.store?.pgpRecipients ?? const <String>[];
+
+  List<KeyRecord> get _matchingPrivatePgpKeys => _privatePgpKeys
+      .where(
+        (key) => pgpIdentityMatchesAnyRecipient(
+          fingerprint: key.fingerprint,
+          identity: key.name,
+          recipients: _requiredRecipients,
+        ),
+      )
+      .toList(growable: false);
 
   @override
   void initState() {
     super.initState();
     _step = _initialStep();
+    if (_isReadyToFinish &&
+        (widget.securityRepository.onboardingComplete ||
+            widget.securityRepository.biometricUnlockEnabled)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _finishOnboarding());
+    }
   }
+
+  bool get _isReadyToFinish =>
+      widget.securityRepository.hasGestureVerifier &&
+      !_needsStoreSetup &&
+      !_needsStoreRepair;
 
   @override
   Widget build(BuildContext context) {
     return PopScope<void>(
       canPop: _stepHistory.isEmpty,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
-          _goBack();
-        }
+        if (!didPop) _goBack();
       },
       child: Scaffold(
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                const SizedBox(height: 24),
-                Row(
-                  children: <Widget>[
-                    if (_stepHistory.isNotEmpty)
-                      IconButton(
-                        tooltip: context.l10n.back,
-                        onPressed: _goBack,
-                        icon: const Icon(Icons.arrow_back),
+          child:
+              MediaQuery.textScalerOf(context).scale(1) >= 1.5
+                  ? _buildLargeTextLayout(context)
+                  : Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const SizedBox(height: 24),
+                        Row(
+                          children: <Widget>[
+                            if (_stepHistory.isNotEmpty)
+                              IconButton(
+                                tooltip: context.l10n.back,
+                                onPressed: _goBack,
+                                icon: const Icon(Icons.arrow_back),
+                              ),
+                            Expanded(
+                              child: Text(
+                                _stepTitle(context.l10n, _step),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(_stepSubtitle(context.l10n, _step)),
+                        const SizedBox(height: 16),
+                        _OnboardingProgress(
+                          currentStep: _step,
+                          steps: _progressSteps,
+                        ),
+                        if (_error != null) ...<Widget>[
+                          const SizedBox(height: 12),
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              _error!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        Expanded(child: _buildStep(context)),
+                        if (_finishing) const LinearProgressIndicator(),
+                      ],
+                    ),
+                  ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLargeTextLayout(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Flexible(
+            flex: 2,
+            fit: FlexFit.loose,
+            child: SingleChildScrollView(
+              primary: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const SizedBox(height: 24),
+                  Row(
+                    children: <Widget>[
+                      if (_stepHistory.isNotEmpty)
+                        IconButton(
+                          tooltip: context.l10n.back,
+                          onPressed: _goBack,
+                          icon: const Icon(Icons.arrow_back),
+                        ),
+                      Expanded(
+                        child: Text(
+                          _stepTitle(context.l10n, _step),
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
                       ),
-                    Expanded(
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(_stepSubtitle(context.l10n, _step)),
+                  if (_error != null) ...<Widget>[
+                    const SizedBox(height: 12),
+                    Semantics(
+                      liveRegion: true,
                       child: Text(
-                        _stepTitle(context.l10n, _step),
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                Text(_stepSubtitle(context.l10n, _step)),
-                const SizedBox(height: 16),
-                _OnboardingProgress(currentStep: _step, steps: _progressSteps),
-                if (_error != null) ...<Widget>[
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
                 ],
-                const SizedBox(height: 16),
-                Expanded(child: _buildStep(context)),
-              ],
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: 16),
+          Expanded(flex: 3, child: _buildStep(context)),
+          if (_finishing) const LinearProgressIndicator(),
+        ],
       ),
     );
   }
@@ -142,23 +232,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!widget.securityRepository.hasGestureVerifier) {
       return _OnboardingStep.gesture;
     }
-    if (_needsStoreSetup || _needsKeyRepair) {
-      return _OnboardingStep.pgp;
-    }
-    if (!widget.securityRepository.biometricUnlockEnabled) {
+    if (!widget.securityRepository.onboardingComplete &&
+        !widget.securityRepository.biometricUnlockEnabled) {
       return _OnboardingStep.biometrics;
     }
-    return _OnboardingStep.pgp;
+    if (_needsStoreSetup) return _OnboardingStep.store;
+    return _OnboardingStep.repair;
   }
 
-  List<_OnboardingStep> get _progressSteps => <_OnboardingStep>[
-    _OnboardingStep.gesture,
-    _OnboardingStep.biometrics,
-    _OnboardingStep.pgp,
-    _OnboardingStep.ssh,
-    if (_needsStoreSetup) _OnboardingStep.store,
-    _OnboardingStep.review,
-  ];
+  List<_OnboardingStep> get _progressSteps {
+    if (widget.securityRepository.onboardingComplete) {
+      return <_OnboardingStep>[
+        _OnboardingStep.store,
+        if (_needsStoreRepair) _OnboardingStep.repair,
+      ];
+    }
+    return <_OnboardingStep>[
+      _OnboardingStep.gesture,
+      _OnboardingStep.biometrics,
+      _OnboardingStep.store,
+      if (_step == _OnboardingStep.createRecipients)
+        _OnboardingStep.createRecipients,
+      if (_needsStoreRepair || _step == _OnboardingStep.repair)
+        _OnboardingStep.repair,
+    ];
+  }
 
   Widget _buildStep(BuildContext context) {
     switch (_step) {
@@ -170,18 +268,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       case _OnboardingStep.biometrics:
         return _BiometricSetupStep(
           securityRepository: widget.securityRepository,
-          onEnable: () => _setStep(_OnboardingStep.pgp),
-          onSkip: () => _setStep(_OnboardingStep.pgp),
+          onEnable: _advanceAfterSecurity,
+          onSkip: _advanceAfterSecurity,
           onError: _showError,
         );
-      case _OnboardingStep.pgp:
-        return _buildPgpStep(context);
-      case _OnboardingStep.ssh:
-        return _buildSshStep(context);
       case _OnboardingStep.store:
         return _buildStoreStep(context);
-      case _OnboardingStep.review:
-        return _buildReviewStep(context);
+      case _OnboardingStep.createRecipients:
+        return _buildCreateRecipientsStep(context);
+      case _OnboardingStep.repair:
+        return _buildRepairStep(context);
+    }
+  }
+
+  void _advanceAfterSecurity() {
+    if (_needsStoreSetup) {
+      _setStep(_OnboardingStep.store);
+    } else if (_needsStoreRepair) {
+      _setStep(_OnboardingStep.repair);
+    } else {
+      _finishOnboarding();
     }
   }
 
@@ -193,30 +299,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         icon: Icons.folder_off_outlined,
         title: context.l10n.noStoreRepository,
         buttonLabel: context.l10n.continueAction,
-        onPressed: () => _setStep(_OnboardingStep.review),
-      );
-    }
-
-    if (!lifecycle.requiresStoreSetup) {
-      final store = lifecycle.selectedStore;
-      return ListView(
-        children: <Widget>[
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.check_circle_outline),
-              title: Text(store?.name ?? repository.currentRepoName),
-              subtitle: Text(store?.root ?? lifecycle.configPath),
-            ),
-          ),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: () => _setStep(_OnboardingStep.review),
-            child: SizedBox(
-              width: double.infinity,
-              child: Center(child: Text(context.l10n.continueAction)),
-            ),
-          ),
-        ],
+        onPressed: _finishOnboarding,
       );
     }
 
@@ -232,158 +315,216 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return _StoreSetupActions(
       lifecycle: lifecycle,
       managedPaths: managedPaths,
-      selectedPgpFingerprint: _effectivePgpFingerprint,
+      selectedPgpFingerprint: _selectedPgpFingerprint,
       hasSshKey: _sshKeys.isNotEmpty,
       pathPickerService: widget.pathPickerService,
-      onCreateLocalStore: ({
-        required String name,
-        required String root,
-        required List<String> pgpKeys,
-        required bool initializeGit,
-      }) {
-        return repository.createLocalStore(
-          name: name,
-          root: root,
-          pgpKeys: pgpKeys,
-          setDefault: true,
-          initializeGit: initializeGit,
-        );
-      },
-      onImportLocalStore: (String root) {
-        return repository.importLocalStore(root: root, setDefault: true);
-      },
-      onCloneStore: ({required String remoteUrl, required String root}) {
-        return repository.cloneStore(
-          remoteUrl: remoteUrl,
-          root: root,
-          setDefault: true,
-        );
-      },
-      onStoreChanged: () async {
-        await repository.refresh();
-        await _attachSelectedPgpKeyToCurrentStore();
-        await repository.refresh();
-        if (!mounted) {
-          return;
-        }
-        if (!_needsStoreSetup) {
-          _setStep(_OnboardingStep.review);
-          return;
-        }
-        setState(() {});
-      },
+      onCreateNeedsRecipient: () => _setStep(_OnboardingStep.createRecipients),
+      onGenerateSshKey: () => _showCreateSshKeyForm(context),
+      onImportSshKey: () => _showImportSshKeyForm(context),
+      onCreateLocalStore:
+          ({
+            required String name,
+            required String root,
+            required List<String> pgpKeys,
+            required bool initializeGit,
+          }) => repository.createLocalStore(
+            name: name,
+            root: root,
+            pgpKeys: pgpKeys,
+            initializeGit: initializeGit,
+          ),
+      onImportLocalStore: (root) => repository.importLocalStore(root: root),
+      onCloneStore:
+          ({required remoteUrl, required root}) =>
+              repository.cloneStore(remoteUrl: remoteUrl, root: root),
+      onStoreChanged: _handleStoreChanged,
     );
   }
 
-  Widget _buildPgpStep(BuildContext context) {
+  Widget _buildCreateRecipientsStep(BuildContext context) {
     final repository = _keyRepository;
     if (repository == null) {
       return _EmptyOnboardingStep(
         icon: Icons.enhanced_encryption_outlined,
         title: context.l10n.noKeyRepository,
-        buttonLabel: context.l10n.continueAction,
-        onPressed: () => _setStep(_OnboardingStep.ssh),
+        buttonLabel: context.l10n.back,
+        onPressed: _goBack,
       );
     }
-
     return _PgpSetupStep(
-      keys: _pgpKeys,
-      onUseKey: (key) => _usePgpKey(repository, key),
+      keys: _privatePgpKeys,
+      emptyTitle: context.l10n.noPgpKeysFound,
+      emptySubtitle: context.l10n.createOrImportEncryptionKey,
+      onUseKey: (key) {
+        _selectedPgpFingerprint = key.fingerprint;
+        _setStep(_OnboardingStep.store);
+      },
       onCreateKey: () => _showCreatePgpKeyForm(context, repository),
       onImportKey: () => _showImportPgpKeyForm(context, repository),
+      allowCreate: true,
     );
   }
 
-  Widget _buildSshStep(BuildContext context) {
+  Widget _buildRepairStep(BuildContext context) {
+    final lifecycle = _lifecycle;
+    final store = lifecycle?.store;
+    if (lifecycle == null || store == null) {
+      return _buildStoreStep(context);
+    }
+    if (store.gitMode == StoreGitMode.invalid) {
+      final appManaged = _isAppManagedStoreRoot(store.root);
+      return _StoreRepairStep(
+        icon: Icons.account_tree_outlined,
+        title: context.l10n.invalidGitMetadataTitle,
+        message: context.l10n.invalidGitMetadataMessage,
+        actionLabel:
+            appManaged
+                ? context.l10n.deleteAppCopy
+                : context.l10n.disconnectStore,
+        onAction:
+            () =>
+                appManaged
+                    ? _confirmDeleteForRepair(store.root)
+                    : _disconnectForRepair(store.root),
+      );
+    }
+
     final repository = _keyRepository;
     if (repository == null) {
       return _EmptyOnboardingStep(
-        icon: Icons.vpn_key_off_outlined,
-        title: context.l10n.noSshRepository,
-        buttonLabel: context.l10n.continueAction,
-        onPressed: () => _setStep(_OnboardingStep.review),
+        icon: Icons.key_off_outlined,
+        title: context.l10n.noKeyRepository,
+        buttonLabel: context.l10n.back,
+        onPressed: _goBack,
       );
     }
-
-    return _SshSetupStep(
-      keys: _sshKeys,
-      onCreateKey: () => _showCreateSshKeyForm(context, repository),
-      onImportKey: () => _showImportSshKeyForm(context, repository),
-      onOpenGithubSettings: () => _showGithubSettings(context, repository),
-      onSkip:
-          () => _setStep(
-            _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.review,
-          ),
+    final missingGpgId = !store.hasGpgId;
+    return _PgpSetupStep(
+      keys: missingGpgId ? _privatePgpKeys : _matchingPrivatePgpKeys,
+      emptyTitle:
+          missingGpgId
+              ? context.l10n.missingGpgIdTitle
+              : context.l10n.requiredPgpKeyMissingTitle,
+      emptySubtitle:
+          missingGpgId
+              ? context.l10n.missingGpgIdMessage
+              : context.l10n.requiredPgpKeyMissingMessage(
+                _requiredRecipients.join(', '),
+              ),
+      onUseKey: (key) => _completePgpRepair(key),
+      onCreateKey:
+          missingGpgId
+              ? () => _showCreatePgpKeyForm(context, repository, repair: true)
+              : null,
+      onImportKey:
+          () => _showImportPgpKeyForm(context, repository, repair: true),
+      allowCreate: missingGpgId,
     );
   }
 
-  Widget _buildReviewStep(BuildContext context) {
-    final lifecycle = _lifecycle;
-    final selectedStore = lifecycle?.selectedStore;
-    return _ReviewStep(
-      hasGestureVerifier: widget.securityRepository.hasGestureVerifier,
-      biometricUnlockEnabled: widget.securityRepository.biometricUnlockEnabled,
-      storeStatusLabel:
-          selectedStore != null && selectedStore.exists
-              ? context.l10n.configured
-              : lifecycle?.onboardingState.label ?? context.l10n.unavailable,
-      storeSetupComplete: !_needsStoreSetup && !_needsKeyRepair,
-      pgpKeyCount: _pgpKeys.length,
-      sshKeyCount: _sshKeys.length,
-      onFinish: _finishOnboarding,
+  bool _isAppManagedStoreRoot(String root) {
+    final repository = widget.settingsRepository;
+    if (repository is! AppManagedPathRepository) return false;
+    final managed = repository as AppManagedPathRepository;
+    return managed.usesAppManagedPaths && managed.isAppManagedStoreRoot(root);
+  }
+
+  Future<void> _disconnectForRepair(String root) async {
+    await _runOnboardingAction(() async {
+      await widget.settingsRepository!.removeStore(root: root);
+      await widget.settingsRepository!.refresh();
+      if (mounted) _setStep(_OnboardingStep.store);
+    });
+  }
+
+  Future<void> _confirmDeleteForRepair(String root) async {
+    final normalized = root.trim().replaceAll(RegExp(r'[/\\]+$'), '');
+    final storeName = normalized.split(RegExp(r'[/\\]')).last;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) =>
+              _DeleteStoreConfirmationDialog(root: root, storeName: storeName),
     );
+    if (approved != true || !mounted) return;
+    await _runOnboardingAction(() async {
+      await widget.settingsRepository!.deleteLocalStore(
+        root: root,
+        confirmation: storeName,
+      );
+      await widget.settingsRepository!.refresh();
+      if (mounted) _setStep(_OnboardingStep.store);
+    });
+  }
+
+  Future<void> _handleStoreChanged() async {
+    await widget.settingsRepository?.refresh();
+    if (!mounted) return;
+    if (_needsStoreSetup) {
+      setState(() {});
+    } else if (_needsStoreRepair) {
+      _setStep(_OnboardingStep.repair);
+    } else {
+      await _finishOnboarding();
+    }
+  }
+
+  Future<void> _completePgpRepair(KeyRecord key) async {
+    if (!key.hasPrivateKey || !key.hasLocalKeyMaterial) {
+      _showError(StateError(context.l10n.requiredPrivatePgpKey));
+      return;
+    }
+    final store = _lifecycle?.store;
+    if (store == null) return;
+    if (store.hasGpgId &&
+        !pgpIdentityMatchesAnyRecipient(
+          fingerprint: key.fingerprint,
+          identity: key.name,
+          recipients: _requiredRecipients,
+        )) {
+      _showError(StateError(context.l10n.pgpKeyDoesNotMatchStore));
+      return;
+    }
+    await _runOnboardingAction(() async {
+      if (!store.hasGpgId) {
+        await _keyRepository!.initializeStoreRecipients(<String>[
+          key.fingerprint,
+        ]);
+      }
+      await widget.settingsRepository?.refresh();
+      if (!mounted) return;
+      if (_needsStoreRepair) {
+        throw StateError(context.l10n.requiredPrivatePgpKey);
+      }
+      await _finishOnboarding();
+    });
   }
 
   void _setStep(_OnboardingStep step, {bool recordHistory = true}) {
+    if (!mounted) return;
     setState(() {
-      if (recordHistory && step != _step) {
-        _stepHistory.add(_step);
-      }
+      if (recordHistory && step != _step) _stepHistory.add(_step);
       _step = step;
       _error = null;
     });
   }
 
   void _goBack() {
-    if (_stepHistory.isEmpty) {
-      return;
-    }
+    if (_stepHistory.isEmpty) return;
     final previous = _stepHistory.removeLast();
     _setStep(previous, recordHistory: false);
   }
 
   void _showError(Object error) {
-    final message = UiProblem.fromError(context.l10n, error).summary;
-    setState(() => _error = message);
+    if (!mounted) return;
+    setState(() => _error = UiProblem.fromError(context.l10n, error).summary);
   }
 
-  Future<void> _usePgpKey(KeyRepository repository, KeyRecord key) async {
-    await _runOnboardingAction(() async {
-      await _finishPgpStep(repository, key);
-    });
-  }
-
-  Future<void> _finishPgpStep(KeyRepository repository, KeyRecord key) async {
-    _selectedPgpFingerprint = key.fingerprint;
-    if (!_needsStoreSetup) {
-      await repository.addPgpKeyToSelectedStore(key.fingerprint);
-      await widget.settingsRepository?.refresh();
-    }
-    _setStep(_OnboardingStep.ssh);
-  }
-
-  Future<void> _attachSelectedPgpKeyToCurrentStore() async {
-    final fingerprint = _effectivePgpFingerprint;
-    final repository = _keyRepository;
-    if (fingerprint == null ||
-        repository == null ||
-        _lifecycle?.selectedStore == null) {
-      return;
-    }
-    await repository.addPgpKeyToSelectedStore(fingerprint);
-  }
-
-  void _showCreatePgpKeyForm(BuildContext context, KeyRepository repository) {
+  void _showCreatePgpKeyForm(
+    BuildContext context,
+    KeyRepository repository, {
+    bool repair = false,
+  }) {
     final name = TextEditingController();
     final email = TextEditingController();
     final passphrase = TextEditingController();
@@ -401,7 +542,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             email: email.text,
             passphrase: passphrase.text.trim().isEmpty ? null : passphrase.text,
           );
-          await _finishPgpStep(repository, key);
+          if (repair) {
+            await _completePgpRepair(key);
+          } else {
+            _selectedPgpFingerprint = key.fingerprint;
+            _setStep(_OnboardingStep.store);
+          }
         } finally {
           passphrase.clear();
         }
@@ -409,11 +555,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  /// Opens the shared PGP import flow, the same one Settings uses.
-  ///
-  /// Onboarding only advances to SSH once the key is imported and, for a protected private key, its
-  /// passphrase has been validated.
-  void _showImportPgpKeyForm(BuildContext context, KeyRepository repository) {
+  void _showImportPgpKeyForm(
+    BuildContext context,
+    KeyRepository repository, {
+    bool repair = false,
+  }) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -443,21 +589,59 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       securityRepository: widget.securityRepository,
                       pathPickerService: widget.pathPickerService,
                       initialDirectory: _defaultKeyFileBasePath(),
+                      validateInspection: (inspection) {
+                        if (!inspection.isPrivate ||
+                            !inspection.hasPrivateKey) {
+                          return context.l10n.requiredPrivatePgpKey;
+                        }
+                        if (repair &&
+                            _lifecycle?.store?.hasGpgId == true &&
+                            !pgpIdentityMatchesAnyRecipient(
+                              fingerprint: inspection.fingerprint,
+                              identity: inspection.identity,
+                              recipients: _requiredRecipients,
+                            )) {
+                          return context.l10n.pgpKeyDoesNotMatchStore;
+                        }
+                        return null;
+                      },
                       onCancel: () => Navigator.of(sheet).pop(),
                       onCompleted: (completion) async {
-                        if (sheet.mounted) {
-                          Navigator.of(sheet).pop();
+                        if (!completion.key.hasPrivateKey ||
+                            !completion.key.hasLocalKeyMaterial) {
+                          if (mounted) {
+                            _showError(
+                              StateError(context.l10n.requiredPrivatePgpKey),
+                            );
+                          }
+                          return;
                         }
+                        if (repair &&
+                            _lifecycle?.store?.hasGpgId == true &&
+                            !pgpIdentityMatchesAnyRecipient(
+                              fingerprint: completion.key.fingerprint,
+                              identity: completion.key.name,
+                              recipients: _requiredRecipients,
+                            )) {
+                          if (mounted) {
+                            _showError(
+                              StateError(context.l10n.pgpKeyDoesNotMatchStore),
+                            );
+                          }
+                          return;
+                        }
+                        if (sheet.mounted) Navigator.of(sheet).pop();
                         if (completion.rememberFailed && mounted) {
-                          setState(
-                            () =>
-                                _error = context.l10n.importedKeyRememberFailed(
-                                  completion.key.name,
-                                ),
+                          _error = context.l10n.importedKeyRememberFailed(
+                            completion.key.name,
                           );
                         }
-                        // Selects the returned fingerprint and advances to SSH.
-                        await _finishPgpStep(repository, completion.key);
+                        if (repair) {
+                          await _completePgpRepair(completion.key);
+                        } else {
+                          _selectedPgpFingerprint = completion.key.fingerprint;
+                          _setStep(_OnboardingStep.store);
+                        }
                       },
                     ),
                   ],
@@ -469,10 +653,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   String _defaultKeyFileBasePath() {
-    final selectedRoot = _lifecycle?.selectedStoreRoot;
-    if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
-      return parentDirectory(selectedRoot);
-    }
+    final root = _lifecycle?.store?.root;
+    if (root != null && root.trim().isNotEmpty) return parentDirectory(root);
     final configPath = _lifecycle?.configPath;
     if (configPath != null && configPath.trim().isNotEmpty) {
       return parentDirectory(configPath);
@@ -480,26 +662,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return defaultUserDirectory();
   }
 
-  void _showCreateSshKeyForm(BuildContext context, KeyRepository repository) {
+  Future<bool> _showCreateSshKeyForm(BuildContext context) async {
+    final repository = _keyRepository;
+    if (repository == null) return false;
     final name = TextEditingController(text: 'github-mobile-ed25519');
-    _showOnboardingForm(
+    await _showOnboardingForm(
       context: context,
       title: context.l10n.generateSshKey,
       fields: <Widget>[_CreateSshKeyFields(name: name)],
       submitLabel: context.l10n.generateSshKey,
       onSubmit: () async {
         await repository.generateSshKey(name.text);
-        _setStep(
-          _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.review,
-        );
+        if (mounted) setState(() {});
       },
     );
+    return _sshKeys.isNotEmpty;
   }
 
-  void _showImportSshKeyForm(BuildContext context, KeyRepository repository) {
+  Future<bool> _showImportSshKeyForm(BuildContext context) async {
+    final repository = _keyRepository;
+    if (repository == null) return false;
     final name = TextEditingController();
     final privateKey = TextEditingController();
-    _showOnboardingForm(
+    await _showOnboardingForm(
       context: context,
       title: context.l10n.importSshKey,
       fields: <Widget>[_ImportSshKeyFields(name: name, privateKey: privateKey)],
@@ -510,48 +695,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             name: name.text,
             privateKey: privateKey.text,
           );
-          _setStep(
-            _needsStoreSetup ? _OnboardingStep.store : _OnboardingStep.review,
-          );
+          if (mounted) setState(() {});
         } finally {
           privateKey.clear();
         }
       },
     );
+    return _sshKeys.isNotEmpty;
   }
 
-  Future<void> _showGithubSettings(
-    BuildContext context,
-    KeyRepository repository,
-  ) async {
-    final url = await repository.githubSshSettingsUri();
-    if (!context.mounted) {
-      return;
-    }
-    showDialog<void>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(context.l10n.githubSshSettings),
-            content: SelectableText(url.toString()),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(context.l10n.close),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _showOnboardingForm({
+  Future<void> _showOnboardingForm({
     required BuildContext context,
     required String title,
     required List<Widget> fields,
     required String submitLabel,
     required Future<void> Function() onSubmit,
   }) {
-    showModalBottomSheet<void>(
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder:
@@ -568,47 +728,101 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       await action();
     } catch (error) {
-      if (mounted) {
-        _showError(error);
-      }
+      _showError(error);
     }
   }
 
   Future<void> _finishOnboarding() async {
-    if (_needsStoreSetup || _needsKeyRepair) {
-      setState(() => _error = context.l10n.selectPrivatePgpKey);
+    if (_finishing) return;
+    if (_needsStoreSetup || _needsStoreRepair) {
+      _showError(StateError(context.l10n.requiredPrivatePgpKey));
       return;
     }
+    _finishing = true;
+    if (mounted) setState(() {});
     await widget.securityRepository.setOnboardingComplete(true);
     await widget.securityRepository.markUnlocked(DateTime.now());
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     widget.onComplete();
   }
 
-  String _stepTitle(AppLocalizations localizations, _OnboardingStep step) {
-    return switch (step) {
-      _OnboardingStep.gesture => localizations.setGestureLock,
-      _OnboardingStep.biometrics => localizations.enableBiometricUnlock,
-      _OnboardingStep.pgp => localizations.choosePgpKey,
-      _OnboardingStep.ssh => localizations.setupSshGithub,
-      _OnboardingStep.store => localizations.setupPasswordStore,
-      _OnboardingStep.review => localizations.reviewSetup,
-    };
+  String _stepTitle(AppLocalizations l10n, _OnboardingStep step) =>
+      switch (step) {
+        _OnboardingStep.gesture => l10n.setGestureLock,
+        _OnboardingStep.biometrics => l10n.enableBiometricUnlock,
+        _OnboardingStep.store => l10n.setupPasswordStore,
+        _OnboardingStep.createRecipients => l10n.choosePgpKey,
+        _OnboardingStep.repair => l10n.repairPasswordStore,
+      };
+
+  String _stepSubtitle(AppLocalizations l10n, _OnboardingStep step) =>
+      switch (step) {
+        _OnboardingStep.gesture => l10n.gestureStepSubtitle,
+        _OnboardingStep.biometrics => l10n.biometricsStepSubtitle,
+        _OnboardingStep.store => l10n.storeFirstSetupSubtitle,
+        _OnboardingStep.createRecipients => l10n.createStoreRecipientSubtitle,
+        _OnboardingStep.repair => l10n.contextualRepairSubtitle,
+      };
+}
+
+class _DeleteStoreConfirmationDialog extends StatefulWidget {
+  const _DeleteStoreConfirmationDialog({
+    required this.root,
+    required this.storeName,
+  });
+
+  final String root;
+  final String storeName;
+
+  @override
+  State<_DeleteStoreConfirmationDialog> createState() =>
+      _DeleteStoreConfirmationDialogState();
+}
+
+class _DeleteStoreConfirmationDialogState
+    extends State<_DeleteStoreConfirmationDialog> {
+  final TextEditingController _confirmation = TextEditingController();
+
+  @override
+  void dispose() {
+    _confirmation.dispose();
+    super.dispose();
   }
 
-  String _stepSubtitle(AppLocalizations localizations, _OnboardingStep step) {
-    return switch (step) {
-      _OnboardingStep.gesture => localizations.gestureStepSubtitle,
-      _OnboardingStep.biometrics => localizations.biometricsStepSubtitle,
-      _OnboardingStep.pgp => localizations.pgpStepSubtitle,
-      _OnboardingStep.ssh => localizations.sshStepSubtitle,
-      _OnboardingStep.store =>
-        _needsStoreSetup
-            ? localizations.createImportCloneStore
-            : localizations.storeAvailable,
-      _OnboardingStep.review => localizations.reviewStepSubtitle,
-    };
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: Text(context.l10n.deleteAppCopy),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(context.l10n.pathValue(widget.root)),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('repair-delete-confirmation'),
+            controller: _confirmation,
+            decoration: InputDecoration(
+              labelText: context.l10n.typeToConfirm(widget.storeName),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(context.l10n.cancel),
+        ),
+        FilledButton(
+          onPressed:
+              _confirmation.text == widget.storeName
+                  ? () => Navigator.of(context).pop(true)
+                  : null,
+          child: Text(context.l10n.delete),
+        ),
+      ],
+    );
   }
 }

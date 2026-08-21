@@ -10,6 +10,7 @@ import 'bridge/pars_bridge_api.dart';
 import 'bridge/frb_generated/frb_generated.dart';
 import 'services/autofill_repository.dart';
 import 'services/bridge_backed_repository.dart';
+import 'services/key_repository.dart';
 import 'services/mobile_pgp_backend.dart';
 import 'services/security_repository.dart';
 import 'services/ui_preferences_store.dart';
@@ -35,15 +36,49 @@ Future<void> main() async {
     bridge: const FrbAutofillBridgeApi(),
     configPath: pgpRuntime.configPath,
     indexPath: '${pgpRuntime.configPath}.autofill.json',
-    storeId: 'selected',
-    storeName: 'Selected store',
+    storeId: 'canonical-store',
+    storeName: 'Pars',
     storeRoot: '',
     pgpExecutable: pgpRuntime.pgpExecutable,
     securityRepository: securityRepository,
-    currentStoreId: () => repository.lifecycle.selectedStoreId ?? 'selected',
-    currentStoreName:
-        () => repository.lifecycle.selectedStore?.name ?? 'Selected store',
-    currentStoreRoot: () => repository.lifecycle.selectedStoreRoot ?? '',
+    currentStoreId: () => 'canonical-store',
+    currentStoreName: () => repository.lifecycle.store?.name ?? 'Pars',
+    currentStoreRoot: () => repository.lifecycle.store?.root ?? '',
+    currentStoreReady:
+        () =>
+            !repository.storeRemovalInProgress &&
+            !repository.lifecycle.requiresStoreSetup &&
+            !repository.lifecycle.requiresStoreRepair,
+    validatePgpPassphraseForCurrentStore: (fingerprint, passphrase) async {
+      final store = repository.lifecycle.store;
+      if (store == null || repository.storeRemovalInProgress) return false;
+      final expected = fingerprint.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+      final matching = repository.keys.where(
+        (key) =>
+            key.hasPrivateKey &&
+            key.hasLocalKeyMaterial &&
+            key.fingerprint.replaceAll(RegExp(r'\s+'), '').toUpperCase() ==
+                expected &&
+            pgpIdentityMatchesAnyRecipient(
+              fingerprint: key.fingerprint,
+              identity: key.name,
+              recipients: store.pgpRecipients,
+            ),
+      );
+      if (matching.isEmpty) return false;
+      try {
+        final prepared = await repository.preparePgpPrivateKey(
+          fingerprint: matching.first.fingerprint,
+          passphrase: passphrase,
+        );
+        return prepared.fingerprint
+                .replaceAll(RegExp(r'\s+'), '')
+                .toUpperCase() ==
+            expected;
+      } catch (_) {
+        return false;
+      }
+    },
   );
   repository = BridgeBackedRepository(
     bridge: bridge,

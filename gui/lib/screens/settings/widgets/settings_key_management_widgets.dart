@@ -1,15 +1,14 @@
 part of '../settings_screen.dart';
 
-extension _SettingsScreenKeyManagementSheets on SettingsScreen {
-  void _showKeys(BuildContext context, KeyRecordType type) {
+extension _SettingsScreenSshKeySheets on SettingsScreen {
+  void _showSshKeys(BuildContext context) {
     showParsAdaptiveDetail<void>(
       context: context,
       builder:
-          (context) => StatefulBuilder(
+          (surfaceContext) => StatefulBuilder(
             builder: (context, setSheetState) {
-              final localizations = context.l10n;
               final keys = keyRepository.keys
-                  .where((key) => key.type == type)
+                  .where((key) => key.type == KeyRecordType.ssh)
                   .toList(growable: false);
               return SafeArea(
                 child: Padding(
@@ -20,93 +19,82 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          type == KeyRecordType.pgp
-                              ? localizations.pgpKeysTitle
-                              : localizations.sshKeysTitle,
+                          context.l10n.sshKeysTitle,
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
+                        const SizedBox(height: 8),
+                        Text(context.l10n.sshKeysGitOnlyDescription),
                         const SizedBox(height: 12),
                         if (keys.isEmpty)
                           ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.key_off_outlined),
-                            title: Text(
-                              type == KeyRecordType.pgp
-                                  ? localizations.noPgpKeys
-                                  : localizations.noSshKeys,
-                            ),
-                            subtitle: Text(localizations.createOrImportKey),
+                            leading: const Icon(Icons.vpn_key_off_outlined),
+                            title: Text(context.l10n.noSshKeys),
+                            subtitle: Text(context.l10n.sshOptionalDescription),
                           ),
                         for (final key in keys)
                           Card(
                             child: ListTile(
+                              leading: const Icon(Icons.vpn_key_outlined),
                               title: Text(key.name),
-                              subtitle: Text(
-                                key.hasLocalKeyMaterial
-                                    ? '${key.fingerprint}\n'
-                                        '${key.source}\n'
-                                        '${key.hasPrivateKey ? localizations.privateKeyMaterial : localizations.publicKeyMaterial}'
-                                    : '${localizations.passwordStoreKeyReference(key.referencedByStores.join(', '))}\n'
-                                        '${localizations.localKeyMaterialMissing}',
+                              subtitle: Text(key.fingerprint),
+                              trailing: PopupMenuButton<String>(
+                                tooltip: context.l10n.keyActionsTooltip(
+                                  context.l10n.sshStep,
+                                  key.name,
+                                ),
+                                onSelected: (action) {
+                                  switch (action) {
+                                    case 'export_public':
+                                      _exportSshPublic(context, key);
+                                    case 'export_private':
+                                      _showExportSshPrivate(context, key);
+                                    case 'delete':
+                                      _showDeleteSshKey(
+                                        context,
+                                        key,
+                                        setSheetState,
+                                      );
+                                  }
+                                },
+                                itemBuilder:
+                                    (context) => <PopupMenuEntry<String>>[
+                                      PopupMenuItem(
+                                        value: 'export_public',
+                                        child: Text(context.l10n.exportPublic),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'export_private',
+                                        child: Text(context.l10n.exportPrivate),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text(context.l10n.delete),
+                                      ),
+                                    ],
                               ),
-                              isThreeLine: true,
-                              trailing:
-                                  key.hasLocalKeyMaterial
-                                      ? PopupMenuButton<String>(
-                                        tooltip: localizations
-                                            .keyActionsTooltip(
-                                              key.type == KeyRecordType.pgp
-                                                  ? localizations.pgpStep
-                                                  : localizations.sshStep,
-                                              key.name,
-                                            ),
-                                        onSelected: (value) {
-                                          switch (value) {
-                                            case 'export_public':
-                                              _exportPublicKey(context, key);
-                                              break;
-                                            case 'export_private':
-                                              _showPrivateExportForm(
-                                                context,
-                                                key,
-                                              );
-                                              break;
-                                            case 'add_to_store':
-                                              _addPgpKeyToStore(context, key);
-                                              break;
-                                            case 'delete':
-                                              _showDeleteKeyDialog(
-                                                context,
-                                                key,
-                                                setSheetState,
-                                              );
-                                              break;
-                                          }
-                                        },
-                                        itemBuilder:
-                                            (context) => _keyActionMenuItems(
-                                              context,
-                                              key.type,
-                                            ),
-                                      )
-                                      : null,
                             ),
                           ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: <Widget>[
-                            FilledButton(
-                              onPressed:
-                                  () => _showCreateKeyForm(context, type),
-                              child: Text(localizations.create),
+                            FilledButton.icon(
+                              onPressed: () => _showGenerateSshKey(context),
+                              icon: const Icon(Icons.add),
+                              label: Text(context.l10n.generateSshKey),
                             ),
-                            OutlinedButton(
-                              onPressed:
-                                  () => _showImportKeyOptions(context, type),
-                              child: Text(localizations.importAction),
+                            OutlinedButton.icon(
+                              onPressed: () => _showImportSshOptions(context),
+                              icon: const Icon(Icons.file_upload_outlined),
+                              label: Text(context.l10n.importSshKey),
+                            ),
+                            TextButton.icon(
+                              onPressed: () => _showGithubSshSettings(context),
+                              icon: const Icon(Icons.open_in_new),
+                              label: Text(context.l10n.githubSettings),
                             ),
                           ],
                         ),
@@ -120,279 +108,27 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     );
   }
 
-  List<PopupMenuEntry<String>> _keyActionMenuItems(
-    BuildContext context,
-    KeyRecordType type,
-  ) {
-    final localizations = context.l10n;
-    return <PopupMenuEntry<String>>[
-      PopupMenuItem<String>(
-        value: 'export_public',
-        child: Text(localizations.exportPublic),
-      ),
-      PopupMenuItem<String>(
-        value: 'export_private',
-        child: Text(localizations.exportPrivate),
-      ),
-      if (type == KeyRecordType.pgp)
-        PopupMenuItem<String>(
-          value: 'add_to_store',
-          child: Text(localizations.addToGpgId),
+  void _showGenerateSshKey(BuildContext context) {
+    final name = TextEditingController(text: 'github-mobile-ed25519');
+    _showSshActionForm(
+      context: context,
+      title: context.l10n.generateSshKey,
+      fields: <Widget>[
+        TextField(
+          controller: name,
+          decoration: InputDecoration(labelText: context.l10n.nameField),
+          textInputAction: TextInputAction.done,
         ),
-      const PopupMenuDivider(),
-      PopupMenuItem<String>(
-        value: 'delete',
-        child: Text(localizations.deleteKeyAction),
-      ),
-    ];
-  }
-
-  void _showDeleteKeyDialog(
-    BuildContext sheetContext,
-    KeyRecord key,
-    StateSetter setSheetState,
-  ) {
-    final confirmation = TextEditingController();
-    final requiredText = _keyDeletionConfirmationLabel(key);
-    var isDeleting = false;
-    showDialog<void>(
-      context: sheetContext,
-      builder:
-          (dialogContext) => StatefulBuilder(
-            builder: (dialogContext, setDialogState) {
-              final localizations = AppLocalizations.of(dialogContext);
-              return AlertDialog(
-                scrollable: true,
-                title: Text(
-                  localizations.deleteKeyTitle(
-                    key.type == KeyRecordType.pgp
-                        ? localizations.pgpStep
-                        : localizations.sshStep,
-                  ),
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      key.name,
-                      style: Theme.of(dialogContext).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(localizations.fingerprintValue(key.fingerprint)),
-                    const SizedBox(height: 12),
-                    Text(localizations.deleteKeyDescription(requiredText)),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: confirmation,
-                      decoration: InputDecoration(
-                        labelText: localizations.deleteKeyConfirmation(
-                          requiredText,
-                        ),
-                      ),
-                      onChanged: (_) => setDialogState(() {}),
-                    ),
-                  ],
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: Text(localizations.cancel),
-                  ),
-                  FilledButton(
-                    onPressed:
-                        confirmation.text == requiredText && !isDeleting
-                            ? () async {
-                              setDialogState(() => isDeleting = true);
-                              try {
-                                var notification = localizations.keyDeleted(
-                                  key.name,
-                                );
-                                if (key.type == KeyRecordType.pgp) {
-                                  final outcome = await keyRepository
-                                      .deletePgpKey(key.fingerprint);
-                                  if (outcome.privateKeyAbsent) {
-                                    await securityRepository
-                                        .clearPgpPassphraseForFingerprint(
-                                          key.fingerprint,
-                                        );
-                                  }
-                                  if (outcome.publicCleanupFailed) {
-                                    notification =
-                                        localizations.pgpKeyDeletePartial;
-                                  }
-                                } else {
-                                  await keyRepository.deleteSshKey(key.name);
-                                }
-                                if (dialogContext.mounted) {
-                                  Navigator.of(dialogContext).pop();
-                                }
-                                setSheetState(() {});
-                                if (!sheetContext.mounted) return;
-                                AppNotification.show(
-                                  sheetContext,
-                                  notification,
-                                );
-                              } catch (error) {
-                                if (dialogContext.mounted) {
-                                  Navigator.of(dialogContext).pop();
-                                }
-                                setSheetState(() {});
-                                if (!sheetContext.mounted) return;
-                                AppNotification.show(
-                                  sheetContext,
-                                  localizations.keyDeleteFailed(
-                                    UiProblem.fromError(
-                                      sheetContext.l10n,
-                                      error,
-                                    ).summary,
-                                  ),
-                                );
-                              }
-                            }
-                            : null,
-                    child: Text(localizations.delete),
-                  ),
-                ],
-              );
-            },
-          ),
+      ],
+      submitLabel: context.l10n.generateSshKey,
+      onSubmit: () async {
+        await keyRepository.generateSshKey(name.text);
+        await settingsRepository.refresh();
+      },
     );
   }
 
-  void _showCreateKeyForm(BuildContext context, KeyRecordType type) {
-    final name = TextEditingController();
-    final email = TextEditingController();
-    final passphrase = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              type == KeyRecordType.pgp
-                  ? context.l10n.createPgpKey
-                  : context.l10n.createSshKey,
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                TextField(
-                  controller: name,
-                  decoration: InputDecoration(
-                    labelText: context.l10n.nameField,
-                  ),
-                ),
-                if (type == KeyRecordType.pgp)
-                  TextField(
-                    controller: email,
-                    decoration: InputDecoration(
-                      labelText: context.l10n.emailField,
-                    ),
-                  ),
-                if (type == KeyRecordType.pgp)
-                  TextField(
-                    controller: passphrase,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: context.l10n.passphraseField,
-                    ),
-                  ),
-              ],
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(context.l10n.cancel),
-              ),
-              FilledButton(
-                onPressed:
-                    () => _runKeyAction(context, () async {
-                      try {
-                        return type == KeyRecordType.pgp
-                            ? await keyRepository.generatePgpKey(
-                              name: name.text,
-                              email: email.text,
-                              passphrase:
-                                  passphrase.text.trim().isEmpty
-                                      ? null
-                                      : passphrase.text,
-                            )
-                            : await keyRepository.generateSshKey(name.text);
-                      } finally {
-                        passphrase.clear();
-                      }
-                    }),
-                child: Text(context.l10n.create),
-              ),
-            ],
-          ),
-    );
-  }
-
-  /// Opens the shared source-independent PGP import flow.
-  ///
-  /// SSH keeps its own Text/File dialog because it needs a key name and has no
-  /// public/private detection.
-  void _showImportKeyOptions(BuildContext context, KeyRecordType type) {
-    if (type == KeyRecordType.ssh) {
-      _showSshImportKeyOptions(context);
-      return;
-    }
-
-    final sheetContext = context;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (sheet) => SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      context.l10n.importPgpKey,
-                      style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    PgpKeyImportBody(
-                      keyRepository: keyRepository,
-                      securityRepository: securityRepository,
-                      pathPickerService: pathPickerService,
-                      initialDirectory: _defaultKeyFileBasePath(),
-                      onCancel: () => Navigator.of(sheet).pop(),
-                      onCompleted: (completion) async {
-                        // Refresh so the key list reflects what the backend confirmed.
-                        await settingsRepository.refresh();
-                        if (sheet.mounted) {
-                          Navigator.of(sheet).pop();
-                        }
-                        if (!sheetContext.mounted) return;
-                        AppNotification.show(
-                          sheetContext,
-                          _importNotification(context.l10n, completion),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-    );
-  }
-
-  void _showSshImportKeyOptions(BuildContext context) {
-    final sheetContext = context;
+  void _showImportSshOptions(BuildContext context) {
     showDialog<void>(
       context: context,
       builder:
@@ -402,14 +138,14 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
               TextButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  _showImportKeyForm(sheetContext, KeyRecordType.ssh);
+                  _showImportSshText(context);
                 },
                 child: Text(dialogContext.l10n.textSource),
               ),
               FilledButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  _showImportKeyFileForm(sheetContext, KeyRecordType.ssh);
+                  _showImportSshFile(context);
                 },
                 child: Text(dialogContext.l10n.fileSource),
               ),
@@ -418,363 +154,310 @@ extension _SettingsScreenKeyManagementSheets on SettingsScreen {
     );
   }
 
-  /// SSH-only text import. PGP uses [PgpKeyImportBody], which detects the key kind.
-  void _showImportKeyForm(BuildContext context, KeyRecordType type) {
+  void _showImportSshText(BuildContext context) {
     final name = TextEditingController();
-    final keyText = TextEditingController();
+    final privateKey = TextEditingController();
+    _showSshActionForm(
+      context: context,
+      title: context.l10n.importSshKey,
+      fields: <Widget>[
+        TextField(
+          controller: name,
+          decoration: InputDecoration(labelText: context.l10n.nameField),
+          textInputAction: TextInputAction.next,
+        ),
+        TextField(
+          controller: privateKey,
+          minLines: 4,
+          maxLines: 8,
+          decoration: InputDecoration(
+            labelText: context.l10n.privateKeyMaterial,
+          ),
+        ),
+      ],
+      submitLabel: context.l10n.importAction,
+      onSubmit: () async {
+        try {
+          await keyRepository.importSshPrivateKeyText(
+            name: name.text,
+            privateKey: privateKey.text,
+          );
+          await settingsRepository.refresh();
+        } finally {
+          privateKey.clear();
+        }
+      },
+    );
+  }
+
+  Future<void> _showImportSshFile(BuildContext context) async {
+    String? selectedPath;
+    final name = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder:
+          (sheetContext) => StatefulBuilder(
+            builder:
+                (context, setSheetState) => _SshActionFormBody(
+                  title: context.l10n.importSshKeyFile,
+                  fields: <Widget>[
+                    TextField(
+                      controller: name,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.nameField,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    PathPickerRow(
+                      title: context.l10n.keyFileField,
+                      path: selectedPath ?? _defaultSshKeyFileBasePath(),
+                      isSelected: selectedPath != null,
+                      onPressed: () async {
+                        final path = await pathPickerService.pickFile(
+                          initialDirectory: _defaultSshKeyFileBasePath(),
+                        );
+                        if (path != null) {
+                          setSheetState(() => selectedPath = path);
+                        }
+                      },
+                    ),
+                  ],
+                  submitLabel: context.l10n.importAction,
+                  canSubmit:
+                      () => selectedPath != null && name.text.trim().isNotEmpty,
+                  onSubmit: () async {
+                    await keyRepository.importSshPrivateKeyFile(
+                      name: name.text,
+                      path: selectedPath!,
+                    );
+                    await settingsRepository.refresh();
+                  },
+                ),
+          ),
+    );
+  }
+
+  Future<void> _exportSshPublic(BuildContext context, KeyRecord key) async {
+    try {
+      final value = await keyRepository.exportSshPublicKey(key.name);
+      if (!context.mounted) return;
+      _showKeyExport(context, context.l10n.exportPublic, value);
+    } catch (error) {
+      if (context.mounted) {
+        AppNotification.show(
+          context,
+          UiProblem.fromError(context.l10n, error).summary,
+        );
+      }
+    }
+  }
+
+  void _showExportSshPrivate(BuildContext context, KeyRecord key) {
+    final confirmation = TextEditingController();
+    final expected = 'EXPORT PRIVATE KEY ${key.name}';
+    _showSshActionForm(
+      context: context,
+      title: context.l10n.exportPrivate,
+      fields: <Widget>[
+        Text(context.l10n.typeToConfirm(expected)),
+        TextField(
+          controller: confirmation,
+          decoration: InputDecoration(labelText: context.l10n.confirmation),
+        ),
+      ],
+      submitLabel: context.l10n.exportPrivate,
+      onSubmit: () async {
+        final value = await keyRepository.exportSshPrivateKey(
+          name: key.name,
+          confirmation: confirmation.text,
+        );
+        if (context.mounted) {
+          _showKeyExport(context, context.l10n.exportPrivate, value);
+        }
+      },
+    );
+  }
+
+  void _showDeleteSshKey(
+    BuildContext context,
+    KeyRecord key,
+    StateSetter refreshSheet,
+  ) {
+    final confirmation = TextEditingController();
+    _showSshActionForm(
+      context: context,
+      title: context.l10n.delete,
+      fields: <Widget>[
+        Text(context.l10n.typeToConfirm(key.name)),
+        TextField(
+          controller: confirmation,
+          decoration: InputDecoration(labelText: context.l10n.confirmation),
+        ),
+      ],
+      submitLabel: context.l10n.delete,
+      onSubmit: () async {
+        if (confirmation.text != key.name) {
+          throw StateError(context.l10n.typeToConfirm(key.name));
+        }
+        await keyRepository.deleteSshKey(key.name);
+        await settingsRepository.refresh();
+        refreshSheet(() {});
+      },
+    );
+  }
+
+  Future<void> _showGithubSshSettings(BuildContext context) async {
+    final uri = await keyRepository.githubSshSettingsUri();
+    if (!context.mounted) return;
     showDialog<void>(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text(context.l10n.importSshKey),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                TextField(
-                  controller: name,
-                  decoration: InputDecoration(
-                    labelText: context.l10n.nameField,
-                  ),
-                ),
-                TextField(
-                  controller: keyText,
-                  minLines: 4,
-                  maxLines: 8,
-                  decoration: InputDecoration(
-                    labelText: context.l10n.keyTextField,
-                  ),
-                ),
-              ],
-            ),
+            title: Text(context.l10n.githubSshSettings),
+            content: SelectableText(uri.toString()),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: Text(context.l10n.cancel),
-              ),
-              FilledButton(
-                onPressed:
-                    () => _runKeyAction(context, () async {
-                      try {
-                        return await keyRepository.importSshPrivateKeyText(
-                          name: name.text,
-                          privateKey: keyText.text,
-                        );
-                      } finally {
-                        keyText.clear();
-                      }
-                    }),
-                child: Text(context.l10n.importAction),
+                child: Text(context.l10n.close),
               ),
             ],
           ),
     );
   }
 
-  Future<void> _chooseFolder(
-    BuildContext context, {
-    required String initialDirectory,
-    required ValueChanged<String> onSelected,
-  }) async {
-    try {
-      final path = await pathPickerService.pickFolder(
-        initialDirectory: initialDirectory,
-      );
-      if (path == null) {
-        return;
-      }
-      onSelected(path);
-    } catch (error) {
-      if (!context.mounted) return;
-      AppNotification.show(
-        context,
-        UiProblem.fromError(context.l10n, error).summary,
-        severity: AppNotificationSeverity.error,
-      );
-    }
-  }
-
-  Future<void> _chooseFile(
-    BuildContext context, {
-    required String initialDirectory,
-    required ValueChanged<String> onSelected,
-  }) async {
-    try {
-      final path = await pathPickerService.pickFile(
-        initialDirectory: initialDirectory,
-      );
-      if (path == null) {
-        return;
-      }
-      onSelected(path);
-    } catch (error) {
-      if (!context.mounted) return;
-      AppNotification.show(
-        context,
-        UiProblem.fromError(context.l10n, error).summary,
-        severity: AppNotificationSeverity.error,
-      );
-    }
-  }
-
-  String _defaultStoreBasePath() {
-    final selectedRoot = settingsRepository.lifecycle.selectedStoreRoot;
-    if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
-      return parentDirectory(selectedRoot);
-    }
-    if (settingsRepository.stores.isNotEmpty) {
-      return parentDirectory(settingsRepository.stores.first.root);
-    }
-    return parentDirectory(settingsRepository.lifecycle.configPath);
-  }
-
-  String _defaultKeyFileBasePath() {
-    final selectedRoot = settingsRepository.lifecycle.selectedStoreRoot;
-    if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
-      return parentDirectory(selectedRoot);
-    }
-    return parentDirectory(settingsRepository.lifecycle.configPath);
-  }
-
-  /// SSH-only file import. The old PGP branch here always called the private-key
-  /// API, which is exactly why a public key from a file used to fail.
-  void _showImportKeyFileForm(BuildContext context, KeyRecordType type) {
-    final name = TextEditingController();
-    final defaultPath = _defaultKeyFileBasePath();
-    String? selectedPath;
+  void _showKeyExport(BuildContext context, String title, String value) {
     showDialog<void>(
       context: context,
       builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setDialogState) => AlertDialog(
-                  title: Text(context.l10n.importSshKeyFile),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      TextField(
-                        controller: name,
-                        decoration: InputDecoration(
-                          labelText: context.l10n.nameField,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      PathPickerRow(
-                        title: context.l10n.keyFileField,
-                        path: selectedPath ?? defaultPath,
-                        isSelected: selectedPath != null,
-                        onPressed:
-                            () => _chooseFile(
-                              context,
-                              initialDirectory: defaultPath,
-                              onSelected:
-                                  (path) => setDialogState(() {
-                                    selectedPath = path;
-                                  }),
-                            ),
-                      ),
-                    ],
-                  ),
-                  actions: <Widget>[
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(context.l10n.cancel),
-                    ),
-                    FilledButton(
-                      onPressed:
-                          selectedPath == null
-                              ? null
-                              : () => _runKeyAction(
-                                context,
-                                () => keyRepository.importSshPrivateKeyFile(
-                                  name: name.text,
-                                  path: selectedPath!,
-                                ),
-                              ),
-                      child: Text(context.l10n.importAction),
-                    ),
-                  ],
-                ),
+          (context) => AlertDialog(
+            title: Text(title),
+            content: SingleChildScrollView(child: SelectableText(value)),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(context.l10n.close),
+              ),
+            ],
           ),
     );
   }
 
-  void _showPrivateExportForm(BuildContext sheetContext, KeyRecord key) {
-    final confirmation = TextEditingController();
-    final requiredText = _privateKeyExportPhrase(key);
-    showDialog<void>(
-      context: sheetContext,
+  String _defaultSshKeyFileBasePath() {
+    final root = settingsRepository.store?.root;
+    if (root != null && root.trim().isNotEmpty) return parentDirectory(root);
+    return defaultUserDirectory();
+  }
+
+  void _showSshActionForm({
+    required BuildContext context,
+    required String title,
+    required List<Widget> fields,
+    required String submitLabel,
+    required Future<void> Function() onSubmit,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (dialogContext, setDialogState) => AlertDialog(
-                  title: Text(dialogContext.l10n.exportPrivateKey),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        key.name,
-                        style: Theme.of(dialogContext).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        dialogContext.l10n.fingerprintValue(key.fingerprint),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        dialogContext.l10n.privateExportSensitive(requiredText),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: confirmation,
-                        decoration: InputDecoration(
-                          labelText: dialogContext.l10n.typeToConfirm(
-                            requiredText,
-                          ),
-                        ),
-                        onChanged: (_) => setDialogState(() {}),
-                      ),
-                    ],
-                  ),
-                  actions: <Widget>[
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: Text(dialogContext.l10n.cancel),
-                    ),
-                    FilledButton(
-                      onPressed:
-                          confirmation.text == requiredText
-                              ? () {
-                                Navigator.of(dialogContext).pop();
-                                _showExportedText(
-                                  sheetContext,
-                                  () =>
-                                      key.type == KeyRecordType.pgp
-                                          ? keyRepository.exportPgpPrivateKey(
-                                            fingerprint: key.fingerprint,
-                                            confirmation: confirmation.text,
-                                          )
-                                          : keyRepository.exportSshPrivateKey(
-                                            name: key.name,
-                                            confirmation: confirmation.text,
-                                          ),
-                                );
-                              }
-                              : null,
-                      child: Text(dialogContext.l10n.exportAction),
-                    ),
-                  ],
-                ),
+          (context) => _SshActionFormBody(
+            title: title,
+            fields: fields,
+            submitLabel: submitLabel,
+            canSubmit: () => true,
+            onSubmit: onSubmit,
           ),
     );
   }
+}
 
-  Future<void> _runKeyAction(
-    BuildContext context,
-    Future<KeyRecord> Function() action,
-  ) async {
-    try {
-      final key = await action();
-      if (!context.mounted) return;
-      Navigator.of(context).pop();
-      AppNotification.show(context, key.name);
-    } catch (error) {
-      if (!context.mounted) return;
-      AppNotification.show(
-        context,
-        UiProblem.fromError(context.l10n, error).summary,
-        severity: AppNotificationSeverity.error,
-      );
-    }
-  }
+class _SshActionFormBody extends StatefulWidget {
+  const _SshActionFormBody({
+    required this.title,
+    required this.fields,
+    required this.submitLabel,
+    required this.canSubmit,
+    required this.onSubmit,
+  });
 
-  void _exportPublicKey(BuildContext context, KeyRecord key) {
-    _showExportedText(
-      context,
-      () =>
-          key.type == KeyRecordType.pgp
-              ? keyRepository.exportPgpPublicKey(key.fingerprint)
-              : keyRepository.exportSshPublicKey(key.name),
-    );
-  }
+  final String title;
+  final List<Widget> fields;
+  final String submitLabel;
+  final bool Function() canSubmit;
+  final Future<void> Function() onSubmit;
 
-  Future<void> _showExportedText(
-    BuildContext context,
-    Future<String> Function() action,
-  ) async {
-    try {
-      final text = await action();
-      if (!context.mounted) return;
-      showDialog<void>(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: Text(context.l10n.exportedKey),
-              content: SelectableText(text),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(context.l10n.close),
+  @override
+  State<_SshActionFormBody> createState() => _SshActionFormBodyState();
+}
+
+class _SshActionFormBodyState extends State<_SshActionFormBody> {
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                widget.title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              ...widget.fields,
+              if (_error != null) ...<Widget>[
+                const SizedBox(height: 12),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ),
               ],
-            ),
-      );
-    } catch (error) {
-      if (!context.mounted) return;
-      AppNotification.show(
-        context,
-        UiProblem.fromError(context.l10n, error).summary,
-        severity: AppNotificationSeverity.error,
-      );
-    }
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _submitting || !widget.canSubmit() ? null : _submit,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Center(child: Text(widget.submitLabel)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  Future<void> _addPgpKeyToStore(BuildContext context, KeyRecord key) async {
+  Future<void> _submit() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
     try {
-      await keyRepository.addPgpKeyToSelectedStore(key.fingerprint);
-      if (!context.mounted) return;
-      AppNotification.show(context, key.fingerprint);
+      await widget.onSubmit();
+      if (mounted) Navigator.of(context).pop();
     } catch (error) {
-      if (!context.mounted) return;
-      AppNotification.show(
-        context,
-        UiProblem.fromError(context.l10n, error).summary,
-        severity: AppNotificationSeverity.error,
-      );
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = UiProblem.fromError(context.l10n, error).summary;
+      });
     }
   }
-}
-
-String _keyConfirmationLabel(KeyRecord key) {
-  final name = key.name.trim();
-  return name.isEmpty ? key.fingerprint : name;
-}
-
-String _keyDeletionConfirmationLabel(KeyRecord key) {
-  final label = _keyConfirmationLabel(key);
-  if (key.type != KeyRecordType.pgp) return label;
-
-  final trailingEmail = RegExp(r'\s*<[^<>]+>\s*$').firstMatch(label);
-  if (trailingEmail == null) return label;
-
-  final displayName = label.substring(0, trailingEmail.start).trim();
-  return displayName.isEmpty ? label : displayName;
-}
-
-/// Reports the canonical imported key, and any secure-storage failure.
-///
-/// Never includes the passphrase.
-String _importNotification(
-  AppLocalizations localizations,
-  PgpImportCompletion completion,
-) {
-  final label = _keyConfirmationLabel(completion.key);
-  if (completion.rememberFailed) {
-    return localizations.importedKeyRememberFailed(label);
-  }
-  return localizations.importedKey(label);
-}
-
-String _privateKeyExportPhrase(KeyRecord key) {
-  return 'EXPORT PRIVATE KEY ${_keyConfirmationLabel(key)}';
 }

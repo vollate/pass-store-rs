@@ -25,6 +25,7 @@ class PgpKeyImportBody extends StatefulWidget {
     required this.securityRepository,
     required this.pathPickerService,
     required this.onCompleted,
+    this.validateInspection,
     this.initialDirectory,
     this.onCancel,
   });
@@ -35,6 +36,9 @@ class PgpKeyImportBody extends StatefulWidget {
 
   /// Called after the key is imported and passphrase policy has been applied.
   final Future<void> Function(PgpImportCompletion completion) onCompleted;
+
+  /// Returns a localized error before import is allowed to mutate key or session state.
+  final String? Function(PgpKeyInspection inspection)? validateInspection;
 
   final String? initialDirectory;
   final VoidCallback? onCancel;
@@ -282,6 +286,17 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
         ),
       };
       if (!mounted) return null;
+      final validationError = widget.validateInspection?.call(inspection);
+      if (validationError != null) {
+        setState(() {
+          _inspection = null;
+          _isInspecting = false;
+          _error = validationError;
+          _remember = false;
+          _passphrase.clear();
+        });
+        return null;
+      }
       setState(() {
         _inspection = inspection;
         _isInspecting = false;

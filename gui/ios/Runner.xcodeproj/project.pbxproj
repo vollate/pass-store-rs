@@ -805,6 +805,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				OTHER_LDFLAGS = "$(inherited) -lz -liconv";
 				CODE_SIGN_ENTITLEMENTS = ParsCredentialProvider/ParsCredentialProvider.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -841,6 +842,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				OTHER_LDFLAGS = "$(inherited) -lz -liconv";
 				CODE_SIGN_ENTITLEMENTS = ParsCredentialProvider/ParsCredentialProvider.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -876,6 +878,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				OTHER_LDFLAGS = "$(inherited) -lz -liconv";
 				CODE_SIGN_ENTITLEMENTS = ParsCredentialProvider/ParsCredentialProvider.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

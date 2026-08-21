@@ -20,6 +20,9 @@ class _StoreSetupActions extends StatelessWidget {
     required this.selectedPgpFingerprint,
     required this.hasSshKey,
     required this.pathPickerService,
+    required this.onCreateNeedsRecipient,
+    required this.onGenerateSshKey,
+    required this.onImportSshKey,
     required this.onCreateLocalStore,
     required this.onImportLocalStore,
     required this.onCloneStore,
@@ -31,6 +34,9 @@ class _StoreSetupActions extends StatelessWidget {
   final String? selectedPgpFingerprint;
   final bool hasSshKey;
   final PathPickerService pathPickerService;
+  final VoidCallback onCreateNeedsRecipient;
+  final Future<bool> Function() onGenerateSshKey;
+  final Future<bool> Function() onImportSshKey;
   final _CreateLocalStoreSubmit onCreateLocalStore;
   final _ImportLocalStoreSubmit onImportLocalStore;
   final _CloneStoreSubmit onCloneStore;
@@ -39,45 +45,61 @@ class _StoreSetupActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = context.l10n;
-    final selectedStore = lifecycle.selectedStore;
+    final store = lifecycle.store;
     return ListView(
       children: <Widget>[
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(
-            Icons.warning_amber_rounded,
-            color: Theme.of(context).colorScheme.error,
+            Icons.folder_open_outlined,
+            color: Theme.of(context).colorScheme.primary,
           ),
           title: Text(
-            selectedStore == null
+            store == null
                 ? localizations.noPasswordStoreConfigured
                 : localizations.passwordStoreFolderNotFound,
           ),
-          subtitle: Text(selectedStore?.root ?? lifecycle.configPath),
+          subtitle: Text(
+            store == null
+                ? localizations.storeFirstSetupSubtitle
+                : localizations.passwordStoreFolderNotFound,
+          ),
         ),
         const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: () => _showCreateLocalStore(context),
+        Semantics(
+          button: true,
+          label: localizations.importLocalStore,
+          child: FilledButton.icon(
+            onPressed: () => _showImportLocalStore(context),
+            icon: const Icon(Icons.folder_open_outlined),
+            label: Text(localizations.importLocalStore),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Semantics(
+          button: true,
+          label: localizations.cloneGitStore,
+          child: FilledButton.tonalIcon(
+            onPressed: () => _showCloneStore(context),
+            icon: const Icon(Icons.cloud_download_outlined),
+            label: Text(localizations.cloneGitStore),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed:
+              selectedPgpFingerprint == null
+                  ? onCreateNeedsRecipient
+                  : () => _showCreateLocalStore(context),
           icon: const Icon(Icons.create_new_folder_outlined),
-          label: Text(context.l10n.createLocalStore),
+          label: Text(localizations.createLocalStore),
         ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: () => _showImportLocalStore(context),
-          icon: const Icon(Icons.folder_open_outlined),
-          label: Text(context.l10n.importLocalStore),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: hasSshKey ? () => _showCloneStore(context) : null,
-          icon: const Icon(Icons.cloud_download_outlined),
-          label: Text(context.l10n.cloneGitStore),
-        ),
-        if (!hasSshKey)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.info_outline),
-            title: Text(context.l10n.addSshBeforeClone),
+        if (selectedPgpFingerprint == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(localizations.createStoreNeedsPgpKey),
           ),
       ],
     );
@@ -87,6 +109,7 @@ class _StoreSetupActions extends StatelessWidget {
     final name = TextEditingController(text: 'Personal');
     final defaultBase = _defaultStoreBasePath();
     String? selectedBase;
+    var initializeGit = true;
     _showPickerStoreForm(
       context: context,
       title: context.l10n.createLocalStore,
@@ -102,7 +125,7 @@ class _StoreSetupActions extends StatelessWidget {
                 selectedPgpFingerprint == null
                     ? const <String>[]
                     : <String>[selectedPgpFingerprint!],
-            initializeGit: managedPaths == null,
+            initializeGit: initializeGit,
           ),
       builder:
           (sheetContext, setSheetState) => <Widget>[
@@ -123,6 +146,13 @@ class _StoreSetupActions extends StatelessWidget {
                             }),
                       )
                       : null,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: initializeGit,
+              onChanged: (value) => setSheetState(() => initializeGit = value),
+              title: Text(context.l10n.initializeGit),
+              subtitle: Text(context.l10n.gitOptionalForLocalStore),
             ),
           ],
     );
@@ -173,18 +203,24 @@ class _StoreSetupActions extends StatelessWidget {
       submitLabel: localizations.chooseFolderAndImport,
       canSubmit: () => true,
       onSubmit: () async {
-        final importedRoot = await pathPickerService
+        final transaction = await pathPickerService
             .importFolderToManagedStorage(
               destinationBaseDirectory: destinationBase,
               resolveConflict:
                   (conflict) =>
                       showManagedStoreConflictSheet(context, conflict),
+              resolveMissingGit: (_) => _resolveMissingGitDecision(context),
             );
-        if (importedRoot == null) {
+        if (transaction == null) {
           throw PathPickerException(localizations.storeImportCancelled);
         }
-        await onImportLocalStore(importedRoot);
+        await completeManagedStoreImport(
+          transaction: transaction,
+          register: onImportLocalStore,
+          refresh: onStoreChanged,
+        );
       },
+      refreshHandledBySubmit: true,
       builder:
           (_, _) => <Widget>[
             ListTile(
@@ -197,28 +233,66 @@ class _StoreSetupActions extends StatelessWidget {
     );
   }
 
+  Future<ManagedStoreGitDecision> _resolveMissingGitDecision(
+    BuildContext context,
+  ) async {
+    return await showDialog<ManagedStoreGitDecision>(
+          context: context,
+          builder:
+              (dialogContext) => AlertDialog(
+                title: Text(dialogContext.l10n.gitMetadataNotFoundTitle),
+                content: Text(dialogContext.l10n.gitMetadataNotFoundMessage),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed:
+                        () => Navigator.of(
+                          dialogContext,
+                        ).pop(ManagedStoreGitDecision.cancel),
+                    child: Text(dialogContext.l10n.cancel),
+                  ),
+                  TextButton(
+                    onPressed:
+                        () => Navigator.of(
+                          dialogContext,
+                        ).pop(ManagedStoreGitDecision.continueWithoutGit),
+                    child: Text(dialogContext.l10n.continueWithoutGit),
+                  ),
+                  FilledButton(
+                    onPressed:
+                        () => Navigator.of(
+                          dialogContext,
+                        ).pop(ManagedStoreGitDecision.initialize),
+                    child: Text(dialogContext.l10n.initializeGit),
+                  ),
+                ],
+              ),
+        ) ??
+        ManagedStoreGitDecision.cancel;
+  }
+
   void _showCloneStore(BuildContext context) {
     final remote = TextEditingController();
     final defaultBase = _defaultStoreBasePath();
     String? selectedBase;
+    var sshReady = hasSshKey;
     _showPickerStoreForm(
       context: context,
       title: context.l10n.cloneGitStore,
       submitLabel: context.l10n.cloneAction,
       canSubmit:
-          () => hasSshKey && (managedPaths != null || selectedBase != null),
+          () =>
+              (!remoteUrlUsesSsh(remote.text) || sshReady) &&
+              (managedPaths != null || selectedBase != null),
       onSubmit:
-          hasSshKey
-              ? () => onCloneStore(
-                remoteUrl: remote.text,
-                root:
-                    managedPaths?.storeRootForRemote(remote.text) ??
-                    joinFilesystemPath(
-                      selectedBase!,
-                      slugFromRemoteUrl(remote.text),
-                    ),
-              )
-              : null,
+          () => onCloneStore(
+            remoteUrl: remote.text,
+            root:
+                managedPaths?.storeRootForRemote(remote.text) ??
+                joinFilesystemPath(
+                  selectedBase!,
+                  slugFromRemoteUrl(remote.text),
+                ),
+          ),
       builder:
           (sheetContext, setSheetState) => <Widget>[
             _CloneStoreFields(
@@ -239,6 +313,37 @@ class _StoreSetupActions extends StatelessWidget {
                       )
                       : null,
             ),
+            if (remoteUrlUsesSsh(remote.text) && !sshReady) ...<Widget>[
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.vpn_key_outlined),
+                title: Text(context.l10n.sshKeyRequiredForRemote),
+                subtitle: Text(context.l10n.sshRequiredForThisClone),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final ready = await onGenerateSshKey();
+                      setSheetState(() => sshReady = ready);
+                    },
+                    icon: const Icon(Icons.add),
+                    label: Text(context.l10n.generateSshKey),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final ready = await onImportSshKey();
+                      setSheetState(() => sshReady = ready);
+                    },
+                    icon: const Icon(Icons.file_upload_outlined),
+                    label: Text(context.l10n.importSshKey),
+                  ),
+                ],
+              ),
+            ],
           ],
     );
   }
@@ -267,12 +372,12 @@ class _StoreSetupActions extends StatelessWidget {
   }
 
   String _defaultStoreBasePath() {
-    final selectedRoot = lifecycle.selectedStoreRoot;
+    final selectedRoot = lifecycle.store?.root;
     if (selectedRoot != null && selectedRoot.trim().isNotEmpty) {
       return parentDirectory(selectedRoot);
     }
-    if (lifecycle.stores.isNotEmpty) {
-      return parentDirectory(lifecycle.stores.first.root);
+    if (lifecycle.store != null) {
+      return parentDirectory(lifecycle.store!.root);
     }
     return parentDirectory(lifecycle.configPath);
   }
@@ -284,6 +389,7 @@ class _StoreSetupActions extends StatelessWidget {
     required bool Function() canSubmit,
     required List<Widget> Function(BuildContext, StateSetter) builder,
     required Future<void> Function()? onSubmit,
+    bool refreshHandledBySubmit = false,
   }) {
     showModalBottomSheet<void>(
       context: context,
@@ -296,6 +402,7 @@ class _StoreSetupActions extends StatelessWidget {
             builder: builder,
             onSubmit: onSubmit,
             onStoreChanged: onStoreChanged,
+            refreshHandledBySubmit: refreshHandledBySubmit,
           ),
     );
   }
@@ -419,6 +526,7 @@ class _StorePickerFormSheet extends StatefulWidget {
     required this.builder,
     required this.onSubmit,
     required this.onStoreChanged,
+    required this.refreshHandledBySubmit,
   });
 
   final String title;
@@ -427,6 +535,7 @@ class _StorePickerFormSheet extends StatefulWidget {
   final List<Widget> Function(BuildContext, StateSetter) builder;
   final Future<void> Function()? onSubmit;
   final Future<void> Function() onStoreChanged;
+  final bool refreshHandledBySubmit;
 
   @override
   State<_StorePickerFormSheet> createState() => _StorePickerFormSheetState();
@@ -493,7 +602,9 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
     });
     try {
       await widget.onSubmit!();
-      await widget.onStoreChanged();
+      if (!widget.refreshHandledBySubmit) {
+        await widget.onStoreChanged();
+      }
       if (mounted) {
         Navigator.of(context).pop();
       }

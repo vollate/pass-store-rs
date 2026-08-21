@@ -4,6 +4,7 @@ import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/screens/vault/vault_screen.dart';
 import 'package:pars_gui/services/fake_pars_repository.dart';
+import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/widgets/pars_adaptive_surface.dart';
 
 import 'support/gui_test_harness.dart';
@@ -163,6 +164,41 @@ void main() {
     expect(cleared, 1);
   });
 
+  testWidgets('Chinese Vault localizes disabled and local Git modes', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    for (final mode in <StoreGitMode>[
+      StoreGitMode.disabled,
+      StoreGitMode.local,
+    ]) {
+      final repository = _VaultPresentationRepository(
+        entries: <PasswordEntry>[_directory('folder')],
+        status:
+            mode == StoreGitMode.disabled
+                ? RepoGitStatus.disabled
+                : RepoGitStatus.clean,
+        mode: mode,
+      );
+      await tester.pumpWidget(
+        buildLocalizedTestApp(
+          locale: const Locale('zh'),
+          child: VaultScreen(
+            vaultRepository: repository,
+            gitRepository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          mode == StoreGitMode.disabled ? '未启用 Git · 仅本地密码库' : '本地 Git · 无远端',
+        ),
+        findsOneWidget,
+      );
+    }
+  });
+
   testWidgets('failed Git status never renders a success icon', (tester) async {
     await configureGuiTestViewport(tester);
     final repository = _VaultPresentationRepository(
@@ -213,13 +249,16 @@ class _VaultPresentationRepository extends FakeParsRepository {
     required List<PasswordEntry> entries,
     List<String> recentPaths = const <String>[],
     RepoGitStatus status = RepoGitStatus.clean,
+    StoreGitMode mode = StoreGitMode.remote,
   }) : _entries = entries,
        _recentPaths = recentPaths,
-       _status = status;
+       _status = status,
+       _mode = mode;
 
   List<PasswordEntry> _entries;
   final List<String> _recentPaths;
   final RepoGitStatus _status;
+  final StoreGitMode _mode;
   int favoriteUpdates = 0;
   int readCount = 0;
 
@@ -231,6 +270,9 @@ class _VaultPresentationRepository extends FakeParsRepository {
 
   @override
   RepoGitStatus get gitStatus => _status;
+
+  @override
+  StoreGitMode get gitMode => _mode;
 
   @override
   List<PasswordEntry> recentEntries() {

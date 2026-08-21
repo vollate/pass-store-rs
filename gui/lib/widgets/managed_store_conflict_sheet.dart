@@ -67,25 +67,6 @@ class _ManagedStoreConflictSheet extends StatelessWidget {
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed:
-                      () => Navigator.of(
-                        context,
-                      ).pop(ManagedStoreConflictPolicy.merge),
-                  icon: const Icon(Icons.merge_type_outlined),
-                  label: Text(localizations.managedStoreMergeLabel),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                localizations.managedStoreMergeDescription,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,

@@ -1,4 +1,5 @@
 import '../models/password_entry.dart';
+import 'store_lifecycle.dart';
 
 abstract interface class GitRepository {
   RepoGitStatus get gitStatus;
@@ -16,7 +17,14 @@ class GitRemote {
   final String pushUrl;
 }
 
-abstract interface class GitOperationsRepository implements GitRepository {
+abstract interface class GitModeRepository {
+  StoreGitMode get gitMode;
+}
+
+abstract interface class GitOperationsRepository
+    implements GitRepository, GitModeRepository {
+  Future<GitOperationResult> initializeRepository();
+
   Future<GitOperationResult> refreshGitStatus();
 
   Future<GitOperationResult> pull();
@@ -44,6 +52,4 @@ abstract interface class GitOperationsRepository implements GitRepository {
   Future<GitOperationResult> autoPullOnOpen();
 
   Future<GitOperationResult> recoverByPull();
-
-  Future<GitOperationResult> deleteLocalRepo({required String confirmation});
 }

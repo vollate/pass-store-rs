@@ -24,13 +24,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Replace the existing copy and remove files that are not in the selected folder.';
 
   @override
-  String get managedStoreMergeLabel => 'Merge and overwrite';
-
-  @override
-  String get managedStoreMergeDescription =>
-      'Overwrite matching files and keep files that exist only in the current copy.';
-
-  @override
   String get noPasswordStoreConfigured => 'No password store is configured.';
 
   @override
@@ -128,10 +121,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String keyDeleted(String keyName) {
     return 'Deleted $keyName';
   }
-
-  @override
-  String get pgpKeyDeletePartial =>
-      'The protected private key was deleted, but its public listing could not be removed.';
 
   @override
   String keyDeleteFailed(String error) {
@@ -319,18 +308,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get decryptEntryFailedTitle => 'Could not decrypt entry';
-
-  @override
-  String get openKeyImportHint => 'Open key import from Settings';
-
-  @override
-  String get chooseImportKey => 'Choose/import key';
-
-  @override
-  String get openPgpKeysHint => 'Open Settings > PGP keys';
-
-  @override
-  String get openKeyManagement => 'Open key management';
 
   @override
   String get copyPassword => 'Copy password';
@@ -616,12 +593,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedSupportSection => 'Advanced and support';
 
   @override
-  String get keyManagementSection => 'Key management';
-
-  @override
-  String get passwordStoresGitSection => 'Password stores and Git';
-
-  @override
   String get platformSection => 'Platform';
 
   @override
@@ -647,19 +618,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Optional encrypted passphrase cache';
 
   @override
-  String get pgpKeysTitle => 'PGP keys';
-
-  @override
-  String get pgpKeyActionsDescription => 'Create, import, export, delete';
-
-  @override
   String get sshKeysTitle => 'SSH keys';
 
   @override
   String get githubAccessKeysDescription => 'GitHub access keys';
-
-  @override
-  String get passwordStoresTitle => 'Password stores';
 
   @override
   String get gitSyncTitle => 'Git sync and remotes';
@@ -717,10 +679,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String cachedForKey(String keyName) {
     return 'Cached for $keyName';
   }
-
-  @override
-  String get selectStoreBeforeDelete =>
-      'Select a store before deleting the local repository.';
 
   @override
   String get updatePasswordStore => 'Update password store';
@@ -927,9 +885,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportedKey => 'Exported key';
-
-  @override
-  String get noPasswordStores => 'No password stores';
 
   @override
   String get createImportCloneStore => 'Create, import, or clone a store.';
@@ -1266,7 +1221,105 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notFound => 'Not found';
 
   @override
+  String get gitMetadataNotFoundTitle => 'Git metadata not found';
+
+  @override
+  String get gitMetadataNotFoundMessage =>
+      'The folder may be local-only, or Android may have hidden its .git data. Initializing creates new history and cannot recover existing history.';
+
+  @override
+  String get initializeGit => 'Initialize Git';
+
+  @override
+  String get continueWithoutGit => 'Continue without Git';
+
+  @override
   String keyCount(int count) {
     return '$count key(s)';
   }
+
+  @override
+  String get storeFirstSetupSubtitle =>
+      'Import or clone your password store. Create a new store only if you do not have one yet.';
+
+  @override
+  String get createStoreRecipientSubtitle =>
+      'Choose a private PGP key only for the new store you are creating.';
+
+  @override
+  String get contextualRepairSubtitle =>
+      'Repair only what this password store requires.';
+
+  @override
+  String get repairPasswordStore => 'Repair password store';
+
+  @override
+  String get createStoreNeedsPgpKey =>
+      'Creating a new store requires choosing or importing a private PGP key first.';
+
+  @override
+  String get gitOptionalForLocalStore =>
+      'Git is optional. The password store remains usable without it.';
+
+  @override
+  String get sshKeyRequiredForRemote => 'SSH key required for this remote';
+
+  @override
+  String get sshRequiredForThisClone =>
+      'This SSH remote needs a key. HTTPS clones do not.';
+
+  @override
+  String get missingGpgIdTitle => 'Encryption recipients are missing';
+
+  @override
+  String get missingGpgIdMessage =>
+      'Choose a private PGP key to create this store\'s missing .gpg-id. Existing recipient files are never replaced here.';
+
+  @override
+  String get requiredPgpKeyMissingTitle => 'Required private PGP key missing';
+
+  @override
+  String requiredPgpKeyMissingMessage(String recipients) {
+    return 'Import private material matching one of these recipients: $recipients';
+  }
+
+  @override
+  String get requiredPrivatePgpKey => 'A matching private PGP key is required.';
+
+  @override
+  String get pgpKeyDoesNotMatchStore =>
+      'This private key does not match the password store recipients.';
+
+  @override
+  String get invalidGitMetadataTitle => 'Git metadata is invalid';
+
+  @override
+  String get invalidGitMetadataMessage =>
+      'This password store contains unusable Git metadata. Disconnect it, then import or clone a valid copy.';
+
+  @override
+  String get disconnectStore => 'Disconnect password store';
+
+  @override
+  String get gitDisabledState => 'Git disabled · local password store';
+
+  @override
+  String get gitLocalState => 'Local Git · no remote';
+
+  @override
+  String get gitRemoteState => 'Git remote configured';
+
+  @override
+  String get storeIssues => 'Repair needed';
+
+  @override
+  String get sshKeysGitOnlyDescription =>
+      'SSH keys are used only for SSH Git remotes. HTTPS and local-only stores do not require them.';
+
+  @override
+  String get storeRemovalInProgressTitle => 'Removing password store…';
+
+  @override
+  String get storeRemovalInProgressDescription =>
+      'Pars is clearing local session and Autofill data before changing the configured store.';
 }

@@ -122,18 +122,6 @@ abstract class AppLocalizations {
   /// **'Replace the existing copy and remove files that are not in the selected folder.'**
   String get managedStoreReplaceDescription;
 
-  /// No description provided for @managedStoreMergeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Merge and overwrite'**
-  String get managedStoreMergeLabel;
-
-  /// No description provided for @managedStoreMergeDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Overwrite matching files and keep files that exist only in the current copy.'**
-  String get managedStoreMergeDescription;
-
   /// No description provided for @noPasswordStoreConfigured.
   ///
   /// In en, this message translates to:
@@ -295,12 +283,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Deleted {keyName}'**
   String keyDeleted(String keyName);
-
-  /// No description provided for @pgpKeyDeletePartial.
-  ///
-  /// In en, this message translates to:
-  /// **'The protected private key was deleted, but its public listing could not be removed.'**
-  String get pgpKeyDeletePartial;
 
   /// No description provided for @keyDeleteFailed.
   ///
@@ -655,30 +637,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not decrypt entry'**
   String get decryptEntryFailedTitle;
-
-  /// No description provided for @openKeyImportHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Open key import from Settings'**
-  String get openKeyImportHint;
-
-  /// No description provided for @chooseImportKey.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose/import key'**
-  String get chooseImportKey;
-
-  /// No description provided for @openPgpKeysHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Open Settings > PGP keys'**
-  String get openPgpKeysHint;
-
-  /// No description provided for @openKeyManagement.
-  ///
-  /// In en, this message translates to:
-  /// **'Open key management'**
-  String get openKeyManagement;
 
   /// No description provided for @copyPassword.
   ///
@@ -1202,18 +1160,6 @@ abstract class AppLocalizations {
   /// **'Advanced and support'**
   String get advancedSupportSection;
 
-  /// No description provided for @keyManagementSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Key management'**
-  String get keyManagementSection;
-
-  /// No description provided for @passwordStoresGitSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Password stores and Git'**
-  String get passwordStoresGitSection;
-
   /// No description provided for @platformSection.
   ///
   /// In en, this message translates to:
@@ -1262,18 +1208,6 @@ abstract class AppLocalizations {
   /// **'Optional encrypted passphrase cache'**
   String get optionalPassphraseCacheState;
 
-  /// No description provided for @pgpKeysTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'PGP keys'**
-  String get pgpKeysTitle;
-
-  /// No description provided for @pgpKeyActionsDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Create, import, export, delete'**
-  String get pgpKeyActionsDescription;
-
   /// No description provided for @sshKeysTitle.
   ///
   /// In en, this message translates to:
@@ -1285,12 +1219,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'GitHub access keys'**
   String get githubAccessKeysDescription;
-
-  /// No description provided for @passwordStoresTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Password stores'**
-  String get passwordStoresTitle;
 
   /// No description provided for @gitSyncTitle.
   ///
@@ -1399,12 +1327,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cached for {keyName}'**
   String cachedForKey(String keyName);
-
-  /// No description provided for @selectStoreBeforeDelete.
-  ///
-  /// In en, this message translates to:
-  /// **'Select a store before deleting the local repository.'**
-  String get selectStoreBeforeDelete;
 
   /// No description provided for @updatePasswordStore.
   ///
@@ -1789,12 +1711,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Exported key'**
   String get exportedKey;
-
-  /// No description provided for @noPasswordStores.
-  ///
-  /// In en, this message translates to:
-  /// **'No password stores'**
-  String get noPasswordStores;
 
   /// No description provided for @createImportCloneStore.
   ///
@@ -2407,11 +2323,179 @@ abstract class AppLocalizations {
   /// **'Not found'**
   String get notFound;
 
+  /// No description provided for @gitMetadataNotFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Git metadata not found'**
+  String get gitMetadataNotFoundTitle;
+
+  /// No description provided for @gitMetadataNotFoundMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder may be local-only, or Android may have hidden its .git data. Initializing creates new history and cannot recover existing history.'**
+  String get gitMetadataNotFoundMessage;
+
+  /// No description provided for @initializeGit.
+  ///
+  /// In en, this message translates to:
+  /// **'Initialize Git'**
+  String get initializeGit;
+
+  /// No description provided for @continueWithoutGit.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue without Git'**
+  String get continueWithoutGit;
+
   /// No description provided for @keyCount.
   ///
   /// In en, this message translates to:
   /// **'{count} key(s)'**
   String keyCount(int count);
+
+  /// No description provided for @storeFirstSetupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import or clone your password store. Create a new store only if you do not have one yet.'**
+  String get storeFirstSetupSubtitle;
+
+  /// No description provided for @createStoreRecipientSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a private PGP key only for the new store you are creating.'**
+  String get createStoreRecipientSubtitle;
+
+  /// No description provided for @contextualRepairSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair only what this password store requires.'**
+  String get contextualRepairSubtitle;
+
+  /// No description provided for @repairPasswordStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair password store'**
+  String get repairPasswordStore;
+
+  /// No description provided for @createStoreNeedsPgpKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating a new store requires choosing or importing a private PGP key first.'**
+  String get createStoreNeedsPgpKey;
+
+  /// No description provided for @gitOptionalForLocalStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Git is optional. The password store remains usable without it.'**
+  String get gitOptionalForLocalStore;
+
+  /// No description provided for @sshKeyRequiredForRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH key required for this remote'**
+  String get sshKeyRequiredForRemote;
+
+  /// No description provided for @sshRequiredForThisClone.
+  ///
+  /// In en, this message translates to:
+  /// **'This SSH remote needs a key. HTTPS clones do not.'**
+  String get sshRequiredForThisClone;
+
+  /// No description provided for @missingGpgIdTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Encryption recipients are missing'**
+  String get missingGpgIdTitle;
+
+  /// No description provided for @missingGpgIdMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a private PGP key to create this store\'s missing .gpg-id. Existing recipient files are never replaced here.'**
+  String get missingGpgIdMessage;
+
+  /// No description provided for @requiredPgpKeyMissingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Required private PGP key missing'**
+  String get requiredPgpKeyMissingTitle;
+
+  /// No description provided for @requiredPgpKeyMissingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Import private material matching one of these recipients: {recipients}'**
+  String requiredPgpKeyMissingMessage(String recipients);
+
+  /// No description provided for @requiredPrivatePgpKey.
+  ///
+  /// In en, this message translates to:
+  /// **'A matching private PGP key is required.'**
+  String get requiredPrivatePgpKey;
+
+  /// No description provided for @pgpKeyDoesNotMatchStore.
+  ///
+  /// In en, this message translates to:
+  /// **'This private key does not match the password store recipients.'**
+  String get pgpKeyDoesNotMatchStore;
+
+  /// No description provided for @invalidGitMetadataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Git metadata is invalid'**
+  String get invalidGitMetadataTitle;
+
+  /// No description provided for @invalidGitMetadataMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This password store contains unusable Git metadata. Disconnect it, then import or clone a valid copy.'**
+  String get invalidGitMetadataMessage;
+
+  /// No description provided for @disconnectStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect password store'**
+  String get disconnectStore;
+
+  /// No description provided for @gitDisabledState.
+  ///
+  /// In en, this message translates to:
+  /// **'Git disabled · local password store'**
+  String get gitDisabledState;
+
+  /// No description provided for @gitLocalState.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Git · no remote'**
+  String get gitLocalState;
+
+  /// No description provided for @gitRemoteState.
+  ///
+  /// In en, this message translates to:
+  /// **'Git remote configured'**
+  String get gitRemoteState;
+
+  /// No description provided for @storeIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair needed'**
+  String get storeIssues;
+
+  /// No description provided for @sshKeysGitOnlyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH keys are used only for SSH Git remotes. HTTPS and local-only stores do not require them.'**
+  String get sshKeysGitOnlyDescription;
+
+  /// No description provided for @storeRemovalInProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Removing password store…'**
+  String get storeRemovalInProgressTitle;
+
+  /// No description provided for @storeRemovalInProgressDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Pars is clearing local session and Autofill data before changing the configured store.'**
+  String get storeRemovalInProgressDescription;
 }
 
 class _AppLocalizationsDelegate
