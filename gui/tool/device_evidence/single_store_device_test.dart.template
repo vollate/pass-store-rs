@@ -208,7 +208,6 @@ void main() {
     await metadata.save(
       VaultMetadata(
         storeRoot: root.path,
-        recentPaths: const <String>['alice'],
         favoritePaths: const <String>{'alice'},
       ),
     );
@@ -270,7 +269,6 @@ void main() {
     expect(find.text('Vault'), findsNothing);
     expect(root.existsSync(), isFalse);
     expect(repository.store, isNull);
-    expect((await metadata.load()).recentPaths, isEmpty);
     expect((await metadata.load()).favoritePaths, isEmpty);
     expect(await security.readActivePgpPassphrase(), isNull);
     expect(

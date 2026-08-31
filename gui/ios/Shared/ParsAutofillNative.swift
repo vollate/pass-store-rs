@@ -6,6 +6,9 @@ private func parsAutofillQueryCandidatesJson(_ request: UnsafePointer<CChar>) ->
 @_silgen_name("pars_autofill_resolve_credential_json")
 private func parsAutofillResolveCredentialJson(_ request: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
 
+@_silgen_name("pars_autofill_record_completion_json")
+private func parsAutofillRecordCompletionJson(_ request: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
+
 @_silgen_name("pars_autofill_free_string")
 private func parsAutofillFreeString(_ value: UnsafeMutablePointer<CChar>?)
 
@@ -86,6 +89,20 @@ enum ParsAutofillNative {
       path: resolvedPath,
       username: username,
       password: password)
+  }
+
+  static func recordCompletion(indexPath: String, path: String) -> Bool {
+    let request: [String: Any?] = [
+      "indexPath": indexPath,
+      "path": path,
+    ]
+    guard let response = call(request: request, handler: parsAutofillRecordCompletionJson),
+      response["error"] is NSNull || response["error"] == nil,
+      response["recorded"] as? Bool == true
+    else {
+      return false
+    }
+    return true
   }
 
   private static func call(

@@ -26,7 +26,7 @@ extension and maintain credential identities for indexed entries.
 
 ### Requirement: Autofill index SHALL persist path-derived matching metadata only
 
-Default autofill index data SHALL derive Username from the final password-entry path component, equivalent to the `.gpg` filename stem, and SHALL derive Website/App service name from the immediate parent directory. It SHALL include entry path, path-derived display and service names, path-derived username, host-normalized parent-directory identity when valid, ranking metadata, selected store identity, freshness metadata, and separately identified opt-in website aliases. It SHALL NOT include plaintext passwords, raw URLs, Android package identifiers, raw decrypted notes, TOTP values, encrypted username-field values, or full decrypted entry content.
+Default autofill index data SHALL derive Username from the final password-entry path component, equivalent to the `.gpg` filename stem, and SHALL derive Website/App service name from the immediate parent directory. Version 2 SHALL include entry path, path-derived display and service names, path-derived username, host-normalized parent-directory identity when valid, Favorite metadata, an internal successful-Autofill completion rank, selected store identity, freshness metadata, and separately identified opt-in website aliases. It SHALL NOT include plaintext passwords, raw URLs, Android package identifiers, raw decrypted notes, TOTP values, encrypted username-field values, full decrypted entry content, or Vault-view history.
 
 #### Scenario: Path-derived entry is indexed without decryption
 
@@ -53,7 +53,7 @@ Default autofill index data SHALL derive Username from the final password-entry 
 
 ### Requirement: Autofill matching SHALL use path services and optional website aliases
 
-Autofill matching SHALL rank an exact normalized parent-directory website match and an exact case-insensitive parent-directory app-name match above an exact opt-in enriched website alias, and SHALL rank those exact matches above path, display-name, service-name, or username text fallbacks. Favorite and recent metadata SHALL only reorder otherwise equivalent match classes. Android package identifiers SHALL NOT be accepted, stored, mapped, or used for matching.
+Autofill matching SHALL rank an exact normalized parent-directory website match and an exact case-insensitive parent-directory app-name match above an exact opt-in enriched website alias, and SHALL rank those exact matches above path, display-name, service-name, or username text fallbacks. Favorite and successful-Autofill completion metadata SHALL only reorder otherwise equivalent match classes. Favorite SHALL add 100 points and an Autofill rank from 0 through 19 SHALL add `50 - rank` points. Android package identifiers SHALL NOT be accepted, stored, mapped, or used for matching.
 
 #### Scenario: Website request matches parent directory
 
@@ -74,11 +74,11 @@ Autofill matching SHALL rank an exact normalized parent-directory website match 
 - **WHEN** an Android caller is known only as package `com.example.bank` and no matching website, app label, or text query is available
 - **THEN** the shared matcher returns no exact package candidate
 
-#### Scenario: Favorite and recent metadata break equivalent ties
+#### Scenario: Favorite and Autofill completion history break equivalent ties
 
 - **GIVEN** multiple entries have the same exact service match class
 - **WHEN** candidates are ranked
-- **THEN** favorite and more-recent entries rank above otherwise equivalent entries
+- **THEN** favorite and more recently completed Autofill entries rank above otherwise equivalent entries
 - **AND** neither bonus outranks a stronger match class
 
 ### Requirement: Autofill SHALL authenticate before returning credentials
@@ -96,7 +96,7 @@ authentication SHALL return no credential.
 
 ### Requirement: Autofill SHALL decrypt credentials only on demand
 
-Autofill providers SHALL decrypt only the selected indexed entry after successful platform authentication. Decryption SHALL use the selected mobile PGP backend and the key-bound cached PGP passphrase when available. The returned username SHALL be the filename-stem username stored in the index, and the returned password SHALL be the decrypted entry's first line. Credential resolution SHALL NOT update or enrich the index. If no usable passphrase or key is available for the selected entry, autofill SHALL fail closed.
+Autofill providers SHALL decrypt only the selected indexed entry after successful platform authentication. Decryption SHALL use the selected mobile PGP backend and the key-bound cached PGP passphrase when available. The returned username SHALL be the filename-stem username stored in the index, and the returned password SHALL be the decrypted entry's first line. The credential-resolution primitive SHALL NOT update or enrich the index. If no usable passphrase or key is available for the selected entry, autofill SHALL fail closed.
 
 #### Scenario: Selected entry is the only decrypted entry
 
@@ -105,7 +105,7 @@ Autofill providers SHALL decrypt only the selected indexed entry after successfu
 - **WHEN** local authentication succeeds for one selected candidate
 - **THEN** Pars decrypts exactly that selected entry once
 - **AND** returns its path-derived username and first-line password
-- **AND** does not write the autofill index
+- **AND** the credential-resolution primitive does not write the Autofill index
 
 #### Scenario: Encrypted username does not override filename stem
 
@@ -120,6 +120,28 @@ Autofill providers SHALL decrypt only the selected indexed entry after successfu
 - **AND** no usable cached passphrase is available
 - **WHEN** autofill tries to resolve the selected entry
 - **THEN** no plaintext credential is returned
+
+### Requirement: Native providers SHALL record only successful Autofill completions
+
+Android Autofill, Android Credential Manager, and the iOS Credential Provider SHALL record a completion only after platform authentication and credential resolution succeed and the platform response has been constructed for return. Recording SHALL atomically move the selected path to rank 0, shift other distinct paths, and retain at most 20 ranked paths. Candidate display, user cancellation, resolution failure, Vault access, and Vault copy SHALL NOT record completion. A recording failure SHALL affect only future ordering and SHALL NOT prevent the current credential from being returned.
+
+#### Scenario: Successful return records bounded MRU history
+
+- **GIVEN** an authenticated credential has been resolved and its platform response is ready
+- **WHEN** the provider is about to return it to the operating system
+- **THEN** its path is atomically moved to Autofill rank 0
+- **AND** duplicate history is removed and only the 20 most recent distinct paths remain ranked
+
+#### Scenario: Cancellation and failure do not record
+
+- **WHEN** a candidate is only displayed, authentication is canceled, or credential resolution fails
+- **THEN** Autofill completion history remains unchanged
+
+#### Scenario: History failure does not block the fill
+
+- **GIVEN** a credential response is ready to return
+- **WHEN** recording its completion fails
+- **THEN** the provider still returns the credential response
 
 ### Requirement: Android Autofill SHALL present renderable matched and unmatched states
 
@@ -171,7 +193,7 @@ Settings SHALL show a concise localized system Autofill state such as Ready with
 #### Scenario: Refresh rebuilds from paths only
 - **GIVEN** Autofill data may be stale
 - **WHEN** the user selects Refresh or Rebuild Autofill data
-- **THEN** Pars rebuilds the index from password-entry paths and ranking metadata
+- **THEN** Pars rebuilds the index from password-entry paths and Favorite metadata while preserving valid same-store completion history by unchanged path
 - **AND** no entry is decrypted
 
 #### Scenario: Clearing Autofill data removes shared candidates
@@ -194,7 +216,7 @@ Settings SHALL show a concise localized system Autofill state such as Ready with
 
 ### Requirement: Autofill index lifecycle SHALL support non-decrypting incremental updates
 
-After an autofill index has been initialized, successful vault add, edit, move, delete, favorite, and recent operations SHALL update only affected logical index records. These operations SHALL NOT accept a PGP backend or passphrase and SHALL NOT decrypt entries. If no autofill index exists, ordinary vault mutations SHALL remain successful without implicitly creating one. Index updates SHALL be atomically published so platform providers never observe a partially written document.
+After an Autofill index has been initialized, successful Vault add, edit, move, delete, and Favorite operations SHALL update only affected logical index records. These operations SHALL NOT accept a PGP backend or passphrase and SHALL NOT decrypt entries. If no Autofill index exists, ordinary Vault mutations SHALL remain successful without implicitly creating one. Index updates SHALL be atomically published so platform providers never observe a partially written document. Vault read, reveal, and copy operations SHALL NOT mutate the index.
 
 #### Scenario: Entry creation upserts one path-derived record
 
@@ -203,12 +225,13 @@ After an autofill index has been initialized, successful vault add, edit, move, 
 - **THEN** one record with service `gitlab.com` and username `alice` is upserted
 - **AND** no other entry is re-derived or decrypted
 
-#### Scenario: Entry move preserves optional aliases
+#### Scenario: Entry move preserves public metadata but resets path-bound history
 
-- **GIVEN** an indexed entry has ranking metadata and opt-in website aliases
+- **GIVEN** an indexed entry has Favorite metadata, completion history, and opt-in website aliases
 - **WHEN** the entry is successfully renamed or moved
 - **THEN** the old path is removed and the new path metadata is derived
-- **AND** existing ranking metadata and opt-in aliases are preserved
+- **AND** Favorite metadata and opt-in aliases are preserved
+- **AND** path-bound Autofill completion history is not inherited by the new path
 - **AND** no entry is decrypted
 
 #### Scenario: Entry deletion removes only affected paths
@@ -218,11 +241,11 @@ After an autofill index has been initialized, successful vault add, edit, move, 
 - **THEN** the matching entry path or path-prefix records are removed
 - **AND** unrelated records remain logically unchanged
 
-#### Scenario: Metadata-only read patches ranking without rebuild
+#### Scenario: Favorite metadata patches without rebuild
 
-- **GIVEN** an indexed entry is opened, favorited, or marked recent
-- **WHEN** its ranking metadata changes
-- **THEN** only supplied favorite and recent fields are patched
+- **GIVEN** an indexed entry's Favorite state changes
+- **WHEN** the metadata update is applied
+- **THEN** only supplied Favorite fields are patched
 - **AND** no full index rebuild or entry decryption occurs
 
 ### Requirement: Encrypted website enrichment SHALL be explicit and transactional
@@ -250,15 +273,15 @@ The system SHALL provide a separate opt-in operation that accepts an explicit no
 - **GIVEN** enriched website aliases exist
 - **WHEN** the user disables or clears URL enrichment
 - **THEN** enriched aliases are removed without decrypting entries
-- **AND** path-derived services, usernames, and ranking metadata remain available
+- **AND** path-derived services, usernames, Favorite metadata, and Autofill completion history remain available
 
 ### Requirement: Autofill SDK SHALL expose only the replacement path-first contract
 
-The Rust core, Flutter Rust Bridge, native C/JNI JSON ABI, Dart repository, Android adapter, and iOS adapter SHALL use the replacement path-first models and operations. Refresh and incremental requests SHALL omit PGP executable and passphrase fields; query requests SHALL expose website, human-readable app name, text query, and limit but SHALL omit Android package fields. The implementation SHALL NOT contain compatibility readers, deprecated aliases, dual-write behavior, or fallback calls for the previous unpublished contract.
+The Rust core, Flutter Rust Bridge, native C/JNI JSON ABI, Dart repository, Android adapter, and iOS adapter SHALL use the version 2 path-first models and operations. Refresh and incremental requests SHALL omit PGP executable and passphrase fields; query requests SHALL expose website, human-readable app name, text query, and limit but SHALL omit Android package fields. Public DTOs SHALL expose Favorite metadata without `recentRank` fields, while native providers SHALL use a dedicated completion-recording operation.
 
 #### Scenario: Default lifecycle API cannot request decryption
 
-- **WHEN** an SDK client constructs a rebuild, upsert, move, remove, or ranking-patch request
+- **WHEN** an SDK client constructs a rebuild, upsert, move, remove, or Favorite-patch request
 - **THEN** the request model has no PGP backend, executable, passphrase, or decrypted-field input
 
 #### Scenario: Query ABI has no package parameter
@@ -267,12 +290,12 @@ The Rust core, Flutter Rust Bridge, native C/JNI JSON ABI, Dart repository, Andr
 - **THEN** the JSON request can contain website, app name, text query, and limit
 - **AND** it cannot contain an Android package matching field
 
-#### Scenario: Development-era index is not migrated
+#### Scenario: Version 1 index migrates without Vault ranking history
 
-- **GIVEN** an index document does not conform to the replacement schema
-- **WHEN** a provider attempts to read it
-- **THEN** candidate lookup fails closed
-- **AND** no legacy parser or migration path is invoked
+- **GIVEN** a valid version 1 index contains paths, Favorite state, website aliases, and `recent_rank`
+- **WHEN** version 2 reads the index
+- **THEN** paths, Favorite state, and website aliases are preserved
+- **AND** the old Vault-derived rank is discarded before the index is atomically rewritten as version 2
 
 ### Requirement: Mobile Autofill presentation SHALL remain accessible within platform constraints
 

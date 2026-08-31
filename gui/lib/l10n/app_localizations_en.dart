@@ -161,9 +161,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultTitle => 'Vault';
 
   @override
-  String get manageTitle => 'Manage';
-
-  @override
   String get retry => 'Retry';
 
   @override
@@ -232,9 +229,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchVaultHint => 'Search by name or path';
 
   @override
-  String get recentSection => 'Recent';
-
-  @override
   String get favoritesSection => 'Favorites';
 
   @override
@@ -247,9 +241,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String browsePathSection(String path) {
     return 'Browse: $path';
   }
-
-  @override
-  String get noRecentEntries => 'No recent entries yet.';
 
   @override
   String get noFavoriteEntries => 'No favorite entries yet.';
@@ -351,10 +342,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get couldNotOpenUrl => 'Could not open the URL.';
 
   @override
-  String get manageSubtitle =>
-      'Maintain passwords in batches or one at a time.';
-
-  @override
   String get generateAndSave => 'Generate and save';
 
   @override
@@ -410,9 +397,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Remove one entry after name confirmation.';
 
   @override
-  String get noEntriesToManage => 'No entries to manage.';
-
-  @override
   String get selectAtLeastOneEntry => 'Select at least one entry.';
 
   @override
@@ -459,9 +443,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noEntriesAvailable => 'No entries available';
-
-  @override
-  String get noEntriesToEdit => 'No entries to edit.';
 
   @override
   String get noSymbols => 'No symbols';
@@ -570,9 +551,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String typeToConfirm(String value) {
     return 'Type $value to confirm';
   }
-
-  @override
-  String get entryField => 'Entry';
 
   @override
   String get batchSelection => 'Batch selection';

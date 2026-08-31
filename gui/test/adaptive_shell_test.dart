@@ -25,8 +25,12 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'github');
     await tester.tap(find.text('Select'));
     await tester.pumpAndSettle();
+    expect(find.text('Move'), findsNothing);
+    expect(find.text('Rename'), findsNothing);
     await tester.tap(find.byType(Checkbox).first);
     await tester.pumpAndSettle();
+    expect(find.text('Move'), findsOneWidget);
+    expect(find.text('Rename'), findsOneWidget);
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Vault').last);

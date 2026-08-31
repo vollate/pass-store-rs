@@ -5,23 +5,22 @@ import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/screens/vault/vault_screen.dart';
 import 'package:pars_gui/services/fake_pars_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
+import 'package:pars_gui/widgets/entry_tile.dart';
 import 'package:pars_gui/widgets/pars_adaptive_surface.dart';
 
 import 'support/gui_test_harness.dart';
 
 void main() {
-  testWidgets('Vault separates Favorites, bounded Recent, and Browse', (
+  testWidgets('Vault exposes Favorites and Browse without Recent', (
     tester,
   ) async {
     await configureGuiTestViewport(tester);
     final repository = _VaultPresentationRepository(
       entries: <PasswordEntry>[
         _entry('favorite/alice', favorite: true),
-        _entry('recent/bob'),
+        _entry('bob'),
         _directory('favorite'),
-        _directory('recent'),
       ],
-      recentPaths: const <String>['recent/bob', 'favorite/alice'],
     );
 
     await tester.pumpWidget(
@@ -35,17 +34,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('FAVORITES'), findsOneWidget);
-    expect(find.text('RECENT'), findsOneWidget);
+    expect(find.text('RECENT'), findsNothing);
     expect(find.text('BROWSE'), findsOneWidget);
-    expect(find.text('alice'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(EntryTile), matching: find.text('alice')),
+      findsOneWidget,
+    );
     expect(find.text('bob'), findsOneWidget);
-    expect(find.text('No recent entries yet.'), findsNothing);
     expectNoFlutterOverflow(tester);
   });
 
-  testWidgets('empty recent metadata never relabels every entry as recent', (
-    tester,
-  ) async {
+  testWidgets('search results replace Favorites and Browse', (tester) async {
     await configureGuiTestViewport(tester);
     final repository = _VaultPresentationRepository(
       entries: <PasswordEntry>[_entry('service/alice'), _directory('service')],
@@ -61,9 +60,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('No recent entries yet.'), findsOneWidget);
-    expect(find.text('alice'), findsNothing);
-    expect(find.text('service'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'alice');
+    await tester.pumpAndSettle();
+
+    expect(find.text('SEARCH RESULTS'), findsOneWidget);
+    expect(find.text('FAVORITES'), findsNothing);
+    expect(find.text('BROWSE'), findsNothing);
+    expect(
+      find.descendant(of: find.byType(EntryTile), matching: find.text('alice')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -72,7 +78,6 @@ void main() {
       await configureGuiTestViewport(tester);
       final repository = _VaultPresentationRepository(
         entries: <PasswordEntry>[_entry('alice'), _directory('folder')],
-        recentPaths: const <String>['alice'],
       );
 
       await tester.pumpWidget(
@@ -247,16 +252,13 @@ PasswordEntry _directory(String path) {
 class _VaultPresentationRepository extends FakeParsRepository {
   _VaultPresentationRepository({
     required List<PasswordEntry> entries,
-    List<String> recentPaths = const <String>[],
     RepoGitStatus status = RepoGitStatus.clean,
     StoreGitMode mode = StoreGitMode.remote,
   }) : _entries = entries,
-       _recentPaths = recentPaths,
        _status = status,
        _mode = mode;
 
   List<PasswordEntry> _entries;
-  final List<String> _recentPaths;
   final RepoGitStatus _status;
   final StoreGitMode _mode;
   int favoriteUpdates = 0;
@@ -273,17 +275,6 @@ class _VaultPresentationRepository extends FakeParsRepository {
 
   @override
   StoreGitMode get gitMode => _mode;
-
-  @override
-  List<PasswordEntry> recentEntries() {
-    final byPath = <String, PasswordEntry>{
-      for (final entry in _entries) entry.path: entry,
-    };
-    return _recentPaths
-        .map((path) => byPath[path])
-        .whereType<PasswordEntry>()
-        .toList();
-  }
 
   @override
   Future<void> toggleFavorite(PasswordEntry entry) async {

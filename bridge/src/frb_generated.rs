@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -185892966;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1187555323;
 
 // Section: executor
 
@@ -1700,7 +1700,7 @@ fn wire__crate__api__open_github_ssh_settings_impl(
         },
     )
 }
-fn wire__crate__api__patch_autofill_index_ranking_impl(
+fn wire__crate__api__patch_autofill_index_favorites_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -1708,7 +1708,7 @@ fn wire__crate__api__patch_autofill_index_ranking_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "patch_autofill_index_ranking",
+            debug_name: "patch_autofill_index_favorites",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -1723,13 +1723,13 @@ fn wire__crate__api__patch_autofill_index_ranking_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_request =
-                <crate::api::PatchAutofillIndexRankingRequest>::sse_decode(&mut deserializer);
+                <crate::api::PatchAutofillIndexFavoritesRequest>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, ()>(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
-                            crate::api::patch_autofill_index_ranking(api_request).await,
+                            crate::api::patch_autofill_index_favorites(api_request).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -2170,7 +2170,6 @@ impl SseDecode for crate::api::AutofillCandidateDto {
         let mut var_matchValue = <String>::sse_decode(deserializer);
         let mut var_score = <i32>::sse_decode(deserializer);
         let mut var_isFavorite = <bool>::sse_decode(deserializer);
-        let mut var_recentRank = <Option<u32>>::sse_decode(deserializer);
         return crate::api::AutofillCandidateDto {
             path: var_path,
             display_name: var_displayName,
@@ -2179,7 +2178,6 @@ impl SseDecode for crate::api::AutofillCandidateDto {
             match_value: var_matchValue,
             score: var_score,
             is_favorite: var_isFavorite,
-            recent_rank: var_recentRank,
         };
     }
 }
@@ -2248,11 +2246,9 @@ impl SseDecode for crate::api::AutofillEntryMetadataDto {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_path = <String>::sse_decode(deserializer);
         let mut var_isFavorite = <bool>::sse_decode(deserializer);
-        let mut var_recentRank = <Option<u32>>::sse_decode(deserializer);
         return crate::api::AutofillEntryMetadataDto {
             path: var_path,
             is_favorite: var_isFavorite,
-            recent_rank: var_recentRank,
         };
     }
 }
@@ -3386,17 +3382,6 @@ impl SseDecode for Option<crate::api::StoreStatusDto> {
     }
 }
 
-impl SseDecode for Option<u32> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<u32>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl SseDecode for crate::api::ParsedEntryFieldDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3411,12 +3396,12 @@ impl SseDecode for crate::api::ParsedEntryFieldDto {
     }
 }
 
-impl SseDecode for crate::api::PatchAutofillIndexRankingRequest {
+impl SseDecode for crate::api::PatchAutofillIndexFavoritesRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_indexPath = <String>::sse_decode(deserializer);
         let mut var_entries = <Vec<crate::api::AutofillEntryMetadataDto>>::sse_decode(deserializer);
-        return crate::api::PatchAutofillIndexRankingRequest {
+        return crate::api::PatchAutofillIndexFavoritesRequest {
             index_path: var_indexPath,
             entries: var_entries,
         };
@@ -3724,7 +3709,7 @@ fn pde_ffi_dispatcher_primary_impl(
         43 => wire__crate__api__move_entry_impl(port, ptr, rust_vec_len, data_len),
         44 => wire__crate__api__open_github_ssh_settings_impl(port, ptr, rust_vec_len, data_len),
         45 => {
-            wire__crate__api__patch_autofill_index_ranking_impl(port, ptr, rust_vec_len, data_len)
+            wire__crate__api__patch_autofill_index_favorites_impl(port, ptr, rust_vec_len, data_len)
         }
         46 => wire__crate__api__prepare_pgp_private_key_impl(port, ptr, rust_vec_len, data_len),
         47 => wire__crate__api__query_autofill_candidates_impl(port, ptr, rust_vec_len, data_len),
@@ -3799,7 +3784,6 @@ impl flutter_rust_bridge::IntoDart for crate::api::AutofillCandidateDto {
             self.match_value.into_into_dart().into_dart(),
             self.score.into_into_dart().into_dart(),
             self.is_favorite.into_into_dart().into_dart(),
-            self.recent_rank.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -3901,12 +3885,8 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::AutofillCredentialResponse>
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::AutofillEntryMetadataDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.path.into_into_dart().into_dart(),
-            self.is_favorite.into_into_dart().into_dart(),
-            self.recent_rank.into_into_dart().into_dart(),
-        ]
-        .into_dart()
+        [self.path.into_into_dart().into_dart(), self.is_favorite.into_into_dart().into_dart()]
+            .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
@@ -5221,20 +5201,20 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ParsedEntryFieldDto>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::PatchAutofillIndexRankingRequest {
+impl flutter_rust_bridge::IntoDart for crate::api::PatchAutofillIndexFavoritesRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [self.index_path.into_into_dart().into_dart(), self.entries.into_into_dart().into_dart()]
             .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::PatchAutofillIndexRankingRequest
+    for crate::api::PatchAutofillIndexFavoritesRequest
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::PatchAutofillIndexRankingRequest>
-    for crate::api::PatchAutofillIndexRankingRequest
+impl flutter_rust_bridge::IntoIntoDart<crate::api::PatchAutofillIndexFavoritesRequest>
+    for crate::api::PatchAutofillIndexFavoritesRequest
 {
-    fn into_into_dart(self) -> crate::api::PatchAutofillIndexRankingRequest {
+    fn into_into_dart(self) -> crate::api::PatchAutofillIndexFavoritesRequest {
         self
     }
 }
@@ -5584,7 +5564,6 @@ impl SseEncode for crate::api::AutofillCandidateDto {
         <String>::sse_encode(self.match_value, serializer);
         <i32>::sse_encode(self.score, serializer);
         <bool>::sse_encode(self.is_favorite, serializer);
-        <Option<u32>>::sse_encode(self.recent_rank, serializer);
     }
 }
 
@@ -5630,7 +5609,6 @@ impl SseEncode for crate::api::AutofillEntryMetadataDto {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.path, serializer);
         <bool>::sse_encode(self.is_favorite, serializer);
-        <Option<u32>>::sse_encode(self.recent_rank, serializer);
     }
 }
 
@@ -6499,16 +6477,6 @@ impl SseEncode for Option<crate::api::StoreStatusDto> {
     }
 }
 
-impl SseEncode for Option<u32> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <u32>::sse_encode(value, serializer);
-        }
-    }
-}
-
 impl SseEncode for crate::api::ParsedEntryFieldDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6518,7 +6486,7 @@ impl SseEncode for crate::api::ParsedEntryFieldDto {
     }
 }
 
-impl SseEncode for crate::api::PatchAutofillIndexRankingRequest {
+impl SseEncode for crate::api::PatchAutofillIndexFavoritesRequest {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.index_path, serializer);

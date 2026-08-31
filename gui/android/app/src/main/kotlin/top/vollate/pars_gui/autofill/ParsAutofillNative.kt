@@ -13,6 +13,9 @@ object ParsAutofillNative {
     @JvmStatic
     external fun resolveCredentialJson(requestJson: String): String
 
+    @JvmStatic
+    external fun recordCompletionJson(requestJson: String): String
+
     fun queryCandidates(requestJson: String): String =
         if (loaded) {
             queryCandidatesJson(requestJson)
@@ -23,6 +26,13 @@ object ParsAutofillNative {
     fun resolveCredential(requestJson: String): String =
         if (loaded) {
             resolveCredentialJson(requestJson)
+        } else {
+            nativeUnavailableJson()
+        }
+
+    fun recordCompletion(requestJson: String): String =
+        if (loaded) {
+            recordCompletionJson(requestJson)
         } else {
             nativeUnavailableJson()
         }
@@ -39,7 +49,6 @@ data class ParsAutofillCandidate(
     val matchValue: String,
     val score: Int,
     val isFavorite: Boolean,
-    val recentRank: Int?,
     val generation: String,
 )
 
@@ -100,8 +109,6 @@ object ParsAutofillNativeBridge {
                         matchValue = candidate.optString("matchValue"),
                         score = candidate.optInt("score"),
                         isFavorite = candidate.optBoolean("isFavorite"),
-                        recentRank =
-                            if (candidate.isNull("recentRank")) null else candidate.optInt("recentRank"),
                         generation = generation,
                     ),
                 )
@@ -149,5 +156,37 @@ object ParsAutofillNativeBridge {
             username = credential.getString("username"),
             password = credential.getString("password"),
         )
+    }
+
+    fun recordCompletion(
+        context: Context,
+        path: String,
+        generation: String,
+    ): Boolean =
+        recordCompletionWith(
+            path = path,
+            generation = generation,
+            stateReader = { ParsAutofillStateStore.read(context) },
+            nativeRecord = ParsAutofillNative::recordCompletion,
+        )
+
+    internal fun recordCompletionWith(
+        path: String,
+        generation: String,
+        stateReader: () -> ParsAutofillState,
+        nativeRecord: (String) -> String,
+    ): Boolean {
+        val state = stateReader()
+        if (state.generation != generation ||
+            !ParsAutofillStateStore.canServe(state, File(state.indexPath).isFile)
+        ) return false
+        val request =
+            JSONObject()
+                .put("indexPath", state.indexPath)
+                .put("path", path)
+        val response = runCatching { JSONObject(nativeRecord(request.toString())) }.getOrNull()
+            ?: return false
+        if (!response.isNull("error") || !response.optBoolean("recorded")) return false
+        return ParsAutofillStateStore.samePublication(state, stateReader())
     }
 }

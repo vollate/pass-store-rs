@@ -74,9 +74,9 @@ Sources: `gui/lib/services/bridge_backed_repository.dart`, `gui/test/bridge_back
 - **THEN** entry and Git presentation state is cleared
 - **AND** the repository does not expose stale entries or `syncFailed`
 
-### Requirement: Vault SHALL support search, browse, recent, favorites, and refresh
+### Requirement: Vault SHALL support search, browse, favorites, and refresh
 
-Vault SHALL refresh on initial open and explicit pull-to-refresh, search by display name or path, browse direct children of a directory, present visible Favorites and bounded Recent sections, and display current favorite state on credential rows or detail headers. Recent SHALL contain only recorded metadata and SHALL NOT fall back to every non-directory entry. Search results SHALL replace home sections while the query is active. Public search, browse, section, selection, and scroll state SHALL survive a safe destination switch for the same store. Store-scoped Recent, Favorite, query, selection, directory, and scroll state SHALL be cleared when the canonical store is removed or replaced.
+Vault SHALL refresh on initial open and explicit pull-to-refresh, search by display name or path, browse direct children of a directory, present visible Favorites, and display current favorite state on credential rows or detail headers. Search results SHALL replace Favorites and Browse while the query is active. Public search, browse, section, selection, and scroll state SHALL survive a safe destination switch for the same store. Store-scoped Favorite, query, selection, directory, and scroll state SHALL be cleared when the canonical store is removed or replaced. Vault SHALL NOT expose a Recent section or derive Autofill ranking from viewing, decrypting, revealing, or copying an entry.
 
 Sources: `gui/lib/screens/vault/vault_screen.dart`, `gui/lib/services/bridge_backed_repository.dart`, `gui/lib/services/vault_metadata_store.dart`, `gui/test/bridge_backed_repository_test.dart`
 
@@ -84,22 +84,14 @@ Sources: `gui/lib/screens/vault/vault_screen.dart`, `gui/lib/services/bridge_bac
 
 - **WHEN** a query is entered
 - **THEN** entries whose display name or path contains the query case-insensitively are returned
-- **AND** Search results replace Favorites, Recent, and Browse while the query is active
+- **AND** Search results replace Favorites and Browse while the query is active
 
-#### Scenario: Recent metadata persists and is bounded
+#### Scenario: Vault access does not create ranking history
 
-- **GIVEN** an entry is read or copied
-- **WHEN** repository metadata is saved
-- **THEN** a later repository instance for the same canonical store returns that entry in bounded recency order
-- **AND** visible recent rows are capped by the shared UI limit
-
-#### Scenario: No history does not relabel all entries as recent
-
-- **GIVEN** the canonical store contains entries
-- **AND** recent metadata is empty
-- **WHEN** Vault renders
-- **THEN** Recent shows a localized empty state or is collapsed according to shared policy
-- **AND** ordinary entries remain available through Browse or Search
+- **GIVEN** a credential is visible in Vault
+- **WHEN** the user opens, decrypts, reveals, or copies it
+- **THEN** no recent-use metadata is written
+- **AND** no Autofill completion ranking update is requested
 
 #### Scenario: Favorite is visible and discoverable
 
@@ -116,7 +108,7 @@ Sources: `gui/lib/screens/vault/vault_screen.dart`, `gui/lib/services/bridge_bac
 
 #### Scenario: Store removal clears store-scoped presentation metadata
 
-- **GIVEN** the canonical store has Recent, Favorite, query, selection, or navigation state
+- **GIVEN** the canonical store has Favorite, query, selection, or navigation state
 - **WHEN** that store is deleted or disconnected successfully
 - **THEN** those store-scoped values are cleared before store setup is shown
 - **AND** a later replacement store cannot inherit them
@@ -136,7 +128,15 @@ Vault SHALL expose generated-password creation and manual credential creation th
 - **GIVEN** Vault is not in selection mode
 - **WHEN** the user invokes Select or long-presses a selectable credential
 - **THEN** Vault enters selection mode and shows selected count
-- **AND** only supported batch actions are enabled
+- **AND** no batch operation is shown until at least one credential is selected
+- **AND** selecting the first credential reveals only supported batch actions
+
+#### Scenario: Focused single-entry workflow does not ask for an entry again
+
+- **GIVEN** the user invokes Edit, Move, Rename, Regenerate, or Delete from a credential detail
+- **WHEN** the focused workflow opens
+- **THEN** it is bound to the displayed credential
+- **AND** it does not show a secondary entry picker
 
 #### Scenario: Leaving selection mode clears selection
 

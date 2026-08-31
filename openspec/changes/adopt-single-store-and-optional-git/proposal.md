@@ -13,7 +13,7 @@ The GUI exposes a multi-repository registry even though users need one immediate
 - Make Git optional: a password store without `.git` remains fully usable for Vault, encryption, and Autofill, while Git and remote actions report an intentional local-only state rather than a failure. Use Rust libgit2 for structured GUI/mobile Git operations where a system `git` executable is unavailable; keep CLI and working desktop system-Git behavior unchanged.
 - Make Import copy the complete visible tree atomically, including `.git`, `.gpg-id`, and dotfiles. Preserve valid Git metadata unchanged; when `.git` is absent, ask whether to initialize Git, continue without Git, or cancel; reject present-but-invalid Git metadata instead of silently replacing it.
 - Preserve the imported store's `.gpg-id`; do not append an arbitrary onboarding key. Creating a new store may write its selected recipients, while recipient rotation remains a separate explicit migration concern.
-- Clear decrypted presentation, store-scoped Recent/Favorite metadata, PGP session state, and native/shared Autofill state before completing store removal or replacement.
+- Clear decrypted presentation, store-scoped Favorite metadata, PGP session state, and native/shared Autofill state before completing store removal or replacement.
 - **BREAKING**: Replace GUI-facing multi-store bridge contracts (list/select/default fallback semantics) with a single-store lifecycle contract. Generated Flutter bridge APIs and affected DTOs will change; TOML `repos` remains temporarily as a deprecated zero-or-one compatibility mirror so older CLI builds can still resolve the selected path.
 
 ## Capabilities

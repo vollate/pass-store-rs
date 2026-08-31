@@ -23,7 +23,7 @@ Linux desktop CMake calls `build_unix.sh linux` during install and passes the fi
 Autofill uses password-store paths as its default non-secret index source. For
 `github.com/alice.gpg`, the immediate parent `github.com` is the Website/App
 service and the filename stem `alice` is the Username. Rebuild, reconcile,
-upsert, move, remove, and ranking-patch requests do not contain a PGP executable
+upsert, move, remove, and favorite-patch requests do not contain a PGP executable
 or passphrase and never decrypt entries.
 
 The candidate query ABI accepts `website`, human-readable `appName`, free-text

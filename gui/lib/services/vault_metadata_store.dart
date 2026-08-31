@@ -3,35 +3,29 @@ import 'dart:io';
 
 class VaultMetadata {
   const VaultMetadata({
-    required this.recentPaths,
     required this.favoritePaths,
     this.storeRoot,
     this.removalTombstone = false,
   });
 
   const VaultMetadata.empty({this.storeRoot, this.removalTombstone = false})
-    : recentPaths = const <String>[],
-      favoritePaths = const <String>{};
+    : favoritePaths = const <String>{};
 
   const VaultMetadata.removed()
-    : recentPaths = const <String>[],
-      favoritePaths = const <String>{},
+    : favoritePaths = const <String>{},
       storeRoot = '',
       removalTombstone = true;
 
-  final List<String> recentPaths;
   final Set<String> favoritePaths;
   final String? storeRoot;
   final bool removalTombstone;
 
   VaultMetadata copyWith({
-    List<String>? recentPaths,
     Set<String>? favoritePaths,
     String? storeRoot,
     bool? removalTombstone,
   }) {
     return VaultMetadata(
-      recentPaths: recentPaths ?? this.recentPaths,
       favoritePaths: favoritePaths ?? this.favoritePaths,
       storeRoot: storeRoot ?? this.storeRoot,
       removalTombstone: removalTombstone ?? this.removalTombstone,
@@ -42,7 +36,6 @@ class VaultMetadata {
     return <String, Object?>{
       'storeRoot': storeRoot,
       'removalTombstone': removalTombstone,
-      'recentPaths': recentPaths,
       'favoritePaths': favoritePaths.toList()..sort(),
     };
   }
@@ -51,16 +44,11 @@ class VaultMetadata {
     if (value is! Map<String, Object?>) {
       return const VaultMetadata.empty();
     }
-    final recent = value['recentPaths'];
     final favorites = value['favoritePaths'];
     return VaultMetadata(
       storeRoot:
           value['storeRoot'] is String ? value['storeRoot'] as String : null,
       removalTombstone: value['removalTombstone'] == true,
-      recentPaths:
-          recent is List
-              ? recent.whereType<String>().toList(growable: false)
-              : const <String>[],
       favoritePaths:
           favorites is List
               ? favorites.whereType<String>().toSet()

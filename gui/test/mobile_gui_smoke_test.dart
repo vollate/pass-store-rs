@@ -19,7 +19,7 @@ import 'package:pars_gui/services/security_repository.dart';
 import 'package:pars_gui/services/settings_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/services/vault_repository.dart';
-import 'package:pars_gui/screens/manage/manage_screen.dart';
+import 'package:pars_gui/screens/vault/operations/vault_operations.dart';
 import 'package:pars_gui/screens/settings/settings_screen.dart';
 import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/screens/vault/vault_screen.dart';
@@ -899,7 +899,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.refreshCount, 2);
-    expect(find.text('No recent entries yet.'), findsOneWidget);
+    expect(find.text('RECENT'), findsNothing);
     expect(find.text('No entries in this store.'), findsOneWidget);
   });
 
@@ -2544,9 +2544,6 @@ class _InjectedRepository
   }
 
   @override
-  List<PasswordEntry> recentEntries() => entries;
-
-  @override
   Future<SecretContent> readEntry(PasswordEntry entry) async {
     return SecretContent(
       password: entry.encryptedContent,
@@ -3328,9 +3325,6 @@ class _EmptyVaultRepository implements VaultRepository, GitRepository {
   List<PasswordEntry> browseEntries(String? directoryPath) => entries;
 
   @override
-  List<PasswordEntry> recentEntries() => entries;
-
-  @override
   Future<SecretContent> readEntry(PasswordEntry entry) async =>
       throw UnimplementedError();
 
@@ -3408,9 +3402,6 @@ class _RefreshingVaultRepository implements VaultRepository, GitRepository {
         )
         .toList(growable: false);
   }
-
-  @override
-  List<PasswordEntry> recentEntries() => entries;
 
   @override
   Future<SecretContent> readEntry(PasswordEntry entry) async {
@@ -3498,9 +3489,6 @@ class _SecretActionRepository implements VaultRepository {
 
   @override
   List<PasswordEntry> browseEntries(String? directoryPath) => entries;
-
-  @override
-  List<PasswordEntry> recentEntries() => entries;
 
   @override
   Future<SecretContent> readEntry(PasswordEntry entry) async {
@@ -3599,9 +3587,6 @@ class _DirectoryVaultRepository implements VaultRepository, GitRepository {
   }
 
   @override
-  List<PasswordEntry> recentEntries() => const <PasswordEntry>[];
-
-  @override
   Future<SecretContent> readEntry(PasswordEntry entry) async {
     return const SecretContent(
       password: 'loaded-secret',
@@ -3684,9 +3669,6 @@ class _ManageVaultRepository implements ManageRepository {
 
   @override
   List<PasswordEntry> browseEntries(String? directoryPath) => entries;
-
-  @override
-  List<PasswordEntry> recentEntries() => entries;
 
   @override
   Future<SecretContent> readEntry(PasswordEntry entry) async =>
@@ -3913,9 +3895,6 @@ class _StoreSetupRepository
 
   @override
   List<PasswordEntry> browseEntries(String? directoryPath) => entries;
-
-  @override
-  List<PasswordEntry> recentEntries() => entries;
 
   @override
   Future<SecretContent> readEntry(PasswordEntry entry) async =>

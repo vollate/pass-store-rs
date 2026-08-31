@@ -6,7 +6,7 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `clear_canonical_store`, `clone_git_repository`, `clone_store_inner`, `configure_pgp_backend_inner`, `configured_upstream`, `create_local_store_inner`, `default_ssh_dir`, `delete_local_store_inner`, `disconnect_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_failure`, `git_remote_callbacks`, `import_local_store_inner`, `imported_key_kind`, `init_git_repository`, `initialize_store_recipients_inner`, `inspect_app_state_inner`, `inspect_git_mode`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `lifecycle_state`, `list_keys_inner`, `load_config_copy`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_matches`, `pgp_key_missing`, `pgp_key_record`, `pgp_preparation_failure`, `read_entry_inner`, `require_app_managed_root`, `require_canonical_store`, `require_empty_canonical_store`, `required_remote_url`, `run_git_command_response_owned`, `run_git_command_response`, `run_system_git`, `sanitize_git_text`, `sanitize_git_token`, `sanitized_remote_url`, `save_config_for_mutation`, `set_canonical_store`, `simple`, `status_code`, `store_failure`, `store_name`, `structured_git_commit`, `structured_git_list_remotes`, `structured_git_pull`, `structured_git_push`, `structured_git_remote_mutation`, `structured_git_response`, `structured_git_status`, `structured_or_system_remote_response`
+// These functions are ignored because they are not marked as `pub`: `clear_canonical_store`, `clone_git_repository`, `clone_store_inner`, `configure_pgp_backend_inner`, `configured_upstream`, `create_local_store_inner`, `create_new_store_tree`, `default_ssh_dir`, `delete_local_store_inner`, `disconnect_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_failure`, `git_remote_callbacks`, `import_local_store_inner`, `imported_key_kind`, `init_git_repository`, `initialize_store_recipients_inner`, `inspect_app_state_inner`, `inspect_git_mode`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `lifecycle_state`, `list_keys_inner`, `load_config_copy`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_matches`, `pgp_key_missing`, `pgp_key_record`, `pgp_preparation_failure`, `read_entry_inner`, `read_regular_gpg_id`, `rename_directory_noreplace`, `require_app_managed_root`, `require_canonical_store`, `require_empty_canonical_store`, `required_remote_url`, `run_git_command_response_owned`, `run_git_command_response`, `run_system_git`, `sanitize_git_text`, `sanitize_git_token`, `sanitized_remote_url`, `save_config_for_mutation`, `set_canonical_store`, `simple`, `status_code`, `store_failure`, `store_name`, `structured_git_commit`, `structured_git_list_remotes`, `structured_git_pull`, `structured_git_push`, `structured_git_remote_mutation`, `structured_git_response`, `structured_git_status`, `structured_or_system_remote_response`, `validated_recipients`, `write_new_gpg_id`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AddPgpKeyToGpgIdRequest`, `ConfiguredUpstream`, `DeletePgpKeyRequest`, `DeletePgpKeyResponse`, `ExportPgpKeyRequest`, `GitRemoteMutation`, `PgpKeyDeletionFailureKind`, `PgpKeyDeletionResultDto`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 // These functions are ignored (category: IgnoreBecauseExplicitAttribute): `add_pgp_key_to_gpg_id`, `delete_pgp_key`, `export_pgp_private_key`, `export_pgp_public_key`, `import_pgp_private_key_file`, `import_pgp_private_key_text`, `import_pgp_public_key`
@@ -48,9 +48,10 @@ Future<UnitResponse> removeAutofillIndexEntry({
   required RemoveAutofillIndexEntryRequest request,
 }) => RustLib.instance.api.crateApiRemoveAutofillIndexEntry(request: request);
 
-Future<UnitResponse> patchAutofillIndexRanking({
-  required PatchAutofillIndexRankingRequest request,
-}) => RustLib.instance.api.crateApiPatchAutofillIndexRanking(request: request);
+Future<UnitResponse> patchAutofillIndexFavorites({
+  required PatchAutofillIndexFavoritesRequest request,
+}) =>
+    RustLib.instance.api.crateApiPatchAutofillIndexFavorites(request: request);
 
 Future<UnitResponse> reconcileAutofillIndex({
   required ReconcileAutofillIndexRequest request,
@@ -283,7 +284,6 @@ class AutofillCandidateDto {
   final String matchValue;
   final int score;
   final bool isFavorite;
-  final int? recentRank;
 
   const AutofillCandidateDto({
     required this.path,
@@ -293,7 +293,6 @@ class AutofillCandidateDto {
     required this.matchValue,
     required this.score,
     required this.isFavorite,
-    this.recentRank,
   });
 
   @override
@@ -304,8 +303,7 @@ class AutofillCandidateDto {
       matchKind.hashCode ^
       matchValue.hashCode ^
       score.hashCode ^
-      isFavorite.hashCode ^
-      recentRank.hashCode;
+      isFavorite.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -318,8 +316,7 @@ class AutofillCandidateDto {
           matchKind == other.matchKind &&
           matchValue == other.matchValue &&
           score == other.score &&
-          isFavorite == other.isFavorite &&
-          recentRank == other.recentRank;
+          isFavorite == other.isFavorite;
 }
 
 class AutofillCandidatesResponse {
@@ -424,16 +421,14 @@ class AutofillCredentialResponse {
 class AutofillEntryMetadataDto {
   final String path;
   final bool isFavorite;
-  final int? recentRank;
 
   const AutofillEntryMetadataDto({
     required this.path,
     required this.isFavorite,
-    this.recentRank,
   });
 
   @override
-  int get hashCode => path.hashCode ^ isFavorite.hashCode ^ recentRank.hashCode;
+  int get hashCode => path.hashCode ^ isFavorite.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -441,8 +436,7 @@ class AutofillEntryMetadataDto {
       other is AutofillEntryMetadataDto &&
           runtimeType == other.runtimeType &&
           path == other.path &&
-          isFavorite == other.isFavorite &&
-          recentRank == other.recentRank;
+          isFavorite == other.isFavorite;
 }
 
 class AutofillQueryRequest {
@@ -2039,11 +2033,11 @@ class ParsedEntryFieldDto {
           value == other.value;
 }
 
-class PatchAutofillIndexRankingRequest {
+class PatchAutofillIndexFavoritesRequest {
   final String indexPath;
   final List<AutofillEntryMetadataDto> entries;
 
-  const PatchAutofillIndexRankingRequest({
+  const PatchAutofillIndexFavoritesRequest({
     required this.indexPath,
     required this.entries,
   });
@@ -2054,7 +2048,7 @@ class PatchAutofillIndexRankingRequest {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PatchAutofillIndexRankingRequest &&
+      other is PatchAutofillIndexFavoritesRequest &&
           runtimeType == other.runtimeType &&
           indexPath == other.indexPath &&
           entries == other.entries;

@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -185892966;
+  int get rustContentHash => -1187555323;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -242,8 +242,8 @@ abstract class RustLibApi extends BaseApi {
     required OpenGithubSshSettingsRequest request,
   });
 
-  Future<UnitResponse> crateApiPatchAutofillIndexRanking({
-    required PatchAutofillIndexRankingRequest request,
+  Future<UnitResponse> crateApiPatchAutofillIndexFavorites({
+    required PatchAutofillIndexFavoritesRequest request,
   });
 
   Future<PreparePgpPrivateKeyResponse> crateApiPreparePgpPrivateKey({
@@ -1713,14 +1713,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<UnitResponse> crateApiPatchAutofillIndexRanking({
-    required PatchAutofillIndexRankingRequest request,
+  Future<UnitResponse> crateApiPatchAutofillIndexFavorites({
+    required PatchAutofillIndexFavoritesRequest request,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_patch_autofill_index_ranking_request(
+          sse_encode_box_autoadd_patch_autofill_index_favorites_request(
             request,
             serializer,
           );
@@ -1735,16 +1735,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit_response,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiPatchAutofillIndexRankingConstMeta,
+        constMeta: kCrateApiPatchAutofillIndexFavoritesConstMeta,
         argValues: [request],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiPatchAutofillIndexRankingConstMeta =>
+  TaskConstMeta get kCrateApiPatchAutofillIndexFavoritesConstMeta =>
       const TaskConstMeta(
-        debugName: "patch_autofill_index_ranking",
+        debugName: "patch_autofill_index_favorites",
         argNames: ["request"],
       );
 
@@ -2124,8 +2124,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AutofillCandidateDto dco_decode_autofill_candidate_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return AutofillCandidateDto(
       path: dco_decode_String(arr[0]),
       displayName: dco_decode_String(arr[1]),
@@ -2134,7 +2134,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       matchValue: dco_decode_String(arr[4]),
       score: dco_decode_i_32(arr[5]),
       isFavorite: dco_decode_bool(arr[6]),
-      recentRank: dco_decode_opt_box_autoadd_u_32(arr[7]),
     );
   }
 
@@ -2201,12 +2200,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AutofillEntryMetadataDto dco_decode_autofill_entry_metadata_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
     return AutofillEntryMetadataDto(
       path: dco_decode_String(arr[0]),
       isFavorite: dco_decode_bool(arr[1]),
-      recentRank: dco_decode_opt_box_autoadd_u_32(arr[2]),
     );
   }
 
@@ -2609,10 +2607,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PatchAutofillIndexRankingRequest
-  dco_decode_box_autoadd_patch_autofill_index_ranking_request(dynamic raw) {
+  PatchAutofillIndexFavoritesRequest
+  dco_decode_box_autoadd_patch_autofill_index_favorites_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_patch_autofill_index_ranking_request(raw);
+    return dco_decode_patch_autofill_index_favorites_request(raw);
   }
 
   @protected
@@ -2675,12 +2673,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   StoreStatusDto dco_decode_box_autoadd_store_status_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_store_status_dto(raw);
-  }
-
-  @protected
-  int dco_decode_box_autoadd_u_32(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as int;
   }
 
   @protected
@@ -3725,12 +3717,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  int? dco_decode_opt_box_autoadd_u_32(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_u_32(raw);
-  }
-
-  @protected
   ParsedEntryFieldDto dco_decode_parsed_entry_field_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -3744,13 +3730,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PatchAutofillIndexRankingRequest
-  dco_decode_patch_autofill_index_ranking_request(dynamic raw) {
+  PatchAutofillIndexFavoritesRequest
+  dco_decode_patch_autofill_index_favorites_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
     if (arr.length != 2)
       throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return PatchAutofillIndexRankingRequest(
+    return PatchAutofillIndexFavoritesRequest(
       indexPath: dco_decode_String(arr[0]),
       entries: dco_decode_list_autofill_entry_metadata_dto(arr[1]),
     );
@@ -4010,7 +3996,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_matchValue = sse_decode_String(deserializer);
     var var_score = sse_decode_i_32(deserializer);
     var var_isFavorite = sse_decode_bool(deserializer);
-    var var_recentRank = sse_decode_opt_box_autoadd_u_32(deserializer);
     return AutofillCandidateDto(
       path: var_path,
       displayName: var_displayName,
@@ -4019,7 +4004,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       matchValue: var_matchValue,
       score: var_score,
       isFavorite: var_isFavorite,
-      recentRank: var_recentRank,
     );
   }
 
@@ -4094,12 +4078,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_path = sse_decode_String(deserializer);
     var var_isFavorite = sse_decode_bool(deserializer);
-    var var_recentRank = sse_decode_opt_box_autoadd_u_32(deserializer);
-    return AutofillEntryMetadataDto(
-      path: var_path,
-      isFavorite: var_isFavorite,
-      recentRank: var_recentRank,
-    );
+    return AutofillEntryMetadataDto(path: var_path, isFavorite: var_isFavorite);
   }
 
   @protected
@@ -4555,12 +4534,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PatchAutofillIndexRankingRequest
-  sse_decode_box_autoadd_patch_autofill_index_ranking_request(
+  PatchAutofillIndexFavoritesRequest
+  sse_decode_box_autoadd_patch_autofill_index_favorites_request(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_patch_autofill_index_ranking_request(deserializer));
+    return (sse_decode_patch_autofill_index_favorites_request(deserializer));
   }
 
   @protected
@@ -4637,12 +4616,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_store_status_dto(deserializer));
-  }
-
-  @protected
-  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_u_32(deserializer));
   }
 
   @protected
@@ -5832,17 +5805,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_u_32(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
   ParsedEntryFieldDto sse_decode_parsed_entry_field_dto(
     SseDeserializer deserializer,
   ) {
@@ -5858,14 +5820,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PatchAutofillIndexRankingRequest
-  sse_decode_patch_autofill_index_ranking_request(
+  PatchAutofillIndexFavoritesRequest
+  sse_decode_patch_autofill_index_favorites_request(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_indexPath = sse_decode_String(deserializer);
     var var_entries = sse_decode_list_autofill_entry_metadata_dto(deserializer);
-    return PatchAutofillIndexRankingRequest(
+    return PatchAutofillIndexFavoritesRequest(
       indexPath: var_indexPath,
       entries: var_entries,
     );
@@ -6139,7 +6101,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.matchValue, serializer);
     sse_encode_i_32(self.score, serializer);
     sse_encode_bool(self.isFavorite, serializer);
-    sse_encode_opt_box_autoadd_u_32(self.recentRank, serializer);
   }
 
   @protected
@@ -6198,7 +6159,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.path, serializer);
     sse_encode_bool(self.isFavorite, serializer);
-    sse_encode_opt_box_autoadd_u_32(self.recentRank, serializer);
   }
 
   @protected
@@ -6695,12 +6655,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_patch_autofill_index_ranking_request(
-    PatchAutofillIndexRankingRequest self,
+  void sse_encode_box_autoadd_patch_autofill_index_favorites_request(
+    PatchAutofillIndexFavoritesRequest self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_patch_autofill_index_ranking_request(self, serializer);
+    sse_encode_patch_autofill_index_favorites_request(self, serializer);
   }
 
   @protected
@@ -6782,12 +6742,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_store_status_dto(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_u_32(self, serializer);
   }
 
   @protected
@@ -7813,16 +7767,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_u_32(self, serializer);
-    }
-  }
-
-  @protected
   void sse_encode_parsed_entry_field_dto(
     ParsedEntryFieldDto self,
     SseSerializer serializer,
@@ -7834,8 +7778,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_patch_autofill_index_ranking_request(
-    PatchAutofillIndexRankingRequest self,
+  void sse_encode_patch_autofill_index_favorites_request(
+    PatchAutofillIndexFavoritesRequest self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs

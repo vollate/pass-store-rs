@@ -11,8 +11,6 @@ abstract interface class VaultRepository {
 
   List<PasswordEntry> browseEntries(String? directoryPath);
 
-  List<PasswordEntry> recentEntries();
-
   Future<SecretContent> readEntry(PasswordEntry entry);
 
   Future<String> copyEntryPassword(PasswordEntry entry);

@@ -18,7 +18,6 @@ class PasswordEntry {
     this.isDirectory = false,
     this.childCount = 0,
     this.isFavorite = false,
-    this.lastUsedLabel,
   });
 
   final String path;
@@ -28,9 +27,8 @@ class PasswordEntry {
   final bool isDirectory;
   final int childCount;
   final bool isFavorite;
-  final String? lastUsedLabel;
 
-  PasswordEntry copyWith({bool? isFavorite, String? lastUsedLabel}) {
+  PasswordEntry copyWith({bool? isFavorite}) {
     return PasswordEntry(
       path: path,
       displayName: displayName,
@@ -39,7 +37,6 @@ class PasswordEntry {
       isDirectory: isDirectory,
       childCount: childCount,
       isFavorite: isFavorite ?? this.isFavorite,
-      lastUsedLabel: lastUsedLabel ?? this.lastUsedLabel,
     );
   }
 

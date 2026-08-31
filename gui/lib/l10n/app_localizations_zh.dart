@@ -157,9 +157,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultTitle => '密码库';
 
   @override
-  String get manageTitle => '管理';
-
-  @override
   String get retry => '重试';
 
   @override
@@ -228,9 +225,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchVaultHint => '按名称或路径搜索';
 
   @override
-  String get recentSection => '最近使用';
-
-  @override
   String get favoritesSection => '收藏';
 
   @override
@@ -243,9 +237,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String browsePathSection(String path) {
     return '浏览：$path';
   }
-
-  @override
-  String get noRecentEntries => '暂无最近使用的条目。';
 
   @override
   String get noFavoriteEntries => '暂无收藏条目。';
@@ -347,9 +338,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get couldNotOpenUrl => '无法打开网址。';
 
   @override
-  String get manageSubtitle => '批量或逐项维护密码。';
-
-  @override
   String get generateAndSave => '生成并保存';
 
   @override
@@ -398,9 +386,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteEntryDescription => '确认名称后删除一个条目。';
 
   @override
-  String get noEntriesToManage => '没有可管理的条目。';
-
-  @override
   String get selectAtLeastOneEntry => '请至少选择一个条目。';
 
   @override
@@ -447,9 +432,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get noEntriesAvailable => '没有可用条目';
-
-  @override
-  String get noEntriesToEdit => '没有可编辑的条目。';
 
   @override
   String get noSymbols => '不使用符号';
@@ -558,9 +540,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String typeToConfirm(String value) {
     return '输入 $value 以确认';
   }
-
-  @override
-  String get entryField => '条目';
 
   @override
   String get batchSelection => '批量选择';

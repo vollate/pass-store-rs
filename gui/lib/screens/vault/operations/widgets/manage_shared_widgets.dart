@@ -1,33 +1,4 @@
-part of '../manage_screen.dart';
-
-class _EntryPicker extends StatelessWidget {
-  const _EntryPicker({
-    required this.entries,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final List<PasswordEntry> entries;
-  final PasswordEntry value;
-  final ValueChanged<PasswordEntry>? onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<PasswordEntry>(
-      initialValue: value,
-      decoration: InputDecoration(labelText: context.l10n.entryField),
-      items: entries
-          .map(
-            (entry) => DropdownMenuItem<PasswordEntry>(
-              value: entry,
-              child: Text(entry.path),
-            ),
-          )
-          .toList(growable: false),
-      onChanged: onChanged == null ? null : (value) => onChanged!(value!),
-    );
-  }
-}
+part of '../vault_operations.dart';
 
 class _CommitCheckbox extends StatelessWidget {
   const _CommitCheckbox({

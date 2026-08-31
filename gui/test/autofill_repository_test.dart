@@ -155,7 +155,7 @@ void main() {
     },
   );
 
-  test('path rebuild sends ranking metadata without secret inputs', () async {
+  test('path rebuild sends favorite metadata without secret inputs', () async {
     final bridge = _RecordingAutofillBridge();
     final securityRepository = InMemorySecurityRepository();
     await securityRepository.startPgpSession(
@@ -180,7 +180,6 @@ void main() {
         repoName: 'Personal',
         encryptedContent: '',
         isFavorite: true,
-        lastUsedLabel: 'Recent',
       ),
       PasswordEntry(
         path: 'github.com',
@@ -199,7 +198,6 @@ void main() {
     expect(request.entries, hasLength(1));
     expect(request.entries.single.path, 'github.com/alice');
     expect(request.entries.single.isFavorite, isTrue);
-    expect(request.entries.single.recentRank, 0);
     expect(repository.status.indexedEntries, 1);
   });
 
@@ -213,7 +211,6 @@ void main() {
         displayName: 'alice',
         repoName: 'Personal',
         encryptedContent: '',
-        lastUsedLabel: 'Recent 3',
       );
 
       await repository.upsertEntry(entry);
@@ -223,16 +220,15 @@ void main() {
         recursive: false,
       );
       await repository.removeEntry(path: 'old', recursive: true);
-      await repository.patchRanking(const <PasswordEntry>[entry]);
+      await repository.patchFavorites(const <PasswordEntry>[entry]);
       await repository.reconcileIndex(const <PasswordEntry>[entry]);
 
       expect(bridge.lastUpsertRequest?.entry.path, 'github.com/alice');
-      expect(bridge.lastUpsertRequest?.entry.recentRank, 2);
       expect(bridge.lastMoveRequest?.oldPath, 'github.com/alice');
       expect(bridge.lastMoveRequest?.newPath, 'gitlab.com/alice');
       expect(bridge.lastRemoveRequest?.recursive, isTrue);
       expect(
-        bridge.lastRankingRequest?.entries.single.path,
+        bridge.lastFavoritesRequest?.entries.single.path,
         'github.com/alice',
       );
       expect(bridge.lastReconcileRequest?.storeId, 'store-0');
@@ -280,7 +276,6 @@ void main() {
                 matchValue: 'github',
                 score: 3650,
                 isFavorite: true,
-                recentRank: 0,
               ),
             ],
           )
@@ -391,7 +386,7 @@ void main() {
 
     await repository.rebuildIndex(entries);
     await repository.upsertEntry(entries.single);
-    await repository.patchRanking(entries);
+    await repository.patchFavorites(entries);
 
     expect(repository.lastRebuiltEntries.single.path, 'github.com/alice');
     expect(repository.operations, contains('upsert:github.com/alice'));
@@ -431,7 +426,7 @@ class _RecordingAutofillBridge implements AutofillBridgeApi {
   frb.UpsertAutofillIndexEntryRequest? lastUpsertRequest;
   frb.MoveAutofillIndexEntryRequest? lastMoveRequest;
   frb.RemoveAutofillIndexEntryRequest? lastRemoveRequest;
-  frb.PatchAutofillIndexRankingRequest? lastRankingRequest;
+  frb.PatchAutofillIndexFavoritesRequest? lastFavoritesRequest;
   frb.ReconcileAutofillIndexRequest? lastReconcileRequest;
   frb.EnrichAutofillIndexWebsitesRequest? lastEnrichRequest;
   frb.ClearAutofillIndexWebsitesRequest? lastClearWebsitesRequest;
@@ -483,11 +478,11 @@ class _RecordingAutofillBridge implements AutofillBridgeApi {
   }
 
   @override
-  Future<frb.UnitResponse> patchAutofillIndexRanking({
-    required frb.PatchAutofillIndexRankingRequest request,
+  Future<frb.UnitResponse> patchAutofillIndexFavorites({
+    required frb.PatchAutofillIndexFavoritesRequest request,
   }) async {
-    calledMethods.add('patch_autofill_index_ranking');
-    lastRankingRequest = request;
+    calledMethods.add('patch_autofill_index_favorites');
+    lastFavoritesRequest = request;
     return const frb.UnitResponse();
   }
 

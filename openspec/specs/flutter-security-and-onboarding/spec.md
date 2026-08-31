@@ -620,7 +620,7 @@ references SHALL remain unchanged.
 
 ### Requirement: Authenticated GUI SHALL provide immediate manual lock
 
-The authenticated GUI SHALL expose a clearly named Lock now action from the Vault or shell header. Lock now SHALL call the existing full lock path, clear the active in-memory PGP session, dispose decrypted detail content, and render the lock screen without changing durable onboarding, key, store, favorite, recent, or locale state.
+The authenticated GUI SHALL expose a clearly named Lock now action from the Vault or shell header. Lock now SHALL call the existing full lock path, clear the active in-memory PGP session, dispose decrypted detail content, and render the lock screen without changing durable onboarding, key, store, favorite, or locale state.
 
 #### Scenario: User locks from Vault
 - **GIVEN** the app is unlocked
@@ -631,7 +631,7 @@ The authenticated GUI SHALL expose a clearly named Lock now action from the Vaul
 
 #### Scenario: Manual lock preserves durable configuration
 - **WHEN** Lock now completes
-- **THEN** persisted onboarding, language, keys, stores, favorites, recents, and secure-storage preferences remain unchanged
+- **THEN** persisted onboarding, language, keys, stores, favorites, and secure-storage preferences remain unchanged
 
 ### Requirement: Authenticated and secret GUI surfaces SHALL protect background and capture privacy
 

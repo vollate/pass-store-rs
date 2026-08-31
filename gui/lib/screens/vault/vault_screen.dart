@@ -17,9 +17,9 @@ import '../../widgets/entry_tile.dart';
 import '../../widgets/pars_action_group.dart';
 import '../../widgets/pars_adaptive_surface.dart';
 import '../../widgets/pars_status_badge.dart';
-import '../manage/manage_screen.dart';
 import '../shell/shell_view_state.dart';
 import 'entry_detail_sheet.dart';
+import 'operations/vault_operations.dart';
 
 enum _EntryDetailAction { edit, move, rename, regenerate, delete }
 
@@ -55,7 +55,6 @@ class VaultScreen extends StatefulWidget {
 
 class _VaultScreenState extends State<VaultScreen> {
   static const int _favoritesLimit = 6;
-  static const int _recentLimit = 10;
 
   late final VaultDestinationState _viewState;
   late final bool _ownsViewState;
@@ -116,21 +115,11 @@ class _VaultScreenState extends State<VaultScreen> {
                 .take(_favoritesLimit)
                 .toList(growable: false)
             : const <PasswordEntry>[];
-    final favoritePaths = favorites.map((entry) => entry.path).toSet();
-    final recent =
-        _query.isEmpty
-            ? widget.vaultRepository
-                .recentEntries()
-                .where((entry) => !favoritePaths.contains(entry.path))
-                .take(_recentLimit)
-                .toList(growable: false)
-            : entries
-                .where((entry) => !entry.isDirectory)
-                .toList(growable: false);
+    final searchResults = entries
+        .where((entry) => !entry.isDirectory)
+        .toList(growable: false);
     final browseEntries =
-        _query.isEmpty
-            ? widget.vaultRepository.browseEntries(_directoryPath)
-            : const <PasswordEntry>[];
+        _query.isEmpty ? _visibleBrowseEntries() : const <PasswordEntry>[];
 
     return RefreshIndicator(
       onRefresh: _refreshVault,
@@ -231,25 +220,20 @@ class _VaultScreenState extends State<VaultScreen> {
                       )
                       .toList(),
             ),
-          AppSection(
-            title:
-                _query.isEmpty
-                    ? localizations.recentSection
-                    : localizations.searchResultsSection,
-            emptyLabel:
-                _query.isEmpty
-                    ? localizations.noRecentEntries
-                    : localizations.noSearchResults,
-            children:
-                recent
-                    .map(
-                      (entry) => _buildEntryTile(
-                        entry,
-                        onTap: () => _showEntry(entry),
-                      ),
-                    )
-                    .toList(),
-          ),
+          if (_query.isNotEmpty)
+            AppSection(
+              title: localizations.searchResultsSection,
+              emptyLabel: localizations.noSearchResults,
+              children:
+                  searchResults
+                      .map(
+                        (entry) => _buildEntryTile(
+                          entry,
+                          onTap: () => _showEntry(entry),
+                        ),
+                      )
+                      .toList(),
+            ),
           if (_query.isEmpty)
             AppSection(
               title:
@@ -288,10 +272,20 @@ class _VaultScreenState extends State<VaultScreen> {
     );
   }
 
+  List<PasswordEntry> _visibleBrowseEntries() {
+    final browsed = widget.vaultRepository.browseEntries(_directoryPath);
+    if (browsed.isNotEmpty || _directoryPath != null) {
+      return browsed;
+    }
+    return widget.vaultRepository.entries
+        .where((entry) => !entry.isDirectory)
+        .toList(growable: false);
+  }
+
   Widget _buildVaultActions(BuildContext context) {
     final localizations = context.l10n;
     if (_viewState.selectionMode) {
-      final selectedCount = _viewState.selectedPaths.length;
+      final selectedCount = _selectedEntries.length;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -311,31 +305,32 @@ class _VaultScreenState extends State<VaultScreen> {
               ),
             ],
           ),
-          ParsActionGroup(
-            actions: <ParsActionItem>[
-              ParsActionItem(
-                label: localizations.move,
-                icon: Icons.drive_file_move_outlined,
-                onPressed: selectedCount == 0 ? null : _showBatchMove,
-              ),
-              ParsActionItem(
-                label: localizations.rename,
-                icon: Icons.drive_file_rename_outline,
-                onPressed: selectedCount == 0 ? null : _showBatchRename,
-              ),
-              ParsActionItem(
-                label: localizations.regenerate,
-                icon: Icons.refresh,
-                onPressed: selectedCount == 0 ? null : _showBatchRegenerate,
-              ),
-              ParsActionItem(
-                label: localizations.delete,
-                icon: Icons.delete_outline,
-                kind: ParsActionKind.destructive,
-                onPressed: selectedCount == 0 ? null : _showBatchDelete,
-              ),
-            ],
-          ),
+          if (selectedCount > 0)
+            ParsActionGroup(
+              actions: <ParsActionItem>[
+                ParsActionItem(
+                  label: localizations.move,
+                  icon: Icons.drive_file_move_outlined,
+                  onPressed: _showBatchMove,
+                ),
+                ParsActionItem(
+                  label: localizations.rename,
+                  icon: Icons.drive_file_rename_outline,
+                  onPressed: _showBatchRename,
+                ),
+                ParsActionItem(
+                  label: localizations.regenerate,
+                  icon: Icons.refresh,
+                  onPressed: _showBatchRegenerate,
+                ),
+                ParsActionItem(
+                  label: localizations.delete,
+                  icon: Icons.delete_outline,
+                  kind: ParsActionKind.destructive,
+                  onPressed: _showBatchDelete,
+                ),
+              ],
+            ),
         ],
       );
     }

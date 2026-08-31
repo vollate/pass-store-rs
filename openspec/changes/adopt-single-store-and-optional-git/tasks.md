@@ -78,7 +78,7 @@
 - [x] 7.2 Add lifecycle notifications so successful store mutation refreshes can unmount `MobileShell` immediately.
 - [x] 7.3 Preserve routing precedence for initial security setup, lock, no-store setup, store repair, and ready shell across startup, resume, unlock, and deletion.
 - [x] 7.4 Present Delete local copy only for verified app-managed roots and Disconnect for externally owned roots.
-- [x] 7.5 Before completing store removal presentation, close decrypted entry detail and clear query, selection, directory, scroll, Recent, and Favorite state belonging to the removed store.
+- [x] 7.5 Before completing store removal presentation, close decrypted entry detail and clear query, selection, directory, scroll, and Favorite state belonging to the removed store.
 - [x] 7.6 Clear the active PGP session and republish native Autofill security state without a store-bound passphrase while retaining durable preferences only in secure storage.
 - [x] 7.7 Remove the shared Autofill index, enrichment metadata, Android candidates, and iOS credential identities when the canonical store is deleted, disconnected, or replaced.
 - [x] 7.8 Require an explicit non-decrypting Autofill rebuild for a replacement store and prove it cannot inherit old paths, aliases, or ranking metadata.

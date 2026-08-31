@@ -198,7 +198,6 @@ class FakeParsRepository
       encryptedContent:
           's3cret-github\nusername: Vollate\nurl: https://github.com\ncreated on desktop',
       isFavorite: true,
-      lastUsedLabel: 'Today',
     ),
     PasswordEntry(
       path: 'finance/stripe',
@@ -206,7 +205,6 @@ class FakeParsRepository
       repoName: '~/.password-store',
       encryptedContent:
           'stripe-passphrase\nlogin: billing@example.com\nwebsite: https://dashboard.stripe.com',
-      lastUsedLabel: 'Yesterday',
     ),
     PasswordEntry(
       path: 'infra/prod/root',
@@ -273,13 +271,6 @@ class FakeParsRepository
     final parent = directoryPath ?? currentRepoName;
     return entries
         .where((entry) => entry.parentPath == parent)
-        .toList(growable: false);
-  }
-
-  @override
-  List<PasswordEntry> recentEntries() {
-    return entries
-        .where((entry) => !entry.isDirectory && entry.lastUsedLabel != null)
         .toList(growable: false);
   }
 

@@ -186,8 +186,8 @@ label rather than the full password-store path. The full path SHALL remain
 visible as read-only context so the user can verify the target without typing
 the entire path.
 
-Sources: `gui/lib/screens/manage/widgets/manage_single_entry_widgets.dart`,
-`gui/lib/screens/manage/manage_screen.dart`, `gui/test/mobile_gui_smoke_test.dart`
+Sources: `gui/lib/screens/vault/operations/widgets/manage_single_entry_widgets.dart`,
+`gui/lib/screens/vault/operations/vault_operations.dart`, `gui/test/mobile_gui_smoke_test.dart`
 
 #### Scenario: Single-entry delete confirms by display label
 

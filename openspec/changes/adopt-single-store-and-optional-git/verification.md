@@ -148,7 +148,7 @@ Invalid-Git evidence:
 
 ## 9.6 Removal/privacy evidence
 
-The device-side Flutter integration uses disposable canonical configs, pure-Rust keyrings, app-managed stores, genuinely encrypted credentials written through `BridgeBackedRepository.saveEntry`, metadata, active sessions, durable synthetic passphrases, and real native publication. One emulator test opens the production Vault detail, decrypts the credential with the synthetic protected key/session, taps Reveal, and observes `live-decrypted-password`; direct canonical removal while that detail remains live unmounts the detail and removes the revealed value before store setup appears. A separate test opens and reveals `synthetic-password`, then drives production Settings → Password store → Delete app copy with exact typed confirmation. It verifies shell/confirmation removal, setup UI, Recent/Favorite metadata and active-session clearing, retained durable preference, native `enabled=false` with no root/passphrase, deleted filesystem root, and singular config with no store. Arbitrary placeholder bytes are not used as decryption evidence. The existing restored `personm` store remains untouched.
+The device-side Flutter integration uses disposable canonical configs, pure-Rust keyrings, app-managed stores, genuinely encrypted credentials written through `BridgeBackedRepository.saveEntry`, metadata, active sessions, durable synthetic passphrases, and real native publication. One emulator test opens the production Vault detail, decrypts the credential with the synthetic protected key/session, taps Reveal, and observes `live-decrypted-password`; direct canonical removal while that detail remains live unmounts the detail and removes the revealed value before store setup appears. A separate test opens and reveals `synthetic-password`, then drives production Settings → Password store → Delete app copy with exact typed confirmation. It verifies shell/confirmation removal, setup UI, Favorite metadata and active-session clearing, retained durable preference, native `enabled=false` with no root/passphrase, deleted filesystem root, and singular config with no store. Arbitrary placeholder bytes are not used as decryption evidence. The existing restored `personm` store remains untouched.
 
 Android instrumentation additionally verifies explicit publication generation, encrypted synthetic passphrase readback, synchronous `enabled=false` clear, generation change on same-root replacement, tombstoning during resolution, stale index retained but unservable, and zero candidates after tombstoning. Candidate intents and iOS credential identity record identifiers carry only path plus generation, never a password. Final native state is:
 
@@ -160,7 +160,7 @@ Flutter behavior tests pass for:
 
 - lifecycle notification unmounting `MobileShell` and closing a sensitive route;
 - deleting the sole app-managed store entering store setup without resetting gesture security;
-- clearing entries, query/selection navigation, Recent/Favorite metadata, active PGP session, enrichment, shared index, candidates, and native publication before bridge mutation;
+- clearing entries, query/selection navigation, Favorite metadata, active PGP session, enrichment, shared index, candidates, and native publication before bridge mutation;
 - retaining only the durable secure-storage passphrase preference;
 - replacement isolation and explicit non-decrypting rebuild requirement;
 - failure retry and dual metadata-sentinel fail-closed behavior;

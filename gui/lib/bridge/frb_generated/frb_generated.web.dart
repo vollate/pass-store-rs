@@ -276,8 +276,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_box_autoadd_open_github_ssh_settings_request(dynamic raw);
 
   @protected
-  PatchAutofillIndexRankingRequest
-  dco_decode_box_autoadd_patch_autofill_index_ranking_request(dynamic raw);
+  PatchAutofillIndexFavoritesRequest
+  dco_decode_box_autoadd_patch_autofill_index_favorites_request(dynamic raw);
 
   @protected
   PgpImportFailureKind dco_decode_box_autoadd_pgp_import_failure_kind(
@@ -313,9 +313,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StoreStatusDto dco_decode_box_autoadd_store_status_dto(dynamic raw);
-
-  @protected
-  int dco_decode_box_autoadd_u_32(dynamic raw);
 
   @protected
   UpsertAutofillIndexEntryRequest
@@ -631,14 +628,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   StoreStatusDto? dco_decode_opt_box_autoadd_store_status_dto(dynamic raw);
 
   @protected
-  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
-
-  @protected
   ParsedEntryFieldDto dco_decode_parsed_entry_field_dto(dynamic raw);
 
   @protected
-  PatchAutofillIndexRankingRequest
-  dco_decode_patch_autofill_index_ranking_request(dynamic raw);
+  PatchAutofillIndexFavoritesRequest
+  dco_decode_patch_autofill_index_favorites_request(dynamic raw);
 
   @protected
   PgpImportFailureKind dco_decode_pgp_import_failure_kind(dynamic raw);
@@ -1020,8 +1014,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PatchAutofillIndexRankingRequest
-  sse_decode_box_autoadd_patch_autofill_index_ranking_request(
+  PatchAutofillIndexFavoritesRequest
+  sse_decode_box_autoadd_patch_autofill_index_favorites_request(
     SseDeserializer deserializer,
   );
 
@@ -1073,9 +1067,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   StoreStatusDto sse_decode_box_autoadd_store_status_dto(
     SseDeserializer deserializer,
   );
-
-  @protected
-  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
   UpsertAutofillIndexEntryRequest
@@ -1499,16 +1490,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
-
-  @protected
   ParsedEntryFieldDto sse_decode_parsed_entry_field_dto(
     SseDeserializer deserializer,
   );
 
   @protected
-  PatchAutofillIndexRankingRequest
-  sse_decode_patch_autofill_index_ranking_request(SseDeserializer deserializer);
+  PatchAutofillIndexFavoritesRequest
+  sse_decode_patch_autofill_index_favorites_request(
+    SseDeserializer deserializer,
+  );
 
   @protected
   PgpImportFailureKind sse_decode_pgp_import_failure_kind(
@@ -1957,8 +1947,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_patch_autofill_index_ranking_request(
-    PatchAutofillIndexRankingRequest self,
+  void sse_encode_box_autoadd_patch_autofill_index_favorites_request(
+    PatchAutofillIndexFavoritesRequest self,
     SseSerializer serializer,
   );
 
@@ -2015,9 +2005,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     StoreStatusDto self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_upsert_autofill_index_entry_request(
@@ -2545,17 +2532,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
-
-  @protected
   void sse_encode_parsed_entry_field_dto(
     ParsedEntryFieldDto self,
     SseSerializer serializer,
   );
 
   @protected
-  void sse_encode_patch_autofill_index_ranking_request(
-    PatchAutofillIndexRankingRequest self,
+  void sse_encode_patch_autofill_index_favorites_request(
+    PatchAutofillIndexFavoritesRequest self,
     SseSerializer serializer,
   );
 

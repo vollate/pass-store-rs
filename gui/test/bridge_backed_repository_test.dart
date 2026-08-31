@@ -15,6 +15,17 @@ import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/services/vault_metadata_store.dart';
 
 void main() {
+  test('legacy recentPaths metadata is ignored and never written again', () {
+    final metadata = VaultMetadata.fromJson(<String, Object?>{
+      'storeRoot': '/tmp/store',
+      'recentPaths': <String>['example.com/alice'],
+      'favoritePaths': <String>['example.com/bob'],
+    });
+
+    expect(metadata.favoritePaths, <String>{'example.com/bob'});
+    expect(metadata.toJson(), isNot(contains('recentPaths')));
+  });
+
   test(
     'bridge-backed repository loads config stores entries and git status',
     () async {
@@ -148,7 +159,7 @@ void main() {
   );
 
   test(
-    'metadata-only entry reads do not rebuild the full autofill index',
+    'vault reads do not affect Autofill ranking while favorites patch incrementally',
     () async {
       final bridge = _LifecycleBridge();
       final autofillRepository = FakeAutofillRepository();
@@ -161,16 +172,16 @@ void main() {
 
       await repository.refresh();
       await repository.readEntry(repository.entries.first);
+      expect(autofillRepository.operations, isNot(contains('favorites')));
       await repository.toggleFavorite(repository.entries.first);
 
-      expect(repository.recentEntries().single.path, 'work/github');
       expect(repository.entries.first.isFavorite, isTrue);
       expect(autofillRepository.operations, isNot(contains('rebuild')));
       expect(
-        autofillRepository.operations.where((value) => value == 'ranking'),
-        hasLength(2),
+        autofillRepository.operations.where((value) => value == 'favorites'),
+        hasLength(1),
       );
-      expect(autofillRepository.lastRankingEntries.single.path, 'work/github');
+      expect(autofillRepository.lastFavoriteEntries.single.path, 'work/github');
     },
   );
 
@@ -250,10 +261,7 @@ void main() {
       final bridge = _LifecycleBridge();
       final metadataStore = _RecordingMetadataStore(
         operations,
-        const VaultMetadata(
-          recentPaths: <String>['work/github'],
-          favoritePaths: <String>{'work/github'},
-        ),
+        const VaultMetadata(favoritePaths: <String>{'work/github'}),
       );
       final security = _RecordingSecurityRepository(operations);
       await security.savePgpPassphrase(
@@ -284,7 +292,6 @@ void main() {
 
       expect(repository.lifecycle.requiresStoreSetup, isTrue);
       expect(repository.entries, isEmpty);
-      expect(repository.recentEntries(), isEmpty);
       expect(repository.entries.where((entry) => entry.isFavorite), isEmpty);
       expect(operations, <String>[
         'lifecycle-published',
@@ -296,7 +303,7 @@ void main() {
       ]);
       expect(await security.readActivePgpPassphrase(), isNull);
       expect((await security.readPgpPassphrase())?.passphrase, 'durable');
-      expect((await metadataStore.load()).recentPaths, isEmpty);
+      expect((await metadataStore.load()).favoritePaths, isEmpty);
       expect(autofill.lastEnrichedPaths, isEmpty);
 
       bridge
@@ -307,7 +314,6 @@ void main() {
       await repository.refresh();
 
       expect(repository.store?.root, '/tmp/replacement-store');
-      expect(repository.recentEntries(), isEmpty);
       expect(repository.entries.where((entry) => entry.isFavorite), isEmpty);
       expect(autofill.operations, isNot(contains('reconcile')));
       expect(autofill.operations, isNot(contains('rebuild')));
@@ -321,10 +327,7 @@ void main() {
     final bridge = _LifecycleBridge();
     final metadataStore = _RecordingMetadataStore(
       operations,
-      const VaultMetadata(
-        recentPaths: <String>['work/github'],
-        favoritePaths: <String>{'work/github'},
-      ),
+      const VaultMetadata(favoritePaths: <String>{'work/github'}),
       failClear: true,
     );
     final repository = BridgeBackedRepository(
@@ -350,10 +353,7 @@ void main() {
       final bridge = _LifecycleBridge();
       final metadataStore = _RecordingMetadataStore(
         operations,
-        const VaultMetadata(
-          recentPaths: <String>['work/github'],
-          favoritePaths: <String>{'work/github'},
-        ),
+        const VaultMetadata(favoritePaths: <String>{'work/github'}),
         failClear: true,
         failMarker: true,
       );
@@ -383,7 +383,6 @@ void main() {
       expect(repository.store?.root, '/tmp/personal-store');
       expect(repository.storeRemovalInProgress, isFalse);
       expect(repository.entries, isEmpty);
-      expect(repository.recentEntries(), isEmpty);
 
       final restarted = BridgeBackedRepository(
         bridge: bridge,
@@ -401,10 +400,7 @@ void main() {
     final bridge = _LifecycleBridge();
     final metadataStore = _RecordingMetadataStore(
       operations,
-      const VaultMetadata(
-        recentPaths: <String>['work/github'],
-        favoritePaths: <String>{'work/github'},
-      ),
+      const VaultMetadata(favoritePaths: <String>{'work/github'}),
       failClear: true,
     );
     final security = _RecordingSecurityRepository(operations);
@@ -431,7 +427,6 @@ void main() {
     expect(bridge.storePresent, isTrue);
     expect(repository.store?.root, '/tmp/personal-store');
     expect(repository.storeRemovalInProgress, isFalse);
-    expect(repository.recentEntries(), isEmpty);
     expect(await security.readActivePgpPassphrase(), isNull);
     expect(autofill.cleared, isTrue);
     expect(autofill.status.kind, AutofillStatusKind.needsRebuild);
@@ -451,7 +446,6 @@ void main() {
       metadataStore: metadataStore,
     );
     await restarted.refresh();
-    expect(restarted.recentEntries(), isEmpty);
     expect(restarted.entries.where((entry) => entry.isFavorite), isEmpty);
   });
 
@@ -471,10 +465,7 @@ void main() {
       autofillRepository: autofill,
       metadataStore: _RecordingMetadataStore(
         operations,
-        const VaultMetadata(
-          recentPaths: <String>['work/github'],
-          favoritePaths: <String>{'work/github'},
-        ),
+        const VaultMetadata(favoritePaths: <String>{'work/github'}),
       ),
     );
     await repository.refresh();
@@ -493,7 +484,6 @@ void main() {
     expect(autofill.cleared, isTrue);
     expect(autofill.operations, isNot(contains('reconcile')));
     expect(autofill.status.kind, AutofillStatusKind.needsRebuild);
-    expect(repository.recentEntries(), isEmpty);
   });
 
   test('removal clear is serialized after an in-flight reconcile', () async {
@@ -655,7 +645,6 @@ void main() {
     await repository.readEntry(repository.entries.first);
     await repository.toggleFavorite(repository.entries.first);
 
-    expect(repository.recentEntries().single.path, 'work/github');
     expect(repository.entries.first.isFavorite, isTrue);
 
     final nextRepository = BridgeBackedRepository(
@@ -665,7 +654,6 @@ void main() {
     );
     await nextRepository.refresh();
 
-    expect(nextRepository.recentEntries().single.path, 'work/github');
     expect(nextRepository.entries.first.isFavorite, isTrue);
   });
 
@@ -1244,7 +1232,7 @@ class _RecordingMetadataStore implements VaultMetadataStore {
 
   @override
   Future<void> save(VaultMetadata value) async {
-    if (value.recentPaths.isEmpty && value.favoritePaths.isEmpty) {
+    if (value.favoritePaths.isEmpty) {
       operations.add('metadata-clear');
       if (failClear) throw StateError('metadata cleanup failed');
     }

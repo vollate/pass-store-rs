@@ -327,18 +327,6 @@ class BridgeBackedRepository
   }
 
   @override
-  List<PasswordEntry> recentEntries() {
-    final byPath = <String, PasswordEntry>{
-      for (final entry in entries)
-        if (!entry.isDirectory) entry.path: entry,
-    };
-    return _metadata.recentPaths
-        .map((path) => byPath[path])
-        .whereType<PasswordEntry>()
-        .toList(growable: false);
-  }
-
-  @override
   Future<SecretContent> readEntry(PasswordEntry entry) async {
     final response = await bridge.readEntry(
       request: await _entryRequest(entry),
@@ -348,7 +336,6 @@ class BridgeBackedRepository
     if (secret == null) {
       throw const BridgeRepositoryException('Bridge did not return an entry.');
     }
-    await _rememberEntry(entry.path);
     return _secretFromBridge(secret);
   }
 
@@ -364,7 +351,6 @@ class BridgeBackedRepository
         'Bridge did not return a copied password.',
       );
     }
-    await _rememberEntry(entry.path);
     return result.password;
   }
 
@@ -1327,7 +1313,6 @@ class BridgeBackedRepository
       isDirectory: isDirectory,
       childCount: entry.childCount,
       isFavorite: _metadata.favoritePaths.contains(entry.path),
-      lastUsedLabel: _lastUsedLabel(entry.path),
     );
   }
 
@@ -1616,22 +1601,6 @@ class BridgeBackedRepository
     return sorted;
   }
 
-  String? _lastUsedLabel(String path) {
-    final index = _metadata.recentPaths.indexOf(path);
-    if (index == -1) {
-      return null;
-    }
-    return index == 0 ? 'Recent' : 'Recent ${index + 1}';
-  }
-
-  Future<void> _rememberEntry(String path) async {
-    final recent = <String>[
-      path,
-      ..._metadata.recentPaths.where((recentPath) => recentPath != path),
-    ].take(20).toList(growable: false);
-    await _saveMetadata(_metadata.copyWith(recentPaths: recent));
-  }
-
   Future<void> _saveMetadata(VaultMetadata metadata) async {
     final previous = _metadata;
     final scoped = metadata.copyWith(
@@ -1646,8 +1615,6 @@ class BridgeBackedRepository
     final changedPaths = <String>{
       ...previous.favoritePaths,
       ...scoped.favoritePaths,
-      ...previous.recentPaths,
-      ...scoped.recentPaths,
     };
     final changedEntries = _entries
         .where(
@@ -1655,7 +1622,7 @@ class BridgeBackedRepository
         )
         .toList(growable: false);
     await _runAutofillUpdate(
-      (repository) => repository.patchRanking(changedEntries),
+      (repository) => repository.patchFavorites(changedEntries),
     );
   }
 
@@ -1675,7 +1642,6 @@ class BridgeBackedRepository
           repoName: currentRepoName,
           encryptedContent: '',
           isFavorite: _metadata.favoritePaths.contains(path),
-          lastUsedLabel: _lastUsedLabel(path),
         );
     if (entry.isDirectory) return;
     await _runAutofillUpdate((repository) => repository.upsertEntry(entry));
@@ -1808,7 +1774,6 @@ class BridgeBackedRepository
       isDirectory: entry.isDirectory,
       childCount: entry.childCount,
       isFavorite: _metadata.favoritePaths.contains(entry.path),
-      lastUsedLabel: _lastUsedLabel(entry.path),
     );
   }
 

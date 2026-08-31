@@ -1,4 +1,4 @@
-part of '../manage_screen.dart';
+part of '../vault_operations.dart';
 
 class _BatchMoveSheet extends StatefulWidget {
   const _BatchMoveSheet({

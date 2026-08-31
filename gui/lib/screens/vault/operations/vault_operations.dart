@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n/l10n.dart';
-import '../../l10n/operation_localizations.dart';
-import '../../models/password_entry.dart';
-import '../../services/ui_problem.dart';
-import '../../services/vault_repository.dart';
-import '../../widgets/pars_adaptive_surface.dart';
+import '../../../l10n/l10n.dart';
+import '../../../l10n/operation_localizations.dart';
+import '../../../models/password_entry.dart';
+import '../../../services/ui_problem.dart';
+import '../../../services/vault_repository.dart';
+import '../../../widgets/pars_adaptive_surface.dart';
 
 part 'widgets/manage_operation_typedefs.dart';
 part 'widgets/manage_single_entry_widgets.dart';
@@ -22,9 +22,8 @@ Future<EntryOperationResult?> showFocusedEditEntrySheet({
     context: context,
     builder:
         (context) => _EditEntrySheet(
-          entries: <PasswordEntry>[entry],
+          entry: entry,
           title: context.l10n.editEntries,
-          showEntryPicker: false,
           canCommit: true,
           onReadEntry: repository.readEntry,
           onSaveRawNotes: (entry, password, fields, notes, commit) async {
@@ -106,8 +105,7 @@ Future<EntryOperationResult?> showFocusedDeleteEntrySheet({
     context: context,
     builder:
         (context) => _DeleteEntrySheet(
-          entries: <PasswordEntry>[entry],
-          showEntryPicker: false,
+          entry: entry,
           canCommit: true,
           onSubmit: (entry, commit) async {
             final localizations = context.l10n;
@@ -202,7 +200,7 @@ Future<EntryOperationResult?> showFocusedMoveOrRenameEntrySurface({
     context: context,
     builder:
         (context) => _MoveOrRenameEntrySheet(
-          entries: <PasswordEntry>[entry],
+          entry: entry,
           rename: rename,
           canCommit: true,
           onSubmit: (selected, target, overwrite, commit) async {

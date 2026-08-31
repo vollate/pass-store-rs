@@ -299,7 +299,6 @@ class _RecordingManageRepository extends FakeParsRepository {
       repoName: 'Test store',
       encryptedContent:
           'original-password\nusername: alice\nurl: https://example.com\noriginal note',
-      lastUsedLabel: 'Now',
     ),
   ];
 
@@ -344,7 +343,6 @@ class _RecordingManageRepository extends FakeParsRepository {
       repoName: current.repoName,
       encryptedContent: content,
       isFavorite: current.isFavorite,
-      lastUsedLabel: current.lastUsedLabel,
     );
     return EntryOperationResult(
       path: path,
@@ -379,7 +377,6 @@ class _RecordingManageRepository extends FakeParsRepository {
         ...lines.skip(1),
       ].join('\n'),
       isFavorite: current.isFavorite,
-      lastUsedLabel: current.lastUsedLabel,
     );
     return BatchOperationResult(
       action: 'Regenerated',

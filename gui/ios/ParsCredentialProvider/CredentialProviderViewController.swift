@@ -121,6 +121,15 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     let passwordCredential = ASPasswordCredential(
       user: credential.username,
       password: credential.password)
+    let _: Bool? = ParsAutofillSharedState.performIfCurrent(
+      generation: generation,
+      load: { ParsAutofillSharedState.loadState() },
+      operation: {
+        guard let state = ParsAutofillSharedState.loadState() else { return nil }
+        return ParsAutofillNative.recordCompletion(
+          indexPath: state.indexPath,
+          path: credential.path) ? true : nil
+      })
     extensionContext.completeRequest(
       withSelectedCredential: passwordCredential,
       completionHandler: nil)

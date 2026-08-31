@@ -11,7 +11,17 @@ struct ParsAutofillStoredState: Codable {
 }
 
 struct ParsAutofillIndex: Codable {
+  let version: Int
+  let storeId: String
+  let storeRoot: String
   let entries: [ParsAutofillIndexEntry]
+
+  enum CodingKeys: String, CodingKey {
+    case version
+    case storeId = "store_id"
+    case storeRoot = "store_root"
+    case entries
+  }
 }
 
 struct ParsAutofillIndexEntry: Codable {
@@ -21,6 +31,7 @@ struct ParsAutofillIndexEntry: Codable {
   let username: String
   let pathWebsite: String?
   let enrichedWebsites: [String]
+  let autofillRank: Int?
 
   enum CodingKeys: String, CodingKey {
     case path
@@ -29,6 +40,7 @@ struct ParsAutofillIndexEntry: Codable {
     case username
     case pathWebsite = "path_website"
     case enrichedWebsites = "enriched_websites"
+    case autofillRank = "autofill_rank"
   }
 }
 
@@ -80,10 +92,12 @@ enum ParsAutofillSharedState {
       withIntermediateDirectories: true)
 
     let sharedIndexURL = containerURL.appendingPathComponent(indexFileName)
-    if FileManager.default.fileExists(atPath: sharedIndexURL.path) {
-      try FileManager.default.removeItem(at: sharedIndexURL)
-    }
-    try FileManager.default.copyItem(at: sourceIndexURL, to: sharedIndexURL)
+    let sourceIndexData = try Data(contentsOf: sourceIndexURL)
+    let existingIndexData = try? Data(contentsOf: sharedIndexURL)
+    let publishedIndexData = try mergeAutofillHistory(
+      source: sourceIndexData,
+      existing: existingIndexData)
+    try publishedIndexData.write(to: sharedIndexURL, options: .atomic)
 
     let state = ParsAutofillStoredState(
       enabled: true,
@@ -104,6 +118,39 @@ enum ParsAutofillSharedState {
         throw autofillError(code: 5, message: "Autofill authorization could not be cleared")
       }
     }
+  }
+
+  static func mergeAutofillHistory(source: Data, existing: Data?) throws -> Data {
+    guard let existing,
+      var sourceObject = try JSONSerialization.jsonObject(with: source) as? [String: Any],
+      let existingObject = try? JSONSerialization.jsonObject(with: existing) as? [String: Any],
+      sourceObject["version"] as? Int == 2,
+      existingObject["version"] as? Int == 2,
+      sourceObject["store_id"] as? String == existingObject["store_id"] as? String,
+      sourceObject["store_root"] as? String == existingObject["store_root"] as? String,
+      var sourceEntries = sourceObject["entries"] as? [[String: Any]],
+      let existingEntries = existingObject["entries"] as? [[String: Any]]
+    else {
+      return source
+    }
+
+    var ranks: [String: Int] = [:]
+    for entry in existingEntries {
+      guard let path = entry["path"] as? String,
+        let rank = entry["autofill_rank"] as? Int,
+        rank >= 0,
+        rank < 20
+      else { continue }
+      ranks[path] = rank
+    }
+    for index in sourceEntries.indices {
+      guard let path = sourceEntries[index]["path"] as? String,
+        let rank = ranks[path]
+      else { continue }
+      sourceEntries[index]["autofill_rank"] = rank
+    }
+    sourceObject["entries"] = sourceEntries
+    return try JSONSerialization.data(withJSONObject: sourceObject, options: [.sortedKeys])
   }
 
   typealias IdentityRemoval = (@escaping (Bool, Error?) -> Void) -> Void

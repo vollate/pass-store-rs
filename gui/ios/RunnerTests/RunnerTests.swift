@@ -10,6 +10,9 @@ class RunnerTests: XCTestCase {
   func testAutofillIndexDecodesSharedRustJson() throws {
     let raw = """
       {
+        "version": 2,
+        "store_id": "store-a",
+        "store_root": "/tmp/store-a",
         "entries": [
           {
             "path": "example.com/alice",
@@ -17,7 +20,8 @@ class RunnerTests: XCTestCase {
             "service_name": "example.com",
             "username": "alice",
             "path_website": "example.com",
-            "enriched_websites": ["login.example.net"]
+            "enriched_websites": ["login.example.net"],
+            "autofill_rank": 3
           }
         ]
       }
@@ -33,6 +37,64 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual(index.entries.first?.username, "alice")
     XCTAssertEqual(index.entries.first?.pathWebsite, "example.com")
     XCTAssertEqual(index.entries.first?.enrichedWebsites, ["login.example.net"])
+    XCTAssertEqual(index.entries.first?.autofillRank, 3)
+  }
+
+  func testPublishingSameStoreMergesOnlyMatchingAutofillHistory() throws {
+    let source = Data(
+      """
+      {
+        "version": 2,
+        "store_id": "store-a",
+        "store_root": "/tmp/store-a",
+        "entries": [
+          {"path":"example.com/alice","autofill_rank":null},
+          {"path":"example.net/bob","autofill_rank":null}
+        ]
+      }
+      """.utf8)
+    let existing = Data(
+      """
+      {
+        "version": 2,
+        "store_id": "store-a",
+        "store_root": "/tmp/store-a",
+        "entries": [
+          {"path":"example.com/alice","autofill_rank":1},
+          {"path":"removed.example/carol","autofill_rank":0}
+        ]
+      }
+      """.utf8)
+
+    let merged = try ParsAutofillSharedState.mergeAutofillHistory(
+      source: source,
+      existing: existing)
+    let object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: merged) as? [String: Any])
+    let entries = try XCTUnwrap(object["entries"] as? [[String: Any]])
+    XCTAssertEqual(entries[0]["autofill_rank"] as? Int, 1)
+    XCTAssertTrue(entries[1]["autofill_rank"] is NSNull)
+    XCTAssertEqual(entries.count, 2)
+  }
+
+  func testPublishingReplacementStoreDoesNotInheritAutofillHistory() throws {
+    let source = Data(
+      """
+      {"version":2,"store_id":"store-b","store_root":"/tmp/store-b","entries":[
+        {"path":"example.com/alice","autofill_rank":null}
+      ]}
+      """.utf8)
+    let existing = Data(
+      """
+      {"version":2,"store_id":"store-a","store_root":"/tmp/store-a","entries":[
+        {"path":"example.com/alice","autofill_rank":0}
+      ]}
+      """.utf8)
+
+    let merged = try ParsAutofillSharedState.mergeAutofillHistory(
+      source: source,
+      existing: existing)
+    XCTAssertEqual(merged, source)
   }
 
   func testAutofillClearWritesDisabledTombstoneBeforeRemovingIndex() throws {

@@ -82,7 +82,7 @@ fn bridge_method_table_matches_generated_api_surface() {
         "upsert_autofill_index_entry",
         "move_autofill_index_entry",
         "remove_autofill_index_entry",
-        "patch_autofill_index_ranking",
+        "patch_autofill_index_favorites",
         "reconcile_autofill_index",
         "enrich_autofill_index_websites",
         "clear_autofill_index_websites",
@@ -404,7 +404,6 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
         entries: vec![AutofillEntryMetadataDto {
             path: "example.com/entry".to_string(),
             is_favorite: true,
-            recent_rank: Some(0),
         }],
     }));
     assert!(rebuilt.error.is_none(), "{:?}", rebuilt.error);

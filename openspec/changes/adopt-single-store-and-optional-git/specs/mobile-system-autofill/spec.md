@@ -2,7 +2,7 @@
 
 ### Requirement: Autofill index lifecycle SHALL support non-decrypting incremental updates
 
-After an Autofill index has been initialized for the canonical store, successful Vault add, edit, move, delete, favorite, and recent operations SHALL update only affected logical index records. These operations SHALL NOT accept a PGP backend or passphrase and SHALL NOT decrypt entries. If no Autofill index exists, ordinary Vault mutations SHALL remain successful without implicitly creating one. Index updates SHALL be atomically published so platform providers never observe a partially written document. Before Disconnect or Delete mutates the store, native providers SHALL synchronously persist a disabled tombstone and reject all candidate/credential reads, then remove the shared index and platform identities. Every enabled native publication SHALL carry an unguessable generation in candidates and credential identities, and providers SHALL revalidate enabled state, root, index, and generation after query or decryption before returning a result. A later store SHALL require an explicit non-decrypting rebuild; reconciliation SHALL reject and remove an index whose store ID or root differs.
+After an Autofill index has been initialized for the canonical store, successful Vault add, edit, move, delete, and Favorite operations SHALL update only affected logical index records. These operations SHALL NOT accept a PGP backend or passphrase and SHALL NOT decrypt entries. Vault read, reveal, and copy SHALL NOT mutate the index. If no Autofill index exists, ordinary Vault mutations SHALL remain successful without implicitly creating one. Index updates SHALL be atomically published so platform providers never observe a partially written document. Before Disconnect or Delete mutates the store, native providers SHALL synchronously persist a disabled tombstone and reject all candidate/credential reads, then remove the shared index and platform identities. Every enabled native publication SHALL carry an unguessable generation in candidates and credential identities, and providers SHALL revalidate enabled state, root, index, and generation after query or decryption before returning a result. A later store SHALL require an explicit non-decrypting rebuild; reconciliation SHALL reject and remove an index whose store ID or root differs.
 
 #### Scenario: Entry creation upserts one path-derived record
 
@@ -11,12 +11,13 @@ After an Autofill index has been initialized for the canonical store, successful
 - **THEN** one record with service `gitlab.com` and username `alice` is upserted
 - **AND** no other entry is re-derived or decrypted
 
-#### Scenario: Entry move preserves optional aliases
+#### Scenario: Entry move preserves public metadata but resets path-bound history
 
-- **GIVEN** an indexed entry has ranking metadata and opt-in website aliases
+- **GIVEN** an indexed entry has Favorite metadata, completion history, and opt-in website aliases
 - **WHEN** the entry is successfully renamed or moved
 - **THEN** the old path is removed and new path metadata is derived
-- **AND** existing ranking metadata and opt-in aliases are preserved
+- **AND** Favorite metadata and opt-in aliases are preserved
+- **AND** path-bound Autofill completion history is not inherited by the new path
 - **AND** no entry is decrypted
 
 #### Scenario: Entry deletion removes only affected paths
@@ -26,12 +27,19 @@ After an Autofill index has been initialized for the canonical store, successful
 - **THEN** matching entry path or path-prefix records are removed
 - **AND** unrelated records remain logically unchanged
 
-#### Scenario: Metadata-only read patches ranking without rebuild
+#### Scenario: Favorite metadata patches without rebuild
 
-- **GIVEN** an indexed entry is opened, favorited, or marked recent
-- **WHEN** its ranking metadata changes
-- **THEN** only supplied favorite and recent fields are patched
+- **GIVEN** an indexed entry's Favorite state changes
+- **WHEN** its metadata update is applied
+- **THEN** only supplied Favorite fields are patched
 - **AND** no full index rebuild or entry decryption occurs
+
+#### Scenario: Same-store publication preserves only valid completion history
+
+- **GIVEN** iOS has shared version 2 completion history for the current store
+- **WHEN** the same store publishes a rebuilt index
+- **THEN** ranks are merged only for unchanged paths with the same store ID and root
+- **AND** replacement stores, removed paths, and moved paths do not inherit old history
 
 #### Scenario: Store removal clears all Autofill candidates
 
@@ -54,7 +62,7 @@ After an Autofill index has been initialized for the canonical store, successful
 
 - **GIVEN** a prior canonical store was removed and a replacement is created, imported, or cloned
 - **WHEN** the replacement becomes ready
-- **THEN** the prior store's paths, aliases, ranking metadata, and credential identities remain absent
+- **THEN** the prior store's paths, aliases, Favorite metadata, completion history, and credential identities remain absent
 - **AND** candidates appear only after an explicit path-derived rebuild for the replacement
 
 #### Scenario: No-store native state publishes no passphrase

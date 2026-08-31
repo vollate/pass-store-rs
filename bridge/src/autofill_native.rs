@@ -32,6 +32,13 @@ struct NativeAutofillCredentialRequest {
     passphrase: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeAutofillCompletionRequest {
+    index_path: String,
+    path: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct NativeAutofillCandidatesResponse {
@@ -48,6 +55,13 @@ struct NativeAutofillCredentialResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct NativeAutofillCompletionResponse {
+    recorded: bool,
+    error: Option<NativeAutofillError>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct NativeAutofillCandidate {
     path: String,
     display_name: String,
@@ -56,7 +70,6 @@ struct NativeAutofillCandidate {
     match_value: String,
     score: i32,
     is_favorite: bool,
-    recent_rank: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -141,6 +154,28 @@ pub fn resolve_credential_json(request_json: &str) -> String {
     serialize_response(&response)
 }
 
+pub fn record_completion_json(request_json: &str) -> String {
+    let response = match serde_json::from_str::<NativeAutofillCompletionRequest>(request_json) {
+        Ok(request) => {
+            match autofill::record_autofill_completion(autofill::RecordAutofillCompletionRequest {
+                index_path: PathBuf::from(request.index_path),
+                path: request.path,
+            }) {
+                Ok(_) => NativeAutofillCompletionResponse { recorded: true, error: None },
+                Err(error) => NativeAutofillCompletionResponse {
+                    recorded: false,
+                    error: Some(NativeAutofillError::from(BridgeFailure::from(error))),
+                },
+            }
+        }
+        Err(error) => NativeAutofillCompletionResponse {
+            recorded: false,
+            error: Some(NativeAutofillError::validation(error)),
+        },
+    };
+    serialize_response(&response)
+}
+
 #[no_mangle]
 pub extern "C" fn pars_autofill_query_candidates_json(request_json: *const c_char) -> *mut c_char {
     ffi_json(request_json, query_candidates_json)
@@ -151,6 +186,11 @@ pub extern "C" fn pars_autofill_resolve_credential_json(
     request_json: *const c_char,
 ) -> *mut c_char {
     ffi_json(request_json, resolve_credential_json)
+}
+
+#[no_mangle]
+pub extern "C" fn pars_autofill_record_completion_json(request_json: *const c_char) -> *mut c_char {
+    ffi_json(request_json, record_completion_json)
 }
 
 #[no_mangle]
@@ -220,7 +260,6 @@ impl From<autofill::AutofillCandidate> for NativeAutofillCandidate {
             match_value: value.match_value,
             score: value.score,
             is_favorite: value.is_favorite,
-            recent_rank: value.recent_rank,
         }
     }
 }
@@ -243,7 +282,7 @@ mod android_jni {
     use jni::sys::jstring;
     use jni::JNIEnv;
 
-    use super::{query_candidates_json, resolve_credential_json};
+    use super::{query_candidates_json, record_completion_json, resolve_credential_json};
 
     #[no_mangle]
     pub extern "system" fn Java_top_vollate_pars_1gui_autofill_ParsAutofillNative_queryCandidatesJson(
@@ -263,6 +302,15 @@ mod android_jni {
         call_json(&mut env, request, resolve_credential_json)
     }
 
+    #[no_mangle]
+    pub extern "system" fn Java_top_vollate_pars_1gui_autofill_ParsAutofillNative_recordCompletionJson(
+        mut env: JNIEnv,
+        _class: JClass,
+        request: JString,
+    ) -> jstring {
+        call_json(&mut env, request, record_completion_json)
+    }
+
     fn call_json(env: &mut JNIEnv, request: JString, handler: fn(&str) -> String) -> jstring {
         let request = match env.get_string(&request) {
             Ok(value) => String::from(value),
@@ -277,11 +325,14 @@ mod android_jni {
 
 #[cfg(test)]
 mod tests {
-    use pars_core::autofill::{write_autofill_index, AutofillIndex, AutofillIndexEntry};
+    use pars_core::autofill::{
+        read_autofill_index, write_autofill_index, AutofillIndex, AutofillIndexEntry,
+        AUTOFILL_INDEX_VERSION,
+    };
     use serde_json::Value;
     use tempfile::tempdir;
 
-    use super::query_candidates_json;
+    use super::{query_candidates_json, record_completion_json};
 
     #[test]
     fn query_candidates_json_matches_path_website_and_app_name() {
@@ -290,7 +341,7 @@ mod tests {
         write_autofill_index(
             &index_path,
             &AutofillIndex {
-                version: 1,
+                version: AUTOFILL_INDEX_VERSION,
                 store_id: "selected".to_string(),
                 store_name: "Selected store".to_string(),
                 store_root: dir.path().display().to_string(),
@@ -303,7 +354,7 @@ mod tests {
                     path_website: Some("example.com".to_string()),
                     enriched_websites: Vec::new(),
                     is_favorite: true,
-                    recent_rank: Some(0),
+                    autofill_rank: None,
                     updated_at_epoch_seconds: 1,
                 }],
             },
@@ -326,6 +377,15 @@ mod tests {
         ));
         let app: Value = serde_json::from_str(&app_raw).unwrap();
         assert_eq!(app["candidates"][0]["matchKind"], "app_name");
+
+        let completion_raw = record_completion_json(&format!(
+            r#"{{"indexPath":"{}","path":"example.com/alice"}}"#,
+            index_path.display().to_string().replace('\\', "\\\\")
+        ));
+        let completion: Value = serde_json::from_str(&completion_raw).unwrap();
+        assert_eq!(completion["recorded"], true);
+        assert!(completion["error"].is_null());
+        assert_eq!(read_autofill_index(&index_path).unwrap().entries[0].autofill_rank, Some(0));
     }
 
     #[test]

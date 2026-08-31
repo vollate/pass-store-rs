@@ -1,20 +1,18 @@
-part of '../manage_screen.dart';
+part of '../vault_operations.dart';
 
 class _EditEntrySheet extends StatefulWidget {
   const _EditEntrySheet({
-    required this.entries,
+    required this.entry,
     required this.canCommit,
     required this.onReadEntry,
     required this.onSaveRawNotes,
     required this.onReplacePassword,
     this.title,
-    this.showEntryPicker = true,
   });
 
-  final List<PasswordEntry> entries;
+  final PasswordEntry entry;
   final bool canCommit;
   final String? title;
-  final bool showEntryPicker;
   final _ReadEntryForEdit onReadEntry;
   final _SaveEditedEntrySubmit onSaveRawNotes;
   final _ReplaceEntryPasswordSubmit onReplacePassword;
@@ -24,7 +22,6 @@ class _EditEntrySheet extends StatefulWidget {
 }
 
 class _EditEntrySheetState extends State<_EditEntrySheet> {
-  PasswordEntry? _entry;
   List<ParsedSecretField> _fields = const <ParsedSecretField>[];
   String _password = '';
   String _notes = '';
@@ -36,10 +33,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
   @override
   void initState() {
     super.initState();
-    _entry = widget.entries.isEmpty ? null : widget.entries.first;
-    if (_entry != null) {
-      _loadEntry(_entry!);
-    }
+    _loadEntry(widget.entry);
   }
 
   Future<void> _loadEntry(PasswordEntry entry) async {
@@ -69,20 +63,14 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
   }
 
   Future<void> _saveRawNotes() async {
-    final entry = _entry;
-    if (entry == null) {
-      return;
-    }
+    final entry = widget.entry;
     await _submit(() async {
       return widget.onSaveRawNotes(entry, _password, _fields, _notes, _commit);
     });
   }
 
   Future<void> _replacePasswordLine() async {
-    final entry = _entry;
-    if (entry == null) {
-      return;
-    }
+    final entry = widget.entry;
     await _submit(() async {
       return widget.onReplacePassword(entry, _password, _commit);
     });
@@ -110,32 +98,12 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.entries.isEmpty) {
-      return _operationSheet(
-        context: context,
-        title: widget.title ?? context.l10n.editEntries,
-        children: <Widget>[Text(context.l10n.noEntriesToEdit)],
-      );
-    }
-    final entry = _entry ?? widget.entries.first;
+    final entry = widget.entry;
     return _operationSheet(
       context: context,
       title: widget.title ?? context.l10n.editEntries,
       children: <Widget>[
-        if (widget.showEntryPicker)
-          _EntryPicker(
-            entries: widget.entries,
-            value: entry,
-            onChanged:
-                _saving
-                    ? null
-                    : (value) {
-                      setState(() => _entry = value);
-                      _loadEntry(value);
-                    },
-          )
-        else
-          Text(context.l10n.pathValue(entry.path)),
+        Text(context.l10n.pathValue(entry.path)),
         if (_loading) ...const <Widget>[
           SizedBox(height: 16),
           LinearProgressIndicator(),

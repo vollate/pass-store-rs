@@ -29,7 +29,6 @@ class AutofillCandidate {
     required this.matchValue,
     required this.score,
     required this.isFavorite,
-    this.recentRank,
   });
 
   final String path;
@@ -39,7 +38,6 @@ class AutofillCandidate {
   final String matchValue;
   final int score;
   final bool isFavorite;
-  final int? recentRank;
 }
 
 class AutofillCredential {
@@ -95,7 +93,7 @@ abstract interface class AutofillRepository {
 
   Future<void> removeEntry({required String path, required bool recursive});
 
-  Future<void> patchRanking(List<PasswordEntry> entries);
+  Future<void> patchFavorites(List<PasswordEntry> entries);
 
   Future<void> reconcileIndex(List<PasswordEntry> entries);
 
@@ -138,8 +136,8 @@ abstract interface class AutofillBridgeApi {
     required frb.RemoveAutofillIndexEntryRequest request,
   });
 
-  Future<frb.UnitResponse> patchAutofillIndexRanking({
-    required frb.PatchAutofillIndexRankingRequest request,
+  Future<frb.UnitResponse> patchAutofillIndexFavorites({
+    required frb.PatchAutofillIndexFavoritesRequest request,
   });
 
   Future<frb.UnitResponse> reconcileAutofillIndex({
@@ -191,9 +189,9 @@ final class FrbAutofillBridgeApi implements AutofillBridgeApi {
   }) => frb.removeAutofillIndexEntry(request: request);
 
   @override
-  Future<frb.UnitResponse> patchAutofillIndexRanking({
-    required frb.PatchAutofillIndexRankingRequest request,
-  }) => frb.patchAutofillIndexRanking(request: request);
+  Future<frb.UnitResponse> patchAutofillIndexFavorites({
+    required frb.PatchAutofillIndexFavoritesRequest request,
+  }) => frb.patchAutofillIndexFavorites(request: request);
 
   @override
   Future<frb.UnitResponse> reconcileAutofillIndex({
@@ -331,10 +329,10 @@ class BridgeAutofillRepository implements AutofillRepository {
   }
 
   @override
-  Future<void> patchRanking(List<PasswordEntry> entries) async {
+  Future<void> patchFavorites(List<PasswordEntry> entries) async {
     if (entries.isEmpty) return;
-    final response = await bridge.patchAutofillIndexRanking(
-      request: frb.PatchAutofillIndexRankingRequest(
+    final response = await bridge.patchAutofillIndexFavorites(
+      request: frb.PatchAutofillIndexFavoritesRequest(
         indexPath: indexPath,
         entries: _entryMetadata(entries),
       ),
@@ -597,16 +595,7 @@ class BridgeAutofillRepository implements AutofillRepository {
     return frb.AutofillEntryMetadataDto(
       path: entry.path,
       isFavorite: entry.isFavorite,
-      recentRank: _recentRank(entry.lastUsedLabel),
     );
-  }
-
-  int? _recentRank(String? label) {
-    if (label == null) return null;
-    if (label == 'Recent') return 0;
-    final match = RegExp(r'^Recent (\d+)$').firstMatch(label);
-    final position = match == null ? null : int.tryParse(match.group(1)!);
-    return position == null ? null : position - 1;
   }
 
   int _passwordEntryCount(List<PasswordEntry> entries) =>
@@ -621,7 +610,6 @@ class BridgeAutofillRepository implements AutofillRepository {
       matchValue: candidate.matchValue,
       score: candidate.score,
       isFavorite: candidate.isFavorite,
-      recentRank: candidate.recentRank,
     );
   }
 
@@ -672,7 +660,7 @@ class FakeAutofillRepository implements AutofillRepository {
   final Map<String, AutofillCredential> _credentials;
   final Object? operationError;
   List<PasswordEntry> lastRebuiltEntries = const <PasswordEntry>[];
-  List<PasswordEntry> lastRankingEntries = const <PasswordEntry>[];
+  List<PasswordEntry> lastFavoriteEntries = const <PasswordEntry>[];
   List<String> lastEnrichedPaths = const <String>[];
   final List<String> operations = <String>[];
   bool cleared = false;
@@ -720,9 +708,9 @@ class FakeAutofillRepository implements AutofillRepository {
   }
 
   @override
-  Future<void> patchRanking(List<PasswordEntry> entries) async {
-    operations.add('ranking');
-    lastRankingEntries = List<PasswordEntry>.of(entries);
+  Future<void> patchFavorites(List<PasswordEntry> entries) async {
+    operations.add('favorites');
+    lastFavoriteEntries = List<PasswordEntry>.of(entries);
   }
 
   @override
@@ -785,7 +773,7 @@ class FakeAutofillRepository implements AutofillRepository {
     _candidates.clear();
     _credentials.clear();
     lastRebuiltEntries = const <PasswordEntry>[];
-    lastRankingEntries = const <PasswordEntry>[];
+    lastFavoriteEntries = const <PasswordEntry>[];
     lastEnrichedPaths = const <String>[];
     operations.add('clear');
     cleared = true;

@@ -356,12 +356,6 @@ abstract class AppLocalizations {
   /// **'Vault'**
   String get vaultTitle;
 
-  /// No description provided for @manageTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Manage'**
-  String get manageTitle;
-
   /// No description provided for @retry.
   ///
   /// In en, this message translates to:
@@ -494,12 +488,6 @@ abstract class AppLocalizations {
   /// **'Search by name or path'**
   String get searchVaultHint;
 
-  /// No description provided for @recentSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Recent'**
-  String get recentSection;
-
   /// No description provided for @favoritesSection.
   ///
   /// In en, this message translates to:
@@ -523,12 +511,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Browse: {path}'**
   String browsePathSection(String path);
-
-  /// No description provided for @noRecentEntries.
-  ///
-  /// In en, this message translates to:
-  /// **'No recent entries yet.'**
-  String get noRecentEntries;
 
   /// No description provided for @noFavoriteEntries.
   ///
@@ -716,12 +698,6 @@ abstract class AppLocalizations {
   /// **'Could not open the URL.'**
   String get couldNotOpenUrl;
 
-  /// No description provided for @manageSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Maintain passwords in batches or one at a time.'**
-  String get manageSubtitle;
-
   /// No description provided for @generateAndSave.
   ///
   /// In en, this message translates to:
@@ -818,12 +794,6 @@ abstract class AppLocalizations {
   /// **'Remove one entry after name confirmation.'**
   String get deleteEntryDescription;
 
-  /// No description provided for @noEntriesToManage.
-  ///
-  /// In en, this message translates to:
-  /// **'No entries to manage.'**
-  String get noEntriesToManage;
-
   /// No description provided for @selectAtLeastOneEntry.
   ///
   /// In en, this message translates to:
@@ -919,12 +889,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No entries available'**
   String get noEntriesAvailable;
-
-  /// No description provided for @noEntriesToEdit.
-  ///
-  /// In en, this message translates to:
-  /// **'No entries to edit.'**
-  String get noEntriesToEdit;
 
   /// No description provided for @noSymbols.
   ///
@@ -1117,12 +1081,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Type {value} to confirm'**
   String typeToConfirm(String value);
-
-  /// No description provided for @entryField.
-  ///
-  /// In en, this message translates to:
-  /// **'Entry'**
-  String get entryField;
 
   /// No description provided for @batchSelection.
   ///

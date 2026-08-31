@@ -61,4 +61,59 @@ class ParsAutofillStateGateTest {
         assertFalse(ParsAutofillStateStore.canServe(enabled, indexExists = false))
         assertFalse(ParsAutofillStateStore.canServe(missingRoot, indexExists = true))
     }
+
+    @Test
+    fun completionHistoryRequiresCurrentPublicationAndTreatsNativeFailureAsBestEffort() {
+        val directory = Files.createTempDirectory("pars-autofill-completion").toFile()
+        try {
+            val index = directory.resolve("index.json").apply { writeText("{}") }
+            val state =
+                ParsAutofillState(
+                    enabled = true,
+                    configPath = "/config",
+                    indexPath = index.path,
+                    storeRoot = "/store",
+                    passphrase = null,
+                    generation = "generation-a",
+                )
+            var nativeCalled = false
+            assertTrue(
+                ParsAutofillNativeBridge.recordCompletionWith(
+                    path = "example.com/alice",
+                    generation = "generation-a",
+                    stateReader = { state },
+                    nativeRecord = {
+                        nativeCalled = true
+                        """{"recorded":true,"error":null}"""
+                    },
+                ),
+            )
+            assertTrue(nativeCalled)
+
+            nativeCalled = false
+            assertFalse(
+                ParsAutofillNativeBridge.recordCompletionWith(
+                    path = "example.com/alice",
+                    generation = "stale-generation",
+                    stateReader = { state },
+                    nativeRecord = {
+                        nativeCalled = true
+                        """{"recorded":true,"error":null}"""
+                    },
+                ),
+            )
+            assertFalse(nativeCalled)
+
+            assertFalse(
+                ParsAutofillNativeBridge.recordCompletionWith(
+                    path = "example.com/alice",
+                    generation = "generation-a",
+                    stateReader = { state },
+                    nativeRecord = { """{"recorded":false,"error":{"message":"write failed"}}""" },
+                ),
+            )
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
 }

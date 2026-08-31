@@ -88,7 +88,7 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "upsert_autofill_index_entry",
     "move_autofill_index_entry",
     "remove_autofill_index_entry",
-    "patch_autofill_index_ranking",
+    "patch_autofill_index_favorites",
     "reconcile_autofill_index",
     "enrich_autofill_index_websites",
     "clear_autofill_index_websites",
@@ -687,7 +687,6 @@ pub struct RebuildAutofillIndexRequest {
 pub struct AutofillEntryMetadataDto {
     pub path: String,
     pub is_favorite: bool,
-    pub recent_rank: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -712,7 +711,7 @@ pub struct RemoveAutofillIndexEntryRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct PatchAutofillIndexRankingRequest {
+pub struct PatchAutofillIndexFavoritesRequest {
     pub index_path: String,
     pub entries: Vec<AutofillEntryMetadataDto>,
 }
@@ -880,7 +879,6 @@ pub struct AutofillCandidateDto {
     pub match_value: String,
     pub score: i32,
     pub is_favorite: bool,
-    pub recent_rank: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -988,11 +986,11 @@ pub async fn remove_autofill_index_entry(request: RemoveAutofillIndexEntryReques
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
 
-pub async fn patch_autofill_index_ranking(
-    request: PatchAutofillIndexRankingRequest,
+pub async fn patch_autofill_index_favorites(
+    request: PatchAutofillIndexFavoritesRequest,
 ) -> UnitResponse {
     let result =
-        autofill::patch_autofill_index_ranking(autofill::PatchAutofillIndexRankingRequest {
+        autofill::patch_autofill_index_favorites(autofill::PatchAutofillIndexFavoritesRequest {
             index_path: PathBuf::from(request.index_path),
             entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
         });
@@ -3131,7 +3129,7 @@ impl From<KeyExportResult> for KeyExportDto {
 
 impl From<AutofillEntryMetadataDto> for AutofillEntryMetadata {
     fn from(value: AutofillEntryMetadataDto) -> Self {
-        Self { path: value.path, is_favorite: value.is_favorite, recent_rank: value.recent_rank }
+        Self { path: value.path, is_favorite: value.is_favorite }
     }
 }
 
@@ -3145,7 +3143,6 @@ impl From<autofill::AutofillCandidate> for AutofillCandidateDto {
             match_value: value.match_value,
             score: value.score,
             is_favorite: value.is_favorite,
-            recent_rank: value.recent_rank,
         }
     }
 }

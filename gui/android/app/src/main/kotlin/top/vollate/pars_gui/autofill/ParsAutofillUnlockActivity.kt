@@ -99,13 +99,13 @@ class ParsAutofillUnlockActivity : Activity() {
             ParsAutofillNativeBridge.resolveCredential(this, path, generation)
                 ?: return finishCanceled()
         when (intent.getStringExtra(EXTRA_MODE)) {
-            MODE_AUTOFILL -> finishAutofill(credential)
-            MODE_CREDENTIAL -> finishCredentialManager(credential)
+            MODE_AUTOFILL -> finishAutofill(credential, generation)
+            MODE_CREDENTIAL -> finishCredentialManager(credential, generation)
             else -> finishCanceled()
         }
     }
 
-    private fun finishAutofill(credential: ParsAutofillCredential) {
+    private fun finishAutofill(credential: ParsAutofillCredential, generation: String) {
         val usernameId = getParcelableExtraCompat<AutofillId>(EXTRA_USERNAME_ID)
         val passwordId = getParcelableExtraCompat<AutofillId>(EXTRA_PASSWORD_ID)
         val presentation =
@@ -121,27 +121,31 @@ class ParsAutofillUnlockActivity : Activity() {
         if (passwordId != null) {
             datasetBuilder.setValue(passwordId, AutofillValue.forText(credential.password), presentation)
         }
+        val dataset = datasetBuilder.build()
+        ParsAutofillNativeBridge.recordCompletion(this, credential.path, generation)
         setResult(
             RESULT_OK,
             Intent().putExtra(
                 AutofillManager.EXTRA_AUTHENTICATION_RESULT,
-                datasetBuilder.build(),
+                dataset,
             ),
         )
         finish()
     }
 
-    private fun finishCredentialManager(credential: ParsAutofillCredential) {
+    private fun finishCredentialManager(credential: ParsAutofillCredential, generation: String) {
         val data =
             Bundle().apply {
                 putString("android.credentials.BUNDLE_KEY_ID", credential.username)
                 putString("android.credentials.BUNDLE_KEY_PASSWORD", credential.password)
             }
+        val response = GetCredentialResponse(Credential(Credential.TYPE_PASSWORD_CREDENTIAL, data))
+        ParsAutofillNativeBridge.recordCompletion(this, credential.path, generation)
         setResult(
             RESULT_OK,
             Intent().putExtra(
                 CredentialProviderService.EXTRA_GET_CREDENTIAL_RESPONSE,
-                GetCredentialResponse(Credential(Credential.TYPE_PASSWORD_CREDENTIAL, data)),
+                response,
             ),
         )
         finish()

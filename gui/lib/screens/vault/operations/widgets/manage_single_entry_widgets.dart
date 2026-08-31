@@ -1,4 +1,4 @@
-part of '../manage_screen.dart';
+part of '../vault_operations.dart';
 
 class _GenerateEntrySheet extends StatefulWidget {
   const _GenerateEntrySheet({required this.canCommit, required this.onSubmit});
@@ -195,13 +195,13 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
 
 class _MoveOrRenameEntrySheet extends StatefulWidget {
   const _MoveOrRenameEntrySheet({
-    required this.entries,
+    required this.entry,
     required this.rename,
     required this.canCommit,
     required this.onSubmit,
   });
 
-  final List<PasswordEntry> entries;
+  final PasswordEntry entry;
   final bool rename;
   final bool canCommit;
   final _MoveOrRenameEntrySubmit onSubmit;
@@ -212,7 +212,6 @@ class _MoveOrRenameEntrySheet extends StatefulWidget {
 }
 
 class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
-  late PasswordEntry _entry;
   var _target = '';
   var _overwrite = false;
   var _commit = false;
@@ -222,8 +221,7 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
   @override
   void initState() {
     super.initState();
-    _entry = widget.entries.first;
-    _target = widget.rename ? _entry.path : '';
+    _target = widget.rename ? widget.entry.path : '';
   }
 
   Future<void> _submit() async {
@@ -233,7 +231,7 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
     });
     try {
       final result = await widget.onSubmit(
-        _entry,
+        widget.entry,
         _target,
         _overwrite,
         _commit,
@@ -258,22 +256,10 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
       context: context,
       title: rename ? context.l10n.renameEntry : context.l10n.moveEntry,
       children: <Widget>[
-        _EntryPicker(
-          entries: widget.entries,
-          value: _entry,
-          onChanged:
-              _saving
-                  ? null
-                  : (value) => setState(() {
-                    _entry = value;
-                    if (rename) {
-                      _target = value.path;
-                    }
-                  }),
-        ),
+        Text(context.l10n.pathValue(widget.entry.path)),
         const SizedBox(height: 12),
         TextFormField(
-          key: ValueKey('${rename ? 'rename' : 'move'}-${_entry.path}'),
+          key: ValueKey('${rename ? 'rename' : 'move'}-${widget.entry.path}'),
           initialValue: _target,
           decoration: InputDecoration(
             labelText:
@@ -311,15 +297,13 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
 
 class _DeleteEntrySheet extends StatefulWidget {
   const _DeleteEntrySheet({
-    required this.entries,
+    required this.entry,
     required this.canCommit,
     required this.onSubmit,
-    this.showEntryPicker = true,
   });
 
-  final List<PasswordEntry> entries;
+  final PasswordEntry entry;
   final bool canCommit;
-  final bool showEntryPicker;
   final _DeleteEntrySubmit onSubmit;
 
   @override
@@ -327,20 +311,13 @@ class _DeleteEntrySheet extends StatefulWidget {
 }
 
 class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
-  late PasswordEntry _entry;
   var _confirmation = '';
   var _commit = false;
   var _saving = false;
   String? _errorText;
 
-  @override
-  void initState() {
-    super.initState();
-    _entry = widget.entries.first;
-  }
-
   Future<void> _submit() async {
-    final requiredText = _deleteConfirmationLabel(_entry);
+    final requiredText = _deleteConfirmationLabel(widget.entry);
     if (_confirmation.trim() != requiredText) {
       setState(() => _errorText = context.l10n.typeToConfirm(requiredText));
       return;
@@ -350,7 +327,7 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
       _errorText = null;
     });
     try {
-      final result = await widget.onSubmit(_entry, _commit);
+      final result = await widget.onSubmit(widget.entry, _commit);
       if (mounted) {
         Navigator.of(context).pop(result);
       }
@@ -370,26 +347,13 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
       context: context,
       title: context.l10n.deleteEntry,
       children: <Widget>[
-        if (widget.showEntryPicker)
-          _EntryPicker(
-            entries: widget.entries,
-            value: _entry,
-            onChanged:
-                _saving
-                    ? null
-                    : (value) => setState(() {
-                      _entry = value;
-                      _confirmation = '';
-                    }),
-          ),
-        if (widget.showEntryPicker) const SizedBox(height: 12),
-        Text(context.l10n.pathValue(_entry.path)),
+        Text(context.l10n.pathValue(widget.entry.path)),
         const SizedBox(height: 12),
         TextFormField(
-          key: ValueKey('delete-${_entry.path}'),
+          key: ValueKey('delete-${widget.entry.path}'),
           decoration: InputDecoration(
             labelText: context.l10n.typeToConfirm(
-              _deleteConfirmationLabel(_entry),
+              _deleteConfirmationLabel(widget.entry),
             ),
           ),
           onChanged: (value) => _confirmation = value,

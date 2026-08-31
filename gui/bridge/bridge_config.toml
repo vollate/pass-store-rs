@@ -62,7 +62,7 @@ methods = [
   "upsert_autofill_index_entry",
   "move_autofill_index_entry",
   "remove_autofill_index_entry",
-  "patch_autofill_index_ranking",
+  "patch_autofill_index_favorites",
   "reconcile_autofill_index",
   "enrich_autofill_index_websites",
   "clear_autofill_index_websites",

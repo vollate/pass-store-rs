@@ -79,7 +79,7 @@ openspec/specs/
 - `native-bridge-api`: typed Flutter/Rust bridge request/response API surface
   and bridge failure mapping.
 - `flutter-vault-and-manage`: Flutter repository-backed vault browsing, search,
-  recent/favorite metadata, entry detail, and manage workflows.
+  favorite metadata, entry detail, and contextual management workflows.
 - `flutter-security-and-onboarding`: local lock, gesture verifier, biometrics,
   PGP passphrase session/cache, and onboarding flow.
 - `store-lifecycle`: GUI/bridge password store discovery, create/import/clone,
