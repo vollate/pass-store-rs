@@ -12,17 +12,10 @@ use crate::gui::{
 };
 use crate::pgp::backend::PgpBackend;
 
-pub const AUTOFILL_INDEX_VERSION: u32 = 2;
+pub const AUTOFILL_INDEX_VERSION: u32 = 3;
 pub const AUTOFILL_HISTORY_LIMIT: u32 = 20;
 
 static TEMP_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AutofillEntryMetadata {
-    pub path: String,
-    pub is_favorite: bool,
-}
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,14 +24,13 @@ pub struct RebuildAutofillIndexRequest {
     pub store_id: String,
     pub store_name: String,
     pub store_root: PathBuf,
-    pub entries: Vec<AutofillEntryMetadata>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UpsertAutofillIndexEntryRequest {
     pub index_path: PathBuf,
-    pub entry: AutofillEntryMetadata,
+    pub path: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -60,13 +52,6 @@ pub struct RemoveAutofillIndexEntryRequest {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct PatchAutofillIndexFavoritesRequest {
-    pub index_path: PathBuf,
-    pub entries: Vec<AutofillEntryMetadata>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct RecordAutofillCompletionRequest {
     pub index_path: PathBuf,
     pub path: String,
@@ -79,25 +64,21 @@ pub struct ReconcileAutofillIndexRequest {
     pub store_id: String,
     pub store_name: String,
     pub store_root: PathBuf,
-    pub entries: Vec<AutofillEntryMetadata>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct EnrichAutofillIndexWebsitesRequest {
+pub struct RefreshAutofillIndexLoginAndUrlsRequest {
     pub index_path: PathBuf,
     pub store_root: PathBuf,
     pub pgp_executable: String,
     pub passphrase: Option<String>,
-    pub paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ClearAutofillIndexWebsitesRequest {
+pub struct ForgetAutofillIndexLoginAndUrlsRequest {
     pub index_path: PathBuf,
-    /// Empty clears enrichment for every indexed entry.
-    pub paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -138,9 +119,10 @@ pub struct AutofillIndexEntry {
     pub display_name: String,
     pub service_name: Option<String>,
     pub username: String,
+    #[serde(default)]
+    pub enriched_login: Option<String>,
     pub path_website: Option<String>,
     pub enriched_websites: Vec<String>,
-    pub is_favorite: bool,
     pub autofill_rank: Option<u32>,
     pub updated_at_epoch_seconds: i64,
 }
@@ -154,7 +136,6 @@ pub struct AutofillCandidate {
     pub match_kind: String,
     pub match_value: String,
     pub score: i32,
-    pub is_favorite: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -170,37 +151,13 @@ struct AutofillIndexVersion {
     version: u32,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyAutofillIndexV1 {
-    version: u32,
-    store_id: String,
-    store_name: String,
-    store_root: String,
-    generated_at_epoch_seconds: i64,
-    entries: Vec<LegacyAutofillIndexEntryV1>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyAutofillIndexEntryV1 {
-    path: String,
-    display_name: String,
-    service_name: Option<String>,
-    username: String,
-    path_website: Option<String>,
-    enriched_websites: Vec<String>,
-    is_favorite: bool,
-    recent_rank: Option<u32>,
-    updated_at_epoch_seconds: i64,
-}
-
 pub fn rebuild_autofill_index(
     request: RebuildAutofillIndexRequest,
 ) -> gui::GuiResult<AutofillIndex> {
     validate_store_root(&request.store_root)?;
-    let metadata = metadata_by_path(request.entries)?;
-    let previous = read_index_if_initialized(&request.index_path)?
+    let previous = read_index_if_initialized(&request.index_path)
+        .ok()
+        .flatten()
         .filter(|index| index_matches_store(index, &request.store_id, &request.store_root))
         .map(|index| {
             index
@@ -214,14 +171,15 @@ pub fn rebuild_autofill_index(
     let mut entries = list_password_paths(&request.store_root)?
         .into_iter()
         .map(|path| {
-            let ranking = metadata.get(&path);
-            derive_index_entry(
+            let previous = previous.get(&path);
+            let mut entry = derive_index_entry(
                 &path,
-                ranking.is_some_and(|value| value.is_favorite),
-                previous.get(&path).and_then(|value| value.autofill_rank),
-                Vec::new(),
+                previous.and_then(|value| value.autofill_rank),
+                previous.map(|value| value.enriched_websites.clone()).unwrap_or_default(),
                 now,
-            )
+            )?;
+            entry.enriched_login = previous.and_then(|value| value.enriched_login.clone());
+            Ok(entry)
         })
         .collect::<gui::GuiResult<Vec<_>>>()?;
     entries.sort_by(|left, right| left.path.cmp(&right.path));
@@ -244,7 +202,7 @@ pub fn upsert_autofill_index_entry(
     let Some(mut index) = read_index_if_initialized(&request.index_path)? else {
         return Ok(None);
     };
-    let path = normalize_entry_path(&request.entry.path)?;
+    let path = normalize_entry_path(&request.path)?;
     let now = Utc::now().timestamp();
     let enriched_websites = index
         .entries
@@ -254,13 +212,13 @@ pub fn upsert_autofill_index_entry(
         .unwrap_or_default();
     let autofill_rank =
         index.entries.iter().find(|entry| entry.path == path).and_then(|entry| entry.autofill_rank);
-    let replacement = derive_index_entry(
-        &path,
-        request.entry.is_favorite,
-        autofill_rank,
-        enriched_websites,
-        now,
-    )?;
+    let enriched_login = index
+        .entries
+        .iter()
+        .find(|entry| entry.path == path)
+        .and_then(|entry| entry.enriched_login.clone());
+    let mut replacement = derive_index_entry(&path, autofill_rank, enriched_websites, now)?;
+    replacement.enriched_login = enriched_login;
     index.entries.retain(|entry| entry.path != path);
     index.entries.push(replacement);
     finish_index_mutation(&request.index_path, index).map(Some)
@@ -285,17 +243,13 @@ pub fn move_autofill_index_entry(
         };
         let moved_path =
             if suffix.is_empty() { new_path.clone() } else { format!("{new_path}/{suffix}") };
-        replacements.push(derive_index_entry(
-            &moved_path,
-            entry.is_favorite,
-            None,
-            entry.enriched_websites,
-            now,
-        )?);
+        let mut replacement = derive_index_entry(&moved_path, None, entry.enriched_websites, now)?;
+        replacement.enriched_login = entry.enriched_login;
+        replacements.push(replacement);
     }
 
     if replacements.is_empty() && !request.recursive {
-        replacements.push(derive_index_entry(&new_path, false, None, Vec::new(), now)?);
+        replacements.push(derive_index_entry(&new_path, None, Vec::new(), now)?);
     }
     retained.extend(replacements);
     index.entries = retained;
@@ -315,39 +269,33 @@ pub fn remove_autofill_index_entry(
     finish_index_mutation(&request.index_path, index).map(Some)
 }
 
-pub fn patch_autofill_index_favorites(
-    request: PatchAutofillIndexFavoritesRequest,
-) -> gui::GuiResult<Option<AutofillIndex>> {
-    let Some(mut index) = read_index_if_initialized(&request.index_path)? else {
-        return Ok(None);
-    };
-    let metadata = metadata_by_path(request.entries)?;
-    let now = Utc::now().timestamp();
-    for entry in &mut index.entries {
-        if let Some(ranking) = metadata.get(&entry.path) {
-            entry.is_favorite = ranking.is_favorite;
-            entry.updated_at_epoch_seconds = now;
-        }
-    }
-    finish_index_mutation(&request.index_path, index).map(Some)
-}
-
 pub fn reconcile_autofill_index(
     request: ReconcileAutofillIndexRequest,
 ) -> gui::GuiResult<Option<AutofillIndex>> {
-    let Some(mut index) = read_index_if_initialized(&request.index_path)? else {
-        return Ok(None);
+    let mut index = match read_index_if_initialized(&request.index_path) {
+        Ok(Some(index)) => index,
+        Ok(None) | Err(_) => {
+            return rebuild_autofill_index(RebuildAutofillIndexRequest {
+                index_path: request.index_path,
+                store_id: request.store_id,
+                store_name: request.store_name,
+                store_root: request.store_root,
+            })
+            .map(Some);
+        }
     };
     validate_store_root(&request.store_root)?;
     let requested_root = fs::canonicalize(&request.store_root)?;
     let indexed_root = fs::canonicalize(Path::new(&index.store_root)).ok();
     if index.store_id != request.store_id || indexed_root.as_ref() != Some(&requested_root) {
-        clear_autofill_index(&request.index_path)?;
-        return Err(CoreError::ValidationError(
-            "autofill index belongs to a different password store; rebuild required".to_string(),
-        ));
+        return rebuild_autofill_index(RebuildAutofillIndexRequest {
+            index_path: request.index_path,
+            store_id: request.store_id,
+            store_name: request.store_name,
+            store_root: request.store_root,
+        })
+        .map(Some);
     }
-    let metadata = metadata_by_path(request.entries)?;
     let existing = index
         .entries
         .into_iter()
@@ -357,17 +305,12 @@ pub fn reconcile_autofill_index(
     let mut entries = Vec::new();
 
     for path in list_password_paths(&request.store_root)? {
-        let ranking = metadata.get(&path);
         let previous = existing.get(&path);
         let enriched_websites =
             previous.map(|entry| entry.enriched_websites.clone()).unwrap_or_default();
-        let is_favorite = ranking.map_or_else(
-            || previous.is_some_and(|entry| entry.is_favorite),
-            |entry| entry.is_favorite,
-        );
         let autofill_rank = previous.and_then(|entry| entry.autofill_rank);
-        let mut entry =
-            derive_index_entry(&path, is_favorite, autofill_rank, enriched_websites, now)?;
+        let mut entry = derive_index_entry(&path, autofill_rank, enriched_websites, now)?;
+        entry.enriched_login = previous.and_then(|entry| entry.enriched_login.clone());
         if previous.is_some_and(|previous| same_logical_entry(previous, &entry)) {
             entry.updated_at_epoch_seconds =
                 previous.expect("checked above").updated_at_epoch_seconds;
@@ -418,28 +361,17 @@ pub fn record_autofill_completion(
     finish_index_mutation(&request.index_path, index)
 }
 
-pub fn enrich_autofill_index_websites_with_backend(
-    request: EnrichAutofillIndexWebsitesRequest,
+pub fn refresh_autofill_index_login_and_urls_with_backend(
+    request: RefreshAutofillIndexLoginAndUrlsRequest,
     backend: &dyn PgpBackend,
 ) -> gui::GuiResult<AutofillIndex> {
-    if request.paths.is_empty() {
-        return Err(CoreError::ValidationError(
-            "autofill website enrichment requires at least one path".to_string(),
-        ));
-    }
     validate_store_root(&request.store_root)?;
     let mut index = read_autofill_index(&request.index_path)?;
-    let paths = request
-        .paths
-        .iter()
-        .map(|path| normalize_entry_path(path))
-        .collect::<gui::GuiResult<BTreeSet<_>>>()?;
-    for path in &paths {
-        if !index.entries.iter().any(|entry| &entry.path == path) {
-            return Err(CoreError::ValidationError(format!(
-                "autofill entry is not indexed: {path}"
-            )));
-        }
+    let paths = index.entries.iter().map(|entry| entry.path.clone()).collect::<BTreeSet<_>>();
+    if paths.is_empty() {
+        return Err(CoreError::ValidationError(
+            "encrypted Autofill metadata refresh requires at least one indexed entry".to_string(),
+        ));
     }
 
     let mut aliases = BTreeMap::new();
@@ -452,37 +384,31 @@ pub fn enrich_autofill_index_websites_with_backend(
             },
             backend,
         )?;
-        aliases.insert(path.clone(), website_identifiers_for_secret(&secret));
+        aliases.insert(path.clone(), login_and_website_identifiers_for_secret(&secret));
     }
 
     let now = Utc::now().timestamp();
     for entry in &mut index.entries {
-        if let Some(values) = aliases.remove(&entry.path) {
-            entry.enriched_websites = values;
+        if let Some((login, websites)) = aliases.remove(&entry.path) {
+            entry.enriched_login = login;
+            entry.enriched_websites = websites;
             entry.updated_at_epoch_seconds = now;
         }
     }
     finish_index_mutation(&request.index_path, index)
 }
 
-pub fn clear_autofill_index_websites(
-    request: ClearAutofillIndexWebsitesRequest,
+pub fn forget_autofill_index_login_and_urls(
+    request: ForgetAutofillIndexLoginAndUrlsRequest,
 ) -> gui::GuiResult<Option<AutofillIndex>> {
     let Some(mut index) = read_index_if_initialized(&request.index_path)? else {
         return Ok(None);
     };
-    let paths = request
-        .paths
-        .iter()
-        .map(|path| normalize_entry_path(path))
-        .collect::<gui::GuiResult<BTreeSet<_>>>()?;
-    let clear_all = paths.is_empty();
     let now = Utc::now().timestamp();
     for entry in &mut index.entries {
-        if clear_all || paths.contains(&entry.path) {
-            entry.enriched_websites.clear();
-            entry.updated_at_epoch_seconds = now;
-        }
+        entry.enriched_login = None;
+        entry.enriched_websites.clear();
+        entry.updated_at_epoch_seconds = now;
     }
     finish_index_mutation(&request.index_path, index).map(Some)
 }
@@ -516,7 +442,7 @@ pub fn resolve_autofill_credential_with_backend(
 
     Ok(AutofillCredential {
         path: entry.path.clone(),
-        username: entry.username.clone(),
+        username: effective_username(entry).to_string(),
         password: secret.password,
     })
 }
@@ -548,42 +474,6 @@ pub fn read_autofill_index(index_path: &Path) -> gui::GuiResult<AutofillIndex> {
                 index_path.display()
             ))
         }),
-        1 => {
-            let legacy: LegacyAutofillIndexV1 = serde_json::from_str(&raw).map_err(|error| {
-                CoreError::ValidationError(format!(
-                    "failed to parse autofill index {}: {error}",
-                    index_path.display()
-                ))
-            })?;
-            debug_assert_eq!(legacy.version, 1);
-            let index = AutofillIndex {
-                version: AUTOFILL_INDEX_VERSION,
-                store_id: legacy.store_id,
-                store_name: legacy.store_name,
-                store_root: legacy.store_root,
-                generated_at_epoch_seconds: legacy.generated_at_epoch_seconds,
-                entries: legacy
-                    .entries
-                    .into_iter()
-                    .map(|entry| {
-                        let _legacy_recent_rank = entry.recent_rank;
-                        AutofillIndexEntry {
-                            path: entry.path,
-                            display_name: entry.display_name,
-                            service_name: entry.service_name,
-                            username: entry.username,
-                            path_website: entry.path_website,
-                            enriched_websites: entry.enriched_websites,
-                            is_favorite: entry.is_favorite,
-                            autofill_rank: None,
-                            updated_at_epoch_seconds: entry.updated_at_epoch_seconds,
-                        }
-                    })
-                    .collect(),
-            };
-            write_autofill_index(index_path, &index)?;
-            Ok(index)
-        }
         unsupported => Err(CoreError::ValidationError(format!(
             "unsupported autofill index version: {unsupported}"
         ))),
@@ -642,6 +532,18 @@ pub fn match_autofill_candidates(
             }
         }
         if best.is_none() {
+            if let Some(app_name) = &app_name {
+                if entry
+                    .enriched_websites
+                    .iter()
+                    .filter_map(|value| normalize_service_name(value))
+                    .any(|value| &value == app_name)
+                {
+                    best = Some(("enriched_app_name", app_name.clone(), 3000));
+                }
+            }
+        }
+        if best.is_none() {
             if let Some(website) = &website {
                 if entry.enriched_websites.iter().any(|value| value == website) {
                     best = Some(("enriched_website", website.clone(), 3000));
@@ -656,11 +558,10 @@ pub fn match_autofill_candidates(
             candidates.push(AutofillCandidate {
                 path: entry.path.clone(),
                 display_name: entry.display_name.clone(),
-                username: entry.username.clone(),
+                username: effective_username(entry).to_string(),
                 match_kind: match_kind.to_string(),
                 match_value,
                 score: base_score + ranking_bonus(entry),
-                is_favorite: entry.is_favorite,
             });
         }
     }
@@ -725,12 +626,6 @@ fn validate_store_root(store_root: &Path) -> gui::GuiResult<()> {
     }
 }
 
-fn metadata_by_path(
-    entries: Vec<AutofillEntryMetadata>,
-) -> gui::GuiResult<BTreeMap<String, AutofillEntryMetadata>> {
-    entries.into_iter().map(|entry| Ok((normalize_entry_path(&entry.path)?, entry))).collect()
-}
-
 fn list_password_paths(store_root: &Path) -> gui::GuiResult<Vec<String>> {
     Ok(gui::list_entries(ListEntriesRequest {
         root: store_root.to_path_buf(),
@@ -745,7 +640,6 @@ fn list_password_paths(store_root: &Path) -> gui::GuiResult<Vec<String>> {
 
 fn derive_index_entry(
     path: &str,
-    is_favorite: bool,
     autofill_rank: Option<u32>,
     enriched_websites: Vec<String>,
     updated_at_epoch_seconds: i64,
@@ -758,7 +652,7 @@ fn derive_index_entry(
     let display_name = service_name.clone().unwrap_or_else(|| username.clone());
     let enriched_websites = enriched_websites
         .into_iter()
-        .filter_map(|value| normalize_website_identifier(&value))
+        .filter_map(|value| normalize_autofill_alias(&value))
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
@@ -767,9 +661,9 @@ fn derive_index_entry(
         display_name,
         service_name,
         username,
+        enriched_login: None,
         path_website,
         enriched_websites,
-        is_favorite,
         autofill_rank,
         updated_at_epoch_seconds,
     })
@@ -851,25 +745,31 @@ fn same_logical_entry(left: &AutofillIndexEntry, right: &AutofillIndexEntry) -> 
         && left.display_name == right.display_name
         && left.service_name == right.service_name
         && left.username == right.username
+        && left.enriched_login == right.enriched_login
         && left.path_website == right.path_website
         && left.enriched_websites == right.enriched_websites
-        && left.is_favorite == right.is_favorite
         && left.autofill_rank == right.autofill_rank
 }
 
-fn website_identifiers_for_secret(secret: &EntrySecret) -> Vec<String> {
+fn login_and_website_identifiers_for_secret(secret: &EntrySecret) -> (Option<String>, Vec<String>) {
+    let login = secret.fields.iter().find_map(|field| {
+        (field.key.trim().eq_ignore_ascii_case("login"))
+            .then(|| field.value.trim())
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    });
     let mut websites = BTreeSet::new();
     for field in &secret.fields {
         let key = field.key.trim().to_ascii_lowercase();
-        if matches!(key.as_str(), "url" | "website" | "service") {
+        if key == "url" {
             for value in field.value.split([',', ';', '\n']).map(str::trim) {
-                if let Some(host) = normalize_website_identifier(value) {
-                    websites.insert(host);
+                if let Some(alias) = normalize_autofill_alias(value) {
+                    websites.insert(alias);
                 }
             }
         }
     }
-    websites.into_iter().collect()
+    (login, websites.into_iter().collect())
 }
 
 fn normalize_query(query: Option<&str>) -> String {
@@ -879,16 +779,22 @@ fn normalize_query(query: Option<&str>) -> String {
 fn entry_matches_query(entry: &AutofillIndexEntry, query: &str) -> bool {
     entry.path.to_lowercase().contains(query)
         || entry.display_name.to_lowercase().contains(query)
-        || entry.username.to_lowercase().contains(query)
+        || effective_username(entry).to_lowercase().contains(query)
         || entry.service_name.as_ref().is_some_and(|value| value.to_lowercase().contains(query))
 }
 
+fn effective_username(entry: &AutofillIndexEntry) -> &str {
+    entry.enriched_login.as_deref().unwrap_or(&entry.username)
+}
+
+fn normalize_autofill_alias(value: &str) -> Option<String> {
+    normalize_website_identifier(value).or_else(|| normalize_service_name(value))
+}
+
 fn ranking_bonus(entry: &AutofillIndexEntry) -> i32 {
-    let favorite = if entry.is_favorite { 100 } else { 0 };
-    let autofill_history = entry
+    entry
         .autofill_rank
         .map(|rank| 50_i32.saturating_sub(i32::try_from(rank).unwrap_or(i32::MAX)))
         .unwrap_or(0)
-        .max(0);
-    favorite + autofill_history
+        .max(0)
 }

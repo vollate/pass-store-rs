@@ -27,7 +27,7 @@ class ParsStatusBadge extends StatelessWidget {
       liveRegion: kind == ParsStatusKind.error,
       label: label,
       child: ActionChip(
-        avatar: Icon(icon, size: 18, color: color),
+        avatar: Icon(icon, size: ParsSizes.iconTiny, color: color),
         label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
         onPressed: onPressed,
         backgroundColor: color.withValues(alpha: 0.12),

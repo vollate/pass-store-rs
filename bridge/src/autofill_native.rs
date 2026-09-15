@@ -69,7 +69,6 @@ struct NativeAutofillCandidate {
     match_kind: String,
     match_value: String,
     score: i32,
-    is_favorite: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -259,7 +258,6 @@ impl From<autofill::AutofillCandidate> for NativeAutofillCandidate {
             match_kind: value.match_kind,
             match_value: value.match_value,
             score: value.score,
-            is_favorite: value.is_favorite,
         }
     }
 }
@@ -351,9 +349,9 @@ mod tests {
                     display_name: "example.com".to_string(),
                     service_name: Some("example.com".to_string()),
                     username: "alice".to_string(),
+                    enriched_login: None,
                     path_website: Some("example.com".to_string()),
                     enriched_websites: Vec::new(),
-                    is_favorite: true,
                     autofill_rank: None,
                     updated_at_epoch_seconds: 1,
                 }],

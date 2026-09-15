@@ -28,7 +28,6 @@ class AutofillCandidate {
     required this.matchKind,
     required this.matchValue,
     required this.score,
-    required this.isFavorite,
   });
 
   final String path;
@@ -37,7 +36,6 @@ class AutofillCandidate {
   final String matchKind;
   final String matchValue;
   final int score;
-  final bool isFavorite;
 }
 
 class AutofillCredential {
@@ -52,7 +50,7 @@ class AutofillCredential {
   final String password;
 }
 
-enum AutofillStatusKind { ready, needsRebuild, busy, disabled, unavailable }
+enum AutofillStatusKind { ready, syncFailed, busy, disabled, unavailable }
 
 class AutofillStatus {
   const AutofillStatus({
@@ -93,13 +91,11 @@ abstract interface class AutofillRepository {
 
   Future<void> removeEntry({required String path, required bool recursive});
 
-  Future<void> patchFavorites(List<PasswordEntry> entries);
-
   Future<void> reconcileIndex(List<PasswordEntry> entries);
 
-  Future<void> enrichWebsites(List<String> paths);
+  Future<void> useEncryptedLoginAndUrls(List<PasswordEntry> entries);
 
-  Future<void> clearWebsiteEnrichment([List<String> paths = const <String>[]]);
+  Future<void> forgetEncryptedLoginAndUrls();
 
   Future<List<AutofillCandidate>> queryCandidates({
     String? website,
@@ -136,20 +132,16 @@ abstract interface class AutofillBridgeApi {
     required frb.RemoveAutofillIndexEntryRequest request,
   });
 
-  Future<frb.UnitResponse> patchAutofillIndexFavorites({
-    required frb.PatchAutofillIndexFavoritesRequest request,
-  });
-
   Future<frb.UnitResponse> reconcileAutofillIndex({
     required frb.ReconcileAutofillIndexRequest request,
   });
 
-  Future<frb.UnitResponse> enrichAutofillIndexWebsites({
-    required frb.EnrichAutofillIndexWebsitesRequest request,
+  Future<frb.UnitResponse> refreshAutofillIndexLoginAndUrls({
+    required frb.RefreshAutofillIndexLoginAndUrlsRequest request,
   });
 
-  Future<frb.UnitResponse> clearAutofillIndexWebsites({
-    required frb.ClearAutofillIndexWebsitesRequest request,
+  Future<frb.UnitResponse> forgetAutofillIndexLoginAndUrls({
+    required frb.ForgetAutofillIndexLoginAndUrlsRequest request,
   });
 
   Future<frb.AutofillCandidatesResponse> queryAutofillCandidates({
@@ -189,24 +181,19 @@ final class FrbAutofillBridgeApi implements AutofillBridgeApi {
   }) => frb.removeAutofillIndexEntry(request: request);
 
   @override
-  Future<frb.UnitResponse> patchAutofillIndexFavorites({
-    required frb.PatchAutofillIndexFavoritesRequest request,
-  }) => frb.patchAutofillIndexFavorites(request: request);
-
-  @override
   Future<frb.UnitResponse> reconcileAutofillIndex({
     required frb.ReconcileAutofillIndexRequest request,
   }) => frb.reconcileAutofillIndex(request: request);
 
   @override
-  Future<frb.UnitResponse> enrichAutofillIndexWebsites({
-    required frb.EnrichAutofillIndexWebsitesRequest request,
-  }) => frb.enrichAutofillIndexWebsites(request: request);
+  Future<frb.UnitResponse> refreshAutofillIndexLoginAndUrls({
+    required frb.RefreshAutofillIndexLoginAndUrlsRequest request,
+  }) => frb.refreshAutofillIndexLoginAndUrls(request: request);
 
   @override
-  Future<frb.UnitResponse> clearAutofillIndexWebsites({
-    required frb.ClearAutofillIndexWebsitesRequest request,
-  }) => frb.clearAutofillIndexWebsites(request: request);
+  Future<frb.UnitResponse> forgetAutofillIndexLoginAndUrls({
+    required frb.ForgetAutofillIndexLoginAndUrlsRequest request,
+  }) => frb.forgetAutofillIndexLoginAndUrls(request: request);
 
   @override
   Future<frb.AutofillCandidatesResponse> queryAutofillCandidates({
@@ -273,7 +260,6 @@ class BridgeAutofillRepository implements AutofillRepository {
         storeId: currentStoreId?.call() ?? storeId,
         storeName: currentStoreName?.call() ?? storeName,
         root: currentStoreRoot?.call() ?? storeRoot,
-        entries: _entryMetadata(entries),
       ),
     );
     _throwIfFailure(response.error);
@@ -290,7 +276,7 @@ class BridgeAutofillRepository implements AutofillRepository {
     final response = await bridge.upsertAutofillIndexEntry(
       request: frb.UpsertAutofillIndexEntryRequest(
         indexPath: indexPath,
-        entry: _metadataForEntry(entry),
+        path: entry.path,
       ),
     );
     await _completeIncremental(response);
@@ -329,18 +315,6 @@ class BridgeAutofillRepository implements AutofillRepository {
   }
 
   @override
-  Future<void> patchFavorites(List<PasswordEntry> entries) async {
-    if (entries.isEmpty) return;
-    final response = await bridge.patchAutofillIndexFavorites(
-      request: frb.PatchAutofillIndexFavoritesRequest(
-        indexPath: indexPath,
-        entries: _entryMetadata(entries),
-      ),
-    );
-    await _completeIncremental(response);
-  }
-
-  @override
   Future<void> reconcileIndex(List<PasswordEntry> entries) async {
     final response = await bridge.reconcileAutofillIndex(
       request: frb.ReconcileAutofillIndexRequest(
@@ -348,47 +322,35 @@ class BridgeAutofillRepository implements AutofillRepository {
         storeId: currentStoreId?.call() ?? storeId,
         storeName: currentStoreName?.call() ?? storeName,
         root: currentStoreRoot?.call() ?? storeRoot,
-        entries: _entryMetadata(entries),
       ),
     );
-    try {
-      _throwIfFailure(response.error);
-    } catch (error, stackTrace) {
-      await _serializePlatformState(_clearPlatformState);
-      _status = const AutofillStatus(
-        available: false,
-        indexedEntries: 0,
-        kind: AutofillStatusKind.needsRebuild,
-        message:
-            'Autofill data belongs to another store. Rebuild it explicitly.',
-      );
-      Error.throwWithStackTrace(error, stackTrace);
-    }
+    _throwIfFailure(response.error);
     await publishPlatformState();
-    if (_status.available) {
-      _status = AutofillStatus(
-        available: true,
-        indexedEntries: _passwordEntryCount(entries),
-        message: 'Path-based autofill data is synchronized',
-      );
-    }
+    _status = AutofillStatus(
+      available: true,
+      indexedEntries: _passwordEntryCount(entries),
+      message: 'Path-based autofill data is synchronized automatically',
+    );
   }
 
   @override
-  Future<void> enrichWebsites(List<String> paths) async {
+  Future<void> useEncryptedLoginAndUrls(List<PasswordEntry> entries) async {
+    final paths = entries
+        .where((entry) => !entry.isDirectory)
+        .map((entry) => entry.path)
+        .toList(growable: false);
     if (paths.isEmpty) {
       throw const AutofillRepositoryException(
-        'Select at least one entry before reading encrypted URL fields.',
+        'There are no password entries to read.',
       );
     }
-    final response = await bridge.enrichAutofillIndexWebsites(
-      request: frb.EnrichAutofillIndexWebsitesRequest(
+    final response = await bridge.refreshAutofillIndexLoginAndUrls(
+      request: frb.RefreshAutofillIndexLoginAndUrlsRequest(
         configPath: configPath,
         indexPath: indexPath,
         root: currentStoreRoot?.call() ?? storeRoot,
         pgpExecutable: pgpExecutable,
         passphrase: await _activePassphrase(),
-        paths: paths,
       ),
     );
     _throwIfFailure(response.error);
@@ -397,19 +359,15 @@ class BridgeAutofillRepository implements AutofillRepository {
       available: _status.available,
       indexedEntries: _status.indexedEntries,
       kind: _status.kind,
-      message: 'Encrypted website aliases updated for ${paths.length} entries',
+      message:
+          'Encrypted login and URL fields updated for ${paths.length} entries',
     );
   }
 
   @override
-  Future<void> clearWebsiteEnrichment([
-    List<String> paths = const <String>[],
-  ]) async {
-    final response = await bridge.clearAutofillIndexWebsites(
-      request: frb.ClearAutofillIndexWebsitesRequest(
-        indexPath: indexPath,
-        paths: paths,
-      ),
+  Future<void> forgetEncryptedLoginAndUrls() async {
+    final response = await bridge.forgetAutofillIndexLoginAndUrls(
+      request: frb.ForgetAutofillIndexLoginAndUrlsRequest(indexPath: indexPath),
     );
     _throwIfFailure(response.error);
     await publishPlatformState();
@@ -417,7 +375,7 @@ class BridgeAutofillRepository implements AutofillRepository {
       available: _status.available,
       indexedEntries: _status.indexedEntries,
       kind: _status.kind,
-      message: 'Encrypted website aliases cleared',
+      message: 'Encrypted login and URL fields removed',
     );
   }
 
@@ -509,8 +467,9 @@ class BridgeAutofillRepository implements AutofillRepository {
     _status = AutofillStatus(
       available: false,
       indexedEntries: _status.indexedEntries,
-      kind: AutofillStatusKind.needsRebuild,
-      message: 'Autofill sync failed: $error. Rebuild it from Settings.',
+      kind: AutofillStatusKind.syncFailed,
+      message:
+          'Automatic Autofill sync failed: $error. It will retry on refresh.',
     );
   }
 
@@ -584,20 +543,6 @@ class BridgeAutofillRepository implements AutofillRepository {
       currentStoreReady?.call() == true &&
       (currentStoreRoot?.call() ?? storeRoot) == capturedRoot;
 
-  List<frb.AutofillEntryMetadataDto> _entryMetadata(
-    List<PasswordEntry> entries,
-  ) => <frb.AutofillEntryMetadataDto>[
-    for (final entry in entries)
-      if (!entry.isDirectory) _metadataForEntry(entry),
-  ];
-
-  frb.AutofillEntryMetadataDto _metadataForEntry(PasswordEntry entry) {
-    return frb.AutofillEntryMetadataDto(
-      path: entry.path,
-      isFavorite: entry.isFavorite,
-    );
-  }
-
   int _passwordEntryCount(List<PasswordEntry> entries) =>
       entries.where((entry) => !entry.isDirectory).length;
 
@@ -609,7 +554,6 @@ class BridgeAutofillRepository implements AutofillRepository {
       matchKind: candidate.matchKind,
       matchValue: candidate.matchValue,
       score: candidate.score,
-      isFavorite: candidate.isFavorite,
     );
   }
 
@@ -660,7 +604,6 @@ class FakeAutofillRepository implements AutofillRepository {
   final Map<String, AutofillCredential> _credentials;
   final Object? operationError;
   List<PasswordEntry> lastRebuiltEntries = const <PasswordEntry>[];
-  List<PasswordEntry> lastFavoriteEntries = const <PasswordEntry>[];
   List<String> lastEnrichedPaths = const <String>[];
   final List<String> operations = <String>[];
   bool cleared = false;
@@ -708,31 +651,32 @@ class FakeAutofillRepository implements AutofillRepository {
   }
 
   @override
-  Future<void> patchFavorites(List<PasswordEntry> entries) async {
-    operations.add('favorites');
-    lastFavoriteEntries = List<PasswordEntry>.of(entries);
-  }
-
-  @override
   Future<void> reconcileIndex(List<PasswordEntry> entries) async {
     operations.add('reconcile');
     final error = operationError;
     if (error != null) throw error;
+    _status = AutofillStatus(
+      available: true,
+      indexedEntries: entries.where((entry) => !entry.isDirectory).length,
+      message: 'Path-based autofill data is synchronized automatically',
+    );
   }
 
   @override
-  Future<void> enrichWebsites(List<String> paths) async {
+  Future<void> useEncryptedLoginAndUrls(List<PasswordEntry> entries) async {
+    final paths = entries
+        .where((entry) => !entry.isDirectory)
+        .map((entry) => entry.path)
+        .toList(growable: false);
     if (paths.isEmpty) {
-      throw const AutofillRepositoryException('Select at least one entry.');
+      throw const AutofillRepositoryException('There are no password entries.');
     }
     operations.add('enrich');
     lastEnrichedPaths = List<String>.of(paths);
   }
 
   @override
-  Future<void> clearWebsiteEnrichment([
-    List<String> paths = const <String>[],
-  ]) async {
+  Future<void> forgetEncryptedLoginAndUrls() async {
     operations.add('clear-enrichment');
   }
 
@@ -763,8 +707,9 @@ class FakeAutofillRepository implements AutofillRepository {
     _status = AutofillStatus(
       available: false,
       indexedEntries: _status.indexedEntries,
-      kind: AutofillStatusKind.needsRebuild,
-      message: 'Autofill sync failed: $error. Rebuild it from Settings.',
+      kind: AutofillStatusKind.syncFailed,
+      message:
+          'Automatic Autofill sync failed: $error. It will retry on refresh.',
     );
   }
 
@@ -773,7 +718,6 @@ class FakeAutofillRepository implements AutofillRepository {
     _candidates.clear();
     _credentials.clear();
     lastRebuiltEntries = const <PasswordEntry>[];
-    lastFavoriteEntries = const <PasswordEntry>[];
     lastEnrichedPaths = const <String>[];
     operations.add('clear');
     cleared = true;

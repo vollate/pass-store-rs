@@ -7,9 +7,17 @@ class ParsTheme {
   static const Color surface = Color(0xFFF8FAFC);
   static const Color darkSurface = Color(0xFF111827);
 
-  static ThemeData light() => _build(Brightness.light);
+  // ColorScheme.fromSeed runs the Material tonal-palette algorithm and the
+  // surrounding ThemeData carries every component sub-theme, so building both
+  // brightnesses costs more than a frame budget on a phone. The result is
+  // immutable and input-free, so it is built once and shared. Theme edits need
+  // a restart rather than a hot reload to take effect.
+  static ThemeData? _light;
+  static ThemeData? _dark;
 
-  static ThemeData dark() => _build(Brightness.dark);
+  static ThemeData light() => _light ??= _build(Brightness.light);
+
+  static ThemeData dark() => _dark ??= _build(Brightness.dark);
 
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
@@ -20,37 +28,49 @@ class ParsTheme {
     );
     final semanticColors =
         isDark ? ParsSemanticColors.dark : ParsSemanticColors.light;
+    final entryPalette =
+        isDark ? ParsEntryPalette.dark : ParsEntryPalette.light;
+    const section = ParsSectionStyle.standard;
     final controlShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(ParsRadii.control),
     );
 
-    return ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colorScheme.surface,
-      extensions: <ThemeExtension<dynamic>>[semanticColors],
+      extensions: <ThemeExtension<dynamic>>[
+        semanticColors,
+        entryPalette,
+        section,
+      ],
       visualDensity: VisualDensity.standard,
       appBarTheme: AppBarTheme(
         centerTitle: false,
-        elevation: 0,
-        scrolledUnderElevation: 1,
+        elevation: ParsElevation.flat,
+        scrolledUnderElevation: ParsElevation.scrolledUnder,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
         surfaceTintColor: Colors.transparent,
       ),
+      // Cards use the same fill, radius and outline as a grouped section, so a
+      // standalone card and a section container read as one component family.
       cardTheme: CardThemeData(
-        elevation: 0,
+        elevation: ParsElevation.flat,
         margin: EdgeInsets.zero,
         color: colorScheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ParsRadii.card),
-          side: BorderSide(color: colorScheme.outlineVariant),
+          borderRadius: section.borderRadius,
+          side: BorderSide(
+            color: colorScheme.outlineVariant,
+            width: section.borderWidth,
+          ),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 72,
+        height: ParsSizes.navigationBar,
         backgroundColor: colorScheme.surfaceContainer,
         indicatorColor: colorScheme.secondaryContainer,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -111,7 +131,10 @@ class ParsTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ParsRadii.control),
-          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          borderSide: BorderSide(
+            color: colorScheme.primary,
+            width: ParsSizes.focusRing,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ParsRadii.control),
@@ -119,7 +142,10 @@ class ParsTheme {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ParsRadii.control),
-          borderSide: BorderSide(color: colorScheme.error, width: 2),
+          borderSide: BorderSide(
+            color: colorScheme.error,
+            width: ParsSizes.focusRing,
+          ),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -182,7 +208,7 @@ class ParsTheme {
         ),
       ),
       dialogTheme: DialogThemeData(
-        elevation: 3,
+        elevation: ParsElevation.raised,
         backgroundColor: colorScheme.surfaceContainerHigh,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
@@ -190,8 +216,8 @@ class ParsTheme {
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        elevation: 3,
-        modalElevation: 3,
+        elevation: ParsElevation.raised,
+        modalElevation: ParsElevation.raised,
         backgroundColor: colorScheme.surfaceContainerLow,
         modalBackgroundColor: colorScheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
@@ -204,8 +230,8 @@ class ParsTheme {
       ),
       dividerTheme: DividerThemeData(
         color: colorScheme.outlineVariant,
-        thickness: 1,
-        space: 1,
+        thickness: ParsSizes.hairline,
+        space: ParsSizes.hairline,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
@@ -220,6 +246,42 @@ class ParsTheme {
         ),
         textStyle: TextStyle(color: colorScheme.onInverseSurface),
       ),
+    );
+
+    return base.copyWith(textTheme: _typography(base.textTheme));
+  }
+
+  // The stock Material scale leaves entry names and their paths at the same
+  // weight, which flattens the list. Titles carry the weight, supporting text
+  // stays regular and leans on colour instead.
+  static TextTheme _typography(TextTheme base) {
+    return base.copyWith(
+      headlineSmall: base.headlineSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.4,
+      ),
+      titleLarge: base.titleLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.2,
+      ),
+      titleMedium: base.titleMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.1,
+        height: 1.25,
+      ),
+      titleSmall: base.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+      bodySmall: base.bodySmall?.copyWith(height: 1.3),
+      labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    );
+  }
+
+  // Paths, fingerprints and other machine data are easier to scan and compare
+  // in a monospace face.
+  static TextStyle mono(TextStyle base) {
+    return base.copyWith(
+      fontFamily: ParsFonts.mono,
+      fontFamilyFallback: ParsFonts.monoFallback,
+      letterSpacing: 0,
     );
   }
 }

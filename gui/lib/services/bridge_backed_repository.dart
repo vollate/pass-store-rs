@@ -85,11 +85,9 @@ class BridgeBackedRepository
   List<PasswordEntry> _entries = const <PasswordEntry>[];
   List<KeyRecord> _keys = const <KeyRecord>[];
   RepoGitStatus _gitStatus = RepoGitStatus.disabled;
-  VaultMetadata _metadata = const VaultMetadata.empty();
   int _refreshEpoch = 0;
   Future<void> _storeSideEffectTail = Future<void>.value();
   bool _storeRemovalInProgress = false;
-  bool _autofillRebuildRequired = false;
   final ValueNotifier<int> _lifecycleRevision = ValueNotifier<int>(0);
   String? _publishedLifecycleIdentity;
 
@@ -250,7 +248,7 @@ class BridgeBackedRepository
       return;
     }
 
-    _metadata = await _loadMetadataForStore(currentStore.root);
+    await _loadMetadataForStore(currentStore.root);
     if (refreshEpoch != _refreshEpoch) return;
     final entriesResponse = await bridge.listEntries(
       request: frb.ListEntriesRequest(
@@ -283,21 +281,9 @@ class BridgeBackedRepository
         _gitStatus = _gitStatusFromBridge(gitResponse);
     }
     if (reconcileAutofill) {
-      final repository = autofillRepository;
-      if (_autofillRebuildRequired && repository?.status.available == true) {
-        _autofillRebuildRequired = false;
-      }
-      if (_autofillRebuildRequired) {
-        repository?.recordSyncFailure(
-          const AutofillRepositoryException(
-            'A replacement password store requires an explicit Autofill rebuild.',
-          ),
-        );
-      } else {
-        await _runAutofillUpdate(
-          (repository) => repository.reconcileIndex(_entries),
-        );
-      }
+      await _runAutofillUpdate(
+        (repository) => repository.reconcileIndex(_entries),
+      );
     }
     if (refreshEpoch == _refreshEpoch) _publishLifecycle();
   }
@@ -352,15 +338,6 @@ class BridgeBackedRepository
       );
     }
     return result.password;
-  }
-
-  @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {
-    final favorites = _metadata.favoritePaths.toSet();
-    if (!favorites.add(entry.path)) {
-      favorites.remove(entry.path);
-    }
-    await _saveMetadata(_metadata.copyWith(favoritePaths: favorites));
   }
 
   @override
@@ -722,7 +699,6 @@ class BridgeBackedRepository
   Future<void> _beginCanonicalStoreRemoval() async {
     ++_refreshEpoch;
     _storeRemovalInProgress = true;
-    _autofillRebuildRequired = true;
     _clearStoreScopedPresentation();
     _publishLifecycle();
     await _clearStoreScopedDurableState();
@@ -747,7 +723,7 @@ class BridgeBackedRepository
       _storeRemovalInProgress = false;
       autofillRepository?.recordSyncFailure(
         const AutofillRepositoryException(
-          'Autofill data was cleared for privacy. Rebuild it explicitly.',
+          'Autofill data was cleared for privacy and will rebuild on refresh.',
         ),
       );
       _publishLifecycle();
@@ -1312,7 +1288,6 @@ class BridgeBackedRepository
       encryptedContent: '',
       isDirectory: isDirectory,
       childCount: entry.childCount,
-      isFavorite: _metadata.favoritePaths.contains(entry.path),
     );
   }
 
@@ -1601,31 +1576,6 @@ class BridgeBackedRepository
     return sorted;
   }
 
-  Future<void> _saveMetadata(VaultMetadata metadata) async {
-    final previous = _metadata;
-    final scoped = metadata.copyWith(
-      storeRoot: _lifecycle.store?.root,
-      removalTombstone: false,
-    );
-    await _metadataStore.save(scoped);
-    await _metadataStore.clearStoreRemovedMarker();
-    _metadata = scoped;
-    _entries = _entries.map(_decorateEntry).toList(growable: false);
-
-    final changedPaths = <String>{
-      ...previous.favoritePaths,
-      ...scoped.favoritePaths,
-    };
-    final changedEntries = _entries
-        .where(
-          (entry) => !entry.isDirectory && changedPaths.contains(entry.path),
-        )
-        .toList(growable: false);
-    await _runAutofillUpdate(
-      (repository) => repository.patchFavorites(changedEntries),
-    );
-  }
-
   PasswordEntry? _entryForPath(String path) {
     for (final entry in _entries) {
       if (entry.path == path) return entry;
@@ -1641,7 +1591,6 @@ class BridgeBackedRepository
           displayName: _basename(path),
           repoName: currentRepoName,
           encryptedContent: '',
-          isFavorite: _metadata.favoritePaths.contains(path),
         );
     if (entry.isDirectory) return;
     await _runAutofillUpdate((repository) => repository.upsertEntry(entry));
@@ -1686,12 +1635,23 @@ class BridgeBackedRepository
     if (!removalWasPersisted &&
         !loaded.removalTombstone &&
         loaded.storeRoot == root) {
-      return loaded;
+      final current = loaded.copyWith(version: VaultMetadata.currentVersion);
+      if (loaded.version != VaultMetadata.currentVersion) {
+        try {
+          await _metadataStore.save(current);
+        } catch (_) {
+          // In-memory metadata is sanitized even if disk cleanup needs retry.
+        }
+      }
+      return current;
     }
     if (!removalWasPersisted &&
         !loaded.removalTombstone &&
         loaded.storeRoot == null) {
-      final migrated = loaded.copyWith(storeRoot: root);
+      final migrated = loaded.copyWith(
+        storeRoot: root,
+        version: VaultMetadata.currentVersion,
+      );
       try {
         await _metadataStore.save(migrated);
         return migrated;
@@ -1711,7 +1671,6 @@ class BridgeBackedRepository
   void _clearStoreScopedPresentation() {
     _entries = const <PasswordEntry>[];
     _gitStatus = RepoGitStatus.disabled;
-    _metadata = const VaultMetadata.removed();
   }
 
   Future<void> _clearStoreScopedDurableState() async {
@@ -1763,18 +1722,6 @@ class BridgeBackedRepository
       repository.recordSyncFailure(error);
       return false;
     }
-  }
-
-  PasswordEntry _decorateEntry(PasswordEntry entry) {
-    return PasswordEntry(
-      path: entry.path,
-      displayName: entry.displayName,
-      repoName: entry.repoName,
-      encryptedContent: entry.encryptedContent,
-      isDirectory: entry.isDirectory,
-      childCount: entry.childCount,
-      isFavorite: _metadata.favoritePaths.contains(entry.path),
-    );
   }
 
   KeyRecord _keyFromMutation(frb.KeyMutationResponse response) {

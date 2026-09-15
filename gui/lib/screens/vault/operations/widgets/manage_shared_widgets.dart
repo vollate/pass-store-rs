@@ -72,10 +72,13 @@ class _ErrorText extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = this.message;
     if (message == null) {
-      return const SizedBox(height: 12);
+      return const SizedBox(height: ParsSpacing.sm);
     }
     return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      padding: const EdgeInsets.only(
+        top: ParsSpacing.xs,
+        bottom: ParsSpacing.sm,
+      ),
       child: Text(
         message,
         style: TextStyle(color: Theme.of(context).colorScheme.error),
@@ -108,7 +111,7 @@ Widget _operationSheet({
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: ParsSpacing.md),
             ...children,
           ],
         ),

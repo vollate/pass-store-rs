@@ -229,9 +229,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchVaultHint => 'Search by name or path';
 
   @override
-  String get favoritesSection => 'Favorites';
-
-  @override
   String get searchResultsSection => 'Search results';
 
   @override
@@ -241,9 +238,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String browsePathSection(String path) {
     return 'Browse: $path';
   }
-
-  @override
-  String get noFavoriteEntries => 'No favorite entries yet.';
 
   @override
   String get noSearchResults => 'No entries match this search.';
@@ -281,9 +275,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get couldNotCopyPassword => 'Could not copy the password.';
 
   @override
-  String get favoriteUpdateFailed => 'Could not update the favorite.';
-
-  @override
   String entryCount(int count) {
     return '$count entries';
   }
@@ -308,12 +299,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hide => 'Hide';
-
-  @override
-  String get favorite => 'Favorite';
-
-  @override
-  String get unfavorite => 'Unfavorite';
 
   @override
   String get openUrl => 'Open URL';
@@ -723,47 +708,37 @@ class AppLocalizationsEn extends AppLocalizations {
       'Import or create a private PGP key before saving a passphrase.';
 
   @override
-  String get rebuildPaths => 'Rebuild paths';
-
-  @override
-  String get readUrlFields => 'Read URL fields';
-
-  @override
-  String get clearUrlAliases => 'Clear URL aliases';
-
-  @override
   String get clearAll => 'Clear all';
 
   @override
-  String get readEncryptedUrlFieldsTitle => 'Read encrypted URL fields?';
+  String get useLoginAndUrlFields => 'Use login & URL fields';
 
   @override
-  String readEncryptedUrlFieldsDescription(int count) {
-    return 'This optional action decrypts all $count selected entries once and stores only normalized website aliases. Path-based Autofill does not require it.';
+  String get useLoginAndUrlFieldsHint =>
+      'Use encrypted login as the Autofill username and URL for website or app matching.';
+
+  @override
+  String get forgetLoginAndUrlFields => 'Forget login & URL fields';
+
+  @override
+  String get forgetLoginAndUrlFieldsHint =>
+      'Return to filename usernames and folder-based matching. No passwords are decrypted.';
+
+  @override
+  String confirmUseLoginAndUrlFields(int count) {
+    return 'Decrypt all $count password entries once? Only login and normalized URL data will be indexed; passwords will not be stored.';
   }
 
   @override
-  String get readSelectedEntries => 'Read selected entries';
+  String get useFields => 'Use fields';
 
   @override
-  String get autofillRebuiltSuccess =>
-      'Path-based Autofill data rebuilt without decrypting entries.';
+  String get loginAndUrlFieldsUpdated =>
+      'Encrypted login and URL fields updated.';
 
   @override
-  String get autofillAliasesCleared => 'Encrypted website aliases cleared.';
-
-  @override
-  String get autofillDataCleared => 'Autofill data cleared.';
-
-  @override
-  String get clearAutofillConfirmation =>
-      'Remove all shared Autofill candidates for this store? This does not delete password entries.';
-
-  @override
-  String get openSystemPasswordSettings => 'Open system password settings.';
-
-  @override
-  String get autofillAliasesUpdated => 'Encrypted website aliases updated.';
+  String get loginAndUrlFieldsForgotten =>
+      'Encrypted login and URL fields removed.';
 
   @override
   String get noEntriesToEnrich => 'There are no password entries to enrich.';
@@ -778,7 +753,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get autofillReady => 'Ready';
 
   @override
-  String get autofillNeedsRebuild => 'Needs rebuild';
+  String get autofillSyncFailed => 'Sync failed';
 
   @override
   String get autofillBusy => 'Working…';

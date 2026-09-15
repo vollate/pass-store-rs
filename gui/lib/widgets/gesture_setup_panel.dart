@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/pars_design_tokens.dart';
 import '../l10n/l10n.dart';
 import '../services/security_repository.dart';
 import 'gesture_lock_input.dart';
@@ -38,7 +39,7 @@ class _GestureSetupPanelState extends State<GestureSetupPanel> {
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 160),
+          duration: ParsMotion.quick,
           child: Text(
             _message ??
                 (_isConfirming
@@ -55,7 +56,7 @@ class _GestureSetupPanelState extends State<GestureSetupPanel> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: ParsSpacing.md),
         OutlinedButton(
           onPressed:
               _initialPattern == null || _isSaving
@@ -75,7 +76,8 @@ class _GestureSetupPanelState extends State<GestureSetupPanel> {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (largeText) {
-          final inputSize = constraints.maxWidth.clamp(0.0, 320.0).toDouble();
+          final inputSize =
+              constraints.maxWidth.clamp(0.0, ParsSizes.gestureGrid).toDouble();
           return SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -90,7 +92,7 @@ class _GestureSetupPanelState extends State<GestureSetupPanel> {
                 builder: (context, gridConstraints) {
                   final inputSize =
                       gridConstraints.biggest.shortestSide
-                          .clamp(0.0, 320.0)
+                          .clamp(0.0, ParsSizes.gestureGrid)
                           .toDouble();
                   return grid(inputSize);
                 },

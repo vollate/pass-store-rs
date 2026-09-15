@@ -158,7 +158,7 @@ class _MobileShellState extends State<MobileShell> {
                       ),
                     ],
                   ),
-                  const VerticalDivider(width: 1),
+                  const VerticalDivider(width: ParsSizes.hairline),
                   Expanded(child: content),
                 ],
               ),

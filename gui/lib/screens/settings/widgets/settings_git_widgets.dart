@@ -107,19 +107,19 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               Semantics(
                 label: context.l10n.gitSyncTitle,
                 value: _gitModeLabel(context),
                 child: Chip(label: Text(_gitModeLabel(context))),
               ),
               if (widget.gitMode == StoreGitMode.invalid) ...<Widget>[
-                const SizedBox(height: 8),
+                const SizedBox(height: ParsSpacing.xs),
                 Text(context.l10n.invalidGitMetadataMessage),
               ],
               if (widget.gitRepository.gitStatus ==
                   RepoGitStatus.disabled) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 FilledButton.icon(
                   onPressed:
                       _running
@@ -130,10 +130,10 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                 ),
               ],
               if (hasGit) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: ParsSpacing.xs,
+                  runSpacing: ParsSpacing.xs,
                   children: <Widget>[
                     FilledButton.icon(
                       onPressed:
@@ -169,7 +169,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 TextField(
                   decoration: InputDecoration(
                     labelText: context.l10n.commitMessageField,
@@ -186,7 +186,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                               setState(() => _pushAfterCommit = value ?? false),
                   title: Text(context.l10n.pushAfterCommit),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: ParsSpacing.xs),
                 FilledButton.icon(
                   onPressed:
                       _running || !hasGit
@@ -202,11 +202,11 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                   icon: const Icon(Icons.add_task_outlined),
                   label: Text(context.l10n.commit),
                 ),
-                const Divider(height: 28),
+                const Divider(height: ParsSpacing.xxl),
                 _RemoteList(remotes: _remotes),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: ParsSpacing.xs,
+                  runSpacing: ParsSpacing.xs,
                   children: <Widget>[
                     OutlinedButton.icon(
                       onPressed: _running ? null : _refreshRemotes,
@@ -215,14 +215,14 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 TextField(
                   decoration: InputDecoration(
                     labelText: context.l10n.remoteNameField,
                   ),
                   onChanged: (value) => _remoteName = value,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: ParsSpacing.xs),
                 TextField(
                   decoration: InputDecoration(
                     labelText: context.l10n.remoteUrlField,
@@ -230,7 +230,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                   onChanged: (value) => setState(() => _remoteUrl = value),
                 ),
                 if (_usesSshRemote) ...<Widget>[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: ParsSpacing.xs),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.vpn_key_outlined),
@@ -242,10 +242,10 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: ParsSpacing.xs),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: ParsSpacing.xs,
+                  runSpacing: ParsSpacing.xs,
                   children: <Widget>[
                     FilledButton(
                       onPressed:
@@ -283,20 +283,20 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                   ],
                 ),
               ],
-              const Divider(height: 28),
+              const Divider(height: ParsSpacing.xxl),
               if (_running) ...const <Widget>[
-                SizedBox(height: 12),
+                SizedBox(height: ParsSpacing.sm),
                 LinearProgressIndicator(),
               ],
               if (_errorText != null) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 Text(
                   _errorText!,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ],
               if (_output != null) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 _GitOutputPanel(output: _output!),
               ],
             ],
@@ -385,9 +385,9 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
       child: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
+            left: ParsSpacing.lg,
+            right: ParsSpacing.lg,
+            top: ParsSpacing.lg,
             bottom: MediaQuery.of(context).viewInsets.bottom + 20,
           ),
           child: Column(
@@ -400,16 +400,16 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ParsSpacing.xs),
               Text(context.l10n.gitArgsOnlyDescription),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               Row(
                 children: <Widget>[
                   const Text(
                     'git',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: ParsSpacing.xs),
                   Expanded(
                     child: TextFormField(
                       initialValue: _argsText,
@@ -424,9 +424,9 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ParsSpacing.xs),
               SelectableText('git ${_argsText.trim()}'),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               FilledButton(
                 onPressed: _running ? null : _run,
                 child: SizedBox(
@@ -435,18 +435,18 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
                 ),
               ),
               if (_running) ...const <Widget>[
-                SizedBox(height: 12),
+                SizedBox(height: ParsSpacing.sm),
                 LinearProgressIndicator(),
               ],
               if (_errorText != null) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 Text(
                   _errorText!,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ],
               if (_output != null) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 _GitOutputPanel(output: _output!),
               ],
             ],
@@ -526,10 +526,10 @@ class _GitOutputPanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(ParsRadii.small),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(ParsSpacing.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -537,7 +537,7 @@ class _GitOutputPanel extends StatelessWidget {
               output.command,
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ParsSpacing.xs),
             Text(
               context.l10n.exitCodeValue(
                 output.exitCode?.toString() ?? 'signal',
@@ -545,7 +545,7 @@ class _GitOutputPanel extends StatelessWidget {
             ),
             Text(output.success ? context.l10n.success : context.l10n.failed),
             if (output.stdout.trim().isNotEmpty) ...<Widget>[
-              const SizedBox(height: 8),
+              const SizedBox(height: ParsSpacing.xs),
               Text(
                 context.l10n.standardOutput,
                 style: const TextStyle(fontWeight: FontWeight.w700),
@@ -553,7 +553,7 @@ class _GitOutputPanel extends StatelessWidget {
               SelectableText(output.stdout),
             ],
             if (output.stderr.trim().isNotEmpty) ...<Widget>[
-              const SizedBox(height: 8),
+              const SizedBox(height: ParsSpacing.xs),
               Text(
                 context.l10n.standardError,
                 style: const TextStyle(fontWeight: FontWeight.w700),

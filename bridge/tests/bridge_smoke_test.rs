@@ -4,16 +4,16 @@ use std::pin::pin;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use pars_bridge::api::{
-    self, AddPgpKeyToGpgIdRequest, AutofillCredentialRequest, AutofillEntryMetadataDto,
-    AutofillQueryRequest, ClearAutofillIndexRequest, ConfigurePgpBackendRequest,
-    CreateLocalStoreRequest, DeleteLocalStoreRequest, DeletePgpKeyRequest, DeleteSshKeyRequest,
-    DisconnectStoreRequest, EntryRequest, ExportPgpKeyRequest, ExportSshKeyRequest,
+    self, AddPgpKeyToGpgIdRequest, AutofillCredentialRequest, AutofillQueryRequest,
+    ClearAutofillIndexRequest, ConfigurePgpBackendRequest, CreateLocalStoreRequest,
+    DeleteLocalStoreRequest, DeletePgpKeyRequest, DeleteSshKeyRequest, DisconnectStoreRequest,
+    EntryRequest, ExportPgpKeyRequest, ExportSshKeyRequest, ForgetAutofillIndexLoginAndUrlsRequest,
     GeneratePgpKeyRequest, GenerateSshKeyRequest, ImportKeyTextRequest, ImportLocalStoreRequest,
     ImportPgpKeyFileRequest, ImportPgpKeyTextRequest, InitializeStoreRecipientsRequest,
     InsertEntryRequest, InspectAppStateRequest, InspectPgpKeyFileRequest, InspectPgpKeyTextRequest,
     ListEntriesRequest, ListKeysRequest, OpenGithubSshSettingsRequest, PgpImportFailureKind,
     PgpKeyDeletionFailureKind, PgpKeyKindDto, PreparePgpPrivateKeyRequest,
-    RebuildAutofillIndexRequest, SUPPORTED_METHODS,
+    RebuildAutofillIndexRequest, RefreshAutofillIndexLoginAndUrlsRequest, SUPPORTED_METHODS,
 };
 use pars_core::util::test_util::PgpKeyMaterialFixture;
 
@@ -82,10 +82,9 @@ fn bridge_method_table_matches_generated_api_surface() {
         "upsert_autofill_index_entry",
         "move_autofill_index_entry",
         "remove_autofill_index_entry",
-        "patch_autofill_index_favorites",
         "reconcile_autofill_index",
-        "enrich_autofill_index_websites",
-        "clear_autofill_index_websites",
+        "refresh_autofill_index_login_and_urls",
+        "forget_autofill_index_login_and_urls",
         "query_autofill_candidates",
         "resolve_autofill_credential",
         "clear_autofill_index",
@@ -376,8 +375,7 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
         config_path: config_path.display().to_string(),
         root: store_root.display().to_string(),
         path: "example.com/entry".to_string(),
-        content: "entry-secret\nusername: hidden-name\nurl: https://ignored.example/login"
-            .to_string(),
+        content: "entry-secret\nlogin: hidden-name\nurl: https://ignored.example/login".to_string(),
         overwrite: false,
         pgp_executable: String::new(),
     }));
@@ -401,16 +399,33 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         root: store_root.display().to_string(),
-        entries: vec![AutofillEntryMetadataDto {
-            path: "example.com/entry".to_string(),
-            is_favorite: true,
-        }],
     }));
     assert!(rebuilt.error.is_none(), "{:?}", rebuilt.error);
     let raw_index = std::fs::read_to_string(&index_path).expect("path index");
     assert!(!raw_index.contains("entry-secret"));
     assert!(!raw_index.contains("hidden-name"));
     assert!(!raw_index.contains("ignored.example"));
+
+    let refreshed = block_on(api::refresh_autofill_index_login_and_urls(
+        RefreshAutofillIndexLoginAndUrlsRequest {
+            config_path: config_path.display().to_string(),
+            index_path: index_path.display().to_string(),
+            root: store_root.display().to_string(),
+            pgp_executable: None,
+            passphrase: None,
+        },
+    ));
+    assert!(refreshed.error.is_none(), "{:?}", refreshed.error);
+
+    let alias = block_on(api::query_autofill_candidates(AutofillQueryRequest {
+        index_path: index_path.display().to_string(),
+        website: Some("ignored.example".to_string()),
+        app_name: None,
+        query: None,
+        limit: 10,
+    }));
+    assert!(alias.error.is_none(), "{:?}", alias.error);
+    assert_eq!(alias.candidates[0].username, "hidden-name");
 
     let website = block_on(api::query_autofill_candidates(AutofillQueryRequest {
         index_path: index_path.display().to_string(),
@@ -444,8 +459,13 @@ fn pure_rust_pgp_bridge_encrypts_and_decrypts_entries() {
     }));
     assert!(credential.error.is_none(), "{:?}", credential.error);
     let credential = credential.credential.expect("credential");
-    assert_eq!(credential.username, "entry");
+    assert_eq!(credential.username, "hidden-name");
     assert_eq!(credential.password, "entry-secret");
+
+    let forgotten = block_on(api::forget_autofill_index_login_and_urls(
+        ForgetAutofillIndexLoginAndUrlsRequest { index_path: index_path.display().to_string() },
+    ));
+    assert!(forgotten.error.is_none(), "{:?}", forgotten.error);
 
     let cleared = block_on(api::clear_autofill_index(ClearAutofillIndexRequest {
         index_path: index_path.display().to_string(),

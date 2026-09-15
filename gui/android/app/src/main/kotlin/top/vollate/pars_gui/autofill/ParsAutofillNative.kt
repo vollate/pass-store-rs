@@ -48,7 +48,6 @@ data class ParsAutofillCandidate(
     val matchKind: String,
     val matchValue: String,
     val score: Int,
-    val isFavorite: Boolean,
     val generation: String,
 )
 
@@ -108,7 +107,6 @@ object ParsAutofillNativeBridge {
                         matchKind = candidate.getString("matchKind"),
                         matchValue = candidate.optString("matchValue"),
                         score = candidate.optInt("score"),
-                        isFavorite = candidate.optBoolean("isFavorite"),
                         generation = generation,
                     ),
                 )

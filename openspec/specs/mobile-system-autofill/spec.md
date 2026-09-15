@@ -26,7 +26,7 @@ extension and maintain credential identities for indexed entries.
 
 ### Requirement: Autofill index SHALL persist path-derived matching metadata only
 
-Default autofill index data SHALL derive Username from the final password-entry path component, equivalent to the `.gpg` filename stem, and SHALL derive Website/App service name from the immediate parent directory. Version 2 SHALL include entry path, path-derived display and service names, path-derived username, host-normalized parent-directory identity when valid, Favorite metadata, an internal successful-Autofill completion rank, selected store identity, freshness metadata, and separately identified opt-in website aliases. It SHALL NOT include plaintext passwords, raw URLs, Android package identifiers, raw decrypted notes, TOTP values, encrypted username-field values, full decrypted entry content, or Vault-view history.
+Default autofill index data SHALL derive Username from the final password-entry path component, equivalent to the `.gpg` filename stem, and SHALL derive Website/App service name from the immediate parent directory. Version 3 SHALL include entry path, path-derived display and service names, path-derived username, host-normalized parent-directory identity when valid, an internal successful-Autofill completion rank, selected store identity, freshness metadata, and separately identified opt-in `login` and normalized `url` metadata. An opted-in `login` value SHALL become the effective Autofill username while retaining the path-derived username as a fallback. It SHALL NOT include plaintext passwords, raw URLs, Android package identifiers, raw decrypted notes, TOTP values, full decrypted entry content, Vault-view history, or favorite state.
 
 #### Scenario: Path-derived entry is indexed without decryption
 
@@ -48,12 +48,12 @@ Default autofill index data SHALL derive Username from the final password-entry 
 
 - **GIVEN** an encrypted entry contains a password, username field, URL field, TOTP field, and `android-package` field
 - **WHEN** the default autofill index is built or incrementally updated
-- **THEN** none of those decrypted field values is read or stored
+- **THEN** none of those decrypted field values is read or stored by automatic path indexing
 - **AND** no Android package identifier is stored
 
 ### Requirement: Autofill matching SHALL use path services and optional website aliases
 
-Autofill matching SHALL rank an exact normalized parent-directory website match and an exact case-insensitive parent-directory app-name match above an exact opt-in enriched website alias, and SHALL rank those exact matches above path, display-name, service-name, or username text fallbacks. Favorite and successful-Autofill completion metadata SHALL only reorder otherwise equivalent match classes. Favorite SHALL add 100 points and an Autofill rank from 0 through 19 SHALL add `50 - rank` points. Android package identifiers SHALL NOT be accepted, stored, mapped, or used for matching.
+Autofill matching SHALL rank an exact normalized parent-directory website match and an exact case-insensitive parent-directory app-name match above an exact opt-in normalized URL website/app alias, and SHALL rank those exact matches above path, display-name, service-name, or effective-username text fallbacks. Successful-Autofill completion metadata SHALL only reorder otherwise equivalent match classes. An Autofill rank from 0 through 19 SHALL add `50 - rank` points. Android package identifiers SHALL NOT be accepted, stored, mapped, or used for matching.
 
 #### Scenario: Website request matches parent directory
 
@@ -74,11 +74,11 @@ Autofill matching SHALL rank an exact normalized parent-directory website match 
 - **WHEN** an Android caller is known only as package `com.example.bank` and no matching website, app label, or text query is available
 - **THEN** the shared matcher returns no exact package candidate
 
-#### Scenario: Favorite and Autofill completion history break equivalent ties
+#### Scenario: Autofill completion history breaks equivalent ties
 
 - **GIVEN** multiple entries have the same exact service match class
 - **WHEN** candidates are ranked
-- **THEN** favorite and more recently completed Autofill entries rank above otherwise equivalent entries
+- **THEN** more recently completed Autofill entries rank above otherwise equivalent entries
 - **AND** neither bonus outranks a stronger match class
 
 ### Requirement: Autofill SHALL authenticate before returning credentials
@@ -96,7 +96,7 @@ authentication SHALL return no credential.
 
 ### Requirement: Autofill SHALL decrypt credentials only on demand
 
-Autofill providers SHALL decrypt only the selected indexed entry after successful platform authentication. Decryption SHALL use the selected mobile PGP backend and the key-bound cached PGP passphrase when available. The returned username SHALL be the filename-stem username stored in the index, and the returned password SHALL be the decrypted entry's first line. The credential-resolution primitive SHALL NOT update or enrich the index. If no usable passphrase or key is available for the selected entry, autofill SHALL fail closed.
+Autofill providers SHALL decrypt only the selected indexed entry after successful platform authentication. Decryption SHALL use the selected mobile PGP backend and the key-bound cached PGP passphrase when available. The returned username SHALL be the opted-in `login` value when available and otherwise the filename-stem username stored in the index; the returned password SHALL be the decrypted entry's first line. The credential-resolution primitive SHALL NOT update or enrich the index. If no usable passphrase or key is available for the selected entry, autofill SHALL fail closed.
 
 #### Scenario: Selected entry is the only decrypted entry
 
@@ -104,15 +104,16 @@ Autofill providers SHALL decrypt only the selected indexed entry after successfu
 - **AND** a usable key-bound PGP passphrase is available
 - **WHEN** local authentication succeeds for one selected candidate
 - **THEN** Pars decrypts exactly that selected entry once
-- **AND** returns its path-derived username and first-line password
+- **AND** returns its opted-in login or path-derived fallback username and first-line password
 - **AND** the credential-resolution primitive does not write the Autofill index
 
-#### Scenario: Encrypted username does not override filename stem
+#### Scenario: Opted-in login overrides filename stem
 
 - **GIVEN** the selected path is `example.com/alice`
-- **AND** its encrypted content contains `username: bob`
+- **AND** its encrypted content contains `login: bob`
+- **AND** the user has explicitly refreshed encrypted login and URL fields
 - **WHEN** the credential is successfully resolved
-- **THEN** the returned username is `alice`
+- **THEN** the returned username is `bob`
 
 #### Scenario: Missing passphrase fails closed
 
@@ -174,9 +175,9 @@ The Android AutofillService SHALL use a localized, system-safe `RemoteViews` pre
 - **THEN** the shared matcher does not create a package-name candidate
 - **AND** presentation code does not add package identifiers to index or request data
 
-### Requirement: Settings SHALL control path indexing and optional enrichment
+### Requirement: Settings SHALL expose automatic path indexing and optional enrichment
 
-Settings SHALL show a concise localized system Autofill state such as Ready with indexed count, Needs rebuild, Busy, Unavailable, or Disabled. It SHALL provide actions to open platform Autofill setup, explicitly rebuild path-derived data, clear Autofill data, and separately enable, run, clear, or disable encrypted website-field enrichment. Raw parser field lists, private app-storage paths, and backend error strings SHALL NOT be used as the Settings tile subtitle; bounded non-secret diagnostics SHALL be available only through explicit Details or Runtime diagnostics. A normal rebuild SHALL NOT require a PGP session or passphrase and SHALL NOT decrypt entries. Enrichment SHALL remain disabled by default and SHALL clearly disclose that selected encrypted entries will be read.
+Settings SHALL show a concise localized system Autofill state such as Ready with indexed count, Busy, or Unavailable. Path-derived data SHALL be created and reconciled automatically whenever a valid store is loaded. Settings SHALL expose exactly two metadata actions: use encrypted login and URL fields, and forget encrypted login and URL fields. Raw parser field lists, private app-storage paths, and backend error strings SHALL NOT be used as the Settings tile subtitle; bounded non-secret diagnostics SHALL be available only through explicit Details or Runtime diagnostics. Automatic path indexing SHALL NOT require a PGP session or passphrase and SHALL NOT decrypt entries. Encrypted-field enrichment SHALL remain disabled by default and SHALL clearly disclose that every encrypted entry will be read once.
 
 #### Scenario: Ready status is concise
 - **GIVEN** the Autofill index is valid and contains entries
@@ -184,30 +185,23 @@ Settings SHALL show a concise localized system Autofill state such as Ready with
 - **THEN** it shows a localized Ready state and indexed count
 - **AND** the tile does not contain raw index JSON or filesystem details
 
-#### Scenario: Invalid index offers rebuild without raw parser text
+#### Scenario: Invalid index self-heals without raw parser text
 - **GIVEN** the Autofill index fails closed because it uses an invalid schema
-- **WHEN** Settings renders Autofill state
-- **THEN** it shows a localized Needs rebuild summary and Rebuild action
+- **WHEN** the GUI refreshes a valid password store
+- **THEN** it replaces the index automatically from folder paths
 - **AND** raw parser fields and private app-storage paths are available only through explicit bounded diagnostics
 
-#### Scenario: Refresh rebuilds from paths only
+#### Scenario: Refresh reconciles from paths only
 - **GIVEN** Autofill data may be stale
-- **WHEN** the user selects Refresh or Rebuild Autofill data
-- **THEN** Pars rebuilds the index from password-entry paths and Favorite metadata while preserving valid same-store completion history by unchanged path
+- **WHEN** the GUI loads or refreshes the valid password store
+- **THEN** Pars rebuilds the index from password-entry paths while preserving valid same-store completion history by unchanged path
 - **AND** no entry is decrypted
 
-#### Scenario: Clearing Autofill data removes shared candidates
-- **GIVEN** Autofill data exists for the selected store
-- **WHEN** the user clears Autofill data from Settings and confirms the destructive action
-- **THEN** shared Autofill index data is removed
-- **AND** iOS credential identities are removed when running on iOS
-- **AND** the resulting localized status is visible
-
-#### Scenario: URL enrichment is visibly separate
-- **GIVEN** URL enrichment is disabled
+#### Scenario: Encrypted-field enrichment is visibly separate
+- **GIVEN** encrypted-field enrichment is disabled
 - **WHEN** the user views Autofill settings
-- **THEN** default path refresh and encrypted URL enrichment are presented as separate actions
-- **AND** enrichment is not run until the user explicitly opts in and supplies a non-empty entry selection
+- **THEN** automatic path indexing is described separately from the two encrypted-field actions
+- **AND** enrichment is not run until the user explicitly confirms decrypting every entry
 
 #### Scenario: Status refresh remains non-decrypting
 - **WHEN** Settings refreshes or re-renders the concise Autofill status
@@ -216,72 +210,119 @@ Settings SHALL show a concise localized system Autofill state such as Ready with
 
 ### Requirement: Autofill index lifecycle SHALL support non-decrypting incremental updates
 
-After an Autofill index has been initialized, successful Vault add, edit, move, delete, and Favorite operations SHALL update only affected logical index records. These operations SHALL NOT accept a PGP backend or passphrase and SHALL NOT decrypt entries. If no Autofill index exists, ordinary Vault mutations SHALL remain successful without implicitly creating one. Index updates SHALL be atomically published so platform providers never observe a partially written document. Vault read, reveal, and copy operations SHALL NOT mutate the index.
+Valid-store load and refresh SHALL create a missing index and replace a malformed or different-store index automatically. After an Autofill index has been initialized for the canonical store, successful Vault add, edit, move, and delete operations SHALL update only affected logical index records. These operations SHALL NOT accept a PGP backend or passphrase and SHALL NOT decrypt entries. Vault read, reveal, and copy SHALL NOT mutate the index. Ordinary Vault mutations SHALL remain successful if no Autofill index exists or an index update fails, without implicitly creating an index. Index updates SHALL be atomically published so platform providers never observe a partially written document. Before Disconnect or Delete mutates the store, native providers SHALL synchronously persist a disabled tombstone and reject all candidate/credential reads, then remove the shared index and platform identities. Every enabled native publication SHALL carry an unguessable generation in candidates and credential identities, and providers SHALL revalidate enabled state, root, index, and generation after query or decryption before returning a result. A later store SHALL require an explicit non-decrypting rebuild; reconciliation SHALL reject and remove an index whose store ID or root differs.
 
 #### Scenario: Entry creation upserts one path-derived record
 
-- **GIVEN** an autofill index exists
+- **GIVEN** an Autofill index exists
 - **WHEN** a new entry `gitlab.com/alice.gpg` is successfully created
 - **THEN** one record with service `gitlab.com` and username `alice` is upserted
 - **AND** no other entry is re-derived or decrypted
 
 #### Scenario: Entry move preserves public metadata but resets path-bound history
 
-- **GIVEN** an indexed entry has Favorite metadata, completion history, and opt-in website aliases
+- **GIVEN** an indexed entry has completion history and opt-in website aliases
 - **WHEN** the entry is successfully renamed or moved
-- **THEN** the old path is removed and the new path metadata is derived
-- **AND** Favorite metadata and opt-in aliases are preserved
+- **THEN** the old path is removed and new path metadata is derived
+- **AND** opt-in aliases are preserved
 - **AND** path-bound Autofill completion history is not inherited by the new path
 - **AND** no entry is decrypted
 
 #### Scenario: Entry deletion removes only affected paths
 
-- **GIVEN** an autofill index exists
+- **GIVEN** an Autofill index exists
 - **WHEN** an entry or folder is successfully deleted
-- **THEN** the matching entry path or path-prefix records are removed
+- **THEN** matching entry path or path-prefix records are removed
 - **AND** unrelated records remain logically unchanged
 
-#### Scenario: Favorite metadata patches without rebuild
+#### Scenario: Same-store publication preserves only valid completion history
 
-- **GIVEN** an indexed entry's Favorite state changes
-- **WHEN** the metadata update is applied
-- **THEN** only supplied Favorite fields are patched
-- **AND** no full index rebuild or entry decryption occurs
+- **GIVEN** iOS has shared version 3 completion history for the current store
+- **WHEN** the same store publishes a rebuilt index
+- **THEN** ranks are merged only for unchanged paths with the same store ID and root
+- **AND** replacement stores, removed paths, and moved paths do not inherit old history
 
-### Requirement: Encrypted website enrichment SHALL be explicit and transactional
+#### Scenario: Store removal clears all Autofill candidates
 
-The system SHALL provide a separate opt-in operation that accepts an explicit non-empty set of indexed paths, decrypts only those entries, normalizes values from `url`, `website`, and `service` fields, and stores only normalized website aliases separately from path-derived identity. If any selected entry cannot be decrypted or validated, the existing index SHALL remain unchanged. Normal rebuild, incremental mutation, candidate query, metadata update, and credential resolution flows SHALL NOT invoke enrichment.
+- **GIVEN** the canonical store has a published shared Autofill index
+- **WHEN** its Disconnect or Delete flow starts
+- **THEN** Android and iOS persist disabled native state before filesystem or config mutation
+- **AND** candidate and credential reads fail closed even when a stale index file remains
+- **AND** shared index and iOS credential identities are then removed
+- **AND** no entry is decrypted during cleanup
 
-#### Scenario: Explicit enrichment adds normalized aliases
+#### Scenario: Tombstone cancels in-flight resolution
 
-- **GIVEN** an indexed entry contains `url: https://www.example.com/login`
-- **WHEN** the user explicitly enriches that selected entry
-- **THEN** exactly that entry is decrypted
+- **GIVEN** a candidate or identity was issued for publication generation `A`
+- **AND** native query or credential decryption has started
+- **WHEN** removal writes a disabled tombstone or a replacement publishes generation `B`
+- **THEN** the provider returns no result from generation `A`
+- **AND** no removed-store password reaches an intent, log, or platform response
+
+#### Scenario: Store replacement cannot inherit old candidates
+
+- **GIVEN** a prior canonical store was removed and a replacement is created, imported, or cloned
+- **WHEN** the replacement becomes ready
+- **THEN** the prior store's paths, aliases, completion history, and credential identities remain absent
+- **AND** candidates appear only after an explicit path-derived rebuild for the replacement
+
+#### Scenario: No-store native state publishes no passphrase
+
+- **GIVEN** Flutter secure storage retains an explicitly remembered PGP passphrase
+- **WHEN** no canonical ready store exists after removal
+- **THEN** native Autofill remains disabled and publishes no passphrase
+- **AND** the durable secure-storage preference is not itself exposed or deleted by index cleanup
+
+#### Scenario: Replacement passphrase must match current recipients
+
+- **GIVEN** secure storage retains a passphrase for fingerprint `ABC`
+- **AND** a replacement store requires only fingerprint `DEF`
+- **WHEN** native Autofill publication is evaluated
+- **THEN** no passphrase is published
+- **AND** the durable `ABC` record remains in secure storage
+
+#### Scenario: Cleanup failure cannot revive a stale index
+
+- **GIVEN** native state is disabled for store removal
+- **AND** shared-index deletion fails
+- **WHEN** a provider or replacement refresh observes the leftover index
+- **THEN** the provider returns no candidates or credentials
+- **AND** root-mismatched reconciliation removes the stale index and reports that an explicit rebuild is required
+
+### Requirement: Encrypted login and URL enrichment SHALL be explicit and transactional
+
+The system SHALL provide a separate opt-in operation that decrypts every indexed entry, stores a trimmed non-empty `login` value as the effective Autofill username, and stores only normalized `url` values as website/app aliases separately from path-derived identity. If any entry cannot be decrypted or validated, the existing index SHALL remain unchanged. Automatic reconciliation, incremental mutation, candidate query, metadata update, and credential resolution flows SHALL NOT invoke enrichment.
+
+#### Scenario: Explicit enrichment adds login and normalized URL data
+
+- **GIVEN** indexed entries contain `login` and `url` fields
+- **WHEN** the user explicitly refreshes encrypted login and URL fields
+- **THEN** every indexed entry is decrypted exactly once
+- **AND** a non-empty `login` becomes that entry's effective Autofill username
 - **AND** `example.com` is stored as an enriched website alias
 - **AND** the raw URL and other decrypted content are not stored
 
 #### Scenario: Enrichment failure preserves the previous index
 
-- **GIVEN** multiple paths are selected for one enrichment operation
-- **AND** one selected entry cannot be decrypted
+- **GIVEN** one indexed entry cannot be decrypted
 - **WHEN** enrichment runs
 - **THEN** the operation fails
 - **AND** none of the staged alias replacements is committed
 
-#### Scenario: Disabling enrichment clears aliases without decryption
+#### Scenario: Forgetting enrichment clears login and URL data without decryption
 
-- **GIVEN** enriched website aliases exist
-- **WHEN** the user disables or clears URL enrichment
-- **THEN** enriched aliases are removed without decrypting entries
-- **AND** path-derived services, usernames, Favorite metadata, and Autofill completion history remain available
+- **GIVEN** enriched login and URL metadata exists
+- **WHEN** the user chooses Forget login and URL fields
+- **THEN** enriched logins and aliases are removed without decrypting entries
+- **AND** path-derived services, usernames, and Autofill completion history remain available
 
 ### Requirement: Autofill SDK SHALL expose only the replacement path-first contract
 
-The Rust core, Flutter Rust Bridge, native C/JNI JSON ABI, Dart repository, Android adapter, and iOS adapter SHALL use the version 2 path-first models and operations. Refresh and incremental requests SHALL omit PGP executable and passphrase fields; query requests SHALL expose website, human-readable app name, text query, and limit but SHALL omit Android package fields. Public DTOs SHALL expose Favorite metadata without `recentRank` fields, while native providers SHALL use a dedicated completion-recording operation.
+The Rust core, Flutter Rust Bridge, native C/JNI JSON ABI, Dart repository, Android adapter, and iOS adapter SHALL use the version 3 path-first models and operations. Refresh and incremental requests SHALL omit PGP executable and passphrase fields; query requests SHALL expose website, human-readable app name, text query, and limit but SHALL omit Android package or favorite fields. Native providers SHALL use a dedicated completion-recording operation.
 
 #### Scenario: Default lifecycle API cannot request decryption
 
-- **WHEN** an SDK client constructs a rebuild, upsert, move, remove, or Favorite-patch request
+- **WHEN** an SDK client constructs a rebuild, upsert, move, or remove request
 - **THEN** the request model has no PGP backend, executable, passphrase, or decrypted-field input
 
 #### Scenario: Query ABI has no package parameter
@@ -290,12 +331,12 @@ The Rust core, Flutter Rust Bridge, native C/JNI JSON ABI, Dart repository, Andr
 - **THEN** the JSON request can contain website, app name, text query, and limit
 - **AND** it cannot contain an Android package matching field
 
-#### Scenario: Version 1 index migrates without Vault ranking history
+#### Scenario: Older schemas self-heal through automatic reconciliation
 
-- **GIVEN** a valid version 1 index contains paths, Favorite state, website aliases, and `recent_rank`
-- **WHEN** version 2 reads the index
-- **THEN** paths, Favorite state, and website aliases are preserved
-- **AND** the old Vault-derived rank is discarded before the index is atomically rewritten as version 2
+- **GIVEN** an Autofill index uses an older schema
+- **WHEN** the GUI refreshes a valid password store
+- **THEN** version 3 replaces it from current folder paths
+- **AND** no entry is decrypted
 
 ### Requirement: Mobile Autofill presentation SHALL remain accessible within platform constraints
 
@@ -320,10 +361,10 @@ Changes to Flutter Autofill settings, Android `RemoteViews`, Android authenticat
 - **THEN** it uses public indexed metadata
 - **AND** no entry is decrypted until one authenticated candidate is selected
 
-#### Scenario: Rendering Settings performs no implicit rebuild
+#### Scenario: Rendering Settings performs no secret enrichment
 - **WHEN** the redesigned Settings home or Autofill detail route renders
-- **THEN** it does not implicitly rebuild the index, enrich URLs, or decrypt entries
-- **AND** those operations remain explicit user actions
+- **THEN** it does not enrich login or URL fields or decrypt entries
+- **AND** secret enrichment remains an explicit user action while path reconciliation remains automatic
 
 #### Scenario: Session-only passphrase is not published durably
 - **GIVEN** Flutter has an active in-memory PGP session

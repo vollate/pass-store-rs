@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../app/pars_design_tokens.dart';
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../models/pgp_key_import.dart';
@@ -28,7 +29,6 @@ class EntryDetailSheet extends StatefulWidget {
     this.onSecretCleared,
     this.copyText,
     this.onOpenUri,
-    this.onFavoriteChanged,
     this.onEdit,
     this.onMove,
     this.onRename,
@@ -47,7 +47,6 @@ class EntryDetailSheet extends StatefulWidget {
   final VoidCallback? onSecretCleared;
   final Future<void> Function(String text)? copyText;
   final Future<void> Function(Uri uri)? onOpenUri;
-  final VoidCallback? onFavoriteChanged;
   final VoidCallback? onEdit;
   final VoidCallback? onMove;
   final VoidCallback? onRename;
@@ -63,7 +62,6 @@ class EntryDetailSheet extends StatefulWidget {
 class _EntryDetailSheetState extends State<EntryDetailSheet> {
   final TextEditingController _passphraseController = TextEditingController();
   bool _isRevealed = false;
-  late bool _isFavorite;
   bool _needsPassphrase = false;
   bool _isLoading = true;
   bool _isPreparingKey = false;
@@ -76,7 +74,6 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
   @override
   void initState() {
     super.initState();
-    _isFavorite = widget.entry.isFavorite;
     _ownsClipboardService = widget.clipboardService == null;
     widget.privacyEvents?.addListener(_handlePrivacyEvent);
     _clipboardService =
@@ -101,7 +98,6 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     if (oldWidget.entry.path != widget.entry.path ||
         oldWidget.repository != widget.repository) {
       _clearSecret();
-      _isFavorite = widget.entry.isFavorite;
       _prepareSecretLoad();
     }
   }
@@ -117,16 +113,26 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final availableHeight = MediaQuery.sizeOf(context).height - keyboardInset;
-    final preferredHeight = (availableHeight * 0.78).clamp(0.0, 720.0);
+    // A rotation delivers the new viewport size one frame before the stale
+    // keyboard inset clears, so the raw inset can exceed the new height.
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final keyboardInset = MediaQuery.viewInsetsOf(
+      context,
+    ).bottom.clamp(0.0, viewportHeight);
+    final availableHeight = viewportHeight - keyboardInset;
+    final preferredHeight = (availableHeight *
+            ParsSheetMetrics.preferredHeightFactor)
+        .clamp(0.0, ParsSheetMetrics.maxHeight);
     final stableHeight =
-        availableHeight < 240
+        availableHeight < ParsSheetMetrics.minHeight
             ? availableHeight
-            : preferredHeight.clamp(240.0, 720.0);
+            : preferredHeight.clamp(
+              ParsSheetMetrics.minHeight,
+              ParsSheetMetrics.maxHeight,
+            );
     return AnimatedPadding(
       padding: EdgeInsets.only(bottom: keyboardInset),
-      duration: const Duration(milliseconds: 180),
+      duration: ParsMotion.standard,
       curve: Curves.easeOutCubic,
       child: SizedBox(
         key: const ValueKey<String>('entry-detail-sheet'),
@@ -143,22 +149,22 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
       return SafeArea(
         child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          padding: ParsInsets.sheetBlock,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               const Center(child: _SheetHandle()),
-              const SizedBox(height: 18),
+              const SizedBox(height: ParsSpacing.lg),
               Text(
                 localizations.pgpPassphraseRequiredTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ParsSpacing.xs),
               Text(widget.entry.path),
-              const SizedBox(height: 16),
+              const SizedBox(height: ParsSpacing.md),
               TextField(
                 controller: _passphraseController,
                 autofocus: true,
@@ -170,7 +176,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                 ),
                 onSubmitted: (_) => _startPgpSession(),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: ParsSpacing.md),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -198,14 +204,14 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     if (_isLoading) {
       return SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          padding: ParsInsets.sheetBlockTall,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: const <Widget>[
               _SheetHandle(),
-              SizedBox(height: 24),
+              SizedBox(height: ParsSpacing.xl),
               CircularProgressIndicator(),
-              SizedBox(height: 18),
+              SizedBox(height: ParsSpacing.lg),
             ],
           ),
         ),
@@ -215,30 +221,30 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     if (_loadError != null) {
       return SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          padding: ParsInsets.sheetBlock,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               const Center(child: _SheetHandle()),
-              const SizedBox(height: 18),
+              const SizedBox(height: ParsSpacing.lg),
               Text(
                 localizations.decryptEntryFailedTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ParsSpacing.xs),
               Text(
                 _loadError!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.error,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: ParsSpacing.md),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: ParsSpacing.xs,
+                runSpacing: ParsSpacing.xs,
                 children: <Widget>[
                   FilledButton.icon(
                     onPressed: _loadSecret,
@@ -265,14 +271,14 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     final url = _entryUrl(content);
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+        padding: ParsInsets.sheetBlock,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               const Center(child: _SheetHandle()),
-              const SizedBox(height: 18),
+              const SizedBox(height: ParsSpacing.lg),
               Row(
                 children: <Widget>[
                   CircleAvatar(
@@ -280,7 +286,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                     foregroundColor: Colors.white,
                     child: Text(widget.entry.initials),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: ParsSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,16 +303,6 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip:
-                        _isFavorite
-                            ? localizations.unfavorite
-                            : localizations.favorite,
-                    isSelected: _isFavorite,
-                    onPressed: _toggleFavorite,
-                    icon: const Icon(Icons.star_border_outlined),
-                    selectedIcon: const Icon(Icons.star),
-                  ),
                   PopupMenuButton<_EntryDetailMenuAction>(
                     tooltip: localizations.moreActions,
                     onSelected:
@@ -315,15 +311,15 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: ParsSpacing.md),
               DecoratedBox(
                 key: const ValueKey<String>('entry-password-surface'),
                 decoration: BoxDecoration(
                   color: passwordSurfaceColor,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(ParsRadii.card),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(ParsSpacing.md),
                   child: Row(
                     children: <Widget>[
                       Expanded(
@@ -353,10 +349,10 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: ParsSpacing.xs,
+                runSpacing: ParsSpacing.xs,
                 children: <Widget>[
                   FilledButton.icon(
                     onPressed: _copyPassword,
@@ -372,14 +368,14 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                 ],
               ),
               if (content.fields.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 16),
+                const SizedBox(height: ParsSpacing.md),
                 Text(
                   localizations.fields,
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: ParsSpacing.xs),
                 for (final field in content.fields)
                   ListTile(
                     dense: true,
@@ -393,14 +389,14 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                   ),
               ],
               if (content.rawNotes.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 16),
+                const SizedBox(height: ParsSpacing.md),
                 Text(
                   localizations.rawNotes,
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: ParsSpacing.xs),
                 Text(content.rawNotes),
               ],
             ],
@@ -466,7 +462,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
       child: Row(
         children: <Widget>[
           Icon(icon, color: color),
-          const SizedBox(width: 12),
+          const SizedBox(width: ParsSpacing.sm),
           Text(label, style: color == null ? null : TextStyle(color: color)),
         ],
       ),
@@ -636,15 +632,6 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     _showMessage(message);
   }
 
-  Future<void> _toggleFavorite() async {
-    await widget.repository.toggleFavorite(widget.entry);
-    if (!mounted) {
-      return;
-    }
-    setState(() => _isFavorite = !_isFavorite);
-    widget.onFavoriteChanged?.call();
-  }
-
   void _showQrCode(String password) {
     showModalBottomSheet<void>(
       context: context,
@@ -654,12 +641,12 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
           (context) => SafeArea(
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+                padding: ParsInsets.sheetBlockTall,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     const _SheetHandle(),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: ParsSpacing.lg),
                     Row(
                       children: <Widget>[
                         Expanded(
@@ -676,11 +663,11 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: ParsSpacing.md),
                     QrImageView(
                       data: password,
                       version: QrVersions.auto,
-                      size: 200,
+                      size: ParsSizes.qrCode,
                       // Keep QR modules on a fixed high-contrast background.
                       backgroundColor: Colors.white,
                     ),
@@ -748,11 +735,11 @@ class _SheetHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 42,
-      height: 4,
+      width: ParsSizes.sheetHandleWidth,
+      height: ParsSizes.sheetHandleHeight,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.outlineVariant,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(ParsRadii.pill),
       ),
     );
   }

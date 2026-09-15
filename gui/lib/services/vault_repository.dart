@@ -15,8 +15,6 @@ abstract interface class VaultRepository {
 
   Future<String> copyEntryPassword(PasswordEntry entry);
 
-  Future<void> toggleFavorite(PasswordEntry entry);
-
   Future<EntryOperationResult> generateEntry({
     required String path,
     required int length,

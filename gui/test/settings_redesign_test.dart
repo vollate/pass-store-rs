@@ -31,16 +31,29 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('APPEARANCE'), findsOneWidget);
-    expect(find.text('SECURITY AND PRIVACY'), findsOneWidget);
-    expect(find.text('Advanced Git args'), findsNothing);
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Security and privacy'), findsOneWidget);
 
+    // Advanced content stays below every routine group rather than competing
+    // with it for the top of the page.
     await tester.scrollUntilVisible(
       find.text('Advanced Git args'),
       300,
       scrollable: find.byType(Scrollable).last,
     );
-    expect(find.text('ADVANCED AND SUPPORT'), findsOneWidget);
+    for (final routine in <String>[
+      'Appearance',
+      'Security and privacy',
+      'Vault and sync',
+      'Autofill',
+    ]) {
+      expect(
+        tester.getTopLeft(find.text('Advanced and support')).dy,
+        greaterThan(tester.getTopLeft(find.text(routine)).dy),
+        reason: '"Advanced and support" must follow "$routine"',
+      );
+    }
+    expect(find.text('Advanced and support'), findsOneWidget);
     expect(find.text('Runtime diagnostics'), findsOneWidget);
     expectNoFlutterOverflow(tester);
   });
@@ -74,12 +87,12 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
 
-    expect(find.text('Needs rebuild'), findsOneWidget);
+    expect(find.text('Sync failed'), findsOneWidget);
     expect(find.textContaining('/data/user/0'), findsNothing);
     await tester.tap(find.text('System Autofill'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Needs rebuild'), findsWidgets);
+    expect(find.text('Sync failed'), findsWidgets);
     expect(find.text('Diagnostic details'), findsOneWidget);
     expect(find.textContaining('/data/user/0'), findsNothing);
     await tester.tap(find.text('Diagnostic details'));

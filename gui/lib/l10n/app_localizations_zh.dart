@@ -225,9 +225,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchVaultHint => '按名称或路径搜索';
 
   @override
-  String get favoritesSection => '收藏';
-
-  @override
   String get searchResultsSection => '搜索结果';
 
   @override
@@ -237,9 +234,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String browsePathSection(String path) {
     return '浏览：$path';
   }
-
-  @override
-  String get noFavoriteEntries => '暂无收藏条目。';
 
   @override
   String get noSearchResults => '没有符合搜索条件的条目。';
@@ -277,9 +271,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get couldNotCopyPassword => '无法复制密码。';
 
   @override
-  String get favoriteUpdateFailed => '无法更新收藏状态。';
-
-  @override
   String entryCount(int count) {
     return '$count 个条目';
   }
@@ -304,12 +295,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hide => '隐藏';
-
-  @override
-  String get favorite => '收藏';
-
-  @override
-  String get unfavorite => '取消收藏';
 
   @override
   String get openUrl => '打开网址';
@@ -706,45 +691,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get createPrivatePgpKeyFirst => '保存密码前请先导入或创建私有 PGP 密钥。';
 
   @override
-  String get rebuildPaths => '重建路径索引';
-
-  @override
-  String get readUrlFields => '读取 URL 字段';
-
-  @override
-  String get clearUrlAliases => '清除 URL 别名';
-
-  @override
   String get clearAll => '全部清除';
 
   @override
-  String get readEncryptedUrlFieldsTitle => '读取加密 URL 字段？';
+  String get useLoginAndUrlFields => '使用登录名和 URL 字段';
 
   @override
-  String readEncryptedUrlFieldsDescription(int count) {
-    return '此可选操作会解密所选的 $count 个条目一次，并且只保存规范化的网站别名。基于路径的自动填充不需要此操作。';
+  String get useLoginAndUrlFieldsHint =>
+      '将加密的 login 用作自动填充用户名，并使用 URL 匹配网站或应用。';
+
+  @override
+  String get forgetLoginAndUrlFields => '移除登录名和 URL 字段';
+
+  @override
+  String get forgetLoginAndUrlFieldsHint => '恢复使用文件名作为用户名和基于文件夹的匹配；不会解密任何密码。';
+
+  @override
+  String confirmUseLoginAndUrlFields(int count) {
+    return '要一次性解密全部 $count 个密码条目吗？索引只保存 login 和规范化后的 URL 数据，不会保存密码。';
   }
 
   @override
-  String get readSelectedEntries => '读取所选条目';
+  String get useFields => '使用字段';
 
   @override
-  String get autofillRebuiltSuccess => '已基于路径重建自动填充数据，未解密任何条目。';
+  String get loginAndUrlFieldsUpdated => '已更新加密的登录名和 URL 字段。';
 
   @override
-  String get autofillAliasesCleared => '已清除加密网站别名。';
-
-  @override
-  String get autofillDataCleared => '已清除自动填充数据。';
-
-  @override
-  String get clearAutofillConfirmation => '移除此密码库的全部共享自动填充候选项？这不会删除密码条目。';
-
-  @override
-  String get openSystemPasswordSettings => '请打开系统密码设置。';
-
-  @override
-  String get autofillAliasesUpdated => '已更新加密网站别名。';
+  String get loginAndUrlFieldsForgotten => '已移除加密的登录名和 URL 字段。';
 
   @override
   String get noEntriesToEnrich => '没有可用于补充网站信息的密码条目。';
@@ -759,7 +733,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autofillReady => '可用';
 
   @override
-  String get autofillNeedsRebuild => '需要重建';
+  String get autofillSyncFailed => '同步失败';
 
   @override
   String get autofillBusy => '正在处理…';

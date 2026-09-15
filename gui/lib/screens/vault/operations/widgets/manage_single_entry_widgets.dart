@@ -152,13 +152,13 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
           ),
           onChanged: (value) => _path = value,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         TextFormField(
           obscureText: true,
           decoration: InputDecoration(labelText: context.l10n.password),
           onChanged: (value) => _password = value,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         TextFormField(
           minLines: 2,
           maxLines: 4,
@@ -257,7 +257,7 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
       title: rename ? context.l10n.renameEntry : context.l10n.moveEntry,
       children: <Widget>[
         Text(context.l10n.pathValue(widget.entry.path)),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         TextFormField(
           key: ValueKey('${rename ? 'rename' : 'move'}-${widget.entry.path}'),
           initialValue: _target,
@@ -348,7 +348,7 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
       title: context.l10n.deleteEntry,
       children: <Widget>[
         Text(context.l10n.pathValue(widget.entry.path)),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         TextFormField(
           key: ValueKey('delete-${widget.entry.path}'),
           decoration: InputDecoration(

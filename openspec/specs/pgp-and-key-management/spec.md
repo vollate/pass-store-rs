@@ -83,108 +83,6 @@ Sources: `core/src/util/fs_util.rs`, `core/src/pgp/backend.rs`,
 - WHEN backend validation runs
 - THEN it returns an invalid `.gpg-id` error
 
-### Requirement: Bridge PGP key management SHALL generate, import, list, and export keys
-
-The bridge SHALL expose methods to list keys, generate PGP keys, inspect and
-import public or private PGP keys from text or file sources, export public PGP
-keys, and export private PGP keys. Inspection and import SHALL derive the key
-kind and canonical primary-key fingerprint from supported key material rather
-than inferring kind from the selected source. Protected private-key material
-SHALL be passphrase-validated against the exact import material before the
-configured backend is mutated. Private PGP key export SHALL still identify the
-target key by fingerprint, but its confirmation phrase SHALL be derived from
-the human-readable key identity returned by key listing rather than the
-fingerprint.
-
-Sources: `bridge/src/api.rs`, `core/src/pgp/backend.rs`,
-`bridge/tests/bridge_smoke_test.rs`, `gui/lib/services/key_repository.dart`
-
-#### Scenario: Private PGP export requires human-readable confirmation
-
-- GIVEN a PGP key with fingerprint `ABC` and identity `Alice`
-- WHEN private PGP export is requested for fingerprint `ABC`
-- THEN confirmation must equal `EXPORT PRIVATE KEY Alice`
-- OTHERWISE the bridge returns a validation error that includes the expected
-  phrase
-
-#### Scenario: Private PGP export targets the selected fingerprint
-
-- GIVEN two PGP keys share the display identity `Alice`
-- WHEN private PGP export is requested for one key's fingerprint with
-  confirmation `EXPORT PRIVATE KEY Alice`
-- THEN the bridge exports private key material only for the requested
-  fingerprint
-
-#### Scenario: Import type must match requested PGP import
-
-- GIVEN imported key material is detected as PGP public or private
-- WHEN a legacy type-specific import method requests a kind that does not match
-  the detected material
-- THEN the bridge returns a validation error
-
-#### Scenario: Text and file sources detect key kind independently
-
-- GIVEN supported PGP public or private key material is supplied as pasted
-  armored text, an armored file, or a binary OpenPGP file
-- WHEN PGP import inspection runs
-- THEN it returns the material's public/private kind
-- AND the result does not derive key kind from whether Text or File was selected
-
-#### Scenario: Import returns a canonical fingerprint
-
-- GIVEN supported PGP key material has canonical primary fingerprint `ABC`
-- WHEN the key is imported into system GPG or the pure-Rust backend
-- THEN the bridge returns fingerprint `ABC` with backend-confirmed key metadata
-- AND it returns the same fingerprint when the key already exists
-
-#### Scenario: Incorrect protected-key passphrase does not mutate the keyring
-
-- GIVEN private PGP import material is protected by a passphrase
-- WHEN import receives no passphrase or an incorrect passphrase
-- THEN the bridge returns a typed passphrase validation failure
-- AND the configured keyring does not contain a newly imported key
-- AND the error does not contain the passphrase or private key material
-
-#### Scenario: Correct protected-key passphrase completes import
-
-- GIVEN private PGP import material with fingerprint `ABC` is protected by a
-  passphrase
-- WHEN import receives the correct passphrase
-- THEN the bridge validates the encryption-capable private material
-- AND imports the key
-- AND returns fingerprint `ABC`
-
-#### Scenario: Unprotected private key imports without a passphrase
-
-- GIVEN supported private PGP import material is not passphrase-protected
-- WHEN it is imported without a passphrase
-- THEN import succeeds and returns its canonical fingerprint
-
-### Requirement: GUI-facing PGP key management SHALL delete local PGP keys
-
-The GUI-facing key-management API SHALL support deleting a local PGP key by
-fingerprint through the configured PGP backend. Deletion SHALL remove local
-public key material and local private key material for that fingerprint when
-present, and SHALL report an error when the key cannot be found or cannot be
-deleted.
-
-Sources: `core/src/pgp/backend.rs`, `core/src/pgp/rpgp_backend.rs`,
-`bridge/src/api.rs`, `bridge/tests/bridge_smoke_test.rs`,
-`gui/lib/services/key_repository.dart`
-
-#### Scenario: Delete PGP key by fingerprint
-
-- GIVEN a PGP key exists in the configured backend
-- WHEN the GUI-facing delete PGP key API is called with that fingerprint
-- THEN the key is removed from subsequent key listings
-- AND local private key material for that fingerprint is removed when it exists
-
-#### Scenario: Missing PGP key deletion reports an error
-
-- GIVEN no local PGP key matches fingerprint `ABC`
-- WHEN the GUI-facing delete PGP key API is called with fingerprint `ABC`
-- THEN the API returns a key-management error
-
 ### Requirement: SSH key management SHALL operate without external ssh-keygen for generated ed25519 keys
 
 The core key management layer SHALL generate OpenSSH ed25519 keys directly,
@@ -253,21 +151,6 @@ Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
 - GIVEN incomplete private key text
 - WHEN detection rejects it
 - THEN the error string does not include the invalid private text
-
-### Requirement: Selected PGP keys SHALL be appended to root `.gpg-id` once
-
-Adding a PGP key to the selected store SHALL create the store root if needed,
-append the normalized fingerprint to root `.gpg-id`, preserve an existing final
-line, and avoid duplicate entries.
-
-Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
-`bridge/src/api.rs`, `gui/lib/services/bridge_backed_repository.dart`
-
-#### Scenario: Duplicate selected key is not appended twice
-
-- GIVEN `.gpg-id` already contains a fingerprint
-- WHEN the same fingerprint is added twice
-- THEN `.gpg-id` contains one copy of that fingerprint
 
 ### Requirement: Pure Rust private-key import SHALL apply managed OpenPGP protection
 
@@ -531,6 +414,78 @@ SHALL clean same-key preparation temporaries, and SHALL NOT modify password-stor
 - **WHEN** local key `ABC` is deleted
 - **THEN** every `.gpg-id` remains byte-for-byte unchanged
 - **AND** the GUI may represent `ABC` as referenced but missing locally
+
+### Requirement: Bridge PGP setup APIs SHALL list, inspect, import, and generate keys contextually
+
+The GUI bridge SHALL expose the PGP operations required to list usable local material, inspect text or file input, import public or private material with exact-key passphrase validation, generate a new private key for new-store creation, and prepare a selected private key for a session. It SHALL NOT expose general Flutter PGP export, delete, or append-to-`.gpg-id` operations. Inspection and import SHALL derive key kind and canonical primary-key fingerprint from the supplied material rather than its source.
+
+#### Scenario: Text and file sources detect key kind independently
+
+- **GIVEN** supported PGP public or private material is supplied as text, an armored file, or a binary OpenPGP file
+- **WHEN** contextual PGP inspection runs
+- **THEN** it returns the material's public/private kind and canonical fingerprint
+- **AND** it does not derive kind from whether Text or File was selected
+
+#### Scenario: Incorrect protected-key passphrase does not mutate the keyring
+
+- **GIVEN** private import material is protected by a passphrase
+- **WHEN** contextual import receives no passphrase or an incorrect passphrase
+- **THEN** it returns a typed sanitized validation failure
+- **AND** the configured keyring is not mutated
+
+#### Scenario: Correct protected-key passphrase completes import
+
+- **GIVEN** protected private material has canonical fingerprint `ABC`
+- **WHEN** contextual import receives the correct passphrase
+- **THEN** exact encryption-capable private material is validated and imported
+- **AND** the result identifies fingerprint `ABC`
+
+#### Scenario: Unprotected private key imports without a passphrase
+
+- **GIVEN** supported private PGP material is not passphrase-protected
+- **WHEN** it is imported without a passphrase
+- **THEN** import succeeds and returns its canonical fingerprint
+
+#### Scenario: New-store creation can generate recipients
+
+- **GIVEN** Create needs a recipient for a new `.gpg-id`
+- **WHEN** the user generates a new private PGP key successfully
+- **THEN** the generated canonical fingerprint may be written as a new-store recipient
+- **AND** the operation does not modify any existing store
+
+### Requirement: Existing store `.gpg-id` recipients SHALL remain authoritative
+
+Import, Clone, unlock, and missing-key repair SHALL treat the nearest applicable `.gpg-id` recipients as authoritative. Repair SHALL make matching private material available and SHALL NOT append or substitute an unrelated local fingerprint. Recipient changes to an existing store SHALL require a separate explicit migration that defines re-encryption behavior.
+
+#### Scenario: Import does not append the onboarding key
+
+- **GIVEN** an imported store `.gpg-id` contains recipient `ABC`
+- **AND** another local private key `DEF` exists
+- **WHEN** Import and repair complete
+- **THEN** `.gpg-id` still contains its original recipients
+- **AND** `DEF` is not appended automatically
+
+#### Scenario: Matching private import satisfies existing recipient
+
+- **GIVEN** an existing store requires recipient `ABC`
+- **AND** local private material for `ABC` is absent
+- **WHEN** the user imports valid private material for `ABC`
+- **THEN** required-key repair can complete
+- **AND** `.gpg-id` is not rewritten
+
+#### Scenario: Nonmatching key cannot satisfy repair
+
+- **GIVEN** an existing store requires recipient `ABC`
+- **WHEN** contextual repair imports or selects key `DEF`
+- **THEN** repair remains incomplete
+- **AND** the store recipients remain unchanged
+
+#### Scenario: New store writes selected recipients once
+
+- **GIVEN** Create is initializing a new password store
+- **WHEN** one or more usable private-key fingerprints are selected for that new store
+- **THEN** the new root `.gpg-id` is written with those normalized recipients
+- **AND** duplicate recipient lines are not created
 
 ## Needs Verification
 

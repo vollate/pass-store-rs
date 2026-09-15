@@ -197,7 +197,6 @@ class FakeParsRepository
       repoName: '~/.password-store',
       encryptedContent:
           's3cret-github\nusername: Vollate\nurl: https://github.com\ncreated on desktop',
-      isFavorite: true,
     ),
     PasswordEntry(
       path: 'finance/stripe',
@@ -283,9 +282,6 @@ class FakeParsRepository
   Future<String> copyEntryPassword(PasswordEntry entry) async {
     return PassEntryParser.parse(entry.encryptedContent).password;
   }
-
-  @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {}
 
   @override
   Future<EntryOperationResult> generateEntry({

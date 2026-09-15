@@ -45,7 +45,7 @@ class _AutofillSettingsSheetBodyState
     final localizations = context.l10n;
     final summary = switch (kind) {
       AutofillStatusKind.ready => localizations.autofillReady,
-      AutofillStatusKind.needsRebuild => localizations.autofillNeedsRebuild,
+      AutofillStatusKind.syncFailed => localizations.autofillSyncFailed,
       AutofillStatusKind.busy => localizations.autofillBusy,
       AutofillStatusKind.disabled => localizations.autofillDisabled,
       AutofillStatusKind.unavailable => localizations.autofillUnavailableState,
@@ -53,7 +53,7 @@ class _AutofillSettingsSheetBodyState
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ParsSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,12 +64,12 @@ class _AutofillSettingsSheetBodyState
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(switch (kind) {
                 AutofillStatusKind.ready => Icons.check_circle_outline,
-                AutofillStatusKind.needsRebuild => Icons.refresh,
+                AutofillStatusKind.syncFailed => Icons.sync_problem_outlined,
                 AutofillStatusKind.busy => Icons.sync,
                 AutofillStatusKind.disabled => Icons.block_outlined,
                 AutofillStatusKind.unavailable => Icons.info_outline,
@@ -88,65 +88,36 @@ class _AutofillSettingsSheetBodyState
                 title: Text(localizations.diagnosticDetails),
                 children: <Widget>[
                   SelectableText(diagnostics),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: ParsSpacing.sm),
                 ],
               ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            const SizedBox(height: ParsSpacing.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
+                Text(localizations.useLoginAndUrlFieldsHint),
+                const SizedBox(height: ParsSpacing.xs),
                 FilledButton.icon(
                   onPressed:
                       repository == null || _busy
                           ? null
-                          : () => _run(
-                            () => repository.rebuildIndex(widget.entries),
-                            localizations.autofillRebuiltSuccess,
-                          ),
-                  icon: const Icon(Icons.refresh),
-                  label: Text(context.l10n.rebuildPaths),
-                ),
-                OutlinedButton.icon(
-                  onPressed:
-                      repository == null || _busy
-                          ? null
-                          : () => _confirmAndEnrich(repository),
+                          : () => _confirmUseEncryptedFields(repository),
                   icon: const Icon(Icons.link_outlined),
-                  label: Text(context.l10n.readUrlFields),
+                  label: Text(localizations.useLoginAndUrlFields),
                 ),
+                const SizedBox(height: ParsSpacing.md),
+                Text(localizations.forgetLoginAndUrlFieldsHint),
+                const SizedBox(height: ParsSpacing.xs),
                 OutlinedButton.icon(
                   onPressed:
                       repository == null || _busy
                           ? null
                           : () => _run(
-                            repository.clearWebsiteEnrichment,
-                            localizations.autofillAliasesCleared,
+                            repository.forgetEncryptedLoginAndUrls,
+                            localizations.loginAndUrlFieldsForgotten,
                           ),
                   icon: const Icon(Icons.link_off_outlined),
-                  label: Text(context.l10n.clearUrlAliases),
-                ),
-                OutlinedButton.icon(
-                  onPressed:
-                      repository == null || _busy
-                          ? null
-                          : () => _confirmClear(repository),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                  icon: const Icon(Icons.delete_outline),
-                  label: Text(context.l10n.clearAll),
-                ),
-                OutlinedButton.icon(
-                  onPressed:
-                      repository == null || _busy
-                          ? null
-                          : () => _run(
-                            repository.openPlatformSettings,
-                            localizations.openSystemPasswordSettings,
-                          ),
-                  icon: const Icon(Icons.settings_outlined),
-                  label: Text(context.l10n.setup),
+                  label: Text(localizations.forgetLoginAndUrlFields),
                 ),
               ],
             ),
@@ -156,34 +127,7 @@ class _AutofillSettingsSheetBodyState
     );
   }
 
-  Future<void> _confirmClear(AutofillRepository repository) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: Text(context.l10n.clearAll),
-            content: Text(context.l10n.clearAutofillConfirmation),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: Text(context.l10n.cancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                  foregroundColor: Theme.of(context).colorScheme.onError,
-                ),
-                child: Text(context.l10n.clearAll),
-              ),
-            ],
-          ),
-    );
-    if (confirmed != true || !mounted) return;
-    await _run(repository.clearIndex, context.l10n.autofillDataCleared);
-  }
-
-  Future<void> _confirmAndEnrich(AutofillRepository repository) async {
+  Future<void> _confirmUseEncryptedFields(AutofillRepository repository) async {
     final entries = widget.entries
         .where((entry) => !entry.isDirectory)
         .toList(growable: false);
@@ -191,71 +135,30 @@ class _AutofillSettingsSheetBodyState
       AppNotification.show(context, context.l10n.noEntriesToEnrich);
       return;
     }
-    final selected = <String>{};
-    final selectedPaths = await showDialog<Set<String>>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (dialogContext, setDialogState) => AlertDialog(
-                  title: Text(dialogContext.l10n.readEncryptedUrlFieldsTitle),
-                  content: SizedBox(
-                    width: double.maxFinite,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          dialogContext.l10n.readEncryptedUrlFieldsDescription(
-                            selected.length,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Flexible(
-                          child: ListView(
-                            shrinkWrap: true,
-                            children: <Widget>[
-                              for (final entry in entries)
-                                CheckboxListTile(
-                                  value: selected.contains(entry.path),
-                                  title: Text(entry.displayName),
-                                  subtitle: Text(entry.path),
-                                  onChanged:
-                                      (value) => setDialogState(() {
-                                        if (value ?? false) {
-                                          selected.add(entry.path);
-                                        } else {
-                                          selected.remove(entry.path);
-                                        }
-                                      }),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  actions: <Widget>[
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: Text(dialogContext.l10n.cancel),
-                    ),
-                    FilledButton(
-                      onPressed:
-                          selected.isEmpty
-                              ? null
-                              : () => Navigator.of(
-                                dialogContext,
-                              ).pop(Set<String>.of(selected)),
-                      child: Text(dialogContext.l10n.readSelectedEntries),
-                    ),
-                  ],
-                ),
+          (dialogContext) => AlertDialog(
+            title: Text(dialogContext.l10n.useLoginAndUrlFields),
+            content: Text(
+              dialogContext.l10n.confirmUseLoginAndUrlFields(entries.length),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(dialogContext.l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(dialogContext.l10n.useFields),
+              ),
+            ],
           ),
     );
-    if (selectedPaths == null || selectedPaths.isEmpty || !mounted) return;
+    if (confirmed != true || !mounted) return;
     await _run(
-      () => repository.enrichWebsites(selectedPaths.toList(growable: false)),
-      context.l10n.autofillAliasesUpdated,
+      () => repository.useEncryptedLoginAndUrls(entries),
+      context.l10n.loginAndUrlFieldsUpdated,
     );
   }
 

@@ -24,7 +24,7 @@ class _OnboardingProgress extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           LinearProgressIndicator(value: current / safeSteps.length),
-          const SizedBox(height: 8),
+          const SizedBox(height: ParsSpacing.xs),
           Row(
             children: <Widget>[
               Expanded(
@@ -77,7 +77,7 @@ class _BiometricSetupStep extends StatelessWidget {
               title: Text(context.l10n.biometricUnlock),
               subtitle: Text(_biometricSubtitle(context.l10n, status)),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             FilledButton.icon(
               onPressed:
                   status == BiometricUnlockStatus.unavailable
@@ -95,7 +95,7 @@ class _BiometricSetupStep extends StatelessWidget {
               icon: const Icon(Icons.fingerprint),
               label: Text(context.l10n.enableBiometricUnlock),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ParsSpacing.xs),
             OutlinedButton(
               onPressed: onSkip,
               child: SizedBox(
@@ -141,7 +141,7 @@ class _EmptyOnboardingStep extends StatelessWidget {
           leading: Icon(icon),
           title: Text(title),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         FilledButton(
           onPressed: onPressed,
           child: SizedBox(

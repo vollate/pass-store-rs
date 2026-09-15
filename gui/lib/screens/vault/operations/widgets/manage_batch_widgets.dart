@@ -49,7 +49,7 @@ class _BatchMoveSheetState extends State<_BatchMoveSheet> {
       title: context.l10n.batchMove,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         TextFormField(
           decoration: InputDecoration(
             labelText: context.l10n.destinationFolder,
@@ -137,12 +137,12 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
       title: context.l10n.batchRename,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         TextFormField(
           decoration: InputDecoration(labelText: context.l10n.prefix),
           onChanged: (value) => _prefix = value,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         TextFormField(
           decoration: InputDecoration(labelText: context.l10n.suffix),
           onChanged: (value) => _suffix = value,
@@ -224,7 +224,7 @@ class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
       title: context.l10n.batchDelete,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         TextFormField(
           decoration: InputDecoration(labelText: context.l10n.confirmation),
           onChanged: (value) => _confirmation = value,
@@ -335,11 +335,11 @@ class _SelectedPreview extends StatelessWidget {
       children: entries
           .map(
             (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.only(bottom: ParsSpacing.xs),
               child: Row(
                 children: <Widget>[
-                  const Icon(Icons.lock_outline, size: 16),
-                  const SizedBox(width: 8),
+                  const Icon(Icons.lock_outline, size: ParsSizes.iconTiny),
+                  const SizedBox(width: ParsSpacing.xs),
                   Expanded(child: Text(entry.path)),
                 ],
               ),

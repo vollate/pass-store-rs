@@ -488,12 +488,6 @@ abstract class AppLocalizations {
   /// **'Search by name or path'**
   String get searchVaultHint;
 
-  /// No description provided for @favoritesSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Favorites'**
-  String get favoritesSection;
-
   /// No description provided for @searchResultsSection.
   ///
   /// In en, this message translates to:
@@ -511,12 +505,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Browse: {path}'**
   String browsePathSection(String path);
-
-  /// No description provided for @noFavoriteEntries.
-  ///
-  /// In en, this message translates to:
-  /// **'No favorite entries yet.'**
-  String get noFavoriteEntries;
 
   /// No description provided for @noSearchResults.
   ///
@@ -584,12 +572,6 @@ abstract class AppLocalizations {
   /// **'Could not copy the password.'**
   String get couldNotCopyPassword;
 
-  /// No description provided for @favoriteUpdateFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not update the favorite.'**
-  String get favoriteUpdateFailed;
-
   /// No description provided for @entryCount.
   ///
   /// In en, this message translates to:
@@ -637,18 +619,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide'**
   String get hide;
-
-  /// No description provided for @favorite.
-  ///
-  /// In en, this message translates to:
-  /// **'Favorite'**
-  String get favorite;
-
-  /// No description provided for @unfavorite.
-  ///
-  /// In en, this message translates to:
-  /// **'Unfavorite'**
-  String get unfavorite;
 
   /// No description provided for @openUrl.
   ///
@@ -1406,83 +1376,59 @@ abstract class AppLocalizations {
   /// **'Import or create a private PGP key before saving a passphrase.'**
   String get createPrivatePgpKeyFirst;
 
-  /// No description provided for @rebuildPaths.
-  ///
-  /// In en, this message translates to:
-  /// **'Rebuild paths'**
-  String get rebuildPaths;
-
-  /// No description provided for @readUrlFields.
-  ///
-  /// In en, this message translates to:
-  /// **'Read URL fields'**
-  String get readUrlFields;
-
-  /// No description provided for @clearUrlAliases.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear URL aliases'**
-  String get clearUrlAliases;
-
   /// No description provided for @clearAll.
   ///
   /// In en, this message translates to:
   /// **'Clear all'**
   String get clearAll;
 
-  /// No description provided for @readEncryptedUrlFieldsTitle.
+  /// No description provided for @useLoginAndUrlFields.
   ///
   /// In en, this message translates to:
-  /// **'Read encrypted URL fields?'**
-  String get readEncryptedUrlFieldsTitle;
+  /// **'Use login & URL fields'**
+  String get useLoginAndUrlFields;
 
-  /// No description provided for @readEncryptedUrlFieldsDescription.
+  /// No description provided for @useLoginAndUrlFieldsHint.
   ///
   /// In en, this message translates to:
-  /// **'This optional action decrypts all {count} selected entries once and stores only normalized website aliases. Path-based Autofill does not require it.'**
-  String readEncryptedUrlFieldsDescription(int count);
+  /// **'Use encrypted login as the Autofill username and URL for website or app matching.'**
+  String get useLoginAndUrlFieldsHint;
 
-  /// No description provided for @readSelectedEntries.
+  /// No description provided for @forgetLoginAndUrlFields.
   ///
   /// In en, this message translates to:
-  /// **'Read selected entries'**
-  String get readSelectedEntries;
+  /// **'Forget login & URL fields'**
+  String get forgetLoginAndUrlFields;
 
-  /// No description provided for @autofillRebuiltSuccess.
+  /// No description provided for @forgetLoginAndUrlFieldsHint.
   ///
   /// In en, this message translates to:
-  /// **'Path-based Autofill data rebuilt without decrypting entries.'**
-  String get autofillRebuiltSuccess;
+  /// **'Return to filename usernames and folder-based matching. No passwords are decrypted.'**
+  String get forgetLoginAndUrlFieldsHint;
 
-  /// No description provided for @autofillAliasesCleared.
+  /// No description provided for @confirmUseLoginAndUrlFields.
   ///
   /// In en, this message translates to:
-  /// **'Encrypted website aliases cleared.'**
-  String get autofillAliasesCleared;
+  /// **'Decrypt all {count} password entries once? Only login and normalized URL data will be indexed; passwords will not be stored.'**
+  String confirmUseLoginAndUrlFields(int count);
 
-  /// No description provided for @autofillDataCleared.
+  /// No description provided for @useFields.
   ///
   /// In en, this message translates to:
-  /// **'Autofill data cleared.'**
-  String get autofillDataCleared;
+  /// **'Use fields'**
+  String get useFields;
 
-  /// No description provided for @clearAutofillConfirmation.
+  /// No description provided for @loginAndUrlFieldsUpdated.
   ///
   /// In en, this message translates to:
-  /// **'Remove all shared Autofill candidates for this store? This does not delete password entries.'**
-  String get clearAutofillConfirmation;
+  /// **'Encrypted login and URL fields updated.'**
+  String get loginAndUrlFieldsUpdated;
 
-  /// No description provided for @openSystemPasswordSettings.
+  /// No description provided for @loginAndUrlFieldsForgotten.
   ///
   /// In en, this message translates to:
-  /// **'Open system password settings.'**
-  String get openSystemPasswordSettings;
-
-  /// No description provided for @autofillAliasesUpdated.
-  ///
-  /// In en, this message translates to:
-  /// **'Encrypted website aliases updated.'**
-  String get autofillAliasesUpdated;
+  /// **'Encrypted login and URL fields removed.'**
+  String get loginAndUrlFieldsForgotten;
 
   /// No description provided for @noEntriesToEnrich.
   ///
@@ -1508,11 +1454,11 @@ abstract class AppLocalizations {
   /// **'Ready'**
   String get autofillReady;
 
-  /// No description provided for @autofillNeedsRebuild.
+  /// No description provided for @autofillSyncFailed.
   ///
   /// In en, this message translates to:
-  /// **'Needs rebuild'**
-  String get autofillNeedsRebuild;
+  /// **'Sync failed'**
+  String get autofillSyncFailed;
 
   /// No description provided for @autofillBusy.
   ///

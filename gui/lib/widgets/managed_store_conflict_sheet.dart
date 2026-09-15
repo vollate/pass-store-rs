@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/pars_design_tokens.dart';
 import '../l10n/l10n.dart';
 import '../services/path_picker_service.dart';
 
@@ -29,7 +30,7 @@ class _ManagedStoreConflictSheet extends StatelessWidget {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ParsSpacing.lg),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -41,14 +42,14 @@ class _ManagedStoreConflictSheet extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ParsSpacing.xs),
               Text(
                 localizations.managedStoreConflictDescription(storeName),
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: ParsSpacing.lg),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -60,14 +61,14 @@ class _ManagedStoreConflictSheet extends StatelessWidget {
                   label: Text(localizations.managedStoreReplaceLabel),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: ParsSpacing.xs),
               Text(
                 localizations.managedStoreReplaceDescription,
                 style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               SizedBox(
                 width: double.infinity,
                 child: TextButton(

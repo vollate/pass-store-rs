@@ -29,7 +29,7 @@ class ParsAutofillStateStoreInstrumentedTest {
         store.mkdirs()
         index.writeText(
             """{
-              "version":2,
+              "version":3,
               "store_id":"instrumented-store",
               "store_name":"Instrumented",
               "store_root":"${store.absolutePath}",
@@ -41,7 +41,6 @@ class ParsAutofillStateStoreInstrumentedTest {
                 "username":"alice",
                 "path_website":"example.com",
                 "enriched_websites":[],
-                "is_favorite":false,
                 "autofill_rank":null,
                 "updated_at_epoch_seconds":0
               }]

@@ -205,12 +205,7 @@ void main() {
     );
     expect(saved.path, 'alice');
     await repository.refresh();
-    await metadata.save(
-      VaultMetadata(
-        storeRoot: root.path,
-        favoritePaths: const <String>{'alice'},
-      ),
-    );
+    await metadata.save(VaultMetadata(storeRoot: root.path));
     await security.startPgpSession(
       fingerprint: key.fingerprint,
       passphrase: 'synthetic-passphrase',
@@ -269,7 +264,7 @@ void main() {
     expect(find.text('Vault'), findsNothing);
     expect(root.existsSync(), isFalse);
     expect(repository.store, isNull);
-    expect((await metadata.load()).favoritePaths, isEmpty);
+    expect((await metadata.load()).removalTombstone, isTrue);
     expect(await security.readActivePgpPassphrase(), isNull);
     expect(
       (await security.readPgpPassphrase())?.passphrase,

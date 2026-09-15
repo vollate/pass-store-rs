@@ -17,7 +17,9 @@ import '../../services/store_lifecycle.dart';
 import '../../services/ui_preferences_store.dart';
 import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
+import '../../app/pars_design_tokens.dart';
 import '../../widgets/app_notification.dart';
+import '../../widgets/app_section.dart';
 import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
 import '../../widgets/pars_adaptive_surface.dart';
@@ -80,101 +82,98 @@ class SettingsScreen extends StatelessWidget {
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverList.list(
-            children: <Widget>[
-              _SettingsSection(
-                title: localizations.appearanceSection,
-                children: <Widget>[
-                  _SettingsTile(
-                    title: localizations.languageTitle,
-                    subtitle: _localeLabel(localizations, localePreference),
-                    icon: Icons.language,
-                    onTap: () => _showLanguage(context),
-                  ),
-                ],
+        AppSection(
+          title: localizations.appearanceSection,
+          children: <Widget>[
+            _SettingsTile(
+              title: localizations.languageTitle,
+              subtitle: _localeLabel(localizations, localePreference),
+              icon: Icons.language,
+              onTap: () => _showLanguage(context),
+            ),
+          ],
+        ),
+        AppSection(
+          title: localizations.securityPrivacySection,
+          children: <Widget>[
+            _SettingsTile(
+              title: localizations.gestureBiometricsTitle,
+              subtitle:
+                  securityRepository.lockOnResume
+                      ? localizations.lockOnResumeState
+                      : localizations.gestureConfiguredState,
+              icon: Icons.pattern,
+              onTap: () => _showSecuritySheet(context),
+            ),
+            _SettingsTile(
+              title: localizations.pgpSessionTimeoutTitle,
+              subtitle: _localizedPgpExpiration(
+                localizations,
+                securityRepository.pgpSessionExpiration,
               ),
-              _SettingsSection(
-                title: localizations.securityPrivacySection,
-                children: <Widget>[
-                  _SettingsTile(
-                    title: localizations.gestureBiometricsTitle,
-                    subtitle:
-                        securityRepository.lockOnResume
-                            ? localizations.lockOnResumeState
-                            : localizations.gestureConfiguredState,
-                    icon: Icons.pattern,
-                    onTap: () => _showSecuritySheet(context),
-                  ),
-                  _SettingsTile(
-                    title: localizations.pgpSessionTimeoutTitle,
-                    subtitle: _localizedPgpExpiration(
-                      localizations,
-                      securityRepository.pgpSessionExpiration,
-                    ),
-                    icon: Icons.timer_outlined,
-                    onTap: () => _showPgpSessionTimeoutSheet(context),
-                  ),
-                  _SettingsTile(
-                    title: localizations.keychainPassphraseTitle,
-                    subtitle:
-                        securityRepository.hasStoredPgpPassphrase
-                            ? localizations.pgpPassphraseCachedState
-                            : localizations.optionalPassphraseCacheState,
-                    icon: Icons.key_outlined,
-                    onTap: () => _showPgpPassphraseStorageSheet(context),
-                  ),
-                ],
+              icon: Icons.timer_outlined,
+              onTap: () => _showPgpSessionTimeoutSheet(context),
+            ),
+            _SettingsTile(
+              title: localizations.keychainPassphraseTitle,
+              subtitle:
+                  securityRepository.hasStoredPgpPassphrase
+                      ? localizations.pgpPassphraseCachedState
+                      : localizations.optionalPassphraseCacheState,
+              icon: Icons.key_outlined,
+              onTap: () => _showPgpPassphraseStorageSheet(context),
+            ),
+          ],
+        ),
+        AppSection(
+          title: localizations.vaultSyncSection,
+          children: <Widget>[
+            _SettingsTile(
+              title: localizations.passwordStore,
+              subtitle: _passwordStoreSubtitle(localizations),
+              icon: Icons.folder_outlined,
+              onTap: () => _showPasswordStore(context),
+            ),
+            _SettingsTile(
+              title: localizations.gitSyncTitle,
+              subtitle: _gitModeSubtitle(localizations),
+              icon: Icons.sync,
+              onTap: () => _showGitSync(context),
+            ),
+          ],
+        ),
+        AppSection(
+          title: localizations.autofillSection,
+          children: <Widget>[
+            _SettingsTile(
+              title: localizations.systemAutofillTitle,
+              subtitle: _autofillSubtitle(localizations),
+              icon: Icons.password_outlined,
+              onTap: () => _showAutofill(context),
+            ),
+          ],
+        ),
+        AppSection(
+          title: localizations.advancedSupportSection,
+          children: <Widget>[
+            if (!Platform.isAndroid && !Platform.isIOS)
+              _SettingsTile(
+                title: localizations.advancedGitArgsTitle,
+                subtitle: localizations.advancedGitArgsDescription,
+                icon: Icons.terminal,
+                onTap: () => _showGitArgs(context),
               ),
-              _SettingsSection(
-                title: localizations.vaultSyncSection,
-                children: <Widget>[
-                  _SettingsTile(
-                    title: localizations.passwordStore,
-                    subtitle: _passwordStoreSubtitle(localizations),
-                    icon: Icons.folder_outlined,
-                    onTap: () => _showPasswordStore(context),
-                  ),
-                  _SettingsTile(
-                    title: localizations.gitSyncTitle,
-                    subtitle: _gitModeSubtitle(localizations),
-                    icon: Icons.sync,
-                    onTap: () => _showGitSync(context),
-                  ),
-                ],
-              ),
-              _SettingsSection(
-                title: localizations.autofillSection,
-                children: <Widget>[
-                  _SettingsTile(
-                    title: localizations.systemAutofillTitle,
-                    subtitle: _autofillSubtitle(localizations),
-                    icon: Icons.password_outlined,
-                    onTap: () => _showAutofill(context),
-                  ),
-                ],
-              ),
-              _SettingsSection(
-                title: localizations.advancedSupportSection,
-                children: <Widget>[
-                  if (!Platform.isAndroid && !Platform.isIOS)
-                    _SettingsTile(
-                      title: localizations.advancedGitArgsTitle,
-                      subtitle: localizations.advancedGitArgsDescription,
-                      icon: Icons.terminal,
-                      onTap: () => _showGitArgs(context),
-                    ),
-                  _SettingsTile(
-                    title: localizations.runtimeDiagnosticsTitle,
-                    subtitle: localizations.runtimeDiagnosticsDescription,
-                    icon: Icons.health_and_safety_outlined,
-                    onTap: () => _showRuntimeDiagnostics(context),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            _SettingsTile(
+              title: localizations.runtimeDiagnosticsTitle,
+              subtitle: localizations.runtimeDiagnosticsDescription,
+              icon: Icons.health_and_safety_outlined,
+              onTap: () => _showRuntimeDiagnostics(context),
+            ),
+          ],
+        ),
+        // Clears the navigation bar so the last row stays reachable.
+        const SliverToBoxAdapter(
+          child: SizedBox(height: ParsSizes.floatingActionClearance),
         ),
       ],
     );
@@ -270,7 +269,7 @@ class SettingsScreen extends StatelessWidget {
       AutofillStatusKind.ready => localizations.autofillIndexedEntries(
         status.indexedEntries,
       ),
-      AutofillStatusKind.needsRebuild => localizations.autofillNeedsRebuild,
+      AutofillStatusKind.syncFailed => localizations.autofillSyncFailed,
       AutofillStatusKind.busy => localizations.autofillBusy,
       AutofillStatusKind.disabled => localizations.autofillDisabled,
       AutofillStatusKind.unavailable => localizations.autofillUnavailableState,

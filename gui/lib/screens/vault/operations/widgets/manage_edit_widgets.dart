@@ -105,10 +105,10 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
       children: <Widget>[
         Text(context.l10n.pathValue(entry.path)),
         if (_loading) ...const <Widget>[
-          SizedBox(height: 16),
+          SizedBox(height: ParsSpacing.md),
           LinearProgressIndicator(),
         ] else ...<Widget>[
-          const SizedBox(height: 12),
+          const SizedBox(height: ParsSpacing.sm),
           TextFormField(
             key: ValueKey('password-${entry.path}-$_password'),
             initialValue: _password,
@@ -116,7 +116,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
             decoration: InputDecoration(labelText: context.l10n.password),
             onChanged: (value) => _password = value,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ParsSpacing.sm),
           TextFormField(
             key: ValueKey('notes-${entry.path}-$_notes'),
             initialValue: _notes,
@@ -140,7 +140,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
                   onPressed: _saveRawNotes,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: ParsSpacing.sm),
               Expanded(
                 child: _SubmitButton(
                   saving: _saving,

@@ -8,7 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `clear_canonical_store`, `clone_git_repository`, `clone_store_inner`, `configure_pgp_backend_inner`, `configured_upstream`, `create_local_store_inner`, `create_new_store_tree`, `default_ssh_dir`, `delete_local_store_inner`, `disconnect_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_failure`, `git_remote_callbacks`, `import_local_store_inner`, `imported_key_kind`, `init_git_repository`, `initialize_store_recipients_inner`, `inspect_app_state_inner`, `inspect_git_mode`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `lifecycle_state`, `list_keys_inner`, `load_config_copy`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_matches`, `pgp_key_missing`, `pgp_key_record`, `pgp_preparation_failure`, `read_entry_inner`, `read_regular_gpg_id`, `rename_directory_noreplace`, `require_app_managed_root`, `require_canonical_store`, `require_empty_canonical_store`, `required_remote_url`, `run_git_command_response_owned`, `run_git_command_response`, `run_system_git`, `sanitize_git_text`, `sanitize_git_token`, `sanitized_remote_url`, `save_config_for_mutation`, `set_canonical_store`, `simple`, `status_code`, `store_failure`, `store_name`, `structured_git_commit`, `structured_git_list_remotes`, `structured_git_pull`, `structured_git_push`, `structured_git_remote_mutation`, `structured_git_response`, `structured_git_status`, `structured_or_system_remote_response`, `validated_recipients`, `write_new_gpg_id`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AddPgpKeyToGpgIdRequest`, `ConfiguredUpstream`, `DeletePgpKeyRequest`, `DeletePgpKeyResponse`, `ExportPgpKeyRequest`, `GitRemoteMutation`, `PgpKeyDeletionFailureKind`, `PgpKeyDeletionResultDto`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 // These functions are ignored (category: IgnoreBecauseExplicitAttribute): `add_pgp_key_to_gpg_id`, `delete_pgp_key`, `export_pgp_private_key`, `export_pgp_public_key`, `import_pgp_private_key_file`, `import_pgp_private_key_text`, `import_pgp_public_key`
 
 Future<ConfigResponse> loadConfig({required LoadConfigRequest request}) =>
@@ -48,23 +48,21 @@ Future<UnitResponse> removeAutofillIndexEntry({
   required RemoveAutofillIndexEntryRequest request,
 }) => RustLib.instance.api.crateApiRemoveAutofillIndexEntry(request: request);
 
-Future<UnitResponse> patchAutofillIndexFavorites({
-  required PatchAutofillIndexFavoritesRequest request,
-}) =>
-    RustLib.instance.api.crateApiPatchAutofillIndexFavorites(request: request);
-
 Future<UnitResponse> reconcileAutofillIndex({
   required ReconcileAutofillIndexRequest request,
 }) => RustLib.instance.api.crateApiReconcileAutofillIndex(request: request);
 
-Future<UnitResponse> enrichAutofillIndexWebsites({
-  required EnrichAutofillIndexWebsitesRequest request,
-}) =>
-    RustLib.instance.api.crateApiEnrichAutofillIndexWebsites(request: request);
+Future<UnitResponse> refreshAutofillIndexLoginAndUrls({
+  required RefreshAutofillIndexLoginAndUrlsRequest request,
+}) => RustLib.instance.api.crateApiRefreshAutofillIndexLoginAndUrls(
+  request: request,
+);
 
-Future<UnitResponse> clearAutofillIndexWebsites({
-  required ClearAutofillIndexWebsitesRequest request,
-}) => RustLib.instance.api.crateApiClearAutofillIndexWebsites(request: request);
+Future<UnitResponse> forgetAutofillIndexLoginAndUrls({
+  required ForgetAutofillIndexLoginAndUrlsRequest request,
+}) => RustLib.instance.api.crateApiForgetAutofillIndexLoginAndUrls(
+  request: request,
+);
 
 Future<AutofillCandidatesResponse> queryAutofillCandidates({
   required AutofillQueryRequest request,
@@ -283,7 +281,6 @@ class AutofillCandidateDto {
   final String matchKind;
   final String matchValue;
   final int score;
-  final bool isFavorite;
 
   const AutofillCandidateDto({
     required this.path,
@@ -292,7 +289,6 @@ class AutofillCandidateDto {
     required this.matchKind,
     required this.matchValue,
     required this.score,
-    required this.isFavorite,
   });
 
   @override
@@ -302,8 +298,7 @@ class AutofillCandidateDto {
       username.hashCode ^
       matchKind.hashCode ^
       matchValue.hashCode ^
-      score.hashCode ^
-      isFavorite.hashCode;
+      score.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -315,8 +310,7 @@ class AutofillCandidateDto {
           username == other.username &&
           matchKind == other.matchKind &&
           matchValue == other.matchValue &&
-          score == other.score &&
-          isFavorite == other.isFavorite;
+          score == other.score;
 }
 
 class AutofillCandidatesResponse {
@@ -418,27 +412,6 @@ class AutofillCredentialResponse {
           error == other.error;
 }
 
-class AutofillEntryMetadataDto {
-  final String path;
-  final bool isFavorite;
-
-  const AutofillEntryMetadataDto({
-    required this.path,
-    required this.isFavorite,
-  });
-
-  @override
-  int get hashCode => path.hashCode ^ isFavorite.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AutofillEntryMetadataDto &&
-          runtimeType == other.runtimeType &&
-          path == other.path &&
-          isFavorite == other.isFavorite;
-}
-
 class AutofillQueryRequest {
   final String indexPath;
   final String? website;
@@ -536,27 +509,6 @@ class ClearAutofillIndexRequest {
       other is ClearAutofillIndexRequest &&
           runtimeType == other.runtimeType &&
           indexPath == other.indexPath;
-}
-
-class ClearAutofillIndexWebsitesRequest {
-  final String indexPath;
-  final List<String> paths;
-
-  const ClearAutofillIndexWebsitesRequest({
-    required this.indexPath,
-    required this.paths,
-  });
-
-  @override
-  int get hashCode => indexPath.hashCode ^ paths.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ClearAutofillIndexWebsitesRequest &&
-          runtimeType == other.runtimeType &&
-          indexPath == other.indexPath &&
-          paths == other.paths;
 }
 
 class CloneStoreRequest {
@@ -879,45 +831,6 @@ class EditEntryRequest {
           pgpExecutable == other.pgpExecutable;
 }
 
-class EnrichAutofillIndexWebsitesRequest {
-  final String configPath;
-  final String indexPath;
-  final String root;
-  final String? pgpExecutable;
-  final String? passphrase;
-  final List<String> paths;
-
-  const EnrichAutofillIndexWebsitesRequest({
-    required this.configPath,
-    required this.indexPath,
-    required this.root,
-    this.pgpExecutable,
-    this.passphrase,
-    required this.paths,
-  });
-
-  @override
-  int get hashCode =>
-      configPath.hashCode ^
-      indexPath.hashCode ^
-      root.hashCode ^
-      pgpExecutable.hashCode ^
-      passphrase.hashCode ^
-      paths.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is EnrichAutofillIndexWebsitesRequest &&
-          runtimeType == other.runtimeType &&
-          configPath == other.configPath &&
-          indexPath == other.indexPath &&
-          root == other.root &&
-          pgpExecutable == other.pgpExecutable &&
-          passphrase == other.passphrase &&
-          paths == other.paths;
-}
-
 class EntryRequest {
   final String configPath;
   final String root;
@@ -1052,6 +965,22 @@ class ExportSshKeyRequest {
           sshDir == other.sshDir &&
           name == other.name &&
           confirmation == other.confirmation;
+}
+
+class ForgetAutofillIndexLoginAndUrlsRequest {
+  final String indexPath;
+
+  const ForgetAutofillIndexLoginAndUrlsRequest({required this.indexPath});
+
+  @override
+  int get hashCode => indexPath.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ForgetAutofillIndexLoginAndUrlsRequest &&
+          runtimeType == other.runtimeType &&
+          indexPath == other.indexPath;
 }
 
 class GenerateEntryRequest {
@@ -2033,27 +1962,6 @@ class ParsedEntryFieldDto {
           value == other.value;
 }
 
-class PatchAutofillIndexFavoritesRequest {
-  final String indexPath;
-  final List<AutofillEntryMetadataDto> entries;
-
-  const PatchAutofillIndexFavoritesRequest({
-    required this.indexPath,
-    required this.entries,
-  });
-
-  @override
-  int get hashCode => indexPath.hashCode ^ entries.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is PatchAutofillIndexFavoritesRequest &&
-          runtimeType == other.runtimeType &&
-          indexPath == other.indexPath &&
-          entries == other.entries;
-}
-
 /// Why a PGP import failed, so Flutter can branch without matching on message text.
 enum PgpImportFailureKind {
   unsupportedMaterial,
@@ -2205,14 +2113,12 @@ class RebuildAutofillIndexRequest {
   final String storeId;
   final String storeName;
   final String root;
-  final List<AutofillEntryMetadataDto> entries;
 
   const RebuildAutofillIndexRequest({
     required this.indexPath,
     required this.storeId,
     required this.storeName,
     required this.root,
-    required this.entries,
   });
 
   @override
@@ -2220,8 +2126,7 @@ class RebuildAutofillIndexRequest {
       indexPath.hashCode ^
       storeId.hashCode ^
       storeName.hashCode ^
-      root.hashCode ^
-      entries.hashCode;
+      root.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -2231,8 +2136,7 @@ class RebuildAutofillIndexRequest {
           indexPath == other.indexPath &&
           storeId == other.storeId &&
           storeName == other.storeName &&
-          root == other.root &&
-          entries == other.entries;
+          root == other.root;
 }
 
 class ReconcileAutofillIndexRequest {
@@ -2240,14 +2144,12 @@ class ReconcileAutofillIndexRequest {
   final String storeId;
   final String storeName;
   final String root;
-  final List<AutofillEntryMetadataDto> entries;
 
   const ReconcileAutofillIndexRequest({
     required this.indexPath,
     required this.storeId,
     required this.storeName,
     required this.root,
-    required this.entries,
   });
 
   @override
@@ -2255,8 +2157,7 @@ class ReconcileAutofillIndexRequest {
       indexPath.hashCode ^
       storeId.hashCode ^
       storeName.hashCode ^
-      root.hashCode ^
-      entries.hashCode;
+      root.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -2266,8 +2167,42 @@ class ReconcileAutofillIndexRequest {
           indexPath == other.indexPath &&
           storeId == other.storeId &&
           storeName == other.storeName &&
+          root == other.root;
+}
+
+class RefreshAutofillIndexLoginAndUrlsRequest {
+  final String configPath;
+  final String indexPath;
+  final String root;
+  final String? pgpExecutable;
+  final String? passphrase;
+
+  const RefreshAutofillIndexLoginAndUrlsRequest({
+    required this.configPath,
+    required this.indexPath,
+    required this.root,
+    this.pgpExecutable,
+    this.passphrase,
+  });
+
+  @override
+  int get hashCode =>
+      configPath.hashCode ^
+      indexPath.hashCode ^
+      root.hashCode ^
+      pgpExecutable.hashCode ^
+      passphrase.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RefreshAutofillIndexLoginAndUrlsRequest &&
+          runtimeType == other.runtimeType &&
+          configPath == other.configPath &&
+          indexPath == other.indexPath &&
           root == other.root &&
-          entries == other.entries;
+          pgpExecutable == other.pgpExecutable &&
+          passphrase == other.passphrase;
 }
 
 class RemoveAutofillIndexEntryRequest {
@@ -2379,15 +2314,15 @@ class UnitResponse {
 
 class UpsertAutofillIndexEntryRequest {
   final String indexPath;
-  final AutofillEntryMetadataDto entry;
+  final String path;
 
   const UpsertAutofillIndexEntryRequest({
     required this.indexPath,
-    required this.entry,
+    required this.path,
   });
 
   @override
-  int get hashCode => indexPath.hashCode ^ entry.hashCode;
+  int get hashCode => indexPath.hashCode ^ path.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -2395,5 +2330,5 @@ class UpsertAutofillIndexEntryRequest {
       other is UpsertAutofillIndexEntryRequest &&
           runtimeType == other.runtimeType &&
           indexPath == other.indexPath &&
-          entry == other.entry;
+          path == other.path;
 }

@@ -8,7 +8,13 @@ Define the shared semantic, adaptive, localized, accessible, and testable founda
 
 ### Requirement: Flutter UI SHALL use one semantic design foundation
 
-The production Flutter UI SHALL derive color, typography, spacing, shape, status, component, and motion treatments from shared theme tokens or focused shared components. Success, warning, error, busy, unavailable, selected, and destructive states SHALL use matching visual and semantic treatments in light and dark themes. Screen-local hard-coded colors SHALL NOT be used when a semantic theme role exists.
+The production Flutter UI SHALL derive color, typography, spacing, shape, status, component, and motion treatments from shared theme tokens or focused shared components. Success, warning, error, busy, unavailable, selected, and destructive states SHALL use matching visual and semantic treatments in light and dark themes. Grouped content sections SHALL take their container fill, outline, radius, row height, row padding, and inter-section spacing from a single shared section style carried on the theme. Screen-local hard-coded colors, spacing, radii, elevations, or component sizes SHALL NOT be used when a semantic theme role or token exists.
+
+#### Scenario: Vault and Settings sections share one geometry
+- **WHEN** Vault and Settings render their grouped content sections
+- **THEN** both use the same section container outline, radius, page gutter, and inter-section spacing
+- **AND** their rows share one minimum height and one internal padding
+- **AND** neither route defines those values locally
 
 #### Scenario: Failure status uses failure semantics
 - **GIVEN** Git status is failed
@@ -87,12 +93,12 @@ Every production Flutter label, tooltip, semantic label, validation message, emp
 Every actionable control SHALL expose an accessible name and enabled, selected, expanded, obscured, busy, or destructive state as applicable. Icon-only controls SHALL have localized tooltips and semantic labels. Dynamic errors and operation outcomes SHALL be announced through live regions without announcing passwords, passphrases, private-key material, or other secrets.
 
 #### Scenario: Screen reader reaches an icon-only action
-- **WHEN** assistive technology focuses a copy, favorite, reveal, close, overflow, lock, or selection control
+- **WHEN** assistive technology focuses a copy, create, reveal, close, overflow, lock, or selection control
 - **THEN** it announces a localized purpose and current state
 - **AND** activating it invokes the same concrete action as touch input
 
 #### Scenario: Busy state is announced
-- **WHEN** key preparation, decryption, rebuild, or mutation is in progress
+- **WHEN** key preparation, decryption, automatic Autofill synchronization, or mutation is in progress
 - **THEN** the affected control is disabled against duplicate submission
 - **AND** assistive technology receives a localized busy status
 
@@ -102,8 +108,8 @@ Primary UI surfaces SHALL show a stable localized summary and recovery action fo
 
 #### Scenario: Autofill schema is invalid
 - **GIVEN** the Autofill index fails closed because its schema is invalid
-- **WHEN** Settings renders Autofill status
-- **THEN** the tile shows a localized Needs rebuild summary and recovery action
+- **WHEN** automatic valid-store synchronization cannot replace it
+- **THEN** the tile shows a localized Sync failed summary and indicates that refresh will retry
 - **AND** raw parser fields and private app-storage paths are absent from the tile
 
 #### Scenario: User requests diagnostic details

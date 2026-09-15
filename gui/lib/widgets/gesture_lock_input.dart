@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import '../app/pars_design_tokens.dart';
 import '../l10n/l10n.dart';
 
 const int _gestureDimension = 3;
@@ -113,7 +114,7 @@ class _GestureLockInputState extends State<GestureLockInput> {
                   onPressed: widget.enabled ? _clearPattern : null,
                   child: Text(context.l10n.clearGesture),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: ParsSpacing.xs),
                 FilledButton(
                   onPressed:
                       widget.enabled && _selected.isNotEmpty
@@ -206,7 +207,7 @@ class _GestureDot extends StatelessWidget {
       selected: selected,
       onTap: onActivate,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
+        duration: ParsMotion.quick,
         width: _gestureDotSize,
         height: _gestureDotSize,
         decoration: BoxDecoration(

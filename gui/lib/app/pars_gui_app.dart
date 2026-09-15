@@ -16,6 +16,7 @@ import '../services/sensitive_clipboard_service.dart';
 import '../services/settings_repository.dart';
 import '../services/ui_preferences_store.dart';
 import '../services/vault_repository.dart';
+import 'pars_design_tokens.dart';
 import 'pars_theme.dart';
 
 class ParsGuiApp extends StatefulWidget {
@@ -430,22 +431,24 @@ class _StoreRemovingScreen extends StatelessWidget {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(
+              maxWidth: ParsContentWidth.narrow,
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(ParsSpacing.xl),
               child: Semantics(
                 liveRegion: true,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     const CircularProgressIndicator(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: ParsSpacing.xl),
                     Text(
                       localizations.storeRemovalInProgressTitle,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: ParsSpacing.xs),
                     Text(
                       localizations.storeRemovalInProgressDescription,
                       textAlign: TextAlign.center,

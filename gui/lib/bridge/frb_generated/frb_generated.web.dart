@@ -49,9 +49,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  AutofillEntryMetadataDto dco_decode_autofill_entry_metadata_dto(dynamic raw);
-
-  @protected
   AutofillQueryRequest dco_decode_autofill_query_request(dynamic raw);
 
   @protected
@@ -82,10 +79,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ClearAutofillIndexRequest dco_decode_box_autoadd_clear_autofill_index_request(
     dynamic raw,
   );
-
-  @protected
-  ClearAutofillIndexWebsitesRequest
-  dco_decode_box_autoadd_clear_autofill_index_websites_request(dynamic raw);
 
   @protected
   CloneStoreRequest dco_decode_box_autoadd_clone_store_request(dynamic raw);
@@ -131,10 +124,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EditEntryRequest dco_decode_box_autoadd_edit_entry_request(dynamic raw);
 
   @protected
-  EnrichAutofillIndexWebsitesRequest
-  dco_decode_box_autoadd_enrich_autofill_index_websites_request(dynamic raw);
-
-  @protected
   EntryRequest dco_decode_box_autoadd_entry_request(dynamic raw);
 
   @protected
@@ -142,6 +131,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportSshKeyRequest dco_decode_box_autoadd_export_ssh_key_request(
+    dynamic raw,
+  );
+
+  @protected
+  ForgetAutofillIndexLoginAndUrlsRequest
+  dco_decode_box_autoadd_forget_autofill_index_login_and_urls_request(
     dynamic raw,
   );
 
@@ -276,10 +271,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_box_autoadd_open_github_ssh_settings_request(dynamic raw);
 
   @protected
-  PatchAutofillIndexFavoritesRequest
-  dco_decode_box_autoadd_patch_autofill_index_favorites_request(dynamic raw);
-
-  @protected
   PgpImportFailureKind dco_decode_box_autoadd_pgp_import_failure_kind(
     dynamic raw,
   );
@@ -300,6 +291,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   ReconcileAutofillIndexRequest
   dco_decode_box_autoadd_reconcile_autofill_index_request(dynamic raw);
+
+  @protected
+  RefreshAutofillIndexLoginAndUrlsRequest
+  dco_decode_box_autoadd_refresh_autofill_index_login_and_urls_request(
+    dynamic raw,
+  );
 
   @protected
   RemoveAutofillIndexEntryRequest
@@ -328,10 +325,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ClearAutofillIndexRequest dco_decode_clear_autofill_index_request(
     dynamic raw,
   );
-
-  @protected
-  ClearAutofillIndexWebsitesRequest
-  dco_decode_clear_autofill_index_websites_request(dynamic raw);
 
   @protected
   CloneStoreRequest dco_decode_clone_store_request(dynamic raw);
@@ -377,10 +370,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EditEntryRequest dco_decode_edit_entry_request(dynamic raw);
 
   @protected
-  EnrichAutofillIndexWebsitesRequest
-  dco_decode_enrich_autofill_index_websites_request(dynamic raw);
-
-  @protected
   EntryRequest dco_decode_entry_request(dynamic raw);
 
   @protected
@@ -394,6 +383,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportSshKeyRequest dco_decode_export_ssh_key_request(dynamic raw);
+
+  @protected
+  ForgetAutofillIndexLoginAndUrlsRequest
+  dco_decode_forget_autofill_index_login_and_urls_request(dynamic raw);
 
   @protected
   GenerateEntryRequest dco_decode_generate_entry_request(dynamic raw);
@@ -499,11 +492,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AutofillCandidateDto> dco_decode_list_autofill_candidate_dto(
-    dynamic raw,
-  );
-
-  @protected
-  List<AutofillEntryMetadataDto> dco_decode_list_autofill_entry_metadata_dto(
     dynamic raw,
   );
 
@@ -631,10 +619,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ParsedEntryFieldDto dco_decode_parsed_entry_field_dto(dynamic raw);
 
   @protected
-  PatchAutofillIndexFavoritesRequest
-  dco_decode_patch_autofill_index_favorites_request(dynamic raw);
-
-  @protected
   PgpImportFailureKind dco_decode_pgp_import_failure_kind(dynamic raw);
 
   @protected
@@ -668,6 +652,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ReconcileAutofillIndexRequest dco_decode_reconcile_autofill_index_request(
     dynamic raw,
   );
+
+  @protected
+  RefreshAutofillIndexLoginAndUrlsRequest
+  dco_decode_refresh_autofill_index_login_and_urls_request(dynamic raw);
 
   @protected
   RemoveAutofillIndexEntryRequest
@@ -733,11 +721,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  AutofillEntryMetadataDto sse_decode_autofill_entry_metadata_dto(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   AutofillQueryRequest sse_decode_autofill_query_request(
     SseDeserializer deserializer,
   );
@@ -772,12 +755,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ClearAutofillIndexRequest sse_decode_box_autoadd_clear_autofill_index_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  ClearAutofillIndexWebsitesRequest
-  sse_decode_box_autoadd_clear_autofill_index_websites_request(
     SseDeserializer deserializer,
   );
 
@@ -833,12 +810,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  EnrichAutofillIndexWebsitesRequest
-  sse_decode_box_autoadd_enrich_autofill_index_websites_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   EntryRequest sse_decode_box_autoadd_entry_request(
     SseDeserializer deserializer,
   );
@@ -850,6 +821,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportSshKeyRequest sse_decode_box_autoadd_export_ssh_key_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ForgetAutofillIndexLoginAndUrlsRequest
+  sse_decode_box_autoadd_forget_autofill_index_login_and_urls_request(
     SseDeserializer deserializer,
   );
 
@@ -1014,12 +991,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PatchAutofillIndexFavoritesRequest
-  sse_decode_box_autoadd_patch_autofill_index_favorites_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   PgpImportFailureKind sse_decode_box_autoadd_pgp_import_failure_kind(
     SseDeserializer deserializer,
   );
@@ -1044,6 +1015,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   ReconcileAutofillIndexRequest
   sse_decode_box_autoadd_reconcile_autofill_index_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RefreshAutofillIndexLoginAndUrlsRequest
+  sse_decode_box_autoadd_refresh_autofill_index_login_and_urls_request(
     SseDeserializer deserializer,
   );
 
@@ -1084,12 +1061,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ClearAutofillIndexRequest sse_decode_clear_autofill_index_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  ClearAutofillIndexWebsitesRequest
-  sse_decode_clear_autofill_index_websites_request(
     SseDeserializer deserializer,
   );
 
@@ -1155,12 +1126,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EditEntryRequest sse_decode_edit_entry_request(SseDeserializer deserializer);
 
   @protected
-  EnrichAutofillIndexWebsitesRequest
-  sse_decode_enrich_autofill_index_websites_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   EntryRequest sse_decode_entry_request(SseDeserializer deserializer);
 
   @protected
@@ -1176,6 +1141,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportSshKeyRequest sse_decode_export_ssh_key_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ForgetAutofillIndexLoginAndUrlsRequest
+  sse_decode_forget_autofill_index_login_and_urls_request(
     SseDeserializer deserializer,
   );
 
@@ -1329,11 +1300,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AutofillCandidateDto> sse_decode_list_autofill_candidate_dto(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  List<AutofillEntryMetadataDto> sse_decode_list_autofill_entry_metadata_dto(
     SseDeserializer deserializer,
   );
 
@@ -1495,12 +1461,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PatchAutofillIndexFavoritesRequest
-  sse_decode_patch_autofill_index_favorites_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   PgpImportFailureKind sse_decode_pgp_import_failure_kind(
     SseDeserializer deserializer,
   );
@@ -1540,6 +1500,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReconcileAutofillIndexRequest sse_decode_reconcile_autofill_index_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RefreshAutofillIndexLoginAndUrlsRequest
+  sse_decode_refresh_autofill_index_login_and_urls_request(
     SseDeserializer deserializer,
   );
 
@@ -1617,12 +1583,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_autofill_entry_metadata_dto(
-    AutofillEntryMetadataDto self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_autofill_query_request(
     AutofillQueryRequest self,
     SseSerializer serializer,
@@ -1664,12 +1624,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_clear_autofill_index_request(
     ClearAutofillIndexRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_box_autoadd_clear_autofill_index_websites_request(
-    ClearAutofillIndexWebsitesRequest self,
     SseSerializer serializer,
   );
 
@@ -1734,12 +1688,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_enrich_autofill_index_websites_request(
-    EnrichAutofillIndexWebsitesRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_box_autoadd_entry_request(
     EntryRequest self,
     SseSerializer serializer,
@@ -1754,6 +1702,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_export_ssh_key_request(
     ExportSshKeyRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_forget_autofill_index_login_and_urls_request(
+    ForgetAutofillIndexLoginAndUrlsRequest self,
     SseSerializer serializer,
   );
 
@@ -1947,12 +1901,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_patch_autofill_index_favorites_request(
-    PatchAutofillIndexFavoritesRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_box_autoadd_pgp_import_failure_kind(
     PgpImportFailureKind self,
     SseSerializer serializer,
@@ -1979,6 +1927,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_reconcile_autofill_index_request(
     ReconcileAutofillIndexRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_refresh_autofill_index_login_and_urls_request(
+    RefreshAutofillIndexLoginAndUrlsRequest self,
     SseSerializer serializer,
   );
 
@@ -2024,12 +1978,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_clear_autofill_index_request(
     ClearAutofillIndexRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_clear_autofill_index_websites_request(
-    ClearAutofillIndexWebsitesRequest self,
     SseSerializer serializer,
   );
 
@@ -2112,12 +2060,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_enrich_autofill_index_websites_request(
-    EnrichAutofillIndexWebsitesRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_entry_request(EntryRequest self, SseSerializer serializer);
 
   @protected
@@ -2141,6 +2083,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_export_ssh_key_request(
     ExportSshKeyRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_forget_autofill_index_login_and_urls_request(
+    ForgetAutofillIndexLoginAndUrlsRequest self,
     SseSerializer serializer,
   );
 
@@ -2330,12 +2278,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_autofill_candidate_dto(
     List<AutofillCandidateDto> self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_list_autofill_entry_metadata_dto(
-    List<AutofillEntryMetadataDto> self,
     SseSerializer serializer,
   );
 
@@ -2538,12 +2480,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_patch_autofill_index_favorites_request(
-    PatchAutofillIndexFavoritesRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_pgp_import_failure_kind(
     PgpImportFailureKind self,
     SseSerializer serializer,
@@ -2594,6 +2530,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_reconcile_autofill_index_request(
     ReconcileAutofillIndexRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_refresh_autofill_index_login_and_urls_request(
+    RefreshAutofillIndexLoginAndUrlsRequest self,
     SseSerializer serializer,
   );
 

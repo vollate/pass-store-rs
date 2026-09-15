@@ -65,7 +65,7 @@ class _StoreSetupActions extends StatelessWidget {
                 : localizations.passwordStoreFolderNotFound,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         Semantics(
           button: true,
           label: localizations.importLocalStore,
@@ -75,7 +75,7 @@ class _StoreSetupActions extends StatelessWidget {
             label: Text(localizations.importLocalStore),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: ParsSpacing.xs),
         Semantics(
           button: true,
           label: localizations.cloneGitStore,
@@ -85,9 +85,9 @@ class _StoreSetupActions extends StatelessWidget {
             label: Text(localizations.cloneGitStore),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: ParsSpacing.md),
         const Divider(),
-        const SizedBox(height: 8),
+        const SizedBox(height: ParsSpacing.xs),
         OutlinedButton.icon(
           onPressed:
               selectedPgpFingerprint == null
@@ -98,7 +98,7 @@ class _StoreSetupActions extends StatelessWidget {
         ),
         if (selectedPgpFingerprint == null)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: ParsSpacing.xs),
             child: Text(localizations.createStoreNeedsPgpKey),
           ),
       ],
@@ -314,7 +314,7 @@ class _StoreSetupActions extends StatelessWidget {
                       : null,
             ),
             if (remoteUrlUsesSsh(remote.text) && !sshReady) ...<Widget>[
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.vpn_key_outlined),
@@ -322,8 +322,8 @@ class _StoreSetupActions extends StatelessWidget {
                 subtitle: Text(context.l10n.sshRequiredForThisClone),
               ),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: ParsSpacing.xs,
+                runSpacing: ParsSpacing.xs,
                 children: <Widget>[
                   FilledButton.tonalIcon(
                     onPressed: () async {
@@ -435,7 +435,7 @@ class _CreateLocalStoreFields extends StatelessWidget {
           decoration: InputDecoration(labelText: context.l10n.nameField),
           onChanged: (_) => onNameChanged(),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         PathPickerRow(
           title: context.l10n.storeFolder,
           path:
@@ -501,7 +501,7 @@ class _CloneStoreFields extends StatelessWidget {
           decoration: InputDecoration(labelText: context.l10n.remoteUrlField),
           onChanged: (_) => onRemoteChanged(),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         PathPickerRow(
           title: context.l10n.storeFolder,
           path:
@@ -550,9 +550,9 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
+          left: ParsSpacing.lg,
+          right: ParsSpacing.lg,
+          top: ParsSpacing.lg,
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
         ),
         child: SingleChildScrollView(
@@ -566,16 +566,16 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               ...widget.builder(context, setState),
               if (_error != null) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 Text(
                   _error!,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: ParsSpacing.md),
               FilledButton(
                 onPressed:
                     _isSubmitting ||

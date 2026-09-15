@@ -12,7 +12,7 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
                   .toList(growable: false);
               return SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(ParsSpacing.lg),
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -23,9 +23,9 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: ParsSpacing.xs),
                         Text(context.l10n.sshKeysGitOnlyDescription),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: ParsSpacing.sm),
                         if (keys.isEmpty)
                           ListTile(
                             contentPadding: EdgeInsets.zero,
@@ -76,10 +76,10 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
                               ),
                             ),
                           ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: ParsSpacing.sm),
                         Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                          spacing: ParsSpacing.xs,
+                          runSpacing: ParsSpacing.xs,
                           children: <Widget>[
                             FilledButton.icon(
                               onPressed: () => _showGenerateSshKey(context),
@@ -208,7 +208,7 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
                         labelText: context.l10n.nameField,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: ParsSpacing.sm),
                     PathPickerRow(
                       title: context.l10n.keyFileField,
                       path: selectedPath ?? _defaultSshKeyFileBasePath(),
@@ -399,9 +399,9 @@ class _SshActionFormBodyState extends State<_SshActionFormBody> {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
+          left: ParsSpacing.lg,
+          right: ParsSpacing.lg,
+          top: ParsSpacing.lg,
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
         ),
         child: SingleChildScrollView(
@@ -415,10 +415,10 @@ class _SshActionFormBodyState extends State<_SshActionFormBody> {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               ...widget.fields,
               if (_error != null) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 Semantics(
                   liveRegion: true,
                   child: Text(
@@ -429,7 +429,7 @@ class _SshActionFormBodyState extends State<_SshActionFormBody> {
                   ),
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: ParsSpacing.md),
               FilledButton(
                 onPressed: _submitting || !widget.canSubmit() ? null : _submit,
                 child: SizedBox(

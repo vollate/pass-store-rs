@@ -24,6 +24,7 @@ import 'package:pars_gui/screens/settings/settings_screen.dart';
 import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/screens/vault/vault_screen.dart';
 import 'package:pars_gui/widgets/app_notification.dart';
+import 'package:pars_gui/widgets/app_section.dart';
 import 'package:pars_gui/widgets/gesture_lock_input.dart';
 
 const _testPgpFingerprint = '3A8E 9C12 77FA 22D1 90BD 48AA A991 D3B4 A702 91EF';
@@ -445,7 +446,6 @@ void main() {
     await tester.pumpWidget(ParsGuiApp.fake());
     await _completeReadyOnboarding(tester);
 
-    expect(find.text('GitHub'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'stripe');
     await tester.pumpAndSettle();
 
@@ -843,7 +843,7 @@ void main() {
     expect(find.text('Bridge Entry'), findsOneWidget);
   });
 
-  testWidgets('vault browses directories and toggles favorites', (
+  testWidgets('vault browses directories without favorite controls', (
     tester,
   ) async {
     final repository = _DirectoryVaultRepository();
@@ -860,23 +860,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('BROWSE'), findsOneWidget);
+    expect(find.text('Browse'), findsOneWidget);
     expect(find.text('work'), findsOneWidget);
     expect(find.text('Work GitHub'), findsNothing);
 
     await tester.tap(find.text('work'));
     await tester.pumpAndSettle();
 
-    expect(find.text('BROWSE: WORK'), findsOneWidget);
+    expect(find.text('Browse: work'), findsOneWidget);
     expect(find.text('Work GitHub'), findsOneWidget);
 
     await tester.tap(find.text('Work GitHub'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Favorite').last);
-    await tester.pumpAndSettle();
 
-    expect(repository.favoritePaths, contains('work/github'));
-    expect(find.byTooltip('Unfavorite'), findsWidgets);
+    expect(find.byIcon(Icons.star), findsNothing);
+    expect(find.byIcon(Icons.star_border_outlined), findsNothing);
   });
 
   testWidgets('vault shows empty and retry states', (tester) async {
@@ -899,7 +897,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.refreshCount, 2);
-    expect(find.text('RECENT'), findsNothing);
+    expect(find.text('Recent'), findsNothing);
     expect(find.text('No entries in this store.'), findsOneWidget);
   });
 
@@ -910,10 +908,12 @@ void main() {
     await _completeReadyOnboarding(tester);
 
     expect(find.text('Manage'), findsNothing);
-    expect(find.text('Create password'), findsOneWidget);
-    expect(find.text('Select'), findsOneWidget);
+    // Create and selection are both icon-only, so each is named by tooltip
+    // rather than a visible label.
+    expect(find.byTooltip('Create password'), findsOneWidget);
+    expect(find.byTooltip('Select'), findsOneWidget);
 
-    await tester.tap(find.text('Create password'));
+    await tester.tap(find.byTooltip('Create password'));
     await tester.pumpAndSettle();
     expect(find.text('Generate and save'), findsOneWidget);
     expect(find.text('Save existing password'), findsOneWidget);
@@ -1173,7 +1173,7 @@ void main() {
     expect(find.text('Saved work/conflict and committed'), findsOneWidget);
   });
 
-  testWidgets('settings system autofill sheet refreshes and clears data', (
+  testWidgets('settings system autofill sheet manages encrypted metadata', (
     tester,
   ) async {
     final repository = _InjectedRepository();
@@ -1191,31 +1191,22 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     await _tapVisible(tester, find.text('System Autofill'));
-    await tester.tap(find.widgetWithText(FilledButton, 'Rebuild paths'));
+    expect(find.text('Rebuild paths'), findsNothing);
+    expect(find.text('Clear all'), findsNothing);
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Use login & URL fields'),
+    );
     await tester.pumpAndSettle();
+    expect(find.textContaining('Decrypt all'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Use fields'));
+    await tester.pumpAndSettle();
+    expect(autofillRepository.lastEnrichedPaths, isNotEmpty);
 
-    expect(autofillRepository.lastRebuiltEntries, isNotEmpty);
-    expect(autofillRepository.status.available, isTrue);
-
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Read URL fields'));
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, 'Forget login & URL fields'),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Read encrypted URL fields?'), findsOneWidget);
-    await tester.tap(find.byType(CheckboxListTile).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Read selected entries'));
-    await tester.pumpAndSettle();
-    expect(autofillRepository.lastEnrichedPaths, hasLength(1));
-
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Setup'));
-    await tester.pumpAndSettle();
-    expect(autofillRepository.operations, contains('open-settings'));
-
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Clear all'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Clear all'));
-    await tester.pumpAndSettle();
-
-    expect(autofillRepository.cleared, isTrue);
+    expect(autofillRepository.operations, contains('clear-enrichment'));
   });
 
   testWidgets('settings shows runtime diagnostics', (tester) async {
@@ -2262,7 +2253,7 @@ Future<void> _openSettingsTile(WidgetTester tester, String label) async {
   await tester.drag(find.byType(Scrollable).last, const Offset(0, 100));
   await tester.pumpAndSettle();
   await tester.tap(
-    find.ancestor(of: tile, matching: find.byType(ListTile)).last,
+    find.ancestor(of: tile, matching: find.byType(ParsSectionRow)).first,
   );
   await tester.pumpAndSettle();
 }
@@ -2555,9 +2546,6 @@ class _InjectedRepository
   @override
   Future<String> copyEntryPassword(PasswordEntry entry) async =>
       entry.encryptedContent;
-
-  @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {}
 
   @override
   Future<EntryOperationResult> generateEntry({
@@ -3333,9 +3321,6 @@ class _EmptyVaultRepository implements VaultRepository, GitRepository {
       throw UnimplementedError();
 
   @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {}
-
-  @override
   Future<EntryOperationResult> generateEntry({
     required String path,
     required int length,
@@ -3415,9 +3400,6 @@ class _RefreshingVaultRepository implements VaultRepository, GitRepository {
   @override
   Future<String> copyEntryPassword(PasswordEntry entry) async =>
       entry.encryptedContent;
-
-  @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {}
 
   @override
   Future<EntryOperationResult> generateEntry({
@@ -3517,9 +3499,6 @@ class _SecretActionRepository implements VaultRepository {
   }
 
   @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {}
-
-  @override
   Future<EntryOperationResult> generateEntry({
     required String path,
     required int length,
@@ -3536,8 +3515,6 @@ class _SecretActionRepository implements VaultRepository {
 }
 
 class _DirectoryVaultRepository implements VaultRepository, GitRepository {
-  final Set<String> favoritePaths = <String>{};
-
   @override
   String get currentRepoName => 'Directory Store';
 
@@ -3559,7 +3536,6 @@ class _DirectoryVaultRepository implements VaultRepository, GitRepository {
       displayName: 'Work GitHub',
       repoName: currentRepoName,
       encryptedContent: 'loaded-secret',
-      isFavorite: favoritePaths.contains('work/github'),
     ),
   ];
 
@@ -3598,13 +3574,6 @@ class _DirectoryVaultRepository implements VaultRepository, GitRepository {
   @override
   Future<String> copyEntryPassword(PasswordEntry entry) async =>
       'loaded-secret';
-
-  @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {
-    if (!favoritePaths.add(entry.path)) {
-      favoritePaths.remove(entry.path);
-    }
-  }
 
   @override
   Future<EntryOperationResult> generateEntry({
@@ -3677,9 +3646,6 @@ class _ManageVaultRepository implements ManageRepository {
   @override
   Future<String> copyEntryPassword(PasswordEntry entry) async =>
       throw UnimplementedError();
-
-  @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {}
 
   @override
   Future<EntryOperationResult> generateEntry({
@@ -3903,9 +3869,6 @@ class _StoreSetupRepository
   @override
   Future<String> copyEntryPassword(PasswordEntry entry) async =>
       throw UnimplementedError();
-
-  @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {}
 
   @override
   Future<EntryOperationResult> generateEntry({

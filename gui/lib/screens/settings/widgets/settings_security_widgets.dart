@@ -123,7 +123,7 @@ class _UnavailableFeatureSheetBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ParsSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,7 +134,7 @@ class _UnavailableFeatureSheetBody extends StatelessWidget {
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             Text(context.l10n.featureUnavailableDescription),
           ],
         ),
@@ -152,7 +152,7 @@ class _RuntimeDiagnosticsSheetBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ParsSpacing.lg),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -164,7 +164,7 @@ class _RuntimeDiagnosticsSheetBody extends StatelessWidget {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               _DiagnosticRow(
                 label: context.l10n.bridgeLoadedLabel,
                 value:
@@ -248,7 +248,7 @@ class _SecuritySettingsSheetBodyState
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ParsSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,13 +259,13 @@ class _SecuritySettingsSheetBodyState
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             OutlinedButton.icon(
               onPressed: () => setState(() => _isChangingGesture = true),
               icon: const Icon(Icons.pattern),
               label: Text(context.l10n.changeGesture),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ParsSpacing.xs),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(context.l10n.requireUnlockOnResume),
@@ -315,17 +315,17 @@ class _SecuritySettingsSheetBodyState
                 );
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ParsSpacing.xs),
             Text(
               context.l10n.autoLockTimeout,
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ParsSpacing.xs),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: ParsSpacing.xs,
+              runSpacing: ParsSpacing.xs,
               children: <Widget>[
                 for (final timeout in _timeoutOptions)
                   ChoiceChip(
@@ -342,7 +342,7 @@ class _SecuritySettingsSheetBodyState
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             OutlinedButton.icon(
               onPressed: () async {
                 await widget.securityRepository.setOnboardingComplete(false);
@@ -396,7 +396,7 @@ class _GestureChangeSheetBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ParsSpacing.lg),
         child: SizedBox(
           height: MediaQuery.of(context).size.height * 0.72,
           child: Column(
@@ -408,9 +408,9 @@ class _GestureChangeSheetBody extends StatelessWidget {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ParsSpacing.xs),
               Text(context.l10n.drawConfirmGesture),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               Expanded(
                 child: GestureSetupPanel(
                   securityRepository: securityRepository,
@@ -445,7 +445,7 @@ class _PgpSessionTimeoutSheetBodyState
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ParsSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,10 +456,10 @@ class _PgpSessionTimeoutSheetBodyState
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: ParsSpacing.xs,
+              runSpacing: ParsSpacing.xs,
               children: <Widget>[
                 for (final expiration in PgpSessionExpiration.values)
                   ChoiceChip(
@@ -534,9 +534,9 @@ class _PgpPassphraseStorageSheetBodyState
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
+          left: ParsSpacing.lg,
+          right: ParsSpacing.lg,
+          top: ParsSpacing.lg,
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
         ),
         child: Column(
@@ -549,7 +549,7 @@ class _PgpPassphraseStorageSheetBodyState
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(context.l10n.storePgpPassphrase),
@@ -566,7 +566,7 @@ class _PgpPassphraseStorageSheetBodyState
                 setState(() {});
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ParsSpacing.xs),
             if (widget.privatePgpKeys.isEmpty)
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -596,7 +596,7 @@ class _PgpPassphraseStorageSheetBodyState
                         }
                         : null,
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ParsSpacing.xs),
             TextField(
               controller: _passphrase,
               enabled: widget.securityRepository.pgpPassphraseStorageEnabled,
@@ -608,10 +608,10 @@ class _PgpPassphraseStorageSheetBodyState
                         : context.l10n.pgpPassphraseLabel,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: ParsSpacing.xs,
+              runSpacing: ParsSpacing.xs,
               children: <Widget>[
                 FilledButton.icon(
                   onPressed:
@@ -677,7 +677,7 @@ class _PgpPassphraseStorageSheetBodyState
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ParsSpacing.sm),
             FutureBuilder<PgpPassphraseCache?>(
               future: widget.securityRepository.readPgpPassphrase(),
               builder: (context, snapshot) {

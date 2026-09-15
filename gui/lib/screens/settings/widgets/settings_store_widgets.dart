@@ -142,7 +142,7 @@ class _PasswordStoreSheetBody extends StatelessWidget {
     final current = store;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ParsSpacing.lg),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -154,7 +154,7 @@ class _PasswordStoreSheetBody extends StatelessWidget {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               if (current == null)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -196,7 +196,7 @@ class _PasswordStoreSheetBody extends StatelessWidget {
                       ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: ParsSpacing.md),
                 FilledButton.tonalIcon(
                   onPressed: () => onRemove(current),
                   icon: Icon(
@@ -272,9 +272,9 @@ class _StoreFormSheetBodyState extends State<_StoreFormSheetBody> {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
+          left: ParsSpacing.lg,
+          right: ParsSpacing.lg,
+          top: ParsSpacing.lg,
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
         ),
         child: SingleChildScrollView(
@@ -288,9 +288,9 @@ class _StoreFormSheetBodyState extends State<_StoreFormSheetBody> {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               ...widget.fields,
-              const SizedBox(height: 16),
+              const SizedBox(height: ParsSpacing.md),
               ListenableBuilder(
                 listenable: widget.listenable,
                 builder:

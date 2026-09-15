@@ -71,10 +71,10 @@ class AppNotification {
 
   static Duration _durationFor(AppNotificationSeverity severity) {
     return switch (severity) {
-      AppNotificationSeverity.info => const Duration(seconds: 3),
-      AppNotificationSeverity.success => const Duration(seconds: 3),
-      AppNotificationSeverity.warning => const Duration(seconds: 8),
-      AppNotificationSeverity.error => const Duration(seconds: 8),
+      AppNotificationSeverity.info => ParsMotion.transientFeedback,
+      AppNotificationSeverity.success => ParsMotion.transientFeedback,
+      AppNotificationSeverity.warning => ParsMotion.recoverableFeedback,
+      AppNotificationSeverity.error => ParsMotion.recoverableFeedback,
     };
   }
 
@@ -151,9 +151,11 @@ class _AppNotificationBannerState extends State<_AppNotificationBanner> {
               0,
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: const BoxConstraints(
+                maxWidth: ParsContentWidth.notification,
+              ),
               child: Material(
-                elevation: 10,
+                elevation: ParsElevation.overlay,
                 color: background,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(ParsRadii.control),

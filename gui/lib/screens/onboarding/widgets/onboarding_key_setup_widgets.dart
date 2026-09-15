@@ -38,7 +38,7 @@ class _PgpSetupStep extends StatelessWidget {
             child:
                 MediaQuery.textScalerOf(context).scale(1) >= 1.5
                     ? Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(ParsSpacing.md),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
@@ -46,9 +46,9 @@ class _PgpSetupStep extends StatelessWidget {
                             key.name,
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: ParsSpacing.xxs),
                           Text(_pgpKeyDetails(key)),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: ParsSpacing.sm),
                           SizedBox(
                             width: double.infinity,
                             child: TextButton(
@@ -69,10 +69,10 @@ class _PgpSetupStep extends StatelessWidget {
                       ),
                     ),
           ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: ParsSpacing.xs,
+          runSpacing: ParsSpacing.xs,
           children: <Widget>[
             if (allowCreate && onCreateKey != null)
               FilledButton.icon(
@@ -117,7 +117,7 @@ class _StoreRepairStep extends StatelessWidget {
           title: Text(title),
           subtitle: Text(message),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         FilledButton.tonal(
           onPressed: onAction,
           child: SizedBox(
@@ -238,9 +238,9 @@ class _OnboardingFormSheetState extends State<_OnboardingFormSheet> {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
+          left: ParsSpacing.lg,
+          right: ParsSpacing.lg,
+          top: ParsSpacing.lg,
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
         ),
         child: SingleChildScrollView(
@@ -254,10 +254,10 @@ class _OnboardingFormSheetState extends State<_OnboardingFormSheet> {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ParsSpacing.sm),
               ...widget.fields,
               if (_error != null) ...<Widget>[
-                const SizedBox(height: 12),
+                const SizedBox(height: ParsSpacing.sm),
                 Semantics(
                   liveRegion: true,
                   child: Text(
@@ -268,7 +268,7 @@ class _OnboardingFormSheetState extends State<_OnboardingFormSheet> {
                   ),
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: ParsSpacing.md),
               FilledButton(
                 onPressed: _isSubmitting ? null : _submit,
                 child: SizedBox(
@@ -287,7 +287,7 @@ class _OnboardingFormSheetState extends State<_OnboardingFormSheet> {
                                         Theme.of(context).colorScheme.onPrimary,
                                   ),
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: ParsSpacing.sm),
                                 Text(widget.submitLabel),
                               ],
                             )

@@ -2,41 +2,46 @@ import 'dart:convert';
 import 'dart:io';
 
 class VaultMetadata {
+  static const int currentVersion = 2;
+
   const VaultMetadata({
-    required this.favoritePaths,
     this.storeRoot,
     this.removalTombstone = false,
+    this.version = currentVersion,
   });
 
-  const VaultMetadata.empty({this.storeRoot, this.removalTombstone = false})
-    : favoritePaths = const <String>{};
+  const VaultMetadata.empty({
+    this.storeRoot,
+    this.removalTombstone = false,
+    this.version = currentVersion,
+  });
 
   const VaultMetadata.removed()
-    : favoritePaths = const <String>{},
-      storeRoot = '',
-      removalTombstone = true;
+    : storeRoot = '',
+      removalTombstone = true,
+      version = currentVersion;
 
-  final Set<String> favoritePaths;
   final String? storeRoot;
   final bool removalTombstone;
+  final int version;
 
   VaultMetadata copyWith({
-    Set<String>? favoritePaths,
     String? storeRoot,
     bool? removalTombstone,
+    int? version,
   }) {
     return VaultMetadata(
-      favoritePaths: favoritePaths ?? this.favoritePaths,
       storeRoot: storeRoot ?? this.storeRoot,
       removalTombstone: removalTombstone ?? this.removalTombstone,
+      version: version ?? this.version,
     );
   }
 
   Map<String, Object?> toJson() {
     return <String, Object?>{
+      'version': currentVersion,
       'storeRoot': storeRoot,
       'removalTombstone': removalTombstone,
-      'favoritePaths': favoritePaths.toList()..sort(),
     };
   }
 
@@ -44,15 +49,11 @@ class VaultMetadata {
     if (value is! Map<String, Object?>) {
       return const VaultMetadata.empty();
     }
-    final favorites = value['favoritePaths'];
     return VaultMetadata(
+      version: value['version'] is int ? value['version'] as int : 1,
       storeRoot:
           value['storeRoot'] is String ? value['storeRoot'] as String : null,
       removalTombstone: value['removalTombstone'] == true,
-      favoritePaths:
-          favorites is List
-              ? favorites.whereType<String>().toSet()
-              : const <String>{},
     );
   }
 }

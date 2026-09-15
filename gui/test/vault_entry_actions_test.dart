@@ -342,7 +342,6 @@ class _RecordingManageRepository extends FakeParsRepository {
       displayName: current.displayName,
       repoName: current.repoName,
       encryptedContent: content,
-      isFavorite: current.isFavorite,
     );
     return EntryOperationResult(
       path: path,
@@ -376,7 +375,6 @@ class _RecordingManageRepository extends FakeParsRepository {
         'regenerated-password',
         ...lines.skip(1),
       ].join('\n'),
-      isFavorite: current.isFavorite,
     );
     return BatchOperationResult(
       action: 'Regenerated',

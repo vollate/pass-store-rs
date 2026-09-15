@@ -99,7 +99,7 @@ Future<void> main() async {
   try {
     await autofillRepository.publishPlatformState();
   } catch (_) {
-    // Native Autofill remains unavailable until Settings rebuilds or retries it.
+    // The next valid-store refresh retries automatic native publication.
   }
   runApp(
     ParsGuiApp(

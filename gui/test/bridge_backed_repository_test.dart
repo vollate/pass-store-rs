@@ -19,10 +19,10 @@ void main() {
     final metadata = VaultMetadata.fromJson(<String, Object?>{
       'storeRoot': '/tmp/store',
       'recentPaths': <String>['example.com/alice'],
-      'favoritePaths': <String>['example.com/bob'],
     });
 
-    expect(metadata.favoritePaths, <String>{'example.com/bob'});
+    expect(metadata.version, 1);
+    expect(metadata.toJson()['version'], VaultMetadata.currentVersion);
     expect(metadata.toJson(), isNot(contains('recentPaths')));
   });
 
@@ -159,33 +159,6 @@ void main() {
   );
 
   test(
-    'vault reads do not affect Autofill ranking while favorites patch incrementally',
-    () async {
-      final bridge = _LifecycleBridge();
-      final autofillRepository = FakeAutofillRepository();
-      final repository = BridgeBackedRepository(
-        bridge: bridge,
-        configPath: '/tmp/pars_config.toml',
-        autofillRepository: autofillRepository,
-        metadataStore: InMemoryVaultMetadataStore(),
-      );
-
-      await repository.refresh();
-      await repository.readEntry(repository.entries.first);
-      expect(autofillRepository.operations, isNot(contains('favorites')));
-      await repository.toggleFavorite(repository.entries.first);
-
-      expect(repository.entries.first.isFavorite, isTrue);
-      expect(autofillRepository.operations, isNot(contains('rebuild')));
-      expect(
-        autofillRepository.operations.where((value) => value == 'favorites'),
-        hasLength(1),
-      );
-      expect(autofillRepository.lastFavoriteEntries.single.path, 'work/github');
-    },
-  );
-
-  test(
     'bridge-backed repository incrementally upserts autofill after entry changes',
     () async {
       final bridge = _LifecycleBridge();
@@ -232,7 +205,7 @@ void main() {
       expect(result.path, 'work/new');
       expect(bridge.calledMethods, contains('insert_entry'));
       expect(autofillRepository.operations, contains('upsert:work/new'));
-      expect(autofillRepository.status.message, contains('Rebuild'));
+      expect(autofillRepository.status.message, contains('retry'));
     },
   );
 
@@ -261,7 +234,7 @@ void main() {
       final bridge = _LifecycleBridge();
       final metadataStore = _RecordingMetadataStore(
         operations,
-        const VaultMetadata(favoritePaths: <String>{'work/github'}),
+        const VaultMetadata.empty(storeRoot: '/tmp/personal-store'),
       );
       final security = _RecordingSecurityRepository(operations);
       await security.savePgpPassphrase(
@@ -273,7 +246,14 @@ void main() {
         passphrase: 'session',
       );
       final autofill = _RecordingAutofillRepository(operations);
-      await autofill.enrichWebsites(<String>['work/github']);
+      await autofill.useEncryptedLoginAndUrls(const <PasswordEntry>[
+        PasswordEntry(
+          path: 'work/github',
+          displayName: 'github',
+          repoName: 'Personal',
+          encryptedContent: '',
+        ),
+      ]);
       final repository = BridgeBackedRepository(
         bridge: bridge,
         configPath: '/tmp/pars_config.toml',
@@ -292,7 +272,6 @@ void main() {
 
       expect(repository.lifecycle.requiresStoreSetup, isTrue);
       expect(repository.entries, isEmpty);
-      expect(repository.entries.where((entry) => entry.isFavorite), isEmpty);
       expect(operations, <String>[
         'lifecycle-published',
         'metadata-removal-marker',
@@ -303,7 +282,6 @@ void main() {
       ]);
       expect(await security.readActivePgpPassphrase(), isNull);
       expect((await security.readPgpPassphrase())?.passphrase, 'durable');
-      expect((await metadataStore.load()).favoritePaths, isEmpty);
       expect(autofill.lastEnrichedPaths, isEmpty);
 
       bridge
@@ -314,10 +292,9 @@ void main() {
       await repository.refresh();
 
       expect(repository.store?.root, '/tmp/replacement-store');
-      expect(repository.entries.where((entry) => entry.isFavorite), isEmpty);
-      expect(autofill.operations, isNot(contains('reconcile')));
+      expect(autofill.operations, contains('reconcile'));
       expect(autofill.operations, isNot(contains('rebuild')));
-      expect(autofill.status.kind, AutofillStatusKind.needsRebuild);
+      expect(autofill.status.kind, AutofillStatusKind.ready);
       expect(autofill.lastEnrichedPaths, isEmpty);
     },
   );
@@ -327,7 +304,7 @@ void main() {
     final bridge = _LifecycleBridge();
     final metadataStore = _RecordingMetadataStore(
       operations,
-      const VaultMetadata(favoritePaths: <String>{'work/github'}),
+      const VaultMetadata.empty(storeRoot: '/tmp/personal-store'),
       failClear: true,
     );
     final repository = BridgeBackedRepository(
@@ -353,7 +330,7 @@ void main() {
       final bridge = _LifecycleBridge();
       final metadataStore = _RecordingMetadataStore(
         operations,
-        const VaultMetadata(favoritePaths: <String>{'work/github'}),
+        const VaultMetadata.empty(storeRoot: '/tmp/personal-store'),
         failClear: true,
         failMarker: true,
       );
@@ -400,7 +377,7 @@ void main() {
     final bridge = _LifecycleBridge();
     final metadataStore = _RecordingMetadataStore(
       operations,
-      const VaultMetadata(favoritePaths: <String>{'work/github'}),
+      const VaultMetadata.empty(storeRoot: '/tmp/personal-store'),
       failClear: true,
     );
     final security = _RecordingSecurityRepository(operations);
@@ -429,7 +406,7 @@ void main() {
     expect(repository.storeRemovalInProgress, isFalse);
     expect(await security.readActivePgpPassphrase(), isNull);
     expect(autofill.cleared, isTrue);
-    expect(autofill.status.kind, AutofillStatusKind.needsRebuild);
+    expect(autofill.status.kind, AutofillStatusKind.syncFailed);
     expect(
       operations,
       containsAllInOrder(<String>[
@@ -446,7 +423,6 @@ void main() {
       metadataStore: metadataStore,
     );
     await restarted.refresh();
-    expect(restarted.entries.where((entry) => entry.isFavorite), isEmpty);
   });
 
   test('failed disconnect remounts only after fail-closed cleanup', () async {
@@ -465,7 +441,7 @@ void main() {
       autofillRepository: autofill,
       metadataStore: _RecordingMetadataStore(
         operations,
-        const VaultMetadata(favoritePaths: <String>{'work/github'}),
+        const VaultMetadata.empty(storeRoot: '/tmp/personal-store'),
       ),
     );
     await repository.refresh();
@@ -483,7 +459,7 @@ void main() {
     expect(await security.readActivePgpPassphrase(), isNull);
     expect(autofill.cleared, isTrue);
     expect(autofill.operations, isNot(contains('reconcile')));
-    expect(autofill.status.kind, AutofillStatusKind.needsRebuild);
+    expect(autofill.status.kind, AutofillStatusKind.syncFailed);
   });
 
   test('removal clear is serialized after an in-flight reconcile', () async {
@@ -623,7 +599,7 @@ void main() {
     );
   });
 
-  test('bridge-backed repository persists vault metadata', () async {
+  test('bridge-backed repository browses directory metadata', () async {
     final metadataStore = InMemoryVaultMetadataStore();
     final bridge = _LifecycleBridge();
     final repository = BridgeBackedRepository(
@@ -641,20 +617,6 @@ void main() {
       repository.browseEntries('work').map((entry) => entry.path),
       <String>['work/github'],
     );
-
-    await repository.readEntry(repository.entries.first);
-    await repository.toggleFavorite(repository.entries.first);
-
-    expect(repository.entries.first.isFavorite, isTrue);
-
-    final nextRepository = BridgeBackedRepository(
-      bridge: _LifecycleBridge(),
-      configPath: '/tmp/pars_config.toml',
-      metadataStore: metadataStore,
-    );
-    await nextRepository.refresh();
-
-    expect(nextRepository.entries.first.isFavorite, isTrue);
   });
 
   test('bridge-backed repository exposes manage operations', () async {
@@ -1232,7 +1194,7 @@ class _RecordingMetadataStore implements VaultMetadataStore {
 
   @override
   Future<void> save(VaultMetadata value) async {
-    if (value.favoritePaths.isEmpty) {
+    if (value.removalTombstone) {
       operations.add('metadata-clear');
       if (failClear) throw StateError('metadata cleanup failed');
     }

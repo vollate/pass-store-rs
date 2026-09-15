@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/pars_design_tokens.dart';
 import '../../l10n/l10n.dart';
 import '../../services/security_repository.dart';
 import '../../widgets/gesture_lock_input.dart';
@@ -41,35 +42,35 @@ class _LockScreenState extends State<LockScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final widthBound = (constraints.maxWidth - 40).clamp(0.0, 320.0);
-            final heightBound = (constraints.maxHeight * 0.52).clamp(
-              160.0,
-              320.0,
-            );
+            final widthBound = (constraints.maxWidth - ParsSpacing.lg * 2)
+                .clamp(0.0, ParsSizes.gestureGrid);
+            final heightBound = (constraints.maxHeight *
+                    ParsSizes.gestureGridViewportFactor)
+                .clamp(ParsSizes.gestureGridMin, ParsSizes.gestureGrid);
             final gridSize =
                 (widthBound < heightBound ? widthBound : heightBound)
                     .toDouble();
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(ParsSpacing.lg),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight:
-                      (constraints.maxHeight - 40)
+                      (constraints.maxHeight - ParsSpacing.lg * 2)
                           .clamp(0, double.infinity)
                           .toDouble(),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: ParsSpacing.xl),
                     Text(
                       context.l10n.unlockPars,
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: ParsSpacing.xs),
                     Text(context.l10n.drawGestureToUnlock),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: ParsSpacing.xxl),
                     FutureBuilder<BiometricUnlockStatus>(
                       future: _biometricStatus,
                       builder: (context, snapshot) {
@@ -77,7 +78,9 @@ class _LockScreenState extends State<LockScreen> {
                           return const SizedBox.shrink();
                         }
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 20),
+                          padding: const EdgeInsets.only(
+                            bottom: ParsSpacing.lg,
+                          ),
                           child: Center(
                             child: FilledButton.icon(
                               onPressed:
@@ -98,7 +101,7 @@ class _LockScreenState extends State<LockScreen> {
                       ),
                     ),
                     if (_error != null) ...<Widget>[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: ParsSpacing.md),
                       Center(
                         child: Semantics(
                           liveRegion: true,
@@ -112,7 +115,7 @@ class _LockScreenState extends State<LockScreen> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: ParsSpacing.xl),
                   ],
                 ),
               ),

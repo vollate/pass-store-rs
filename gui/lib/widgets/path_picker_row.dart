@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/pars_design_tokens.dart';
 import '../l10n/l10n.dart';
 
 class PathPickerRow extends StatelessWidget {
@@ -32,10 +33,13 @@ class PathPickerRow extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(ParsRadii.small),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ParsSpacing.sm,
+            vertical: ParsSpacing.sm,
+          ),
           child: Row(
             children: <Widget>[
               Expanded(
@@ -49,7 +53,7 @@ class PathPickerRow extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: ParsSpacing.xxs),
                     Text(
                       '$pathPrefix: $path',
                       maxLines: 1,
@@ -61,7 +65,7 @@ class PathPickerRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: ParsSpacing.sm),
               TextButton(onPressed: onPressed, child: Text(actionLabel)),
             ],
           ),

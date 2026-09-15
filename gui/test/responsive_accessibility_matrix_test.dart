@@ -122,12 +122,70 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'github');
+    await tester.pumpAndSettle();
 
     expect(find.semantics.byLabel(RegExp('GitHub, work/dev')), findsWidgets);
     expect(find.byTooltip('Copy password'), findsWidgets);
-    expect(find.byTooltip('Favorite'), findsWidgets);
+    expect(find.byTooltip('Create password'), findsOneWidget);
     expect(find.byTooltip('Lock now'), findsOneWidget);
     semantics.dispose();
+  });
+
+  // Rotation reports the new viewport size a frame before the keyboard inset
+  // clears, so an open sheet momentarily sees an inset taller than the screen.
+  testWidgets('open surfaces survive rotation with a stale keyboard inset', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: VaultScreen(
+          vaultRepository: repository,
+          gitRepository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Create password'));
+    await tester.pumpAndSettle();
+
+    tester.view.physicalSize = GuiTestViewport.compactLandscape.size;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 460);
+    await tester.pump();
+    expectNoFlutterOverflow(tester);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 0);
+    await tester.pumpAndSettle();
+    tester.view.physicalSize = GuiTestViewport.compactPhone.size;
+    await tester.pumpAndSettle();
+
+    expect(find.text('Generate and save'), findsOneWidget);
+    expectNoFlutterOverflow(tester);
+  });
+
+  testWidgets('entry detail survives rotation with a stale keyboard inset', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    final entry = repository.entries.firstWhere((entry) => !entry.isDirectory);
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: EntryDetailSheet(entry: entry, repository: repository),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.view.physicalSize = GuiTestViewport.compactLandscape.size;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 460);
+    await tester.pump();
+    expectNoFlutterOverflow(tester);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 0);
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Reveal'), findsOneWidget);
+    expectNoFlutterOverflow(tester);
   });
 }
 

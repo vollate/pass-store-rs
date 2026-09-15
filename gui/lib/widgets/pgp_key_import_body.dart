@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/pars_design_tokens.dart';
 import '../l10n/app_localizations.dart';
 import '../l10n/l10n.dart';
 import '../models/pgp_key_import.dart';
@@ -107,7 +108,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
           selected: <PgpImportSource>{_source},
           onSelectionChanged: _isSubmitting ? null : _changeSource,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: ParsSpacing.sm),
         if (_source == PgpImportSource.text)
           TextField(
             controller: _keyText,
@@ -128,11 +129,11 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
             onPressed: _isSubmitting ? null : _chooseFile,
           ),
         if (_inspection != null) ...<Widget>[
-          const SizedBox(height: 12),
+          const SizedBox(height: ParsSpacing.sm),
           _InspectionSummary(inspection: _inspection!),
         ],
         if (_needsPassphrase) ...<Widget>[
-          const SizedBox(height: 12),
+          const SizedBox(height: ParsSpacing.sm),
           TextField(
             controller: _passphrase,
             obscureText: true,
@@ -155,24 +156,24 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
           ),
         ],
         if (_isInspecting) ...<Widget>[
-          const SizedBox(height: 12),
+          const SizedBox(height: ParsSpacing.sm),
           Row(
             children: <Widget>[
               const SizedBox(
-                width: 16,
-                height: 16,
+                width: ParsSizes.iconTiny,
+                height: ParsSizes.iconTiny,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: ParsSpacing.sm),
               Text(localizations.inspectingKeyMaterial),
             ],
           ),
         ],
         if (_error != null) ...<Widget>[
-          const SizedBox(height: 12),
+          const SizedBox(height: ParsSpacing.sm),
           Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: ParsSpacing.md),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: <Widget>[
@@ -181,7 +182,7 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
                 onPressed: _isSubmitting ? null : _cancel,
                 child: Text(localizations.cancel),
               ),
-            const SizedBox(width: 8),
+            const SizedBox(width: ParsSpacing.xs),
             FilledButton(
               onPressed: _canSubmit ? _submit : null,
               child: Text(

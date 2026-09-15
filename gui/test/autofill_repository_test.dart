@@ -155,7 +155,7 @@ void main() {
     },
   );
 
-  test('path rebuild sends favorite metadata without secret inputs', () async {
+  test('path rebuild sends no secret inputs', () async {
     final bridge = _RecordingAutofillBridge();
     final securityRepository = InMemorySecurityRepository();
     await securityRepository.startPgpSession(
@@ -179,7 +179,6 @@ void main() {
         displayName: 'alice',
         repoName: 'Personal',
         encryptedContent: '',
-        isFavorite: true,
       ),
       PasswordEntry(
         path: 'github.com',
@@ -195,9 +194,6 @@ void main() {
     expect(request.indexPath, '/tmp/autofill.json');
     expect(request.storeId, 'store-0');
     expect(request.root, '/tmp/store');
-    expect(request.entries, hasLength(1));
-    expect(request.entries.single.path, 'github.com/alice');
-    expect(request.entries.single.isFavorite, isTrue);
     expect(repository.status.indexedEntries, 1);
   });
 
@@ -220,17 +216,12 @@ void main() {
         recursive: false,
       );
       await repository.removeEntry(path: 'old', recursive: true);
-      await repository.patchFavorites(const <PasswordEntry>[entry]);
       await repository.reconcileIndex(const <PasswordEntry>[entry]);
 
-      expect(bridge.lastUpsertRequest?.entry.path, 'github.com/alice');
+      expect(bridge.lastUpsertRequest?.path, 'github.com/alice');
       expect(bridge.lastMoveRequest?.oldPath, 'github.com/alice');
       expect(bridge.lastMoveRequest?.newPath, 'gitlab.com/alice');
       expect(bridge.lastRemoveRequest?.recursive, isTrue);
-      expect(
-        bridge.lastFavoritesRequest?.entries.single.path,
-        'github.com/alice',
-      );
       expect(bridge.lastReconcileRequest?.storeId, 'store-0');
       expect(bridge.calledMethods, isNot(contains('rebuild_autofill_index')));
     },
@@ -251,15 +242,22 @@ void main() {
       );
 
       await expectLater(
-        repository.enrichWebsites(const <String>[]),
+        repository.useEncryptedLoginAndUrls(const <PasswordEntry>[]),
         throwsA(isA<AutofillRepositoryException>()),
       );
-      await repository.enrichWebsites(const <String>['github.com/alice']);
-      await repository.clearWebsiteEnrichment();
+      await repository.useEncryptedLoginAndUrls(const <PasswordEntry>[
+        PasswordEntry(
+          path: 'github.com/alice',
+          displayName: 'alice',
+          repoName: 'Personal',
+          encryptedContent: '',
+        ),
+      ]);
+      await repository.forgetEncryptedLoginAndUrls();
 
-      expect(bridge.lastEnrichRequest?.paths, <String>['github.com/alice']);
-      expect(bridge.lastEnrichRequest?.passphrase, 'session-passphrase');
-      expect(bridge.lastClearWebsitesRequest?.paths, isEmpty);
+      expect(bridge.lastRefreshFieldsRequest?.root, '/tmp/store');
+      expect(bridge.lastRefreshFieldsRequest?.passphrase, 'session-passphrase');
+      expect(bridge.lastForgetFieldsRequest?.indexPath, '/tmp/autofill.json');
     },
   );
 
@@ -275,7 +273,6 @@ void main() {
                 matchKind: 'app_name',
                 matchValue: 'github',
                 score: 3650,
-                isFavorite: true,
               ),
             ],
           )
@@ -303,7 +300,7 @@ void main() {
   });
 
   test(
-    'root-mismatched reconcile disables native state and requires rebuild',
+    'successful reconcile publishes an automatically rebuilt index',
     () async {
       const channel = MethodChannel('top.vollate.pars_gui/autofill');
       final methods = <String>[];
@@ -316,15 +313,7 @@ void main() {
         () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(channel, null),
       );
-      final bridge =
-          _RecordingAutofillBridge()
-            ..reconcileResponse = const frb.UnitResponse(
-              error: frb.BridgeFailure(
-                category: frb.BridgeFailureCategory.validationError,
-                message:
-                    'autofill index belongs to another store; rebuild required',
-              ),
-            );
+      final bridge = _RecordingAutofillBridge();
       final repository = BridgeAutofillRepository(
         bridge: bridge,
         configPath: '/tmp/pars.toml',
@@ -337,20 +326,18 @@ void main() {
         forcePlatformPublication: true,
       );
 
-      await expectLater(
-        repository.reconcileIndex(const <PasswordEntry>[
-          PasswordEntry(
-            path: 'example.com/alice',
-            displayName: 'alice',
-            repoName: 'Replacement',
-            encryptedContent: '',
-          ),
-        ]),
-        throwsA(isA<AutofillRepositoryException>()),
-      );
+      await repository.reconcileIndex(const <PasswordEntry>[
+        PasswordEntry(
+          path: 'example.com/alice',
+          displayName: 'alice',
+          repoName: 'Replacement',
+          encryptedContent: '',
+        ),
+      ]);
 
-      expect(methods, <String>['clearState']);
-      expect(repository.status.kind, AutofillStatusKind.needsRebuild);
+      expect(methods, <String>['publishState']);
+      expect(repository.status.kind, AutofillStatusKind.ready);
+      expect(repository.status.indexedEntries, 1);
     },
   );
 
@@ -364,7 +351,6 @@ void main() {
           matchKind: 'path_website',
           matchValue: 'github.com',
           score: 4000,
-          isFavorite: false,
         ),
       ],
       credentials: const <String, AutofillCredential>{
@@ -386,7 +372,6 @@ void main() {
 
     await repository.rebuildIndex(entries);
     await repository.upsertEntry(entries.single);
-    await repository.patchFavorites(entries);
 
     expect(repository.lastRebuiltEntries.single.path, 'github.com/alice');
     expect(repository.operations, contains('upsert:github.com/alice'));
@@ -426,10 +411,9 @@ class _RecordingAutofillBridge implements AutofillBridgeApi {
   frb.UpsertAutofillIndexEntryRequest? lastUpsertRequest;
   frb.MoveAutofillIndexEntryRequest? lastMoveRequest;
   frb.RemoveAutofillIndexEntryRequest? lastRemoveRequest;
-  frb.PatchAutofillIndexFavoritesRequest? lastFavoritesRequest;
   frb.ReconcileAutofillIndexRequest? lastReconcileRequest;
-  frb.EnrichAutofillIndexWebsitesRequest? lastEnrichRequest;
-  frb.ClearAutofillIndexWebsitesRequest? lastClearWebsitesRequest;
+  frb.RefreshAutofillIndexLoginAndUrlsRequest? lastRefreshFieldsRequest;
+  frb.ForgetAutofillIndexLoginAndUrlsRequest? lastForgetFieldsRequest;
   frb.AutofillQueryRequest? lastQueryRequest;
   frb.AutofillCredentialRequest? lastCredentialRequest;
   frb.ClearAutofillIndexRequest? lastClearRequest;
@@ -478,15 +462,6 @@ class _RecordingAutofillBridge implements AutofillBridgeApi {
   }
 
   @override
-  Future<frb.UnitResponse> patchAutofillIndexFavorites({
-    required frb.PatchAutofillIndexFavoritesRequest request,
-  }) async {
-    calledMethods.add('patch_autofill_index_favorites');
-    lastFavoritesRequest = request;
-    return const frb.UnitResponse();
-  }
-
-  @override
   Future<frb.UnitResponse> reconcileAutofillIndex({
     required frb.ReconcileAutofillIndexRequest request,
   }) async {
@@ -496,20 +471,20 @@ class _RecordingAutofillBridge implements AutofillBridgeApi {
   }
 
   @override
-  Future<frb.UnitResponse> enrichAutofillIndexWebsites({
-    required frb.EnrichAutofillIndexWebsitesRequest request,
+  Future<frb.UnitResponse> refreshAutofillIndexLoginAndUrls({
+    required frb.RefreshAutofillIndexLoginAndUrlsRequest request,
   }) async {
-    calledMethods.add('enrich_autofill_index_websites');
-    lastEnrichRequest = request;
+    calledMethods.add('refresh_autofill_index_login_and_urls');
+    lastRefreshFieldsRequest = request;
     return const frb.UnitResponse();
   }
 
   @override
-  Future<frb.UnitResponse> clearAutofillIndexWebsites({
-    required frb.ClearAutofillIndexWebsitesRequest request,
+  Future<frb.UnitResponse> forgetAutofillIndexLoginAndUrls({
+    required frb.ForgetAutofillIndexLoginAndUrlsRequest request,
   }) async {
-    calledMethods.add('clear_autofill_index_websites');
-    lastClearWebsitesRequest = request;
+    calledMethods.add('forget_autofill_index_login_and_urls');
+    lastForgetFieldsRequest = request;
     return const frb.UnitResponse();
   }
 

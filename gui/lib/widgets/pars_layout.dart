@@ -51,5 +51,6 @@ class ParsPageDivider extends StatelessWidget {
   const ParsPageDivider({super.key});
 
   @override
-  Widget build(BuildContext context) => const Divider(height: 1);
+  Widget build(BuildContext context) =>
+      const Divider(height: ParsSizes.hairline);
 }

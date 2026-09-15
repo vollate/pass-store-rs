@@ -5,17 +5,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use pars_core::autofill::{
-    clear_autofill_index, clear_autofill_index_websites,
-    enrich_autofill_index_websites_with_backend, move_autofill_index_entry,
-    patch_autofill_index_favorites, query_autofill_candidates, read_autofill_index,
-    rebuild_autofill_index, reconcile_autofill_index, record_autofill_completion,
-    remove_autofill_index_entry, resolve_autofill_credential_with_backend,
-    upsert_autofill_index_entry, AutofillCredentialRequest, AutofillEntryMetadata,
-    AutofillQueryRequest, ClearAutofillIndexWebsitesRequest, EnrichAutofillIndexWebsitesRequest,
-    MoveAutofillIndexEntryRequest, PatchAutofillIndexFavoritesRequest, RebuildAutofillIndexRequest,
-    ReconcileAutofillIndexRequest, RecordAutofillCompletionRequest,
+    clear_autofill_index, forget_autofill_index_login_and_urls, move_autofill_index_entry,
+    query_autofill_candidates, read_autofill_index, rebuild_autofill_index,
+    reconcile_autofill_index, record_autofill_completion,
+    refresh_autofill_index_login_and_urls_with_backend, remove_autofill_index_entry,
+    resolve_autofill_credential_with_backend, upsert_autofill_index_entry,
+    AutofillCredentialRequest, AutofillQueryRequest, ForgetAutofillIndexLoginAndUrlsRequest,
+    MoveAutofillIndexEntryRequest, RebuildAutofillIndexRequest, ReconcileAutofillIndexRequest,
+    RecordAutofillCompletionRequest, RefreshAutofillIndexLoginAndUrlsRequest,
     RemoveAutofillIndexEntryRequest, UpsertAutofillIndexEntryRequest, AUTOFILL_HISTORY_LIMIT,
-    AUTOFILL_INDEX_VERSION,
 };
 use pars_core::gui::{KeyExportResult, KeyImportResult, PgpKeySummary};
 use pars_core::pgp::backend::{
@@ -39,7 +37,6 @@ fn rebuild_derives_path_metadata_without_a_backend() {
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root,
-        entries: vec![metadata("github.com/alice", true)],
     })
     .expect("rebuild");
 
@@ -48,7 +45,6 @@ fn rebuild_derives_path_metadata_without_a_backend() {
     assert_eq!(github.username, "alice");
     assert_eq!(github.display_name, "github.com");
     assert_eq!(github.path_website.as_deref(), Some("github.com"));
-    assert!(github.is_favorite);
 
     let nested = entry(&index, "Work/GitLab/Älice");
     assert_eq!(nested.service_name.as_deref(), Some("GitLab"));
@@ -73,7 +69,6 @@ fn replacement_schema_is_strict_and_atomic_writes_remain_readable() {
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root,
-        entries: vec![],
     })
     .expect("rebuild");
 
@@ -85,12 +80,12 @@ fn replacement_schema_is_strict_and_atomic_writes_remain_readable() {
             read_autofill_index(&reader_path).expect("atomic reader never sees partial JSON");
         }
     });
-    for rank in 0..50 {
-        patch_autofill_index_favorites(PatchAutofillIndexFavoritesRequest {
+    for _ in 0..50 {
+        record_autofill_completion(RecordAutofillCompletionRequest {
             index_path: index_path.clone(),
-            entries: vec![metadata("example.com/alice", rank % 2 == 0)],
+            path: "example.com/alice".to_string(),
         })
-        .expect("favorite patch");
+        .expect("completion update");
     }
     running.store(false, Ordering::Release);
     reader.join().expect("reader thread");
@@ -109,7 +104,7 @@ fn replacement_schema_is_strict_and_atomic_writes_remain_readable() {
             "username": "alice",
             "websites": [],
             "android_packages": [],
-            "is_favorite": false,
+            "obsolete_flag": false,
             "recent_rank": null,
             "updated_at_epoch_seconds": 0
           }]
@@ -117,43 +112,6 @@ fn replacement_schema_is_strict_and_atomic_writes_remain_readable() {
     )
     .expect("old index");
     assert!(read_autofill_index(&index_path).is_err());
-}
-
-#[test]
-fn v1_migration_preserves_public_metadata_and_drops_vault_recent_rank() {
-    let temp = tempfile::tempdir().expect("tempdir");
-    let index_path = temp.path().join("autofill.json");
-    let legacy = serde_json::json!({
-        "version": 1,
-        "store_id": "personal",
-        "store_name": "Personal",
-        "store_root": temp.path().display().to_string(),
-        "generated_at_epoch_seconds": 7,
-        "entries": [{
-            "path": "example.com/alice",
-            "display_name": "example.com",
-            "service_name": "example.com",
-            "username": "alice",
-            "path_website": "example.com",
-            "enriched_websites": ["login.example.com"],
-            "is_favorite": true,
-            "recent_rank": 0,
-            "updated_at_epoch_seconds": 6
-        }]
-    });
-    std::fs::write(&index_path, serde_json::to_vec_pretty(&legacy).expect("json"))
-        .expect("legacy index");
-
-    let migrated = read_autofill_index(&index_path).expect("migrate v1");
-    let alice = entry(&migrated, "example.com/alice");
-    assert_eq!(migrated.version, AUTOFILL_INDEX_VERSION);
-    assert!(alice.is_favorite);
-    assert_eq!(alice.enriched_websites, vec!["login.example.com"]);
-    assert_eq!(alice.autofill_rank, None);
-
-    let persisted = std::fs::read_to_string(index_path).expect("persisted v2");
-    assert!(persisted.contains("\"autofill_rank\""));
-    assert!(!persisted.contains("recent_rank"));
 }
 
 #[test]
@@ -170,7 +128,6 @@ fn successful_autofill_completions_drive_a_bounded_mru_score() {
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root.clone(),
-        entries: vec![],
     };
     rebuild_autofill_index(rebuild()).expect("rebuild");
 
@@ -217,27 +174,25 @@ fn incremental_operations_preserve_aliases_and_leave_unrelated_entries_unchanged
     let temp = tempfile::tempdir().expect("tempdir");
     let root = temp.path().join("store");
     let alice_path = write_entry(&root, "github.com/alice");
-    write_entry(&root, "mail.example.com/bob");
+    let bob_path = write_entry(&root, "mail.example.com/bob");
     let index_path = temp.path().join("autofill.json");
     rebuild_autofill_index(RebuildAutofillIndexRequest {
         index_path: index_path.clone(),
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root.clone(),
-        entries: vec![metadata("github.com/alice", true)],
     })
     .expect("rebuild");
-    let backend = RecordingBackend::with_entries([(
-        alice_path,
-        "secret\nurl: https://accounts.example.com/login",
-    )]);
-    enrich_autofill_index_websites_with_backend(
-        EnrichAutofillIndexWebsitesRequest {
+    let backend = RecordingBackend::with_entries([
+        (alice_path, "secret\nlogin: alice@example.com\nurl: https://accounts.example.com/login"),
+        (bob_path, "secret"),
+    ]);
+    refresh_autofill_index_login_and_urls_with_backend(
+        RefreshAutofillIndexLoginAndUrlsRequest {
             index_path: index_path.clone(),
             store_root: root,
             pgp_executable: String::new(),
             passphrase: None,
-            paths: vec!["github.com/alice".to_string()],
         },
         &backend,
     )
@@ -260,9 +215,9 @@ fn incremental_operations_preserve_aliases_and_leave_unrelated_entries_unchanged
     let moved = read_autofill_index(&index_path).expect("index");
     let alice = entry(&moved, "GitHub/alice-work");
     assert_eq!(alice.username, "alice-work");
+    assert_eq!(alice.enriched_login.as_deref(), Some("alice@example.com"));
     assert_eq!(alice.service_name.as_deref(), Some("GitHub"));
     assert_eq!(alice.enriched_websites, vec!["accounts.example.com"]);
-    assert!(alice.is_favorite);
     assert_eq!(alice.autofill_rank, None, "path changes reset completion history");
     assert_eq!(entry(&moved, "mail.example.com/bob"), &bob_before);
 
@@ -278,7 +233,7 @@ fn incremental_operations_preserve_aliases_and_leave_unrelated_entries_unchanged
 
     upsert_autofill_index_entry(UpsertAutofillIndexEntryRequest {
         index_path: index_path.clone(),
-        entry: metadata("gitlab.com/carol", false),
+        path: "gitlab.com/carol".to_string(),
     })
     .expect("upsert");
     let upserted = read_autofill_index(&index_path).expect("index");
@@ -287,7 +242,7 @@ fn incremental_operations_preserve_aliases_and_leave_unrelated_entries_unchanged
     let absent = temp.path().join("absent.json");
     assert!(upsert_autofill_index_entry(UpsertAutofillIndexEntryRequest {
         index_path: absent.clone(),
-        entry: metadata("example.com/nobody", false),
+        path: "example.com/nobody".to_string(),
     })
     .expect("uninitialized no-op")
     .is_none());
@@ -299,27 +254,25 @@ fn reconciliation_updates_only_path_metadata_and_preserves_enrichment() {
     let temp = tempfile::tempdir().expect("tempdir");
     let root = temp.path().join("store");
     let alice = write_entry(&root, "example.com/alice");
-    write_entry(&root, "old.example.com/bob");
+    let bob = write_entry(&root, "old.example.com/bob");
     let index_path = temp.path().join("autofill.json");
     rebuild_autofill_index(RebuildAutofillIndexRequest {
         index_path: index_path.clone(),
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root.clone(),
-        entries: vec![metadata("example.com/alice", false)],
     })
     .expect("rebuild");
-    let backend = RecordingBackend::with_entries([(
-        alice,
-        "secret\nwebsite: https://login.example.net/path",
-    )]);
-    enrich_autofill_index_websites_with_backend(
-        EnrichAutofillIndexWebsitesRequest {
+    let backend = RecordingBackend::with_entries([
+        (alice, "secret\nlogin: alice@example.net\nurl: https://login.example.net/path"),
+        (bob, "secret"),
+    ]);
+    refresh_autofill_index_login_and_urls_with_backend(
+        RefreshAutofillIndexLoginAndUrlsRequest {
             index_path: index_path.clone(),
             store_root: root.clone(),
             pgp_executable: String::new(),
             passphrase: None,
-            paths: vec!["example.com/alice".to_string()],
         },
         &backend,
     )
@@ -338,21 +291,23 @@ fn reconciliation_updates_only_path_metadata_and_preserves_enrichment() {
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root,
-        entries: vec![metadata("example.com/alice", true)],
     })
     .expect("reconcile");
 
     assert!(backend.take_calls().is_empty());
     let index = read_autofill_index(&index_path).expect("index");
     assert_eq!(entry(&index, "example.com/alice").enriched_websites, vec!["login.example.net"]);
-    assert!(entry(&index, "example.com/alice").is_favorite);
+    assert_eq!(
+        entry(&index, "example.com/alice").enriched_login.as_deref(),
+        Some("alice@example.net")
+    );
     assert_eq!(entry(&index, "example.com/alice").autofill_rank, Some(0));
     assert!(index.entries.iter().any(|entry| entry.path == "new.example.com/carol"));
     assert!(index.entries.iter().all(|entry| entry.path != "old.example.com/bob"));
 }
 
 #[test]
-fn reconciliation_rejects_replacement_store_and_removes_stale_enrichment() {
+fn reconciliation_automatically_rebuilds_for_a_replacement_store() {
     let temp = tempfile::tempdir().expect("tempdir");
     let old_root = temp.path().join("old-store");
     let old_entry = write_entry(&old_root, "example.com/alice");
@@ -362,20 +317,18 @@ fn reconciliation_rejects_replacement_store_and_removes_stale_enrichment() {
         store_id: "canonical-store".to_string(),
         store_name: "Old".to_string(),
         store_root: old_root.clone(),
-        entries: vec![metadata("example.com/alice", true)],
     })
     .expect("rebuild old store");
     let backend = RecordingBackend::with_entries([(
         old_entry,
-        "secret\nwebsite: https://old-alias.example.net/login",
+        "secret\nlogin: old-login\nurl: https://old-alias.example.net/login",
     )]);
-    enrich_autofill_index_websites_with_backend(
-        EnrichAutofillIndexWebsitesRequest {
+    refresh_autofill_index_login_and_urls_with_backend(
+        RefreshAutofillIndexLoginAndUrlsRequest {
             index_path: index_path.clone(),
             store_root: old_root,
             pgp_executable: String::new(),
             passphrase: None,
-            paths: vec!["example.com/alice".to_string()],
         },
         &backend,
     )
@@ -383,17 +336,43 @@ fn reconciliation_rejects_replacement_store_and_removes_stale_enrichment() {
 
     let replacement_root = temp.path().join("replacement-store");
     write_entry(&replacement_root, "example.com/alice");
-    let error = reconcile_autofill_index(ReconcileAutofillIndexRequest {
+    let rebuilt = reconcile_autofill_index(ReconcileAutofillIndexRequest {
         index_path: index_path.clone(),
         store_id: "canonical-store".to_string(),
         store_name: "Replacement".to_string(),
         store_root: replacement_root,
-        entries: vec![metadata("example.com/alice", false)],
     })
-    .expect_err("replacement must require rebuild");
+    .expect("replacement rebuild")
+    .expect("replacement index");
 
-    assert!(error.to_string().contains("rebuild required"));
-    assert!(!index_path.exists(), "stale index must be removed");
+    let alice = entry(&rebuilt, "example.com/alice");
+    assert_eq!(alice.enriched_login, None);
+    assert!(alice.enriched_websites.is_empty());
+    assert!(index_path.exists());
+}
+
+#[test]
+fn reconciliation_creates_missing_and_replaces_malformed_indexes() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = temp.path().join("store");
+    write_entry(&root, "example.com/alice");
+    let index_path = temp.path().join("autofill.json");
+    let reconcile = || ReconcileAutofillIndexRequest {
+        index_path: index_path.clone(),
+        store_id: "personal".to_string(),
+        store_name: "Personal".to_string(),
+        store_root: root.clone(),
+    };
+
+    let created =
+        reconcile_autofill_index(reconcile()).expect("create missing").expect("created index");
+    assert_eq!(entry(&created, "example.com/alice").username, "alice");
+
+    std::fs::write(&index_path, "{not valid json").expect("malformed index");
+    let replaced =
+        reconcile_autofill_index(reconcile()).expect("replace malformed").expect("replaced index");
+    assert_eq!(replaced.entries.len(), 1);
+    read_autofill_index(&index_path).expect("valid persisted index");
 }
 
 #[test]
@@ -401,26 +380,27 @@ fn matching_prefers_path_website_app_name_and_enriched_alias_over_fallback() {
     let temp = tempfile::tempdir().expect("tempdir");
     let root = temp.path().join("store");
     let path = write_entry(&root, "example.com/alice");
-    write_entry(&root, "GitHub/bob");
-    write_entry(&root, "fallback/carol");
+    let github = write_entry(&root, "GitHub/bob");
+    let fallback_path = write_entry(&root, "fallback/carol");
     let index_path = temp.path().join("autofill.json");
     rebuild_autofill_index(RebuildAutofillIndexRequest {
         index_path: index_path.clone(),
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root.clone(),
-        entries: vec![metadata("fallback/carol", true)],
     })
     .expect("rebuild");
-    let backend =
-        RecordingBackend::with_entries([(path, "secret\nurl: https://accounts.example.net/login")]);
-    enrich_autofill_index_websites_with_backend(
-        EnrichAutofillIndexWebsitesRequest {
+    let backend = RecordingBackend::with_entries([
+        (path, "secret\nlogin: account@example.net\nurl: https://accounts.example.net/login"),
+        (github, "secret"),
+        (fallback_path, "secret"),
+    ]);
+    refresh_autofill_index_login_and_urls_with_backend(
+        RefreshAutofillIndexLoginAndUrlsRequest {
             index_path: index_path.clone(),
             store_root: root,
             pgp_executable: String::new(),
             passphrase: None,
-            paths: vec!["example.com/alice".to_string()],
         },
         &backend,
     )
@@ -456,6 +436,7 @@ fn matching_prefers_path_website_app_name_and_enriched_alias_over_fallback() {
     })
     .expect("enriched");
     assert_eq!(enriched[0].match_kind, "enriched_website");
+    assert_eq!(enriched[0].username, "account@example.net");
 
     let fallback = query_autofill_candidates(AutofillQueryRequest {
         index_path,
@@ -470,7 +451,7 @@ fn matching_prefers_path_website_app_name_and_enriched_alias_over_fallback() {
 }
 
 #[test]
-fn credential_lookup_decrypts_only_selected_entry_and_uses_path_username() {
+fn credential_lookup_decrypts_only_selected_entry_and_uses_effective_login() {
     let temp = tempfile::tempdir().expect("tempdir");
     let root = temp.path().join("store");
     let alice_path = write_entry(&root, "example.com/alice");
@@ -481,13 +462,23 @@ fn credential_lookup_decrypts_only_selected_entry_and_uses_path_username() {
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root.clone(),
-        entries: vec![],
     })
     .expect("rebuild");
     let backend = RecordingBackend::with_entries([
-        (alice_path, "alice-password\nusername: mallory"),
-        (bob_path.clone(), "bob-password\nusername: robert"),
+        (alice_path, "alice-password\nlogin: mallory"),
+        (bob_path.clone(), "bob-password\nlogin: robert"),
     ]);
+    refresh_autofill_index_login_and_urls_with_backend(
+        RefreshAutofillIndexLoginAndUrlsRequest {
+            index_path: index_path.clone(),
+            store_root: root.clone(),
+            pgp_executable: String::new(),
+            passphrase: None,
+        },
+        &backend,
+    )
+    .expect("enrich login");
+    backend.take_calls();
     let before = std::fs::read(&index_path).expect("before");
 
     let credential = resolve_autofill_credential_with_backend(
@@ -502,14 +493,14 @@ fn credential_lookup_decrypts_only_selected_entry_and_uses_path_username() {
     )
     .expect("credential");
 
-    assert_eq!(credential.username, "bob");
+    assert_eq!(credential.username, "robert");
     assert_eq!(credential.password, "bob-password");
     assert_eq!(backend.take_calls(), vec![bob_path]);
     assert_eq!(std::fs::read(index_path).expect("after"), before);
 }
 
 #[test]
-fn enrichment_is_selected_only_transactional_and_clearable_without_decryption() {
+fn enrichment_reads_all_logins_and_urls_transactionally_and_is_clearable_without_decryption() {
     let temp = tempfile::tempdir().expect("tempdir");
     let root = temp.path().join("store");
     let alice = write_entry(&root, "example.com/alice");
@@ -520,57 +511,64 @@ fn enrichment_is_selected_only_transactional_and_clearable_without_decryption() 
         store_id: "personal".to_string(),
         store_name: "Personal".to_string(),
         store_root: root.clone(),
-        entries: vec![],
     })
     .expect("rebuild");
 
-    let selected_backend = RecordingBackend::with_entries([(
-        alice.clone(),
-        "secret\nurl: https://www.example.net/path\nservice: login.example.org",
-    )]);
-    enrich_autofill_index_websites_with_backend(
-        EnrichAutofillIndexWebsitesRequest {
+    let enrichment_backend = RecordingBackend::with_entries([
+        (alice.clone(), "secret\nlogin: alice@example.net\nurl: https://www.example.net/path"),
+        (bob.clone(), "secret\nlogin: bob@example.net\nurl: Example App"),
+    ]);
+    refresh_autofill_index_login_and_urls_with_backend(
+        RefreshAutofillIndexLoginAndUrlsRequest {
             index_path: index_path.clone(),
             store_root: root.clone(),
             pgp_executable: String::new(),
             passphrase: None,
-            paths: vec!["example.com/alice".to_string()],
         },
-        &selected_backend,
+        &enrichment_backend,
     )
-    .expect("selected enrichment");
-    assert_eq!(selected_backend.take_calls(), vec![alice]);
+    .expect("all-entry enrichment");
+    assert_eq!(enrichment_backend.take_calls(), vec![alice.clone(), bob.clone()]);
+    let enriched = read_autofill_index(&index_path).expect("index");
+    assert_eq!(entry(&enriched, "example.com/alice").enriched_websites, vec!["example.net"]);
     assert_eq!(
-        entry(&read_autofill_index(&index_path).expect("index"), "example.com/alice")
-            .enriched_websites,
-        vec!["example.net", "login.example.org"]
+        entry(&enriched, "example.com/alice").enriched_login.as_deref(),
+        Some("alice@example.net")
     );
+    assert_eq!(entry(&enriched, "example.com/bob").enriched_websites, vec!["example app"]);
 
     let before_failure = std::fs::read(&index_path).expect("before failure");
     let failing_backend = RecordingBackend::with_entries([(bob, "secret\nurl: bob.example.net")]);
-    let failure = enrich_autofill_index_websites_with_backend(
-        EnrichAutofillIndexWebsitesRequest {
+    let failure = refresh_autofill_index_login_and_urls_with_backend(
+        RefreshAutofillIndexLoginAndUrlsRequest {
             index_path: index_path.clone(),
             store_root: root,
             pgp_executable: String::new(),
             passphrase: None,
-            paths: vec!["example.com/bob".to_string(), "example.com/alice".to_string()],
         },
         &failing_backend,
     );
     assert!(failure.is_err());
     assert_eq!(std::fs::read(&index_path).expect("after failure"), before_failure);
 
-    clear_autofill_index_websites(ClearAutofillIndexWebsitesRequest {
+    forget_autofill_index_login_and_urls(ForgetAutofillIndexLoginAndUrlsRequest {
         index_path: index_path.clone(),
-        paths: vec![],
     })
     .expect("clear aliases");
-    assert!(read_autofill_index(&index_path)
-        .expect("index")
+    let cleared = read_autofill_index(&index_path).expect("index");
+    assert!(cleared
         .entries
         .iter()
-        .all(|entry| entry.enriched_websites.is_empty()));
+        .all(|entry| entry.enriched_websites.is_empty() && entry.enriched_login.is_none()));
+    let candidates = query_autofill_candidates(AutofillQueryRequest {
+        index_path,
+        website: Some("example.com".to_string()),
+        app_name: None,
+        query: None,
+        limit: 10,
+    })
+    .expect("path-only candidates");
+    assert!(candidates.iter().any(|candidate| candidate.username == "alice"));
 }
 
 #[test]
@@ -588,10 +586,6 @@ fn write_entry(root: &Path, logical_path: &str) -> PathBuf {
     std::fs::create_dir_all(encrypted_path.parent().expect("entry parent")).expect("mkdir");
     std::fs::write(&encrypted_path, "encrypted").expect("entry");
     encrypted_path
-}
-
-fn metadata(path: &str, is_favorite: bool) -> AutofillEntryMetadata {
-    AutofillEntryMetadata { path: path.to_string(), is_favorite }
 }
 
 fn entry<'a>(

@@ -17,7 +17,6 @@ class PasswordEntry {
     required this.encryptedContent,
     this.isDirectory = false,
     this.childCount = 0,
-    this.isFavorite = false,
   });
 
   final String path;
@@ -26,19 +25,6 @@ class PasswordEntry {
   final String encryptedContent;
   final bool isDirectory;
   final int childCount;
-  final bool isFavorite;
-
-  PasswordEntry copyWith({bool? isFavorite}) {
-    return PasswordEntry(
-      path: path,
-      displayName: displayName,
-      repoName: repoName,
-      encryptedContent: encryptedContent,
-      isDirectory: isDirectory,
-      childCount: childCount,
-      isFavorite: isFavorite ?? this.isFavorite,
-    );
-  }
 
   String get parentPath {
     final index = path.lastIndexOf('/');

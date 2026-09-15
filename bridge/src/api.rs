@@ -12,7 +12,7 @@ use git2::{
 };
 use pars_core::autofill::{
     self, AutofillCredential, AutofillCredentialRequest as CoreAutofillCredentialRequest,
-    AutofillEntryMetadata, AutofillQueryRequest as CoreAutofillQueryRequest,
+    AutofillQueryRequest as CoreAutofillQueryRequest,
 };
 use pars_core::config::cli::{
     load_config as load_core_config, save_config as save_core_config, ParsConfig, PgpBackendKind,
@@ -88,10 +88,9 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "upsert_autofill_index_entry",
     "move_autofill_index_entry",
     "remove_autofill_index_entry",
-    "patch_autofill_index_favorites",
     "reconcile_autofill_index",
-    "enrich_autofill_index_websites",
-    "clear_autofill_index_websites",
+    "refresh_autofill_index_login_and_urls",
+    "forget_autofill_index_login_and_urls",
     "query_autofill_candidates",
     "resolve_autofill_credential",
     "clear_autofill_index",
@@ -680,19 +679,12 @@ pub struct RebuildAutofillIndexRequest {
     pub store_id: String,
     pub store_name: String,
     pub root: String,
-    pub entries: Vec<AutofillEntryMetadataDto>,
-}
-
-#[derive(Debug, Clone)]
-pub struct AutofillEntryMetadataDto {
-    pub path: String,
-    pub is_favorite: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct UpsertAutofillIndexEntryRequest {
     pub index_path: String,
-    pub entry: AutofillEntryMetadataDto,
+    pub path: String,
 }
 
 #[derive(Debug, Clone)]
@@ -711,34 +703,25 @@ pub struct RemoveAutofillIndexEntryRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct PatchAutofillIndexFavoritesRequest {
-    pub index_path: String,
-    pub entries: Vec<AutofillEntryMetadataDto>,
-}
-
-#[derive(Debug, Clone)]
 pub struct ReconcileAutofillIndexRequest {
     pub index_path: String,
     pub store_id: String,
     pub store_name: String,
     pub root: String,
-    pub entries: Vec<AutofillEntryMetadataDto>,
 }
 
 #[derive(Debug, Clone)]
-pub struct EnrichAutofillIndexWebsitesRequest {
+pub struct RefreshAutofillIndexLoginAndUrlsRequest {
     pub config_path: String,
     pub index_path: String,
     pub root: String,
     pub pgp_executable: Option<String>,
     pub passphrase: Option<String>,
-    pub paths: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ClearAutofillIndexWebsitesRequest {
+pub struct ForgetAutofillIndexLoginAndUrlsRequest {
     pub index_path: String,
-    pub paths: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -878,7 +861,6 @@ pub struct AutofillCandidateDto {
     pub match_kind: String,
     pub match_value: String,
     pub score: i32,
-    pub is_favorite: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -954,7 +936,6 @@ pub async fn rebuild_autofill_index(request: RebuildAutofillIndexRequest) -> Uni
         store_id: request.store_id,
         store_name: request.store_name,
         store_root: PathBuf::from(request.root),
-        entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
     });
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
@@ -962,7 +943,7 @@ pub async fn rebuild_autofill_index(request: RebuildAutofillIndexRequest) -> Uni
 pub async fn upsert_autofill_index_entry(request: UpsertAutofillIndexEntryRequest) -> UnitResponse {
     let result = autofill::upsert_autofill_index_entry(autofill::UpsertAutofillIndexEntryRequest {
         index_path: PathBuf::from(request.index_path),
-        entry: request.entry.into(),
+        path: request.path,
     });
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
@@ -986,56 +967,43 @@ pub async fn remove_autofill_index_entry(request: RemoveAutofillIndexEntryReques
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
 
-pub async fn patch_autofill_index_favorites(
-    request: PatchAutofillIndexFavoritesRequest,
-) -> UnitResponse {
-    let result =
-        autofill::patch_autofill_index_favorites(autofill::PatchAutofillIndexFavoritesRequest {
-            index_path: PathBuf::from(request.index_path),
-            entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
-        });
-    UnitResponse { error: result.err().map(BridgeFailure::from) }
-}
-
 pub async fn reconcile_autofill_index(request: ReconcileAutofillIndexRequest) -> UnitResponse {
     let result = autofill::reconcile_autofill_index(autofill::ReconcileAutofillIndexRequest {
         index_path: PathBuf::from(request.index_path),
         store_id: request.store_id,
         store_name: request.store_name,
         store_root: PathBuf::from(request.root),
-        entries: request.entries.into_iter().map(AutofillEntryMetadata::from).collect(),
     });
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
 
-pub async fn enrich_autofill_index_websites(
-    request: EnrichAutofillIndexWebsitesRequest,
+pub async fn refresh_autofill_index_login_and_urls(
+    request: RefreshAutofillIndexLoginAndUrlsRequest,
 ) -> UnitResponse {
     let backend = match pgp_backend(&request.config_path, request.pgp_executable.as_deref()) {
         Ok(backend) => backend,
         Err(error) => return UnitResponse { error: Some(error) },
     };
-    let result = autofill::enrich_autofill_index_websites_with_backend(
-        autofill::EnrichAutofillIndexWebsitesRequest {
+    let result = autofill::refresh_autofill_index_login_and_urls_with_backend(
+        autofill::RefreshAutofillIndexLoginAndUrlsRequest {
             index_path: PathBuf::from(request.index_path),
             store_root: PathBuf::from(request.root),
             pgp_executable: request.pgp_executable.unwrap_or_default(),
             passphrase: request.passphrase,
-            paths: request.paths,
         },
         backend.as_ref(),
     );
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
 
-pub async fn clear_autofill_index_websites(
-    request: ClearAutofillIndexWebsitesRequest,
+pub async fn forget_autofill_index_login_and_urls(
+    request: ForgetAutofillIndexLoginAndUrlsRequest,
 ) -> UnitResponse {
-    let result =
-        autofill::clear_autofill_index_websites(autofill::ClearAutofillIndexWebsitesRequest {
+    let result = autofill::forget_autofill_index_login_and_urls(
+        autofill::ForgetAutofillIndexLoginAndUrlsRequest {
             index_path: PathBuf::from(request.index_path),
-            paths: request.paths,
-        });
+        },
+    );
     UnitResponse { error: result.err().map(BridgeFailure::from) }
 }
 
@@ -3127,12 +3095,6 @@ impl From<KeyExportResult> for KeyExportDto {
     }
 }
 
-impl From<AutofillEntryMetadataDto> for AutofillEntryMetadata {
-    fn from(value: AutofillEntryMetadataDto) -> Self {
-        Self { path: value.path, is_favorite: value.is_favorite }
-    }
-}
-
 impl From<autofill::AutofillCandidate> for AutofillCandidateDto {
     fn from(value: autofill::AutofillCandidate) -> Self {
         Self {
@@ -3142,7 +3104,6 @@ impl From<autofill::AutofillCandidate> for AutofillCandidateDto {
             match_kind: value.match_kind,
             match_value: value.match_value,
             score: value.score,
-            is_favorite: value.is_favorite,
         }
     }
 }

@@ -11,15 +11,15 @@ import 'package:pars_gui/widgets/pars_adaptive_surface.dart';
 import 'support/gui_test_harness.dart';
 
 void main() {
-  testWidgets('Vault exposes Favorites and Browse without Recent', (
+  testWidgets('Vault exposes Browse without Favorites or Recent', (
     tester,
   ) async {
     await configureGuiTestViewport(tester);
     final repository = _VaultPresentationRepository(
       entries: <PasswordEntry>[
-        _entry('favorite/alice', favorite: true),
+        _entry('alice'),
         _entry('bob'),
-        _directory('favorite'),
+        _directory('folder'),
       ],
     );
 
@@ -33,9 +33,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('FAVORITES'), findsOneWidget);
-    expect(find.text('RECENT'), findsNothing);
-    expect(find.text('BROWSE'), findsOneWidget);
+    expect(find.text('Favorites'), findsNothing);
+    expect(find.text('Recent'), findsNothing);
+    expect(find.text('Browse'), findsOneWidget);
     expect(
       find.descendant(of: find.byType(EntryTile), matching: find.text('alice')),
       findsOneWidget,
@@ -44,7 +44,7 @@ void main() {
     expectNoFlutterOverflow(tester);
   });
 
-  testWidgets('search results replace Favorites and Browse', (tester) async {
+  testWidgets('search results replace Browse', (tester) async {
     await configureGuiTestViewport(tester);
     final repository = _VaultPresentationRepository(
       entries: <PasswordEntry>[_entry('service/alice'), _directory('service')],
@@ -63,40 +63,13 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'alice');
     await tester.pumpAndSettle();
 
-    expect(find.text('SEARCH RESULTS'), findsOneWidget);
-    expect(find.text('FAVORITES'), findsNothing);
-    expect(find.text('BROWSE'), findsNothing);
+    expect(find.text('Search results'), findsOneWidget);
+    expect(find.text('Browse'), findsNothing);
     expect(
       find.descendant(of: find.byType(EntryTile), matching: find.text('alice')),
       findsOneWidget,
     );
   });
-
-  testWidgets(
-    'favorite action updates visible row state without reading secret',
-    (tester) async {
-      await configureGuiTestViewport(tester);
-      final repository = _VaultPresentationRepository(
-        entries: <PasswordEntry>[_entry('alice'), _directory('folder')],
-      );
-
-      await tester.pumpWidget(
-        buildLocalizedTestApp(
-          child: VaultScreen(
-            vaultRepository: repository,
-            gitRepository: repository,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Favorite').first);
-      await tester.pumpAndSettle();
-
-      expect(repository.favoriteUpdates, 1);
-      expect(repository.readCount, 0);
-      expect(find.byTooltip('Unfavorite'), findsWidgets);
-    },
-  );
 
   testWidgets('entry detail exposes exactly one reveal and hide control', (
     tester,
@@ -227,14 +200,13 @@ void main() {
   });
 }
 
-PasswordEntry _entry(String path, {bool favorite = false}) {
+PasswordEntry _entry(String path) {
   final name = path.split('/').last;
   return PasswordEntry(
     path: path,
     displayName: name,
     repoName: 'test-store',
     encryptedContent: 'password',
-    isFavorite: favorite,
   );
 }
 
@@ -258,10 +230,9 @@ class _VaultPresentationRepository extends FakeParsRepository {
        _status = status,
        _mode = mode;
 
-  List<PasswordEntry> _entries;
+  final List<PasswordEntry> _entries;
   final RepoGitStatus _status;
   final StoreGitMode _mode;
-  int favoriteUpdates = 0;
   int readCount = 0;
 
   @override
@@ -275,19 +246,6 @@ class _VaultPresentationRepository extends FakeParsRepository {
 
   @override
   StoreGitMode get gitMode => _mode;
-
-  @override
-  Future<void> toggleFavorite(PasswordEntry entry) async {
-    favoriteUpdates += 1;
-    _entries = _entries
-        .map(
-          (candidate) =>
-              candidate.path == entry.path
-                  ? candidate.copyWith(isFavorite: !candidate.isFavorite)
-                  : candidate,
-        )
-        .toList(growable: false);
-  }
 
   @override
   Future<SecretContent> readEntry(PasswordEntry entry) async {

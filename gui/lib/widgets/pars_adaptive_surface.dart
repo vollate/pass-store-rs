@@ -87,8 +87,13 @@ class ParsAdaptiveSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final availableHeight = MediaQuery.sizeOf(context).height - keyboardInset;
+    // A rotation delivers the new viewport size one frame before the stale
+    // keyboard inset clears, so the raw inset can exceed the new height.
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final keyboardInset = MediaQuery.viewInsetsOf(
+      context,
+    ).bottom.clamp(0.0, viewportHeight);
+    final availableHeight = viewportHeight - keyboardInset;
     return SafeArea(
       child: AnimatedPadding(
         duration: ParsMotion.quick,

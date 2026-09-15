@@ -23,7 +23,7 @@ void main() {
     expect(repository.refreshCount, 1);
 
     await tester.enterText(find.byType(TextField).first, 'github');
-    await tester.tap(find.text('Select'));
+    await tester.tap(find.byTooltip('Select'));
     await tester.pumpAndSettle();
     expect(find.text('Move'), findsNothing);
     expect(find.text('Rename'), findsNothing);
@@ -67,7 +67,7 @@ void main() {
 
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
-    expect(find.text('APPEARANCE'), findsOneWidget);
+    expect(find.text('Appearance'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

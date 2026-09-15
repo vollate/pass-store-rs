@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/pars_design_tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../models/key_record.dart';
@@ -116,11 +117,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               MediaQuery.textScalerOf(context).scale(1) >= 1.5
                   ? _buildLargeTextLayout(context)
                   : Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(ParsSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const SizedBox(height: 24),
+                        const SizedBox(height: ParsSpacing.xl),
                         Row(
                           children: <Widget>[
                             if (_stepHistory.isNotEmpty)
@@ -140,15 +141,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: ParsSpacing.xs),
                         Text(_stepSubtitle(context.l10n, _step)),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: ParsSpacing.md),
                         _OnboardingProgress(
                           currentStep: _step,
                           steps: _progressSteps,
                         ),
                         if (_error != null) ...<Widget>[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: ParsSpacing.sm),
                           Semantics(
                             liveRegion: true,
                             child: Text(
@@ -159,7 +160,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 16),
+                        const SizedBox(height: ParsSpacing.md),
                         Expanded(child: _buildStep(context)),
                         if (_finishing) const LinearProgressIndicator(),
                       ],
@@ -172,7 +173,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildLargeTextLayout(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(ParsSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -184,7 +185,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const SizedBox(height: 24),
+                  const SizedBox(height: ParsSpacing.xl),
                   Row(
                     children: <Widget>[
                       if (_stepHistory.isNotEmpty)
@@ -202,10 +203,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: ParsSpacing.xs),
                   Text(_stepSubtitle(context.l10n, _step)),
                   if (_error != null) ...<Widget>[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: ParsSpacing.sm),
                     Semantics(
                       liveRegion: true,
                       child: Text(
@@ -220,7 +221,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: ParsSpacing.md),
           Expanded(flex: 3, child: _buildStep(context)),
           if (_finishing) const LinearProgressIndicator(),
         ],
@@ -567,9 +568,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           (sheet) => SafeArea(
             child: Padding(
               padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
+                left: ParsSpacing.lg,
+                right: ParsSpacing.lg,
+                top: ParsSpacing.lg,
                 bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
               ),
               child: SingleChildScrollView(
@@ -583,7 +584,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: ParsSpacing.sm),
                     PgpKeyImportBody(
                       keyRepository: repository,
                       securityRepository: widget.securityRepository,
@@ -799,7 +800,7 @@ class _DeleteStoreConfirmationDialogState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(context.l10n.pathValue(widget.root)),
-          const SizedBox(height: 12),
+          const SizedBox(height: ParsSpacing.sm),
           TextField(
             key: const Key('repair-delete-confirmation'),
             controller: _confirmation,

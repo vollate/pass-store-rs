@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1187555323;
+  int get rustContentHash => 1435473710;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -78,10 +78,6 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 abstract class RustLibApi extends BaseApi {
   Future<UnitResponse> crateApiClearAutofillIndex({
     required ClearAutofillIndexRequest request,
-  });
-
-  Future<UnitResponse> crateApiClearAutofillIndexWebsites({
-    required ClearAutofillIndexWebsitesRequest request,
   });
 
   Future<UnitResponse> crateApiCloneStore({required CloneStoreRequest request});
@@ -122,16 +118,16 @@ abstract class RustLibApi extends BaseApi {
     required EditEntryRequest request,
   });
 
-  Future<UnitResponse> crateApiEnrichAutofillIndexWebsites({
-    required EnrichAutofillIndexWebsitesRequest request,
-  });
-
   Future<KeyExportResponse> crateApiExportSshPrivateKey({
     required ExportSshKeyRequest request,
   });
 
   Future<KeyExportResponse> crateApiExportSshPublicKey({
     required ExportSshKeyRequest request,
+  });
+
+  Future<UnitResponse> crateApiForgetAutofillIndexLoginAndUrls({
+    required ForgetAutofillIndexLoginAndUrlsRequest request,
   });
 
   Future<GenerateEntryResponse> crateApiGenerateEntry({
@@ -242,10 +238,6 @@ abstract class RustLibApi extends BaseApi {
     required OpenGithubSshSettingsRequest request,
   });
 
-  Future<UnitResponse> crateApiPatchAutofillIndexFavorites({
-    required PatchAutofillIndexFavoritesRequest request,
-  });
-
   Future<PreparePgpPrivateKeyResponse> crateApiPreparePgpPrivateKey({
     required PreparePgpPrivateKeyRequest request,
   });
@@ -264,6 +256,10 @@ abstract class RustLibApi extends BaseApi {
 
   Future<UnitResponse> crateApiReconcileAutofillIndex({
     required ReconcileAutofillIndexRequest request,
+  });
+
+  Future<UnitResponse> crateApiRefreshAutofillIndexLoginAndUrls({
+    required RefreshAutofillIndexLoginAndUrlsRequest request,
   });
 
   Future<UnitResponse> crateApiRemoveAutofillIndexEntry({
@@ -329,42 +325,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<UnitResponse> crateApiClearAutofillIndexWebsites({
-    required ClearAutofillIndexWebsitesRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_clear_autofill_index_websites_request(
-            request,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 2,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiClearAutofillIndexWebsitesConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiClearAutofillIndexWebsitesConstMeta =>
-      const TaskConstMeta(
-        debugName: "clear_autofill_index_websites",
-        argNames: ["request"],
-      );
-
-  @override
   Future<UnitResponse> crateApiCloneStore({
     required CloneStoreRequest request,
   }) {
@@ -376,7 +336,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 2,
             port: port_,
           );
         },
@@ -409,7 +369,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 3,
             port: port_,
           );
         },
@@ -442,7 +402,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 4,
             port: port_,
           );
         },
@@ -477,7 +437,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 5,
             port: port_,
           );
         },
@@ -509,7 +469,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 6,
             port: port_,
           );
         },
@@ -542,7 +502,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 7,
             port: port_,
           );
         },
@@ -574,7 +534,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 8,
             port: port_,
           );
         },
@@ -604,7 +564,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 9,
             port: port_,
           );
         },
@@ -636,7 +596,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 10,
             port: port_,
           );
         },
@@ -666,7 +626,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 11,
             port: port_,
           );
         },
@@ -685,42 +645,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "edit_entry", argNames: ["request"]);
 
   @override
-  Future<UnitResponse> crateApiEnrichAutofillIndexWebsites({
-    required EnrichAutofillIndexWebsitesRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_enrich_autofill_index_websites_request(
-            request,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 13,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiEnrichAutofillIndexWebsitesConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiEnrichAutofillIndexWebsitesConstMeta =>
-      const TaskConstMeta(
-        debugName: "enrich_autofill_index_websites",
-        argNames: ["request"],
-      );
-
-  @override
   Future<KeyExportResponse> crateApiExportSshPrivateKey({
     required ExportSshKeyRequest request,
   }) {
@@ -732,7 +656,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 12,
             port: port_,
           );
         },
@@ -765,7 +689,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 13,
             port: port_,
           );
         },
@@ -786,6 +710,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<UnitResponse> crateApiForgetAutofillIndexLoginAndUrls({
+    required ForgetAutofillIndexLoginAndUrlsRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_forget_autofill_index_login_and_urls_request(
+            request,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 14,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiForgetAutofillIndexLoginAndUrlsConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiForgetAutofillIndexLoginAndUrlsConstMeta =>
+      const TaskConstMeta(
+        debugName: "forget_autofill_index_login_and_urls",
+        argNames: ["request"],
+      );
+
+  @override
   Future<GenerateEntryResponse> crateApiGenerateEntry({
     required GenerateEntryRequest request,
   }) {
@@ -797,7 +757,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 15,
             port: port_,
           );
         },
@@ -827,7 +787,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 16,
             port: port_,
           );
         },
@@ -857,7 +817,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 17,
             port: port_,
           );
         },
@@ -887,7 +847,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 18,
             port: port_,
           );
         },
@@ -917,7 +877,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 19,
             port: port_,
           );
         },
@@ -947,7 +907,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 20,
             port: port_,
           );
         },
@@ -975,7 +935,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 21,
             port: port_,
           );
         },
@@ -1003,7 +963,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1033,7 +993,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1065,7 +1025,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1095,7 +1055,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1128,7 +1088,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1163,7 +1123,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1198,7 +1158,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1230,7 +1190,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1263,7 +1223,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1299,7 +1259,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1335,7 +1295,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1368,7 +1328,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1398,7 +1358,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1433,7 +1393,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1468,7 +1428,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1500,7 +1460,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1532,7 +1492,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1562,7 +1522,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1592,7 +1552,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1625,7 +1585,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1658,7 +1618,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1691,7 +1651,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1713,42 +1673,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<UnitResponse> crateApiPatchAutofillIndexFavorites({
-    required PatchAutofillIndexFavoritesRequest request,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_patch_autofill_index_favorites_request(
-            request,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 45,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit_response,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiPatchAutofillIndexFavoritesConstMeta,
-        argValues: [request],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPatchAutofillIndexFavoritesConstMeta =>
-      const TaskConstMeta(
-        debugName: "patch_autofill_index_favorites",
-        argNames: ["request"],
-      );
-
-  @override
   Future<PreparePgpPrivateKeyResponse> crateApiPreparePgpPrivateKey({
     required PreparePgpPrivateKeyRequest request,
   }) {
@@ -1763,7 +1687,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1796,7 +1720,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 47,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1829,7 +1753,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 48,
+            funcId: 46,
             port: port_,
           );
         },
@@ -1862,7 +1786,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 47,
             port: port_,
           );
         },
@@ -1898,7 +1822,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 50,
+            funcId: 48,
             port: port_,
           );
         },
@@ -1920,6 +1844,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<UnitResponse> crateApiRefreshAutofillIndexLoginAndUrls({
+    required RefreshAutofillIndexLoginAndUrlsRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_refresh_autofill_index_login_and_urls_request(
+            request,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 49,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiRefreshAutofillIndexLoginAndUrlsConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRefreshAutofillIndexLoginAndUrlsConstMeta =>
+      const TaskConstMeta(
+        debugName: "refresh_autofill_index_login_and_urls",
+        argNames: ["request"],
+      );
+
+  @override
   Future<UnitResponse> crateApiRemoveAutofillIndexEntry({
     required RemoveAutofillIndexEntryRequest request,
   }) {
@@ -1934,7 +1894,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 51,
+            funcId: 50,
             port: port_,
           );
         },
@@ -1970,7 +1930,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 51,
             port: port_,
           );
         },
@@ -2003,7 +1963,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 53,
+            funcId: 52,
             port: port_,
           );
         },
@@ -2033,7 +1993,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 54,
+            funcId: 53,
             port: port_,
           );
         },
@@ -2066,7 +2026,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 55,
+            funcId: 54,
             port: port_,
           );
         },
@@ -2124,8 +2084,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AutofillCandidateDto dco_decode_autofill_candidate_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return AutofillCandidateDto(
       path: dco_decode_String(arr[0]),
       displayName: dco_decode_String(arr[1]),
@@ -2133,7 +2093,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       matchKind: dco_decode_String(arr[3]),
       matchValue: dco_decode_String(arr[4]),
       score: dco_decode_i_32(arr[5]),
-      isFavorite: dco_decode_bool(arr[6]),
     );
   }
 
@@ -2193,18 +2152,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return AutofillCredentialResponse(
       credential: dco_decode_opt_box_autoadd_autofill_credential_dto(arr[0]),
       error: dco_decode_opt_box_autoadd_bridge_failure(arr[1]),
-    );
-  }
-
-  @protected
-  AutofillEntryMetadataDto dco_decode_autofill_entry_metadata_dto(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return AutofillEntryMetadataDto(
-      path: dco_decode_String(arr[0]),
-      isFavorite: dco_decode_bool(arr[1]),
     );
   }
 
@@ -2271,13 +2218,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_clear_autofill_index_request(raw);
-  }
-
-  @protected
-  ClearAutofillIndexWebsitesRequest
-  dco_decode_box_autoadd_clear_autofill_index_websites_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_clear_autofill_index_websites_request(raw);
   }
 
   @protected
@@ -2354,13 +2294,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  EnrichAutofillIndexWebsitesRequest
-  dco_decode_box_autoadd_enrich_autofill_index_websites_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_enrich_autofill_index_websites_request(raw);
-  }
-
-  @protected
   EntryRequest dco_decode_box_autoadd_entry_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_entry_request(raw);
@@ -2378,6 +2311,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_export_ssh_key_request(raw);
+  }
+
+  @protected
+  ForgetAutofillIndexLoginAndUrlsRequest
+  dco_decode_box_autoadd_forget_autofill_index_login_and_urls_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_forget_autofill_index_login_and_urls_request(raw);
   }
 
   @protected
@@ -2607,13 +2549,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PatchAutofillIndexFavoritesRequest
-  dco_decode_box_autoadd_patch_autofill_index_favorites_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_patch_autofill_index_favorites_request(raw);
-  }
-
-  @protected
   PgpImportFailureKind dco_decode_box_autoadd_pgp_import_failure_kind(
     dynamic raw,
   ) {
@@ -2648,6 +2583,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   dco_decode_box_autoadd_reconcile_autofill_index_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_reconcile_autofill_index_request(raw);
+  }
+
+  @protected
+  RefreshAutofillIndexLoginAndUrlsRequest
+  dco_decode_box_autoadd_refresh_autofill_index_login_and_urls_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_refresh_autofill_index_login_and_urls_request(raw);
   }
 
   @protected
@@ -2712,19 +2656,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (arr.length != 1)
       throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
     return ClearAutofillIndexRequest(indexPath: dco_decode_String(arr[0]));
-  }
-
-  @protected
-  ClearAutofillIndexWebsitesRequest
-  dco_decode_clear_autofill_index_websites_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return ClearAutofillIndexWebsitesRequest(
-      indexPath: dco_decode_String(arr[0]),
-      paths: dco_decode_list_String(arr[1]),
-    );
   }
 
   @protected
@@ -2902,23 +2833,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  EnrichAutofillIndexWebsitesRequest
-  dco_decode_enrich_autofill_index_websites_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
-    return EnrichAutofillIndexWebsitesRequest(
-      configPath: dco_decode_String(arr[0]),
-      indexPath: dco_decode_String(arr[1]),
-      root: dco_decode_String(arr[2]),
-      pgpExecutable: dco_decode_opt_String(arr[3]),
-      passphrase: dco_decode_opt_String(arr[4]),
-      paths: dco_decode_list_String(arr[5]),
-    );
-  }
-
-  @protected
   EntryRequest dco_decode_entry_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -2983,6 +2897,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       sshDir: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
       confirmation: dco_decode_opt_String(arr[2]),
+    );
+  }
+
+  @protected
+  ForgetAutofillIndexLoginAndUrlsRequest
+  dco_decode_forget_autofill_index_login_and_urls_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 1)
+      throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
+    return ForgetAutofillIndexLoginAndUrlsRequest(
+      indexPath: dco_decode_String(arr[0]),
     );
   }
 
@@ -3405,16 +3331,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  List<AutofillEntryMetadataDto> dco_decode_list_autofill_entry_metadata_dto(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return (raw as List<dynamic>)
-        .map(dco_decode_autofill_entry_metadata_dto)
-        .toList();
-  }
-
-  @protected
   ListEntriesRequest dco_decode_list_entries_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -3730,19 +3646,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PatchAutofillIndexFavoritesRequest
-  dco_decode_patch_autofill_index_favorites_request(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return PatchAutofillIndexFavoritesRequest(
-      indexPath: dco_decode_String(arr[0]),
-      entries: dco_decode_list_autofill_entry_metadata_dto(arr[1]),
-    );
-  }
-
-  @protected
   PgpImportFailureKind dco_decode_pgp_import_failure_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return PgpImportFailureKind.values[raw as int];
@@ -3832,14 +3735,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return RebuildAutofillIndexRequest(
       indexPath: dco_decode_String(arr[0]),
       storeId: dco_decode_String(arr[1]),
       storeName: dco_decode_String(arr[2]),
       root: dco_decode_String(arr[3]),
-      entries: dco_decode_list_autofill_entry_metadata_dto(arr[4]),
     );
   }
 
@@ -3849,14 +3751,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return ReconcileAutofillIndexRequest(
       indexPath: dco_decode_String(arr[0]),
       storeId: dco_decode_String(arr[1]),
       storeName: dco_decode_String(arr[2]),
       root: dco_decode_String(arr[3]),
-      entries: dco_decode_list_autofill_entry_metadata_dto(arr[4]),
+    );
+  }
+
+  @protected
+  RefreshAutofillIndexLoginAndUrlsRequest
+  dco_decode_refresh_autofill_index_login_and_urls_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return RefreshAutofillIndexLoginAndUrlsRequest(
+      configPath: dco_decode_String(arr[0]),
+      indexPath: dco_decode_String(arr[1]),
+      root: dco_decode_String(arr[2]),
+      pgpExecutable: dco_decode_opt_String(arr[3]),
+      passphrase: dco_decode_opt_String(arr[4]),
     );
   }
 
@@ -3948,7 +3865,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
     return UpsertAutofillIndexEntryRequest(
       indexPath: dco_decode_String(arr[0]),
-      entry: dco_decode_autofill_entry_metadata_dto(arr[1]),
+      path: dco_decode_String(arr[1]),
     );
   }
 
@@ -3995,7 +3912,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_matchKind = sse_decode_String(deserializer);
     var var_matchValue = sse_decode_String(deserializer);
     var var_score = sse_decode_i_32(deserializer);
-    var var_isFavorite = sse_decode_bool(deserializer);
     return AutofillCandidateDto(
       path: var_path,
       displayName: var_displayName,
@@ -4003,7 +3919,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       matchKind: var_matchKind,
       matchValue: var_matchValue,
       score: var_score,
-      isFavorite: var_isFavorite,
     );
   }
 
@@ -4069,16 +3984,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       credential: var_credential,
       error: var_error,
     );
-  }
-
-  @protected
-  AutofillEntryMetadataDto sse_decode_autofill_entry_metadata_dto(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_path = sse_decode_String(deserializer);
-    var var_isFavorite = sse_decode_bool(deserializer);
-    return AutofillEntryMetadataDto(path: var_path, isFavorite: var_isFavorite);
   }
 
   @protected
@@ -4152,15 +4057,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_clear_autofill_index_request(deserializer));
-  }
-
-  @protected
-  ClearAutofillIndexWebsitesRequest
-  sse_decode_box_autoadd_clear_autofill_index_websites_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_clear_autofill_index_websites_request(deserializer));
   }
 
   @protected
@@ -4245,15 +4141,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  EnrichAutofillIndexWebsitesRequest
-  sse_decode_box_autoadd_enrich_autofill_index_websites_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_enrich_autofill_index_websites_request(deserializer));
-  }
-
-  @protected
   EntryRequest sse_decode_box_autoadd_entry_request(
     SseDeserializer deserializer,
   ) {
@@ -4275,6 +4162,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_export_ssh_key_request(deserializer));
+  }
+
+  @protected
+  ForgetAutofillIndexLoginAndUrlsRequest
+  sse_decode_box_autoadd_forget_autofill_index_login_and_urls_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_forget_autofill_index_login_and_urls_request(
+      deserializer,
+    ));
   }
 
   @protected
@@ -4534,15 +4432,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PatchAutofillIndexFavoritesRequest
-  sse_decode_box_autoadd_patch_autofill_index_favorites_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_patch_autofill_index_favorites_request(deserializer));
-  }
-
-  @protected
   PgpImportFailureKind sse_decode_box_autoadd_pgp_import_failure_kind(
     SseDeserializer deserializer,
   ) {
@@ -4583,6 +4472,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_reconcile_autofill_index_request(deserializer));
+  }
+
+  @protected
+  RefreshAutofillIndexLoginAndUrlsRequest
+  sse_decode_box_autoadd_refresh_autofill_index_login_and_urls_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_refresh_autofill_index_login_and_urls_request(
+      deserializer,
+    ));
   }
 
   @protected
@@ -4662,20 +4562,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_indexPath = sse_decode_String(deserializer);
     return ClearAutofillIndexRequest(indexPath: var_indexPath);
-  }
-
-  @protected
-  ClearAutofillIndexWebsitesRequest
-  sse_decode_clear_autofill_index_websites_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_indexPath = sse_decode_String(deserializer);
-    var var_paths = sse_decode_list_String(deserializer);
-    return ClearAutofillIndexWebsitesRequest(
-      indexPath: var_indexPath,
-      paths: var_paths,
-    );
   }
 
   @protected
@@ -4858,28 +4744,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  EnrichAutofillIndexWebsitesRequest
-  sse_decode_enrich_autofill_index_websites_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_configPath = sse_decode_String(deserializer);
-    var var_indexPath = sse_decode_String(deserializer);
-    var var_root = sse_decode_String(deserializer);
-    var var_pgpExecutable = sse_decode_opt_String(deserializer);
-    var var_passphrase = sse_decode_opt_String(deserializer);
-    var var_paths = sse_decode_list_String(deserializer);
-    return EnrichAutofillIndexWebsitesRequest(
-      configPath: var_configPath,
-      indexPath: var_indexPath,
-      root: var_root,
-      pgpExecutable: var_pgpExecutable,
-      passphrase: var_passphrase,
-      paths: var_paths,
-    );
-  }
-
-  @protected
   EntryRequest sse_decode_entry_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_configPath = sse_decode_String(deserializer);
@@ -4949,6 +4813,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       name: var_name,
       confirmation: var_confirmation,
     );
+  }
+
+  @protected
+  ForgetAutofillIndexLoginAndUrlsRequest
+  sse_decode_forget_autofill_index_login_and_urls_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_indexPath = sse_decode_String(deserializer);
+    return ForgetAutofillIndexLoginAndUrlsRequest(indexPath: var_indexPath);
   }
 
   @protected
@@ -5387,20 +5261,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  List<AutofillEntryMetadataDto> sse_decode_list_autofill_entry_metadata_dto(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    var len_ = sse_decode_i_32(deserializer);
-    var ans_ = <AutofillEntryMetadataDto>[];
-    for (var idx_ = 0; idx_ < len_; ++idx_) {
-      ans_.add(sse_decode_autofill_entry_metadata_dto(deserializer));
-    }
-    return ans_;
-  }
-
-  @protected
   ListEntriesRequest sse_decode_list_entries_request(
     SseDeserializer deserializer,
   ) {
@@ -5820,20 +5680,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PatchAutofillIndexFavoritesRequest
-  sse_decode_patch_autofill_index_favorites_request(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_indexPath = sse_decode_String(deserializer);
-    var var_entries = sse_decode_list_autofill_entry_metadata_dto(deserializer);
-    return PatchAutofillIndexFavoritesRequest(
-      indexPath: var_indexPath,
-      entries: var_entries,
-    );
-  }
-
-  @protected
   PgpImportFailureKind sse_decode_pgp_import_failure_kind(
     SseDeserializer deserializer,
   ) {
@@ -5943,13 +5789,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_storeId = sse_decode_String(deserializer);
     var var_storeName = sse_decode_String(deserializer);
     var var_root = sse_decode_String(deserializer);
-    var var_entries = sse_decode_list_autofill_entry_metadata_dto(deserializer);
     return RebuildAutofillIndexRequest(
       indexPath: var_indexPath,
       storeId: var_storeId,
       storeName: var_storeName,
       root: var_root,
-      entries: var_entries,
     );
   }
 
@@ -5962,13 +5806,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_storeId = sse_decode_String(deserializer);
     var var_storeName = sse_decode_String(deserializer);
     var var_root = sse_decode_String(deserializer);
-    var var_entries = sse_decode_list_autofill_entry_metadata_dto(deserializer);
     return ReconcileAutofillIndexRequest(
       indexPath: var_indexPath,
       storeId: var_storeId,
       storeName: var_storeName,
       root: var_root,
-      entries: var_entries,
+    );
+  }
+
+  @protected
+  RefreshAutofillIndexLoginAndUrlsRequest
+  sse_decode_refresh_autofill_index_login_and_urls_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_configPath = sse_decode_String(deserializer);
+    var var_indexPath = sse_decode_String(deserializer);
+    var var_root = sse_decode_String(deserializer);
+    var var_pgpExecutable = sse_decode_opt_String(deserializer);
+    var var_passphrase = sse_decode_opt_String(deserializer);
+    return RefreshAutofillIndexLoginAndUrlsRequest(
+      configPath: var_configPath,
+      indexPath: var_indexPath,
+      root: var_root,
+      pgpExecutable: var_pgpExecutable,
+      passphrase: var_passphrase,
     );
   }
 
@@ -6055,10 +5917,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   sse_decode_upsert_autofill_index_entry_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_indexPath = sse_decode_String(deserializer);
-    var var_entry = sse_decode_autofill_entry_metadata_dto(deserializer);
+    var var_path = sse_decode_String(deserializer);
     return UpsertAutofillIndexEntryRequest(
       indexPath: var_indexPath,
-      entry: var_entry,
+      path: var_path,
     );
   }
 
@@ -6100,7 +5962,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.matchKind, serializer);
     sse_encode_String(self.matchValue, serializer);
     sse_encode_i_32(self.score, serializer);
-    sse_encode_bool(self.isFavorite, serializer);
   }
 
   @protected
@@ -6149,16 +6010,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       serializer,
     );
     sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
-  }
-
-  @protected
-  void sse_encode_autofill_entry_metadata_dto(
-    AutofillEntryMetadataDto self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.path, serializer);
-    sse_encode_bool(self.isFavorite, serializer);
   }
 
   @protected
@@ -6232,15 +6083,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_clear_autofill_index_request(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_clear_autofill_index_websites_request(
-    ClearAutofillIndexWebsitesRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_clear_autofill_index_websites_request(self, serializer);
   }
 
   @protected
@@ -6334,15 +6176,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_enrich_autofill_index_websites_request(
-    EnrichAutofillIndexWebsitesRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_enrich_autofill_index_websites_request(self, serializer);
-  }
-
-  @protected
   void sse_encode_box_autoadd_entry_request(
     EntryRequest self,
     SseSerializer serializer,
@@ -6367,6 +6200,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_export_ssh_key_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_forget_autofill_index_login_and_urls_request(
+    ForgetAutofillIndexLoginAndUrlsRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_forget_autofill_index_login_and_urls_request(self, serializer);
   }
 
   @protected
@@ -6655,15 +6497,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_patch_autofill_index_favorites_request(
-    PatchAutofillIndexFavoritesRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_patch_autofill_index_favorites_request(self, serializer);
-  }
-
-  @protected
   void sse_encode_box_autoadd_pgp_import_failure_kind(
     PgpImportFailureKind self,
     SseSerializer serializer,
@@ -6706,6 +6539,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_reconcile_autofill_index_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_refresh_autofill_index_login_and_urls_request(
+    RefreshAutofillIndexLoginAndUrlsRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_refresh_autofill_index_login_and_urls_request(self, serializer);
   }
 
   @protected
@@ -6782,16 +6624,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.indexPath, serializer);
-  }
-
-  @protected
-  void sse_encode_clear_autofill_index_websites_request(
-    ClearAutofillIndexWebsitesRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.indexPath, serializer);
-    sse_encode_list_String(self.paths, serializer);
   }
 
   @protected
@@ -6942,20 +6774,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_enrich_autofill_index_websites_request(
-    EnrichAutofillIndexWebsitesRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.configPath, serializer);
-    sse_encode_String(self.indexPath, serializer);
-    sse_encode_String(self.root, serializer);
-    sse_encode_opt_String(self.pgpExecutable, serializer);
-    sse_encode_opt_String(self.passphrase, serializer);
-    sse_encode_list_String(self.paths, serializer);
-  }
-
-  @protected
   void sse_encode_entry_request(EntryRequest self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.configPath, serializer);
@@ -7008,6 +6826,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.sshDir, serializer);
     sse_encode_String(self.name, serializer);
     sse_encode_opt_String(self.confirmation, serializer);
+  }
+
+  @protected
+  void sse_encode_forget_autofill_index_login_and_urls_request(
+    ForgetAutofillIndexLoginAndUrlsRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.indexPath, serializer);
   }
 
   @protected
@@ -7365,18 +7192,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_autofill_candidate_dto(item, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_list_autofill_entry_metadata_dto(
-    List<AutofillEntryMetadataDto> self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_32(self.length, serializer);
-    for (final item in self) {
-      sse_encode_autofill_entry_metadata_dto(item, serializer);
     }
   }
 
@@ -7778,16 +7593,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_patch_autofill_index_favorites_request(
-    PatchAutofillIndexFavoritesRequest self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.indexPath, serializer);
-    sse_encode_list_autofill_entry_metadata_dto(self.entries, serializer);
-  }
-
-  @protected
   void sse_encode_pgp_import_failure_kind(
     PgpImportFailureKind self,
     SseSerializer serializer,
@@ -7879,7 +7684,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.storeId, serializer);
     sse_encode_String(self.storeName, serializer);
     sse_encode_String(self.root, serializer);
-    sse_encode_list_autofill_entry_metadata_dto(self.entries, serializer);
   }
 
   @protected
@@ -7892,7 +7696,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.storeId, serializer);
     sse_encode_String(self.storeName, serializer);
     sse_encode_String(self.root, serializer);
-    sse_encode_list_autofill_entry_metadata_dto(self.entries, serializer);
+  }
+
+  @protected
+  void sse_encode_refresh_autofill_index_login_and_urls_request(
+    RefreshAutofillIndexLoginAndUrlsRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.configPath, serializer);
+    sse_encode_String(self.indexPath, serializer);
+    sse_encode_String(self.root, serializer);
+    sse_encode_opt_String(self.pgpExecutable, serializer);
+    sse_encode_opt_String(self.passphrase, serializer);
   }
 
   @protected
@@ -7971,6 +7787,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.indexPath, serializer);
-    sse_encode_autofill_entry_metadata_dto(self.entry, serializer);
+    sse_encode_String(self.path, serializer);
   }
 }

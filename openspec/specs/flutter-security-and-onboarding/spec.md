@@ -113,131 +113,113 @@ Sources: `gui/lib/services/security_repository.dart`,
 
 ### Requirement: Onboarding SHALL progress through local unlock, optional biometrics, keys, store, and review
 
-Onboarding SHALL use a capability-driven essential-first flow. It SHALL require an accessible local gesture verifier and a usable selected password store before Finish. It SHALL guide PGP key selection, creation, import, or missing-key repair when required by the selected store. Biometric unlock and SSH setup SHALL remain available but SHALL be skippable or deferrable to a post-setup checklist and Settings. Review SHALL distinguish required incomplete work from optional skipped work. Finish SHALL persist onboarding completion and mark the app unlocked only after all required prerequisites are satisfied.
+Onboarding SHALL separate first-run local security from password-store setup. It SHALL require an accessible local gesture verifier, MAY offer biometrics without blocking progress, and SHALL then present Import and Clone as primary store-source actions plus Create as a secondary action. Import or Clone SHALL be completed before PGP repair so `.gpg-id` determines required private material. Create SHALL request recipients only as part of creating `.gpg-id`. SSH setup SHALL appear only for an SSH-form clone or later Git transport configuration. When security and the canonical store are ready, onboarding SHALL enter Vault without a fixed expert step rail or mandatory review step.
 
 Sources: `gui/lib/screens/onboarding/onboarding_screen.dart`, `gui/lib/services/store_lifecycle.dart`, `gui/lib/services/key_repository.dart`
 
-#### Scenario: Essential flow avoids a fixed expert step rail
-- **GIVEN** a new user has no gesture verifier or usable store
-- **WHEN** onboarding renders
-- **THEN** it presents required local unlock and store/key setup in goal-oriented order
-- **AND** it does not require navigating a disabled six-chip Gesture/Biometrics/PGP/SSH/Store/Review rail
+#### Scenario: Essential flow starts with security then store source
 
-#### Scenario: Optional capabilities can be deferred
-- **GIVEN** required gesture and store/key setup are complete
-- **WHEN** biometrics or SSH is unavailable or skipped
-- **THEN** onboarding may continue to review and Finish
-- **AND** Settings or a post-setup checklist exposes the deferred capability later
+- **GIVEN** a new user has no gesture verifier or canonical store
+- **WHEN** onboarding renders
+- **THEN** it first establishes required local unlock
+- **AND** then offers Import, Clone, and secondary Create
+- **AND** it does not require a Gesture/Biometrics/PGP/SSH/Store/Review rail
+
+#### Scenario: Store removal does not repeat security onboarding
+
+- **GIVEN** local security onboarding is complete and the app is unlocked
+- **AND** the canonical store is deleted or disconnected
+- **WHEN** root lifecycle state refreshes
+- **THEN** onboarding opens directly at store setup
+- **AND** gesture and biometric setup are not reset
+
+#### Scenario: Import discovers recipients before PGP repair
+
+- **GIVEN** no canonical store is configured
+- **WHEN** Import finalizes a password store
+- **THEN** onboarding inspects that store's `.gpg-id`
+- **AND** it requests PGP repair only if required private material is unavailable
+
+#### Scenario: Clone requests only relevant transport setup
+
+- **GIVEN** no SSH key is configured
+- **WHEN** the user clones over HTTPS
+- **THEN** SSH setup is not shown as a prerequisite
+- **WHEN** the user clones over SSH and needs a key
+- **THEN** SSH import or generation is offered in that clone context
 
 #### Scenario: Required key repair remains blocking
-- **GIVEN** the selected store references PGP material that is not usable locally
-- **WHEN** onboarding evaluates completion
-- **THEN** it presents the existing key selection, creation, import, or repair flow
-- **AND** Finish remains disabled until the store has the required usable key state
+
+- **GIVEN** the canonical store references PGP material that is not usable locally
+- **WHEN** onboarding evaluates readiness
+- **THEN** it presents contextual matching private-key import or repair
+- **AND** Vault remains unavailable until required key state is usable
 
 #### Scenario: Pure-Rust recipient inspection requires private material
+
 - **GIVEN** mobile uses the configured pure-Rust PGP keyring
 - **AND** `.gpg-id` contains one or more recipients
 - **WHEN** app state is inspected
-- **THEN** every recipient must match listed local private-key material
+- **THEN** at least one usable recipient must match listed local private-key material
 - **AND** a missing or public-only match reports required key repair
 
-#### Scenario: Public-only PGP key cannot satisfy onboarding
-- **GIVEN** local PGP records contain public material without the matching private key
-- **WHEN** onboarding presents usable encryption keys
-- **THEN** the public-only record is not offered as Use PGP key
-- **AND** Finish remains blocked until private material is available
+#### Scenario: Optional capabilities remain deferrable
 
-#### Scenario: Finish onboarding marks app ready
-- **GIVEN** the gesture verifier exists
-- **AND** store setup no longer requires setup or required key repair
-- **WHEN** Finish is activated
-- **THEN** onboarding completion is saved
-- **AND** the security repository is marked unlocked
+- **GIVEN** local security and canonical store repair are complete
+- **WHEN** biometrics, Git, a remote, or SSH is unavailable or skipped
+- **THEN** onboarding can enter Vault
+- **AND** optional capabilities remain available later in Settings
 
 #### Scenario: Existing transactional setup behavior is preserved
-- **WHEN** onboarding imports a protected key, chooses a native path, handles a store conflict, creates a store, or clones a store
-- **THEN** it uses the existing validation, preparation, picker, conflict, and transactional repository behavior
-- **AND** a presentation redesign does not bypass or duplicate those operations
+
+- **WHEN** onboarding imports a protected key, handles an app-managed store conflict, creates a store, or clones a store
+- **THEN** it uses validated picker, preparation, staging, conflict, and transactional repository behavior
+- **AND** presentation code does not duplicate those operations
 
 ### Requirement: Settings SHALL expose security, key, store, Git, and diagnostics surfaces
 
-Settings SHALL organize all existing configuration capabilities into a user-goal hierarchy. Appearance, Security and privacy, Vault and sync, and Autofill SHALL appear before Key management and Advanced/support diagnostics. Appearance SHALL expose the persisted System/English/Chinese language choice. Routine tiles SHALL show concise localized state; technical commands, parser details, internal paths, and diagnostics SHALL be progressively disclosed. Gesture/biometric controls, PGP session timeout, key-bound secure passphrase controls, PGP and SSH key management, password stores, Git sync/remotes, advanced Git args, Autofill, runtime diagnostics, and onboarding reset SHALL remain reachable.
+Settings SHALL organize configuration into Appearance, Security and privacy, Password store, Git synchronization, Autofill, and Advanced/support groups. Appearance SHALL expose persisted System/English/Chinese language choice. Password store SHALL show one canonical store and offer app-managed Delete local copy or external Disconnect, without a store list, switcher, or default action. Git SHALL present disabled, local, or remote capability truthfully and SHALL contain optional SSH management. Settings SHALL retain PGP passphrase/session controls but SHALL NOT expose permanent PGP key CRUD. Technical commands, internal paths, and diagnostics SHALL remain progressively disclosed.
 
 Sources: `gui/lib/screens/settings/settings_screen.dart`, `gui/lib/services/runtime_diagnostics.dart`
 
 #### Scenario: Routine settings precede advanced diagnostics
+
 - **WHEN** Settings home renders
-- **THEN** appearance, security/privacy, vault/sync, and Autofill groups precede key-management and advanced/support groups
-- **AND** Runtime diagnostics and advanced Git args do not receive the same initial prominence as routine settings
+- **THEN** appearance, security/privacy, password store, Git synchronization, and Autofill precede advanced/support
+- **AND** Runtime diagnostics and advanced Git args do not receive routine-setting prominence
 
 #### Scenario: Language is changed from Appearance
+
 - **WHEN** the user selects System, English, or Chinese in Appearance
 - **THEN** the UI foundation applies and persists that locale preference
 - **AND** Settings remains on an equivalent route after the live language change
 
+#### Scenario: Password store presents one canonical root
+
+- **GIVEN** a canonical store exists
+- **WHEN** Password store settings render
+- **THEN** they show that store's concise identity and state
+- **AND** they do not show alternate stores, Select, or Set default actions
+
 #### Scenario: Technical status is summarized
-- **GIVEN** a Settings capability is unavailable, stale, or failed
-- **WHEN** its home row renders
-- **THEN** the row shows a concise localized state and appropriate status semantics
+
+- **GIVEN** a capability is unavailable, stale, or failed
+- **WHEN** its Settings row renders
+- **THEN** the row shows a concise localized state with appropriate semantics
 - **AND** bounded technical details are available only through an explicit details or diagnostics action
 
-#### Scenario: Every existing setting remains reachable
-- **WHEN** the redesign is complete
-- **THEN** each security, key, store, Git, Autofill, diagnostic, and onboarding-reset operation defined by existing requirements has a concrete Settings route or action
-- **AND** none is replaced by a no-op or misleading placeholder
+#### Scenario: Git-disabled status is not an error
 
-#### Scenario: Reset onboarding clears onboarding completion
-- **WHEN** Reset onboarding is selected and its confirmation completes
-- **THEN** onboarding completion is set to false
-- **AND** the app callback returns to the redesigned onboarding flow
+- **GIVEN** the canonical password store intentionally has no `.git`
+- **WHEN** Settings renders Git synchronization
+- **THEN** it shows a localized disabled/local-only state and an Enable Git action
+- **AND** it does not report sync failure
 
-### Requirement: Settings key sheets SHALL separate global add actions from per-key actions
+#### Scenario: Reset onboarding does not manufacture a store
 
-Settings SHALL present PGP keys and SSH keys in separate key-management sheets.
-Each sheet SHALL expose only key-adding actions at the sheet level, and SHALL
-place actions that operate on an existing key inside that key row's overflow
-menu.
-
-#### Scenario: PGP sheet exposes only create and import globally
-
-- **GIVEN** Settings displays the PGP keys sheet with one or more PGP keys
-- **WHEN** the sheet is shown
-- **THEN** the sheet-level actions include Create and Import
-- **AND** sheet-level actions do not include Export public, Export private, Add
-  to `.gpg-id`, or Delete
-
-#### Scenario: PGP key row menu contains key-specific actions
-
-- **GIVEN** Settings displays a PGP key with fingerprint `ABC`
-- **WHEN** the user opens that key row's overflow menu
-- **THEN** the menu includes Export public, Export private, Add to `.gpg-id`,
-  and Delete
-- **AND** choosing one of those actions targets fingerprint `ABC`
-
-#### Scenario: SSH sheet exposes only create and import globally
-
-- **GIVEN** Settings displays the SSH keys sheet with one or more SSH keys
-- **WHEN** the sheet is shown
-- **THEN** the sheet-level actions include Create and Import
-- **AND** sheet-level actions do not include Export public, Export private, or
-  Delete
-
-#### Scenario: SSH key row menu contains key-specific actions
-
-- **GIVEN** Settings displays an SSH key named `mobile-key`
-- **WHEN** the user opens that key row's overflow menu
-- **THEN** the menu includes Export public, Export private, and Delete
-- **AND** choosing one of those actions targets name `mobile-key`
-
-#### Scenario: PGP and SSH sheets remain separate
-
-- **WHEN** the user opens PGP keys from Settings
-- **THEN** Settings shows the PGP keys sheet
-- **AND** it does not merge SSH keys into the same popup
-- **WHEN** the user opens SSH keys from Settings
-- **THEN** Settings shows the SSH keys sheet
-- **AND** it does not merge PGP keys into the same popup
+- **WHEN** Reset onboarding is selected and confirmed
+- **THEN** security onboarding completion is reset according to existing security semantics
+- **AND** the next flow still derives store availability from the actual canonical lifecycle snapshot
 
 ### Requirement: Settings and Onboarding SHALL use native path selectors for filesystem paths
 
@@ -309,50 +291,6 @@ interfaces and SHALL NOT be merged into one popup or form.
 - **THEN** Settings or Onboarding shows a clear error notification
 - **AND** the form does not enable submission using a manually typed path
 
-### Requirement: Settings SHALL allow deleting existing PGP and SSH keys
-
-Settings key management SHALL expose delete actions for existing PGP and SSH
-keys. Before deleting key material, the UI SHALL require confirmation using a
-human-readable key label displayed in the key list, SHALL show the exact phrase
-the user must type before submission, and SHALL show machine identifiers such as
-PGP fingerprints as read-only context rather than requiring them as typed
-confirmation text. Deletion failures SHALL be shown to the user without
-removing the key from the visible list.
-
-Sources: `gui/lib/screens/settings/settings_screen.dart`,
-`gui/test/mobile_gui_smoke_test.dart`,
-`gui/lib/services/key_repository.dart`
-
-#### Scenario: Delete PGP key from settings
-
-- GIVEN Settings displays a PGP key with name `Alice` and fingerprint `ABC`
-- WHEN the user chooses delete for that key
-- AND confirms deletion by typing `Alice`
-- THEN Settings calls the PGP key delete operation for fingerprint `ABC`
-- AND refreshes the visible key list after deletion succeeds
-
-#### Scenario: PGP key delete dialog does not require fingerprint input
-
-- GIVEN a PGP key deletion confirmation dialog is open for fingerprint `ABC`
-- WHEN the dialog renders its confirmation instructions
-- THEN the required typed confirmation text is the key's human-readable name
-- AND the fingerprint `ABC` is displayed only as key context
-
-#### Scenario: Delete SSH key from settings
-
-- GIVEN Settings displays an SSH key named `mobile-key`
-- WHEN the user chooses delete for that key
-- AND confirms deletion by typing `mobile-key`
-- THEN Settings calls the SSH key delete operation for name `mobile-key`
-- AND refreshes the visible key list after deletion succeeds
-
-#### Scenario: Delete key cancellation preserves the key
-
-- GIVEN a key deletion confirmation dialog is open
-- WHEN the user cancels the dialog or enters incorrect confirmation text
-- THEN Settings does not call the key delete operation
-- AND the key remains visible
-
 ### Requirement: PGP passphrase cache SHALL be associated with a selected PGP key
 
 The PGP passphrase cache SHALL store the selected PGP key fingerprint alongside
@@ -388,106 +326,6 @@ Sources: `gui/lib/services/security_repository.dart`,
 - THEN the repository treats the cached passphrase as absent
 - AND the user must save a new key-specific passphrase before biometric unlock
   can restore a PGP session
-
-### Requirement: Deleting a PGP key SHALL clear matching passphrase cache state
-
-Settings SHALL clear any cached PGP passphrase or active PGP session associated
-with a PGP key fingerprint when that key is deleted. Cached passphrases for
-other PGP keys SHALL remain unchanged.
-
-Sources: `gui/lib/screens/settings/settings_screen.dart`,
-`gui/lib/services/security_repository.dart`,
-`gui/test/security_repository_test.dart`,
-`gui/test/mobile_gui_smoke_test.dart`
-
-#### Scenario: Delete cached-passphrase key clears cache
-
-- GIVEN the cached PGP passphrase is associated with fingerprint `ABC`
-- WHEN the user deletes PGP key `ABC` from Settings
-- THEN the security repository clears the cached PGP passphrase
-- AND clears any active PGP session for fingerprint `ABC`
-
-#### Scenario: Delete unrelated PGP key preserves cache
-
-- GIVEN the cached PGP passphrase is associated with fingerprint `ABC`
-- WHEN the user deletes PGP key `DEF` from Settings
-- THEN the cached PGP passphrase for fingerprint `ABC` remains available
-
-### Requirement: Settings and Onboarding SHALL share a source-independent PGP import flow
-
-Settings and Onboarding SHALL offer the same PGP import flow with Text and File
-as source choices. The flow SHALL use bridge inspection to determine public or
-private key kind and passphrase protection, SHALL use a native file picker for
-the File source, and SHALL complete using the canonical key record returned by
-the bridge. A protected private-key import SHALL not complete until its
-passphrase is validated. Successful validation SHALL start an in-memory PGP
-session bound to the imported fingerprint and SHALL persist the passphrase only
-when the user explicitly opts into Keychain/KMS storage.
-
-#### Scenario: Both GUI surfaces offer Text and File
-
-- **WHEN** the user opens PGP import from Settings or Onboarding
-- **THEN** the import flow offers Text and File source choices
-- **AND** selecting File opens the native key-file picker inside the import flow
-
-#### Scenario: Source does not determine public or private kind
-
-- **GIVEN** supported public or private PGP material is supplied from Text or
-  File
-- **WHEN** the GUI inspects the selected material
-- **THEN** it follows the public/private kind returned by the bridge
-- **AND** it does not assume every file is a private key
-
-#### Scenario: Protected private import requests and validates passphrase
-
-- **GIVEN** inspection identifies passphrase-protected private PGP material
-- **WHEN** the user submits the selected text or file
-- **THEN** the flow presents an obscured PGP passphrase field
-- **AND** import completion remains blocked until validation succeeds
-
-#### Scenario: Incorrect passphrase stays in the import flow
-
-- **GIVEN** a protected private-key passphrase step is visible
-- **WHEN** the user enters an incorrect passphrase
-- **THEN** the flow shows a sanitized inline validation error
-- **AND** it does not advance Onboarding or report Settings import success
-- **AND** it does not start or cache a PGP session
-
-#### Scenario: Correct passphrase starts a key-bound session
-
-- **GIVEN** protected private key material imports as fingerprint `ABC`
-- **WHEN** the user enters the correct passphrase
-- **THEN** the security repository starts an in-memory PGP session for
-  fingerprint `ABC`
-- **AND** Onboarding selects `ABC` before advancing or Settings refreshes the
-  visible key list
-
-#### Scenario: Remembering an imported passphrase is explicit
-
-- **GIVEN** the protected private-key passphrase step is visible
-- **WHEN** the user successfully imports the key without selecting Remember in
-  Keychain/KMS
-- **THEN** the passphrase is not written to durable storage
-- **WHEN** the user explicitly selects Remember in Keychain/KMS
-- **THEN** the saved passphrase cache is associated with the imported
-  fingerprint
-
-#### Scenario: Public and unprotected private imports skip passphrase UI
-
-- **GIVEN** inspection identifies a public key or an unprotected private key
-- **WHEN** import succeeds
-- **THEN** the flow does not request or persist a PGP passphrase
-- **AND** it completes with the returned canonical key record
-
-#### Scenario: Secure-storage failure does not expose the passphrase
-
-- **GIVEN** a protected private key was imported and its in-memory session
-  started
-- **WHEN** optional Keychain/KMS persistence fails
-- **THEN** the GUI reports that remembering the passphrase failed without
-  rolling back the imported key
-- **AND** clears the passphrase field
-- **AND** no error or notification contains the passphrase
 
 ### Requirement: Protected PGP sessions SHALL start only after private-key preparation
 
@@ -556,71 +394,9 @@ new states.
 - **THEN** it selects the message through the existing i18n system
 - **AND** the rendered message contains no passphrase or private-key material
 
-### Requirement: GUI PGP deletion SHALL reflect verified managed-key removal
-
-Settings SHALL retain human-readable typed confirmation and SHALL NOT request
-the PGP passphrase merely to delete the encrypted private-key file. When a PGP
-identity is displayed as `Display Name <email>`, the required confirmation
-SHALL be only `Display Name`; the email address SHALL NOT be required. After the
-bridge confirms that managed private material is absent,
-Settings SHALL clear the matching active session and securely stored
-passphrase, refresh the key list, and show localized outcome text. If private
-removal fails, Settings SHALL preserve matching security state and keep the key
-visible. If only public cleanup fails, Settings SHALL report localized partial
-success and SHALL NOT claim the private key remains installed. `.gpg-id`
-references SHALL remain unchanged.
-
-#### Scenario: Complete GUI deletion clears matching authorization
-
-- **GIVEN** Settings displays protected PGP key `ABC` and its matching session or
-  securely stored passphrase exists
-- **WHEN** the user types the displayed human-readable key name and deletion
-  confirms both private and public records absent
-- **THEN** Settings clears the session and stored passphrase for `ABC`
-- **AND** refreshes the list and shows a localized deletion success
-
-#### Scenario: Deletion does not request the private-key passphrase
-
-- **GIVEN** the delete confirmation is open for protected PGP key `ABC`
-- **WHEN** the user supplies the required human-readable key-name confirmation
-- **THEN** Settings submits deletion without requesting or transmitting the PGP
-  passphrase
-
-#### Scenario: PGP email is excluded from typed confirmation
-
-- **GIVEN** Settings displays PGP identity `Alice <alice@example.com>`
-- **WHEN** the user opens its delete confirmation
-- **THEN** the required confirmation value is `Alice`
-- **AND** the user is not required to type `<alice@example.com>`
-
-#### Scenario: Delete confirmation remains usable above the keyboard
-
-- **GIVEN** the PGP delete confirmation is displayed on a phone-sized viewport
-- **WHEN** the software keyboard opens for the confirmation field
-- **THEN** the dialog content can scroll within the remaining height
-- **AND** the confirmation field and delete action remain reachable without a
-  layout overflow
-
-#### Scenario: Private removal failure preserves security state and visibility
-
-- **GIVEN** deletion of `ABC` cannot confirm its private record absent
-- **WHEN** Settings receives the failure
-- **THEN** it does not clear `ABC`'s matching session or stored passphrase
-- **AND** it refreshes or preserves the visible key record and shows a localized
-  failure
-
-#### Scenario: Public cleanup failure clears secrets and reports partial success
-
-- **GIVEN** deletion confirms `ABC`'s private record absent but public cleanup
-  failed
-- **WHEN** Settings handles the structured bridge response
-- **THEN** it clears `ABC`'s matching session and stored passphrase
-- **AND** refreshes the list and shows a localized partial-success warning
-- **AND** any `.gpg-id` reference remains visible as missing local key material
-
 ### Requirement: Authenticated GUI SHALL provide immediate manual lock
 
-The authenticated GUI SHALL expose a clearly named Lock now action from the Vault or shell header. Lock now SHALL call the existing full lock path, clear the active in-memory PGP session, dispose decrypted detail content, and render the lock screen without changing durable onboarding, key, store, favorite, or locale state.
+The authenticated GUI SHALL expose a clearly named Lock now action from the Vault or shell header. Lock now SHALL call the existing full lock path, clear the active in-memory PGP session, dispose decrypted detail content, and render the lock screen without changing durable onboarding, key, store, or locale state.
 
 #### Scenario: User locks from Vault
 - **GIVEN** the app is unlocked
@@ -631,7 +407,7 @@ The authenticated GUI SHALL expose a clearly named Lock now action from the Vaul
 
 #### Scenario: Manual lock preserves durable configuration
 - **WHEN** Lock now completes
-- **THEN** persisted onboarding, language, keys, stores, favorites, and secure-storage preferences remain unchanged
+- **THEN** persisted onboarding, language, keys, stores, and secure-storage preferences remain unchanged
 
 ### Requirement: Authenticated and secret GUI surfaces SHALL protect background and capture privacy
 
@@ -695,6 +471,75 @@ Lock, onboarding, and Settings primary workflows SHALL expose ordered focus, acc
 - **WHEN** the software keyboard opens at 200% text scaling
 - **THEN** content scrolls within the remaining viewport
 - **AND** the required submit action remains reachable
+
+### Requirement: Settings SHALL manage SSH keys without exposing permanent PGP key CRUD
+
+Settings SHALL place SSH key creation, import, public/private export, and deletion under Git synchronization. It SHALL NOT expose a permanent PGP key list or general PGP create, export, append-to-`.gpg-id`, or delete actions. PGP passphrase/session controls SHALL remain under Security and privacy.
+
+#### Scenario: SSH management is available under Git
+
+- **WHEN** the user opens Git synchronization settings
+- **THEN** SSH key management is reachable
+- **AND** existing SSH keys expose supported per-key export and delete actions
+
+#### Scenario: Settings has no general PGP key page
+
+- **WHEN** Settings home and nested routes render
+- **THEN** there is no permanent PGP keys management destination
+- **AND** PGP passphrase/session security controls remain available
+
+#### Scenario: Local-only store does not require SSH
+
+- **GIVEN** the canonical store has Git disabled or has no SSH remote
+- **WHEN** Settings renders SSH capability
+- **THEN** SSH is presented as an optional Git transport capability
+- **AND** store readiness does not depend on configuring an SSH key
+
+### Requirement: Contextual PGP setup and repair SHALL follow the canonical store recipients
+
+Flutter SHALL expose PGP key selection, generation, or import only while creating a store, satisfying a missing `.gpg-id`, or repairing required private material. For an existing `.gpg-id`, the flow SHALL accept only private material matching a required recipient and SHALL NOT append a different selected fingerprint. Protected private import SHALL use the source-independent Text/File inspection and preparation flow, start a fingerprint-bound session only after validation, and persist a passphrase only after explicit consent.
+
+#### Scenario: Existing matching private key completes repair
+
+- **GIVEN** the canonical store `.gpg-id` references fingerprint `ABC`
+- **AND** local private material for `ABC` is usable
+- **WHEN** repair evaluates the store
+- **THEN** the store can become ready without editing `.gpg-id`
+
+#### Scenario: Nonmatching imported private key is rejected for repair
+
+- **GIVEN** the canonical store requires fingerprint `ABC`
+- **WHEN** the user imports private key `DEF` through the repair flow
+- **THEN** the flow does not mark repair complete
+- **AND** `.gpg-id` remains unchanged
+
+#### Scenario: Public-only material cannot complete repair
+
+- **GIVEN** `.gpg-id` references fingerprint `ABC`
+- **AND** local records contain only the public key for `ABC`
+- **WHEN** repair evaluates readiness
+- **THEN** repair remains required
+- **AND** the public-only record is not offered as a usable private key
+
+#### Scenario: Text and File sources use the same inspection flow
+
+- **WHEN** contextual setup or repair opens PGP import
+- **THEN** Text and File source choices use bridge inspection to determine public/private kind and protection
+- **AND** the selected source does not predetermine key kind
+
+#### Scenario: Protected matching import validates before completion
+
+- **GIVEN** matching private material is protected by a passphrase
+- **WHEN** the user imports it during setup or repair
+- **THEN** completion remains blocked until exact-key passphrase validation and private-key preparation succeed
+- **AND** incorrect passphrases produce sanitized inline feedback without starting or caching a session
+
+#### Scenario: Remembering a contextual passphrase is explicit
+
+- **GIVEN** a protected matching private key was prepared successfully
+- **WHEN** the user does not select Remember in Keychain/KMS
+- **THEN** only the in-memory fingerprint-bound PGP session is started
+- **AND** no passphrase is durably stored
 
 ## Needs Verification
 

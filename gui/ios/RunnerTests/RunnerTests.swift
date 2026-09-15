@@ -10,7 +10,7 @@ class RunnerTests: XCTestCase {
   func testAutofillIndexDecodesSharedRustJson() throws {
     let raw = """
       {
-        "version": 2,
+        "version": 3,
         "store_id": "store-a",
         "store_root": "/tmp/store-a",
         "entries": [
@@ -44,7 +44,7 @@ class RunnerTests: XCTestCase {
     let source = Data(
       """
       {
-        "version": 2,
+        "version": 3,
         "store_id": "store-a",
         "store_root": "/tmp/store-a",
         "entries": [
@@ -56,7 +56,7 @@ class RunnerTests: XCTestCase {
     let existing = Data(
       """
       {
-        "version": 2,
+        "version": 3,
         "store_id": "store-a",
         "store_root": "/tmp/store-a",
         "entries": [
@@ -80,13 +80,13 @@ class RunnerTests: XCTestCase {
   func testPublishingReplacementStoreDoesNotInheritAutofillHistory() throws {
     let source = Data(
       """
-      {"version":2,"store_id":"store-b","store_root":"/tmp/store-b","entries":[
+      {"version":3,"store_id":"store-b","store_root":"/tmp/store-b","entries":[
         {"path":"example.com/alice","autofill_rank":null}
       ]}
       """.utf8)
     let existing = Data(
       """
-      {"version":2,"store_id":"store-a","store_root":"/tmp/store-a","entries":[
+      {"version":3,"store_id":"store-a","store_root":"/tmp/store-a","entries":[
         {"path":"example.com/alice","autofill_rank":0}
       ]}
       """.utf8)
