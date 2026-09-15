@@ -210,6 +210,7 @@ class _StoreSetupActions extends StatelessWidget {
                   (conflict) =>
                       showManagedStoreConflictSheet(context, conflict),
               resolveMissingGit: (_) => _resolveMissingGitDecision(context),
+              resolveProviderFault: () => _resolveStoreProviderFault(context),
             );
         if (transaction == null) {
           throw PathPickerException(localizations.storeImportCancelled);
@@ -231,6 +232,32 @@ class _StoreSetupActions extends StatelessWidget {
             ),
           ],
     );
+  }
+
+  Future<bool> _resolveStoreProviderFault(BuildContext context) async {
+    return await showDialog<bool>(
+          context: context,
+          builder:
+              (dialogContext) => AlertDialog(
+                title: Text(dialogContext.l10n.storeImportDirectAccessTitle),
+                content: Text(
+                  dialogContext.l10n.storeImportDirectAccessMessage,
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: Text(dialogContext.l10n.cancel),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: Text(
+                      dialogContext.l10n.storeImportDirectAccessAction,
+                    ),
+                  ),
+                ],
+              ),
+        ) ??
+        false;
   }
 
   Future<ManagedStoreGitDecision> _resolveMissingGitDecision(
@@ -615,6 +642,9 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
             caught is PathPickerException &&
                     caught.code == 'store_import_no_passwords'
                 ? context.l10n.storeImportNoPasswords
+                : caught is PathPickerException &&
+                    caught.code == 'store_import_provider_unlistable'
+                ? context.l10n.storeImportProviderUnlistable
                 : UiProblem.fromError(context.l10n, caught).summary;
         _isSubmitting = false;
       });

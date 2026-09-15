@@ -59,6 +59,8 @@ openspec/specs/
     spec.md
   store-lifecycle/
     spec.md
+  android-direct-store-read/
+    spec.md
 ```
 
 ## Capability Map
@@ -84,6 +86,8 @@ openspec/specs/
   PGP passphrase session/cache, and onboarding flow.
 - `store-lifecycle`: GUI/bridge password store discovery, create/import/clone,
   selection, removal, deletion, and app-state issue reporting.
+- `android-direct-store-read`: authorized Android direct-filesystem recovery
+  of a picker-selected store after DocumentsProvider enumeration fails.
 
 ## Needs Verification
 

@@ -114,7 +114,8 @@ pub fn generate_ssh_ed25519_key(ssh_dir: &Path, name: &str) -> GuiResult<SshKeyS
     validate_key_file_name(name)?;
     fs::create_dir_all(ssh_dir)?;
     let private_path = ssh_dir.join(name);
-    if private_path.exists() || private_path.with_extension("pub").exists() {
+    let public_path = ssh_public_key_path(ssh_dir, name);
+    if private_path.exists() || public_path.exists() {
         return Err(CoreError::Conflict(crate::gui::EntryConflict::already_exists(name)));
     }
 
@@ -126,8 +127,7 @@ pub fn generate_ssh_ed25519_key(ssh_dir: &Path, name: &str) -> GuiResult<SshKeyS
     let public_key_text = ssh_ed25519_public_key_text(&public_key, name);
     seed.zeroize();
 
-    write_private_key(&private_path, &private_key)?;
-    fs::write(private_path.with_extension("pub"), public_key_text)?;
+    write_ssh_key_pair(&private_path, &private_key, &public_path, &public_key_text)?;
     ssh_key_summary(ssh_dir, name)
 }
 
@@ -143,14 +143,18 @@ pub fn import_ssh_private_key_text(
             Err(CoreError::ValidationError("expected SSH private key material".to_string()))
         }
     })?;
+    let public_key_text = ssh_public_key_text_for_private(private_key, name)?;
 
     fs::create_dir_all(ssh_dir)?;
     let private_path = ssh_dir.join(name);
-    if private_path.exists() || private_path.with_extension("pub").exists() {
+    let public_path = ssh_public_key_path(ssh_dir, name);
+    // A private key without its public key is unusable by every other code path, so the name is
+    // only taken when the public key exists or the private key can still be loaded.
+    if public_path.exists() || (private_path.exists() && is_usable_ssh_private_key(&private_path)) {
         return Err(CoreError::Conflict(crate::gui::EntryConflict::already_exists(name)));
     }
-    write_private_key(&private_path, private_key)?;
-    derive_ssh_public_key(&private_path, &private_path.with_extension("pub"))?;
+
+    write_ssh_key_pair(&private_path, private_key, &public_path, &public_key_text)?;
     ssh_key_summary(ssh_dir, name)
 }
 
@@ -249,8 +253,12 @@ fn store_path_error(operation: &str, path: &Path, error: std::io::Error) -> Core
     CoreError::StoreError(format!("{operation} '{}': {error}", path.display()))
 }
 
+fn ssh_public_key_path(ssh_dir: &Path, name: &str) -> PathBuf {
+    ssh_dir.join(format!("{name}.pub"))
+}
+
 fn ssh_key_summary(ssh_dir: &Path, name: &str) -> GuiResult<SshKeySummary> {
-    let public_path = ssh_dir.join(format!("{name}.pub"));
+    let public_path = ssh_public_key_path(ssh_dir, name);
     Ok(SshKeySummary {
         name: name.to_string(),
         fingerprint: ssh_public_key_fingerprint(&public_path)?,
@@ -277,17 +285,21 @@ fn ssh_public_key_fingerprint(public_path: &Path) -> GuiResult<String> {
     Ok(ssh_fingerprint_for_blob(&blob))
 }
 
-fn derive_ssh_public_key(private_path: &Path, public_path: &Path) -> GuiResult<()> {
-    let private_key = fs::read_to_string(private_path).map_err(|err| {
-        CoreError::StoreError(format!(
-            "failed to read SSH private key {}: {err}",
-            private_path.display()
-        ))
-    })?;
-    let public_key = openssh_ed25519_public_key_from_private(&private_key)?;
-    let comment = private_path.file_name().and_then(|name| name.to_str()).unwrap_or("imported-key");
-    fs::write(public_path, ssh_ed25519_public_key_text(&public_key, comment))?;
-    Ok(())
+fn ssh_public_key_text_for_private(private_key: &str, comment: &str) -> GuiResult<String> {
+    if !private_key.contains("-----BEGIN OPENSSH PRIVATE KEY-----") {
+        return Err(CoreError::ValidationError(
+            "only OpenSSH ed25519 private keys can be imported; PEM-encoded RSA and ECDSA keys \
+             are not supported. Generate a supported key with `ssh-keygen -t ed25519`."
+                .to_string(),
+        ));
+    }
+    let public_key = openssh_ed25519_public_key_from_private(private_key)?;
+    Ok(ssh_ed25519_public_key_text(&public_key, comment))
+}
+
+fn is_usable_ssh_private_key(private_path: &Path) -> bool {
+    fs::read_to_string(private_path)
+        .is_ok_and(|private_key| ssh_public_key_text_for_private(&private_key, "").is_ok())
 }
 
 fn ssh_ed25519_public_blob(public_key: &[u8; 32]) -> Vec<u8> {
@@ -465,6 +477,20 @@ impl<'a> SshReader<'a> {
         self.offset = end;
         Ok(bytes)
     }
+}
+
+fn write_ssh_key_pair(
+    private_path: &Path,
+    private_key: &str,
+    public_path: &Path,
+    public_key_text: &str,
+) -> GuiResult<()> {
+    write_private_key(private_path, private_key)?;
+    if let Err(error) = fs::write(public_path, public_key_text) {
+        let _ = fs::remove_file(private_path);
+        return Err(error.into());
+    }
+    Ok(())
 }
 
 fn write_private_key(path: &Path, private_key: &str) -> GuiResult<()> {

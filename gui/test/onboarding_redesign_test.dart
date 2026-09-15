@@ -856,6 +856,7 @@ class _MissingGitPicker implements PathPickerService {
     required String destinationBaseDirectory,
     required ManagedStoreConflictResolver resolveConflict,
     required ManagedStoreGitDecisionResolver resolveMissingGit,
+    required ManagedStoreProviderFaultResolver resolveProviderFault,
   }) async {
     await resolveMissingGit(ManagedStoreGitState.absent);
     return null;
@@ -886,5 +887,6 @@ class _FolderPicker implements PathPickerService {
     required String destinationBaseDirectory,
     required ManagedStoreConflictResolver resolveConflict,
     required ManagedStoreGitDecisionResolver resolveMissingGit,
+    required ManagedStoreProviderFaultResolver resolveProviderFault,
   }) async => null;
 }

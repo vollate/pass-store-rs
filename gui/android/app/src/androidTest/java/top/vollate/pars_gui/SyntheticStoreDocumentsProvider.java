@@ -34,6 +34,7 @@ public final class SyntheticStoreDocumentsProvider extends DocumentsProvider {
   public static final String INVALID_GIT_ROOT = "invalid-git";
   public static final String UNSAFE_ROOT = "unsafe";
   public static final String CYCLE_ROOT = "cycle";
+  public static final String UNLISTABLE_ROOT = "unlistable";
   public static final int OBJECT_COUNT = 256;
   public static final String STATS_DOCUMENT = "__stats";
 
@@ -60,7 +61,7 @@ public final class SyntheticStoreDocumentsProvider extends DocumentsProvider {
     String[] columns = projection != null ? projection : ROOT_PROJECTION;
     MatrixCursor cursor = new MatrixCursor(columns);
     for (String rootId : Arrays.asList(
-        FULL_ROOT, LOCAL_ROOT, INVALID_GIT_ROOT, UNSAFE_ROOT, CYCLE_ROOT)) {
+        FULL_ROOT, LOCAL_ROOT, INVALID_GIT_ROOT, UNSAFE_ROOT, CYCLE_ROOT, UNLISTABLE_ROOT)) {
       Node root = nodes(rootId).get(rootId);
       Object[] row = new Object[columns.length];
       for (int i = 0; i < columns.length; i++) row[i] = rootColumn(columns[i], root);
@@ -86,6 +87,9 @@ public final class SyntheticStoreDocumentsProvider extends DocumentsProvider {
     int attempt = QUERY_ATTEMPTS.computeIfAbsent(parentDocumentId, ignored -> new AtomicInteger())
         .incrementAndGet();
     MatrixCursor cursor = new MatrixCursor(columns);
+    if (UNLISTABLE_ROOT.equals(parentDocumentId)) {
+      return cursor;
+    }
     if (FULL_ROOT.equals(parentDocumentId) && attempt <= 2) {
       if (attempt == 2) {
         Bundle extras = new Bundle();
@@ -190,7 +194,7 @@ public final class SyntheticStoreDocumentsProvider extends DocumentsProvider {
 
   private static String rootId(String documentId) throws FileNotFoundException {
     for (String root : Arrays.asList(
-        FULL_ROOT, LOCAL_ROOT, INVALID_GIT_ROOT, UNSAFE_ROOT, CYCLE_ROOT)) {
+        FULL_ROOT, LOCAL_ROOT, INVALID_GIT_ROOT, UNSAFE_ROOT, CYCLE_ROOT, UNLISTABLE_ROOT)) {
       if (documentId.equals(root) || documentId.startsWith(root + "/")) return root;
     }
     throw new FileNotFoundException(documentId);
@@ -203,6 +207,7 @@ public final class SyntheticStoreDocumentsProvider extends DocumentsProvider {
     else if (LOCAL_ROOT.equals(root)) title = "Local Vault";
     else if (INVALID_GIT_ROOT.equals(root)) title = "Invalid Git Vault";
     else if (UNSAFE_ROOT.equals(root)) title = "Unsafe Vault";
+    else if (UNLISTABLE_ROOT.equals(root)) title = "Unlistable Vault";
     else title = "Cycle Vault";
     directory(values, root, null, title);
     file(values, root + "/.gpg-id", root, ".gpg-id", "SYNTHETIC-RECIPIENT\n");

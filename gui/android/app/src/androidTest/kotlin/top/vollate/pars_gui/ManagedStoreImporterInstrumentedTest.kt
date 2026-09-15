@@ -1,6 +1,7 @@
 package top.vollate.pars_gui
 
 import android.net.Uri
+import android.os.Environment
 import android.provider.DocumentsContract
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -21,6 +22,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,6 +70,7 @@ class ManagedStoreImporterInstrumentedTest {
             assertNotEquals(staging.canonicalPath, handle)
             assertEquals(destination.canonicalPath, staged.getValue("destinationPath"))
             assertTrue(staging.isDirectory)
+            assertEquals(0 to 0, importer.directRecoveryAttemptsForTesting())
             assertEquals("SYNTHETIC-RECIPIENT\n", File(staging, ".gpg-id").readText())
             assertEquals("ref: refs/heads/main\n", File(staging, ".git/HEAD").readText())
             assertTrue(File(staging, ".git/config").readText().contains("synthetic.git"))
@@ -231,6 +234,123 @@ class ManagedStoreImporterInstrumentedTest {
         }
     }
 
+    @Test
+    fun unlistableProviderRootReportsDistinctFaultAndLeavesNoStage() {
+        resetProvider(SyntheticStoreDocumentsProvider.UNLISTABLE_ROOT)
+
+        val failed =
+            call(
+                "stageDirectory",
+                mapOf(
+                    "destinationBaseDirectory" to testRoot.path,
+                    "treeUri" to treeUri(SyntheticStoreDocumentsProvider.UNLISTABLE_ROOT).toString(),
+                ),
+            )
+
+        assertEquals("store_import_provider_unlistable", failed.code)
+        assertTrue(stagingDirectories().isEmpty())
+        assertEquals(
+            5,
+            providerStats(SyntheticStoreDocumentsProvider.UNLISTABLE_ROOT).rootAttempts,
+        )
+
+        val callerPathRejected =
+            call(
+                "stageDirectoryDirect",
+                mapOf(
+                    "destinationBaseDirectory" to testRoot.path,
+                    "treeUri" to treeUri(SyntheticStoreDocumentsProvider.UNLISTABLE_ROOT).toString(),
+                    "sourcePath" to testRoot.path,
+                ),
+            )
+        assertEquals("invalid_import_selection", callerPathRejected.code)
+        assertTrue(stagingDirectories().isEmpty())
+    }
+
+    @Test
+    fun authorizedDirectRecoveryStagesSelectedFilesystemTreeReadOnly() {
+        assumeTrue(
+            "Grant all-files access manually before running direct-recovery instrumentation",
+            Environment.isExternalStorageManager(),
+        )
+        val source =
+            File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                "pars-direct-import-${UUID.randomUUID()}",
+            )
+        assertTrue(source.mkdirs())
+        File(source, ".gpg-id").writeText("DIRECT-RECIPIENT\n")
+        File(source, "folder").mkdir()
+        File(source, "folder/login.gpg").writeText("direct synthetic ciphertext")
+        val sourceSnapshot =
+            source.walkTopDown().associate { file ->
+                file.relativeTo(source).path to
+                    Pair(if (file.isFile) file.readBytes().contentHashCode() else 0, file.lastModified())
+            }
+        try {
+            val documentId = "primary:Download/${source.name}"
+            val treeUri =
+                DocumentsContract.buildTreeDocumentUri(
+                    EXTERNAL_STORAGE_AUTHORITY,
+                    documentId,
+                )
+            importer.recordProviderFailureForTesting(treeUri)
+
+            val recovered =
+                call(
+                    "stageDirectoryDirect",
+                    mapOf(
+                        "destinationBaseDirectory" to testRoot.path,
+                        "treeUri" to treeUri.toString(),
+                    ),
+                )
+
+            assertNull("${recovered.code}: ${recovered.message}", recovered.code)
+            @Suppress("UNCHECKED_CAST")
+            val staged = recovered.value as Map<String, String>
+            val staging = File(staged.getValue("stagingPath"))
+            assertEquals("DIRECT-RECIPIENT\n", File(staging, ".gpg-id").readText())
+            assertEquals(
+                "direct synthetic ciphertext",
+                File(staging, "folder/login.gpg").readText(),
+            )
+            assertEquals(
+                sourceSnapshot,
+                source.walkTopDown().associate { file ->
+                    file.relativeTo(source).path to
+                        Pair(
+                            if (file.isFile) file.readBytes().contentHashCode() else 0,
+                            file.lastModified(),
+                        )
+                },
+            )
+            assertNull(
+                call(
+                    "cancelStagedDirectory",
+                    mapOf("handle" to staged.getValue("handle")),
+                ).code,
+            )
+            assertTrue(stagingDirectories().isEmpty())
+
+            val unsupported = SyntheticStoreDocumentsProvider.treeUri(
+                SyntheticStoreDocumentsProvider.UNLISTABLE_ROOT,
+            )
+            importer.recordProviderFailureForTesting(unsupported)
+            val rejected =
+                call(
+                    "stageDirectoryDirect",
+                    mapOf(
+                        "destinationBaseDirectory" to testRoot.path,
+                        "treeUri" to unsupported.toString(),
+                    ),
+                )
+            assertEquals("store_import_provider_unlistable", rejected.code)
+            assertTrue(stagingDirectories().isEmpty())
+        } finally {
+            source.deleteRecursively()
+        }
+    }
+
     private fun stage(rootId: String): Map<String, String> {
         val result =
             call(
@@ -318,6 +438,7 @@ class ManagedStoreImporterInstrumentedTest {
                 SyntheticStoreDocumentsProvider.INVALID_GIT_ROOT -> "Invalid Git Vault"
                 SyntheticStoreDocumentsProvider.UNSAFE_ROOT -> "Unsafe Vault"
                 SyntheticStoreDocumentsProvider.CYCLE_ROOT -> "Cycle Vault"
+                SyntheticStoreDocumentsProvider.UNLISTABLE_ROOT -> "Unlistable Vault"
                 else -> error("unknown synthetic root")
             }
         requireNotNull(device.wait(Until.findObject(By.text(title)), 10_000)) {

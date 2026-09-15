@@ -1,10 +1,16 @@
 package top.vollate.pars_gui
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.os.SystemClock
 import android.provider.DocumentsContract
+import android.provider.Settings
+import android.os.storage.StorageManager
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,8 +18,10 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.file.Files
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -25,6 +33,9 @@ import java.util.concurrent.RecursiveAction
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
+internal const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
+private const val DIRECT_COPY_BUFFER_BYTES = 16 * 1024
+
 internal data class ImportDocumentEntry(
     val documentId: String,
     val displayName: String,
@@ -34,6 +45,23 @@ internal data class ImportDocumentEntry(
 internal data class ImportDocumentQueryResult(
     val entries: List<ImportDocumentEntry>,
     val loading: Boolean,
+)
+
+internal data class ImportDocumentListing(
+    val entries: List<ImportDocumentEntry>,
+    val attempts: Int,
+)
+
+internal data class ImportStorageVolume(
+    val directory: File,
+    val isPrimary: Boolean,
+    val uuid: String?,
+)
+
+internal data class DirectCopyStats(
+    val fileCount: Int,
+    val directoryCount: Int,
+    val passwordCount: Int,
 )
 
 internal data class StagedImportRecord(
@@ -70,20 +98,180 @@ internal fun queryImportEntriesWithRetries(
     maxLoadingAttempts: Int,
     query: (attempt: Int) -> ImportDocumentQueryResult,
     waitBeforeRetry: () -> Unit,
-): List<ImportDocumentEntry> {
+): ImportDocumentListing {
     var attempt = 0
     while (true) {
         attempt += 1
         val result = query(attempt)
         val retryInitialEmptyRoot =
             depth == 0 && result.entries.isEmpty() && attempt < rootAttempts
-        if (!result.loading && !retryInitialEmptyRoot) return result.entries
+        if (!result.loading && !retryInitialEmptyRoot) {
+            return ImportDocumentListing(entries = result.entries, attempts = attempt)
+        }
         if (attempt >= maxLoadingAttempts) {
             throw IOException("Android did not finish listing the selected folder after $attempt attempts.")
         }
         waitBeforeRetry()
     }
 }
+
+internal fun requireListableImportEntries(
+    depth: Int,
+    listing: ImportDocumentListing,
+): List<ImportDocumentEntry> {
+    if (depth == 0 && listing.entries.isEmpty()) {
+        throw StoreImportException(
+            code = "store_import_provider_unlistable",
+            message = "Android could not list the selected folder.",
+        )
+    }
+    return listing.entries
+}
+
+internal fun requireAuthorizedDirectRead(
+    providerFailedForTree: Boolean,
+    hasAllFilesAccess: Boolean,
+) {
+    if (!providerFailedForTree) {
+        throw StoreImportException(
+            code = "store_import_provider_unlistable",
+            message = "Direct access is available only after provider enumeration fails.",
+        )
+    }
+    if (!hasAllFilesAccess) {
+        throw StoreImportException(
+            code = "store_import_provider_unlistable",
+            message = "All-files access is required for direct recovery.",
+        )
+    }
+}
+
+internal fun resolveExternalStorageTreeDirectory(
+    authority: String?,
+    documentId: String,
+    volumes: List<ImportStorageVolume>,
+): File {
+    if (authority != EXTERNAL_STORAGE_AUTHORITY) {
+        throw StoreImportException(
+            code = "store_import_provider_unlistable",
+            message = "The selected storage provider has no direct filesystem path.",
+        )
+    }
+    val separator = documentId.indexOf(':')
+    if (separator < 0) {
+        throw StoreImportException(
+            code = "store_import_provider_unlistable",
+            message = "The selected folder identifier has no storage volume.",
+        )
+    }
+    val volumeId = documentId.substring(0, separator)
+    val relativePath = documentId.substring(separator + 1)
+    if (relativePath.split('/').any { it == "." || it == ".." }) {
+        throw StoreImportException(
+            code = "store_import_provider_unlistable",
+            message = "The selected folder path escapes its storage volume.",
+        )
+    }
+    val volume =
+        volumes.firstOrNull {
+            if (volumeId.equals("primary", ignoreCase = true)) {
+                it.isPrimary
+            } else {
+                it.uuid?.equals(volumeId, ignoreCase = true) == true
+            }
+        } ?: throw StoreImportException(
+            code = "store_import_provider_unlistable",
+            message = "The selected storage volume is unavailable.",
+        )
+    val volumeRoot = volume.directory.canonicalFile
+    val selected = File(volumeRoot, relativePath).canonicalFile
+    if (!volumeRoot.isDirectory || !selected.isDirectory || !isPathWithin(volumeRoot, selected)) {
+        throw StoreImportException(
+            code = "store_import_provider_unlistable",
+            message = "The selected folder cannot be read directly.",
+        )
+    }
+    return selected
+}
+
+internal fun copyDirectStoreTree(
+    sourceDirectory: File,
+    destinationDirectory: File,
+    maxDepth: Int = 128,
+): DirectCopyStats {
+    val sourceRoot = sourceDirectory.canonicalFile
+    val destinationRoot = destinationDirectory.canonicalFile
+    if (!sourceRoot.isDirectory || !destinationRoot.isDirectory) {
+        throw IOException("The selected or staging directory is unavailable.")
+    }
+    var fileCount = 0
+    var directoryCount = 0
+    var passwordCount = 0
+    val visited = mutableSetOf<String>()
+
+    fun copyDirectory(source: File, destination: File, depth: Int) {
+        if (depth > maxDepth) {
+            throw IOException("Selected store exceeds the maximum directory depth.")
+        }
+        if (Files.isSymbolicLink(source.toPath())) {
+            throw IOException("Selected store contains an unsupported link.")
+        }
+        val canonicalSource = source.canonicalFile
+        if (!isPathWithin(sourceRoot, canonicalSource) || !visited.add(canonicalSource.path)) {
+            throw IOException("Selected store contains an invalid directory cycle.")
+        }
+        val children =
+            source.listFiles()
+                ?: throw IOException("Failed to list the selected folder directly.")
+        val childNames = mutableSetOf<String>()
+        for (child in children) {
+            val safeName = safeImportChildName(child.name)
+            if (!childNames.add(safeName)) {
+                throw IOException("Selected store contains duplicate entries named '$safeName'.")
+            }
+            if (Files.isSymbolicLink(child.toPath())) {
+                throw IOException("Selected store contains an unsupported link.")
+            }
+            val canonicalChild = child.canonicalFile
+            if (!isPathWithin(sourceRoot, canonicalChild)) {
+                throw IOException("Selected store contains an invalid path.")
+            }
+            val target = File(destination, safeName)
+            when {
+                child.isDirectory -> {
+                    if (!target.mkdir()) {
+                        throw IOException("Failed to create imported directory '${target.path}'.")
+                    }
+                    directoryCount += 1
+                    copyDirectory(child, target, depth + 1)
+                }
+                child.isFile -> {
+                    FileInputStream(child).use { input ->
+                        FileOutputStream(target).use { output ->
+                            input.copyTo(output, DIRECT_COPY_BUFFER_BYTES)
+                        }
+                    }
+                    fileCount += 1
+                    if (safeName.lowercase(Locale.ROOT).endsWith(".gpg")) {
+                        passwordCount += 1
+                    }
+                }
+                else -> throw IOException("Selected store contains an unsupported filesystem entry.")
+            }
+        }
+    }
+
+    copyDirectory(sourceRoot, destinationRoot, 0)
+    return DirectCopyStats(fileCount, directoryCount, passwordCount)
+}
+
+private fun isPathWithin(parent: File, child: File): Boolean =
+    child.path == parent.path || child.path.startsWith(parent.path + File.separator)
+
+internal class StoreImportException(
+    val code: String,
+    message: String,
+) : IOException(message)
 
 internal fun safeImportChildName(name: String): String {
     if (
@@ -156,6 +344,16 @@ internal class ManagedStoreImporter(
         ) { pickerResult ->
             handleDirectoryPickerResult(pickerResult.resultCode, pickerResult.data)
         }
+    private val allFilesAccessLauncher: ActivityResultLauncher<Intent> =
+        activity.registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) {
+            val result = activeResult ?: return@registerForActivityResult
+            completeWithSuccess(result, hasAllFilesAccess())
+        }
+    private val providerUnlistableTrees = ConcurrentHashMap.newKeySet<String>()
+    private val directAccessRequests = AtomicInteger()
+    private val directStageRequests = AtomicInteger()
     private var activeResult: MethodChannel.Result? = null
     private var pickerDestinationBaseDirectory: String? = null
 
@@ -163,6 +361,8 @@ internal class ManagedStoreImporter(
         when (call.method) {
             "pickDirectory" -> startDirectoryPicker(call, result)
             "stageDirectory" -> startDirectoryStage(call, result)
+            "requestDirectReadAccess" -> requestDirectReadAccess(call, result)
+            "stageDirectoryDirect" -> startDirectDirectoryStage(call, result)
             "finalizeStagedDirectory" -> finalizeStagedDirectory(call, result)
             "commitStagedDirectory" -> commitStagedDirectory(call, result)
             "rollbackStagedDirectory" -> rollbackStagedDirectory(call, result)
@@ -240,6 +440,117 @@ internal class ManagedStoreImporter(
                 }
             }
         }
+    }
+
+    private fun requestDirectReadAccess(call: MethodCall, result: MethodChannel.Result) {
+        directAccessRequests.incrementAndGet()
+        val treeUriValue = call.argument<String>("treeUri")?.trim()
+        if (treeUriValue.isNullOrEmpty() || !providerUnlistableTrees.contains(treeUriValue)) {
+            result.error(
+                "store_import_provider_unlistable",
+                "Direct access is available only after provider enumeration fails.",
+                null,
+            )
+            return
+        }
+        if (hasAllFilesAccess()) {
+            result.success(true)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            result.success(false)
+            return
+        }
+        if (activeResult != null) {
+            result.error("store_import_busy", "Another store import is already in progress.", null)
+            return
+        }
+        activeResult = result
+        val appIntent =
+            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = Uri.parse("package:${activity.packageName}")
+            }
+        try {
+            allFilesAccessLauncher.launch(appIntent)
+        } catch (_: Exception) {
+            try {
+                allFilesAccessLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            } catch (error: Exception) {
+                activeResult = null
+                result.error(
+                    "store_import_provider_unlistable",
+                    "All-files access settings are unavailable.",
+                    null,
+                )
+            }
+        }
+    }
+
+    private fun startDirectDirectoryStage(call: MethodCall, result: MethodChannel.Result) {
+        directStageRequests.incrementAndGet()
+        if (activeResult != null) {
+            result.error("store_import_busy", "Another store import is already in progress.", null)
+            return
+        }
+        val destination = call.argument<String>("destinationBaseDirectory")?.trim()
+        val treeUriValue = call.argument<String>("treeUri")?.trim()
+        val arguments = call.arguments as? Map<*, *>
+        if (
+            destination.isNullOrEmpty() ||
+            treeUriValue.isNullOrEmpty() ||
+            arguments?.containsKey("sourcePath") == true
+        ) {
+            result.error(
+                "invalid_import_selection",
+                "The selected directory or managed destination is missing.",
+                null,
+            )
+            return
+        }
+        try {
+            requireAuthorizedDirectRead(
+                providerFailedForTree = providerUnlistableTrees.contains(treeUriValue),
+                hasAllFilesAccess = hasAllFilesAccess(),
+            )
+        } catch (error: StoreImportException) {
+            result.error(error.code, error.message, null)
+            return
+        }
+        activeResult = result
+        Log.i(TAG, "Recovering selected document tree through read-only direct access")
+        importExecutor.execute {
+            try {
+                val staged =
+                    stageDirectTreeIntoManagedStorage(Uri.parse(treeUriValue), destination)
+                providerUnlistableTrees.remove(treeUriValue)
+                activity.runOnUiThread {
+                    Log.i(TAG, "Managed-store direct staging completed")
+                    completeWithSuccess(result, staged)
+                }
+            } catch (error: Exception) {
+                activity.runOnUiThread {
+                    Log.e(TAG, "Managed-store direct staging failed", error)
+                    completeWithError(result, error)
+                }
+            }
+        }
+    }
+
+    private fun hasAllFilesAccess(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+
+    internal fun recordProviderFailureForTesting(treeUri: Uri) {
+        if ((activity.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+            throw SecurityException("Provider-failure test seam is unavailable in release builds.")
+        }
+        providerUnlistableTrees.add(treeUri.toString())
+    }
+
+    internal fun directRecoveryAttemptsForTesting(): Pair<Int, Int> {
+        if ((activity.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+            throw SecurityException("Direct-recovery test seam is unavailable in release builds.")
+        }
+        return directAccessRequests.get() to directStageRequests.get()
     }
 
     private fun finalizeStagedDirectory(call: MethodCall, result: MethodChannel.Result) {
@@ -399,7 +710,9 @@ internal class ManagedStoreImporter(
             }
         }
         stagedImports.clear()
+        providerUnlistableTrees.clear()
         directoryPicker.unregister()
+        allFilesAccessLauncher.unregister()
         importExecutor.shutdownNow()
         copyPool.shutdownNow()
     }
@@ -465,6 +778,90 @@ internal class ManagedStoreImporter(
                 TAG,
                 "Staged ${copyStats.fileCount} files, ${copyStats.directoryCount} directories, " +
                     "and ${copyStats.passwordCount} passwords in " +
+                    "${SystemClock.elapsedRealtime() - startedAt} ms",
+            )
+            return mapOf(
+                "handle" to handle,
+                "stagingPath" to record.staging.path,
+                "destinationPath" to record.destination.path,
+            )
+        } catch (error: Exception) {
+            stagingDirectory.deleteRecursively()
+            throw error
+        }
+    }
+
+    private fun stageDirectTreeIntoManagedStorage(
+        treeUri: Uri,
+        destinationBase: String,
+    ): Map<String, String> {
+        if (!hasAllFilesAccess()) {
+            throw StoreImportException(
+                code = "store_import_provider_unlistable",
+                message = "All-files access was revoked before direct recovery.",
+            )
+        }
+        val storageManager =
+            activity.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+        val volumes =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                storageManager.storageVolumes.mapNotNull { volume ->
+                    volume.directory?.let { directory ->
+                        ImportStorageVolume(
+                            directory = directory,
+                            isPrimary = volume.isPrimary,
+                            uuid = volume.uuid,
+                        )
+                    }
+                }
+            } else {
+                emptyList()
+            }
+        val documentId =
+            try {
+                DocumentsContract.getTreeDocumentId(treeUri)
+            } catch (_: IllegalArgumentException) {
+                throw StoreImportException(
+                    code = "store_import_provider_unlistable",
+                    message = "The selected folder identifier is invalid.",
+                )
+            }
+        val sourceDirectory =
+            resolveExternalStorageTreeDirectory(treeUri.authority, documentId, volumes)
+        val startedAt = SystemClock.elapsedRealtime()
+        val destinationDirectory = managedDestination(treeUri, destinationBase)
+        val baseDirectory =
+            destinationDirectory.parentFile
+                ?: throw IOException("Managed store destination has no parent directory.")
+        if (destinationDirectory.exists() && !destinationDirectory.isDirectory) {
+            throw IOException(
+                "The managed store destination is not a directory: '${destinationDirectory.path}'.",
+            )
+        }
+        val stagingDirectory = File(baseDirectory, ".import-${UUID.randomUUID()}")
+        if (!stagingDirectory.mkdir()) {
+            throw IOException("Failed to create import staging directory '${stagingDirectory.path}'.")
+        }
+        try {
+            val stats = copyDirectStoreTree(sourceDirectory, stagingDirectory, MAX_TREE_DEPTH)
+            if (stats.fileCount == 0 && stats.directoryCount == 0) {
+                throw StoreImportException(
+                    code = "store_import_provider_unlistable",
+                    message = "The selected folder was empty during direct recovery.",
+                )
+            }
+            val handle = UUID.randomUUID().toString()
+            val record =
+                StagedImportRecord(
+                    handle = handle,
+                    staging = stagingDirectory.canonicalFile,
+                    destination = destinationDirectory.canonicalFile,
+                )
+            stagedImports[handle] = record
+            Log.i(
+                TAG,
+                "Directly staged ${stats.fileCount} files, ${stats.directoryCount} directories, " +
+                    "and ${stats.passwordCount} passwords in " +
                     "${SystemClock.elapsedRealtime() - startedAt} ms",
             )
             return mapOf(
@@ -725,7 +1122,8 @@ internal class ManagedStoreImporter(
     ): List<ImportDocumentEntry> {
         val treeChildrenUri =
             DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)
-        return queryImportEntriesWithRetries(
+        val listing =
+            queryImportEntriesWithRetries(
             depth = depth,
             rootAttempts = ROOT_QUERY_ATTEMPTS,
             maxLoadingAttempts = MAX_LOADING_QUERY_ATTEMPTS,
@@ -747,6 +1145,16 @@ internal class ManagedStoreImporter(
                 }
             },
         )
+        if (depth == 0 && listing.entries.isEmpty()) {
+            providerUnlistableTrees.add(treeUri.toString())
+            Log.w(
+                TAG,
+                "Provider could not enumerate selected root " +
+                    "(authority=${treeUri.authority} documentId=$parentDocumentId " +
+                    "attempts=${listing.attempts})",
+            )
+        }
+        return requireListableImportEntries(depth, listing)
     }
 
     private fun queryDocumentEntries(
@@ -830,11 +1238,6 @@ internal class ManagedStoreImporter(
             }
         }
     }
-
-    private class StoreImportException(
-        val code: String,
-        message: String,
-    ) : IOException(message)
 
     companion object {
         const val CHANNEL_NAME = "top.vollate.pars_gui/store_import"

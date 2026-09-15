@@ -212,6 +212,30 @@ abstract class AppLocalizations {
   /// **'No passwords were found.'**
   String get storeImportNoPasswords;
 
+  /// No description provided for @storeImportProviderUnlistable.
+  ///
+  /// In en, this message translates to:
+  /// **'Android could not list the selected folder. You can retry and allow direct read access, or use Clone if the store has a remote.'**
+  String get storeImportProviderUnlistable;
+
+  /// No description provided for @storeImportDirectAccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow direct folder access?'**
+  String get storeImportDirectAccessTitle;
+
+  /// No description provided for @storeImportDirectAccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Pars tried Android\'s folder provider first, but it returned no files. To recover this import, open system settings and allow Pars to manage all files. Pars will only read the folder you selected and copy it into app storage. Cancel to leave access unchanged; you can also use Clone if this store has a remote.'**
+  String get storeImportDirectAccessMessage;
+
+  /// No description provided for @storeImportDirectAccessAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open access settings'**
+  String get storeImportDirectAccessAction;
+
   /// No description provided for @storeImportSucceeded.
   ///
   /// In en, this message translates to:

@@ -28,6 +28,8 @@ typedef ManagedStoreConflictResolver =
 typedef ManagedStoreGitDecisionResolver =
     Future<ManagedStoreGitDecision> Function(ManagedStoreGitState state);
 
+typedef ManagedStoreProviderFaultResolver = Future<bool> Function();
+
 class ManagedStoreImportTransaction {
   ManagedStoreImportTransaction({
     required this.root,
@@ -133,12 +135,15 @@ abstract interface class PathPickerService {
   /// Lets the user choose a store and copies it into app-managed storage.
   ///
   /// Android must use the Storage Access Framework instead of converting the
-  /// selected tree URI to a filesystem path. The returned path is always the
-  /// copied, app-readable destination.
+  /// selected tree URI to a filesystem path first. If the provider cannot
+  /// enumerate the selected root, the caller may explicitly authorize a
+  /// read-only direct recovery. The returned path is always the copied,
+  /// app-readable destination.
   Future<ManagedStoreImportTransaction?> importFolderToManagedStorage({
     required String destinationBaseDirectory,
     required ManagedStoreConflictResolver resolveConflict,
     required ManagedStoreGitDecisionResolver resolveMissingGit,
+    required ManagedStoreProviderFaultResolver resolveProviderFault,
   });
 }
 
@@ -187,6 +192,7 @@ class SystemPathPickerService implements PathPickerService {
     required String destinationBaseDirectory,
     required ManagedStoreConflictResolver resolveConflict,
     required ManagedStoreGitDecisionResolver resolveMissingGit,
+    required ManagedStoreProviderFaultResolver resolveProviderFault,
   }) async {
     if (Platform.isAndroid) {
       try {
@@ -211,14 +217,32 @@ class SystemPathPickerService implements PathPickerService {
           );
           if (policy == null) return null;
         }
-        final stage = await _androidStoreImportChannel
-            .invokeMapMethod<String, Object?>(
-              'stageDirectory',
-              <String, Object>{
-                'destinationBaseDirectory': destinationBaseDirectory,
-                'treeUri': treeUri,
-              },
-            );
+        final stage = await stageAndroidDirectoryWithRecoveryForTesting(
+          providerStage:
+              () => _androidStoreImportChannel.invokeMapMethod<String, Object?>(
+                'stageDirectory',
+                <String, Object>{
+                  'destinationBaseDirectory': destinationBaseDirectory,
+                  'treeUri': treeUri,
+                },
+              ),
+          resolveProviderFault: resolveProviderFault,
+          requestDirectReadAccess:
+              () async =>
+                  await _androidStoreImportChannel.invokeMethod<bool>(
+                    'requestDirectReadAccess',
+                    <String, Object>{'treeUri': treeUri},
+                  ) ??
+                  false,
+          directStage:
+              () => _androidStoreImportChannel.invokeMapMethod<String, Object?>(
+                'stageDirectoryDirect',
+                <String, Object>{
+                  'destinationBaseDirectory': destinationBaseDirectory,
+                  'treeUri': treeUri,
+                },
+              ),
+        );
         if (stage == null ||
             stage['handle'] is! String ||
             stage['stagingPath'] is! String) {
@@ -317,6 +341,41 @@ class SystemPathPickerService implements PathPickerService {
       destinationBaseDirectory: destinationBaseDirectory,
       existingStorePolicy: ManagedStoreConflictPolicy.replace,
       resolveMissingGit: resolveMissingGit,
+    );
+  }
+}
+
+@visibleForTesting
+Future<Map<String, Object?>?> stageAndroidDirectoryWithRecoveryForTesting({
+  required Future<Map<String, Object?>?> Function() providerStage,
+  required ManagedStoreProviderFaultResolver resolveProviderFault,
+  required Future<bool> Function() requestDirectReadAccess,
+  required Future<Map<String, Object?>?> Function() directStage,
+}) async {
+  try {
+    return await providerStage();
+  } on PlatformException catch (error) {
+    if (error.code != 'store_import_provider_unlistable') rethrow;
+  }
+
+  if (!await resolveProviderFault()) {
+    throw const PathPickerException(
+      'Android could not list the selected folder.',
+      code: 'store_import_provider_unlistable',
+    );
+  }
+  if (!await requestDirectReadAccess()) {
+    throw const PathPickerException(
+      'Android could not list the selected folder and direct access was not granted.',
+      code: 'store_import_provider_unlistable',
+    );
+  }
+  try {
+    return await directStage();
+  } on PlatformException catch (error) {
+    throw PathPickerException(
+      error.message ?? 'Android could not read the selected folder directly.',
+      code: error.code,
     );
   }
 }

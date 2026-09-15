@@ -6,7 +6,6 @@ license = "GPL-3.0-or-later"
 description = "A zx2c4-pass compatible passwords manager"
 authors = ["Vollate <uint44t@gmail.com>"]
 repository = "https://github.com/vollate/pass-store-rs"
-readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.97"

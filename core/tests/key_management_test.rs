@@ -14,6 +14,12 @@ const PGP_PRIVATE: &str =
     "-----BEGIN PGP PRIVATE KEY BLOCK-----\nsecret\n-----END PGP PRIVATE KEY BLOCK-----";
 const SSH_PRIVATE: &str =
     "-----BEGIN OPENSSH PRIVATE KEY-----\nsecret\n-----END OPENSSH PRIVATE KEY-----";
+const PEM_RSA_PRIVATE: &str = concat!(
+    "-----BEGIN RSA PRIVATE KEY-----\n",
+    "MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n",
+    "KUpRKfFLfRYC9AIKjbJTWit+CqvjWYzvQwECAwEAAQ==\n",
+    "-----END RSA PRIVATE KEY-----\n",
+);
 
 #[test]
 fn detects_key_material_without_echoing_invalid_private_text() {
@@ -139,6 +145,60 @@ fn imports_ssh_private_key_text_and_derives_public_key() {
     assert!(dest.path().join("imported-key").is_file());
     assert!(dest.path().join("imported-key.pub").is_file());
     assert!(imported.fingerprint.starts_with("SHA256:"));
+}
+
+#[test]
+fn imports_ssh_private_key_under_a_name_containing_a_dot() {
+    let source = tempfile::tempdir().unwrap();
+    let dest = tempfile::tempdir().unwrap();
+    generate_ssh_ed25519_key(source.path(), "source-key").unwrap();
+    let private_text = fs::read_to_string(source.path().join("source-key")).unwrap();
+
+    let imported = import_ssh_private_key_text(dest.path(), "github.work", &private_text).unwrap();
+
+    assert_eq!(imported.name, "github.work");
+    assert!(dest.path().join("github.work.pub").is_file());
+    assert_eq!(list_ssh_keys(dest.path()).unwrap(), vec![imported]);
+}
+
+#[test]
+fn rejecting_an_unsupported_ssh_key_writes_nothing() {
+    let dest = tempfile::tempdir().unwrap();
+
+    let err = import_ssh_private_key_text(dest.path(), "work-key", PEM_RSA_PRIVATE).unwrap_err();
+
+    let message = err.to_string();
+    assert!(message.contains("ed25519"), "{message}");
+    assert!(!dest.path().join("work-key").exists());
+    assert!(!dest.path().join("work-key.pub").exists());
+    assert!(list_ssh_keys(dest.path()).unwrap().is_empty());
+}
+
+#[test]
+fn a_rejected_ssh_key_does_not_block_reusing_the_name() {
+    let source = tempfile::tempdir().unwrap();
+    let dest = tempfile::tempdir().unwrap();
+    generate_ssh_ed25519_key(source.path(), "source-key").unwrap();
+    let private_text = fs::read_to_string(source.path().join("source-key")).unwrap();
+    import_ssh_private_key_text(dest.path(), "work-key", PEM_RSA_PRIVATE).unwrap_err();
+
+    let imported = import_ssh_private_key_text(dest.path(), "work-key", &private_text).unwrap();
+
+    assert_eq!(imported.name, "work-key");
+    assert!(dest.path().join("work-key.pub").is_file());
+}
+
+#[test]
+fn importing_over_an_existing_ssh_key_reports_a_conflict() {
+    let source = tempfile::tempdir().unwrap();
+    let dest = tempfile::tempdir().unwrap();
+    generate_ssh_ed25519_key(source.path(), "source-key").unwrap();
+    let private_text = fs::read_to_string(source.path().join("source-key")).unwrap();
+    let existing = generate_ssh_ed25519_key(dest.path(), "work-key").unwrap();
+
+    import_ssh_private_key_text(dest.path(), "work-key", &private_text).unwrap_err();
+
+    assert_eq!(list_ssh_keys(dest.path()).unwrap(), vec![existing]);
 }
 
 #[test]

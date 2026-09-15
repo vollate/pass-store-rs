@@ -90,6 +90,10 @@ write private keys with private permissions on Unix, write `.pub` public keys,
 compute `SHA256:` fingerprints, list `.pub` keys, import unencrypted OpenSSH
 ed25519 private keys, and export public/private SSH keys.
 
+Imported key material SHALL be parsed before any file is written, so a rejected
+key never leaves a private key file behind. Unsupported material SHALL be
+reported as an ed25519-only error rather than a low-level parse failure.
+
 Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
 `bridge/src/api.rs`, `gui/lib/services/key_repository.dart`
 
@@ -99,6 +103,13 @@ Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
 - THEN `<ssh_dir>/mobile-key` exists
 - AND `<ssh_dir>/mobile-key.pub` exists
 - AND the fingerprint starts with `SHA256:`
+
+#### Scenario: Rejected SSH import leaves the key name reusable
+
+- GIVEN a PEM-encoded RSA private key is imported as `work-key`
+- THEN the import fails with an error naming ed25519 support
+- AND neither `<ssh_dir>/work-key` nor `<ssh_dir>/work-key.pub` exists
+- AND a later import of a supported ed25519 key as `work-key` succeeds
 
 #### Scenario: Private SSH export requires confirmation
 

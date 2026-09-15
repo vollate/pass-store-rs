@@ -71,6 +71,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storeImportNoPasswords => '未找到任何密码。';
 
   @override
+  String get storeImportProviderUnlistable =>
+      'Android 无法列出所选目录。你可以重试并允许直接读取；如果仓库有远程地址，也可以使用“克隆”。';
+
+  @override
+  String get storeImportDirectAccessTitle => '允许直接访问目录？';
+
+  @override
+  String get storeImportDirectAccessMessage =>
+      'Pars 已先尝试 Android 的目录提供程序，但它没有返回任何文件。若要恢复本次导入，请打开系统设置并允许 Pars 管理所有文件。Pars 只会读取你刚才选择的目录，并将其复制到 App 存储。取消将保持当前权限不变；如果该仓库有远程地址，也可以使用“克隆”。';
+
+  @override
+  String get storeImportDirectAccessAction => '打开权限设置';
+
+  @override
   String storeImportSucceeded(int passwordCount) {
     return '导入完成：共 $passwordCount 个密码。';
   }

@@ -122,7 +122,7 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
       ],
       submitLabel: context.l10n.generateSshKey,
       onSubmit: () async {
-        await keyRepository.generateSshKey(name.text);
+        await keyRepository.generateSshKey(name.text.trim());
         await settingsRepository.refresh();
       },
     );
@@ -179,8 +179,8 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
       onSubmit: () async {
         try {
           await keyRepository.importSshPrivateKeyText(
-            name: name.text,
-            privateKey: privateKey.text,
+            name: name.text.trim(),
+            privateKey: privateKey.text.trim(),
           );
           await settingsRepository.refresh();
         } finally {
@@ -228,7 +228,7 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
                       () => selectedPath != null && name.text.trim().isNotEmpty,
                   onSubmit: () async {
                     await keyRepository.importSshPrivateKeyFile(
-                      name: name.text,
+                      name: name.text.trim(),
                       path: selectedPath!,
                     );
                     await settingsRepository.refresh();

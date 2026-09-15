@@ -2729,6 +2729,7 @@ class _FakePathPickerService implements PathPickerService {
     required String destinationBaseDirectory,
     required ManagedStoreConflictResolver resolveConflict,
     required ManagedStoreGitDecisionResolver resolveMissingGit,
+    required ManagedStoreProviderFaultResolver resolveProviderFault,
   }) async {
     managedImportDestinationBaseDirectories.add(destinationBaseDirectory);
     final path = _next(_managedImportResults);

@@ -33,6 +33,10 @@
   "storeActionInProgress": "Working…",
   "storeImportCancelled": "No folder was selected.",
   "storeImportNoPasswords": "No passwords were found.",
+  "storeImportProviderUnlistable": "Android could not list the selected folder. You can retry and allow direct read access, or use Clone if the store has a remote.",
+  "storeImportDirectAccessTitle": "Allow direct folder access?",
+  "storeImportDirectAccessMessage": "Pars tried Android's folder provider first, but it returned no files. To recover this import, open system settings and allow Pars to manage all files. Pars will only read the folder you selected and copy it into app storage. Cancel to leave access unchanged; you can also use Clone if this store has a remote.",
+  "storeImportDirectAccessAction": "Open access settings",
   "storeImportSucceeded": "Import complete: {passwordCount} passwords.",
   "@storeImportSucceeded": {
     "placeholders": {

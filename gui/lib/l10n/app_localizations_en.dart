@@ -72,6 +72,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storeImportNoPasswords => 'No passwords were found.';
 
   @override
+  String get storeImportProviderUnlistable =>
+      'Android could not list the selected folder. You can retry and allow direct read access, or use Clone if the store has a remote.';
+
+  @override
+  String get storeImportDirectAccessTitle => 'Allow direct folder access?';
+
+  @override
+  String get storeImportDirectAccessMessage =>
+      'Pars tried Android\'s folder provider first, but it returned no files. To recover this import, open system settings and allow Pars to manage all files. Pars will only read the folder you selected and copy it into app storage. Cancel to leave access unchanged; you can also use Clone if this store has a remote.';
+
+  @override
+  String get storeImportDirectAccessAction => 'Open access settings';
+
+  @override
   String storeImportSucceeded(int passwordCount) {
     return 'Import complete: $passwordCount passwords.';
   }

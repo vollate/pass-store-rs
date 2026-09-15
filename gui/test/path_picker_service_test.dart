@@ -1,9 +1,131 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pars_gui/l10n/app_localizations_en.dart';
+import 'package:pars_gui/l10n/app_localizations_zh.dart';
 import 'package:pars_gui/services/path_picker_service.dart';
 
 void main() {
+  test('provider fault and recovery prompt are localized', () {
+    final english = AppLocalizationsEn();
+    final chinese = AppLocalizationsZh();
+
+    expect(english.storeImportProviderUnlistable, contains('Android'));
+    expect(english.storeImportDirectAccessMessage, contains('folder provider'));
+    expect(chinese.storeImportProviderUnlistable, contains('Android'));
+    expect(chinese.storeImportDirectAccessMessage, contains('目录提供程序'));
+  });
+
+  test('working Android provider never invokes direct recovery', () async {
+    var prompted = false;
+    var requestedAccess = false;
+    var direct = false;
+
+    final result = await stageAndroidDirectoryWithRecoveryForTesting(
+      providerStage: () async => <String, Object?>{'handle': 'provider'},
+      resolveProviderFault: () async {
+        prompted = true;
+        return true;
+      },
+      requestDirectReadAccess: () async {
+        requestedAccess = true;
+        return true;
+      },
+      directStage: () async {
+        direct = true;
+        return <String, Object?>{'handle': 'direct'};
+      },
+    );
+
+    expect(result?['handle'], 'provider');
+    expect(prompted, isFalse);
+    expect(requestedAccess, isFalse);
+    expect(direct, isFalse);
+  });
+
+  test('declined provider recovery leaves direct access untouched', () async {
+    var requestedAccess = false;
+    var direct = false;
+
+    await expectLater(
+      stageAndroidDirectoryWithRecoveryForTesting(
+        providerStage:
+            () async =>
+                throw PlatformException(
+                  code: 'store_import_provider_unlistable',
+                ),
+        resolveProviderFault: () async => false,
+        requestDirectReadAccess: () async {
+          requestedAccess = true;
+          return true;
+        },
+        directStage: () async {
+          direct = true;
+          return <String, Object?>{};
+        },
+      ),
+      throwsA(
+        isA<PathPickerException>().having(
+          (error) => error.code,
+          'code',
+          'store_import_provider_unlistable',
+        ),
+      ),
+    );
+    expect(requestedAccess, isFalse);
+    expect(direct, isFalse);
+  });
+
+  test('provider fault recovers only after access is granted', () async {
+    var direct = false;
+
+    final result = await stageAndroidDirectoryWithRecoveryForTesting(
+      providerStage:
+          () async =>
+              throw PlatformException(
+                code: 'store_import_provider_unlistable',
+              ),
+      resolveProviderFault: () async => true,
+      requestDirectReadAccess: () async => true,
+      directStage: () async {
+        direct = true;
+        return <String, Object?>{'handle': 'direct'};
+      },
+    );
+
+    expect(direct, isTrue);
+    expect(result?['handle'], 'direct');
+  });
+
+  test('dismissed all-files settings preserves provider fault', () async {
+    var direct = false;
+
+    await expectLater(
+      stageAndroidDirectoryWithRecoveryForTesting(
+        providerStage:
+            () async =>
+                throw PlatformException(
+                  code: 'store_import_provider_unlistable',
+                ),
+        resolveProviderFault: () async => true,
+        requestDirectReadAccess: () async => false,
+        directStage: () async {
+          direct = true;
+          return <String, Object?>{};
+        },
+      ),
+      throwsA(
+        isA<PathPickerException>().having(
+          (error) => error.code,
+          'code',
+          'store_import_provider_unlistable',
+        ),
+      ),
+    );
+    expect(direct, isFalse);
+  });
+
   test('remote transport detection only requires SSH keys for SSH URLs', () {
     expect(remoteUrlUsesSsh('git@example.com:org/pass.git'), isTrue);
     expect(remoteUrlUsesSsh('ssh://git@example.com/org/pass.git'), isTrue);

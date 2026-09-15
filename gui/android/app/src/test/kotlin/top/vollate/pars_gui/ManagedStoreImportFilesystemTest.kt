@@ -43,10 +43,10 @@ class ManagedStoreImportFilesystemTest {
                 waitBeforeRetry = {},
             )
 
-        assertEquals(entries, result)
-        assertEquals(258, result.size)
-        assertEquals(".git", safeImportChildName(result.first().displayName))
-        assertEquals(".gpg-id", safeImportChildName(result[1].displayName))
+        assertEquals(entries, result.entries)
+        assertEquals(258, result.entries.size)
+        assertEquals(".git", safeImportChildName(result.entries.first().displayName))
+        assertEquals(".gpg-id", safeImportChildName(result.entries[1].displayName))
     }
 
     @Test
@@ -76,9 +76,169 @@ class ManagedStoreImportFilesystemTest {
                 waitBeforeRetry = { waits += 1 },
             )
 
-        assertEquals(listOf(expected), result)
+        assertEquals(listOf(expected), result.entries)
+        assertEquals(3, result.attempts)
         assertEquals(3, attempts)
         assertEquals(2, waits)
+    }
+
+    @Test
+    fun `empty root is a provider fault after all retries`() {
+        var attempts = 0
+        val listing =
+            queryImportEntriesWithRetries(
+                depth = 0,
+                rootAttempts = 5,
+                maxLoadingAttempts = 40,
+                query = {
+                    attempts += 1
+                    ImportDocumentQueryResult(emptyList(), loading = false)
+                },
+                waitBeforeRetry = {},
+            )
+
+        var code: String? = null
+        try {
+            requireListableImportEntries(0, listing)
+        } catch (error: StoreImportException) {
+            code = error.code
+        }
+        assertEquals(5, attempts)
+        assertEquals("store_import_provider_unlistable", code)
+    }
+
+    @Test
+    fun `empty subdirectory is a legitimate listing`() {
+        val listing = ImportDocumentListing(emptyList(), attempts = 1)
+
+        assertTrue(requireListableImportEntries(1, listing).isEmpty())
+    }
+
+    @Test
+    fun `direct read requires prior provider failure and current authorization`() {
+        requireAuthorizedDirectRead(
+            providerFailedForTree = true,
+            hasAllFilesAccess = true,
+        )
+        for (
+            state in
+                listOf(
+                    false to true,
+                    true to false,
+                )
+        ) {
+            var rejected = false
+            try {
+                requireAuthorizedDirectRead(
+                    providerFailedForTree = state.first,
+                    hasAllFilesAccess = state.second,
+                )
+            } catch (_: StoreImportException) {
+                rejected = true
+            }
+            assertTrue("expected direct read rejection for $state", rejected)
+        }
+    }
+
+    @Test
+    fun `external storage tree resolver validates authority volume and containment`() {
+        val sandbox = Files.createTempDirectory("pars-import-volume").toFile()
+        try {
+            val primary = File(sandbox, "primary").apply { mkdirs() }
+            val selected = File(primary, "password-store").apply { mkdirs() }
+            val removable = File(sandbox, "removable").apply { mkdirs() }
+            val removableSelected = File(removable, "vault").apply { mkdirs() }
+            val volumes =
+                listOf(
+                    ImportStorageVolume(primary, isPrimary = true, uuid = null),
+                    ImportStorageVolume(removable, isPrimary = false, uuid = "ABCD-1234"),
+                )
+
+            assertEquals(
+                selected.canonicalPath,
+                resolveExternalStorageTreeDirectory(
+                    EXTERNAL_STORAGE_AUTHORITY,
+                    "primary:password-store",
+                    volumes,
+                ).canonicalPath,
+            )
+            assertEquals(
+                removableSelected.canonicalPath,
+                resolveExternalStorageTreeDirectory(
+                    EXTERNAL_STORAGE_AUTHORITY,
+                    "ABCD-1234:vault",
+                    volumes,
+                ).canonicalPath,
+            )
+            for (
+                selection in
+                    listOf(
+                        "example.invalid" to "primary:password-store",
+                        EXTERNAL_STORAGE_AUTHORITY to "unknown:password-store",
+                        EXTERNAL_STORAGE_AUTHORITY to "primary:../outside",
+                        EXTERNAL_STORAGE_AUTHORITY to "primary:missing",
+                    )
+            ) {
+                var errorCode: String? = null
+                try {
+                    resolveExternalStorageTreeDirectory(
+                        selection.first,
+                        selection.second,
+                        volumes,
+                    )
+                } catch (error: StoreImportException) {
+                    errorCode = error.code
+                }
+                assertEquals(
+                    "expected provider-fault rejection for $selection",
+                    "store_import_provider_unlistable",
+                    errorCode,
+                )
+            }
+        } finally {
+            sandbox.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `direct copy preserves source and rejects symbolic links`() {
+        val sandbox = Files.createTempDirectory("pars-import-direct").toFile()
+        try {
+            val source = File(sandbox, "source").apply { mkdirs() }
+            val destination = File(sandbox, "destination").apply { mkdirs() }
+            File(source, ".gpg-id").writeText("KEY\n")
+            File(source, "folder").mkdir()
+            File(source, "folder/login.gpg").writeText("ciphertext")
+            val sourceDigest =
+                source.walkTopDown().associate { it.relativeTo(source).path to it.lastModified() }
+
+            val stats = copyDirectStoreTree(source, destination)
+
+            assertEquals(2, stats.fileCount)
+            assertEquals(1, stats.directoryCount)
+            assertEquals(1, stats.passwordCount)
+            assertEquals("ciphertext", File(destination, "folder/login.gpg").readText())
+            assertEquals(
+                sourceDigest,
+                source.walkTopDown().associate { it.relativeTo(source).path to it.lastModified() },
+            )
+
+            val linkedSource = File(sandbox, "linked-source").apply { mkdirs() }
+            Files.createSymbolicLink(
+                File(linkedSource, "link").toPath(),
+                File(source, ".gpg-id").toPath(),
+            )
+            val linkedDestination = File(sandbox, "linked-destination").apply { mkdirs() }
+            var rejected = false
+            try {
+                copyDirectStoreTree(linkedSource, linkedDestination)
+            } catch (_: IOException) {
+                rejected = true
+            }
+            assertTrue(rejected)
+        } finally {
+            sandbox.deleteRecursively()
+        }
     }
 
     @Test
