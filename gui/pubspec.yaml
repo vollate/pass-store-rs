@@ -45,7 +45,7 @@ dependencies:
     hosted:
       name: flutter_rust_bridge
       url: https://pub.flutter-io.cn
-    version: ^2.12.0
+    version: 2.12.0
   flutter_secure_storage:
     hosted:
       name: flutter_secure_storage

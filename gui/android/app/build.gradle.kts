@@ -6,6 +6,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+abstract class BuildParsBridgeTask : Exec() {
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+}
+
 android {
     namespace = "top.vollate.pars_gui"
     compileSdk = flutter.compileSdkVersion
@@ -35,12 +40,6 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-
-    sourceSets {
-        getByName("main") {
-            jniLibs.srcDir(layout.buildDirectory.dir("rustJniLibs"))
-        }
-    }
 }
 
 androidComponents {
@@ -65,8 +64,7 @@ androidComponents {
                 }
             }
         val repoRoot = project.rootDir.parentFile.parentFile
-        val rustJniLibsDir = layout.buildDirectory.dir("rustJniLibs")
-        val buildParsBridge = tasks.register<Exec>("buildParsBridge$capitalizedVariantName") {
+        val buildParsBridge = tasks.register<BuildParsBridgeTask>("buildParsBridge$capitalizedVariantName") {
             val rustBridgeInputs = files(
                 repoRoot.resolve("Cargo.toml"),
                 repoRoot.resolve("Cargo.lock"),
@@ -87,27 +85,24 @@ androidComponents {
                 .withPathSensitivity(PathSensitivity.RELATIVE)
             inputs.property("rustProfile", rustProfile)
             inputs.property("rustAndroidTargets", rustAndroidTargets.joinToString(","))
-            outputs.dir(rustJniLibsDir)
-                .withPropertyName("rustJniLibs")
+            outputDirectory.set(layout.buildDirectory.dir("rustJniLibs/${variant.name}"))
 
             workingDir = repoRoot
             commandLine("bash", "gui/bridge/build_unix.sh", "android")
             environment("PARS_ANDROID_PROFILE", rustProfile)
             environment("PARS_ANDROID_TARGETS", rustAndroidTargets.joinToString(","))
-            environment(
-                "PARS_ANDROID_OUTPUT_DIR",
-                rustJniLibsDir.get().asFile.absolutePath,
-            )
-        }
-
-        listOf(
-            "merge${capitalizedVariantName}JniLibFolders",
-            "merge${capitalizedVariantName}NativeLibs",
-        ).forEach { taskName ->
-            tasks.matching { it.name == taskName }.configureEach {
-                dependsOn(buildParsBridge)
+            doFirst {
+                environment(
+                    "PARS_ANDROID_OUTPUT_DIR",
+                    outputDirectory.get().asFile.absolutePath,
+                )
             }
         }
+
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(
+            buildParsBridge,
+            BuildParsBridgeTask::outputDirectory,
+        )
     }
 }
 
