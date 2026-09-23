@@ -78,30 +78,48 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     return result
   }
 
+  /// Autofill is not the app lock: it never asks for the Pars gesture or the
+  /// device passcode. Biometrics only release the stored PGP passphrase when
+  /// biometric unlock is enabled, as in the app; otherwise the passphrase is typed.
   private func authenticateAndComplete(path: String, generation: String) {
     let context = LAContext()
+    context.localizedFallbackTitle = NSLocalizedString(
+      "autofill_biometric_use_passphrase", comment: "Switches from biometrics to typing")
     var error: NSError?
-    guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
-      cancel(code: .failed)
+    guard ParsAutofillSharedState.loadPassphrase() != nil,
+      context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+    else {
+      promptForPassphrase(path: path, generation: generation, rejected: false)
       return
     }
     context.evaluatePolicy(
-      .deviceOwnerAuthentication,
+      .deviceOwnerAuthenticationWithBiometrics,
       localizedReason: NSLocalizedString(
         "autofill_authentication_reason",
         comment: "Reason shown before filling the selected password")
-    ) { [weak self] success, _ in
+    ) { [weak self] success, error in
       DispatchQueue.main.async {
-        guard success else {
-          self?.cancel(code: .userCanceled)
+        guard let self else { return }
+        if success {
+          self.complete(path: path, generation: generation, useStoredPassphrase: true)
           return
         }
-        self?.complete(path: path, generation: generation)
+        switch (error as? LAError)?.code {
+        case .userCancel, .systemCancel, .appCancel:
+          self.cancel(code: .userCanceled)
+        default:
+          self.promptForPassphrase(path: path, generation: generation, rejected: false)
+        }
       }
     }
   }
 
-  private func complete(path: String, generation: String, passphrase: String? = nil) {
+  private func complete(
+    path: String,
+    generation: String,
+    passphrase: String? = nil,
+    useStoredPassphrase: Bool = false
+  ) {
     let resolution: ParsAutofillIosResolution? = ParsAutofillSharedState.performIfCurrent(
       generation: generation,
       load: { ParsAutofillSharedState.loadState() },
@@ -114,7 +132,7 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
           indexPath: state.indexPath,
           root: root,
           path: path,
-          passphrase: passphrase ?? ParsAutofillSharedState.loadPassphrase())
+          passphrase: useStoredPassphrase ? ParsAutofillSharedState.loadPassphrase() : passphrase)
       })
     guard let resolution else {
       cancel(code: .credentialIdentityNotFound)
@@ -130,9 +148,8 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     }
   }
 
-  /// Asks for the PGP passphrase when none was published, so Autofill still
-  /// works without durable passphrase storage. Input is used for this single
-  /// decryption and never persisted.
+  /// Mirrors the Vault's passphrase step: title, entry path, one field. Input is
+  /// used for this single decryption and never persisted.
   private func promptForPassphrase(path: String, generation: String, rejected: Bool) {
     guard passphraseAttempts < Self.maxPassphraseAttempts else {
       cancel(code: .failed)
@@ -141,10 +158,9 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     passphraseAttempts += 1
     let message =
       rejected
-      ? NSLocalizedString(
+      ? "\(path)\n\n" + NSLocalizedString(
         "autofill_passphrase_rejected", comment: "Shown after a passphrase failed to decrypt")
-      : NSLocalizedString(
-        "autofill_passphrase_message", comment: "Explains why Pars needs the PGP passphrase")
+      : path
     let alert = UIAlertController(
       title: NSLocalizedString(
         "autofill_passphrase_title", comment: "Title of the PGP passphrase prompt"),

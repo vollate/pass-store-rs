@@ -8,6 +8,7 @@ struct ParsAutofillStoredState: Codable {
   let indexPath: String
   let storeRoot: String?
   let generation: String?
+  var biometricUnlock: Bool? = nil
 }
 
 struct ParsAutofillIndex: Codable {
@@ -75,7 +76,8 @@ enum ParsAutofillSharedState {
     configPath: String,
     indexPath: String,
     storeRoot: String?,
-    passphrase: String?
+    passphrase: String?,
+    biometricUnlock: Bool = false
   ) throws {
     guard let containerURL = containerURL() else {
       throw autofillError(code: 2, message: "App group container is unavailable")
@@ -104,13 +106,16 @@ enum ParsAutofillSharedState {
       configPath: configPath,
       indexPath: sharedIndexURL.path,
       storeRoot: storeRoot,
-      generation: UUID().uuidString)
+      generation: UUID().uuidString,
+      biometricUnlock: biometricUnlock)
     let stateData = try JSONEncoder().encode(state)
     try stateData.write(
       to: containerURL.appendingPathComponent(stateFileName),
       options: .atomic)
 
-    if let passphrase, !passphrase.isEmpty {
+    // Like the app, the stored passphrase is only released by a biometric
+    // unlock, so without one it is never republished for Autofill.
+    if biometricUnlock, let passphrase, !passphrase.isEmpty {
       try savePassphrase(passphrase)
     } else {
       let status = deletePassphrase()
@@ -274,7 +279,7 @@ enum ParsAutofillSharedState {
   }
 
   static func loadPassphrase() -> String? {
-    guard loadState() != nil else { return nil }
+    guard loadState()?.biometricUnlock == true else { return nil }
     var query = keychainQuery()
     query[kSecReturnData as String] = true
     query[kSecMatchLimit as String] = kSecMatchLimitOne

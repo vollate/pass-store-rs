@@ -3,17 +3,16 @@
     <string name="app_name">Pars</string>
     <string name="autofill_service_summary">使用 Pars 自动填充密码</string>
     <string name="credential_provider_summary">Pars 中的密码</string>
-    <string name="autofill_unlock_title">解锁 Pars</string>
-    <string name="autofill_unlock_subtitle">填充所选密码</string>
-    <string name="autofill_cancel">取消</string>
+    <string name="autofill_biometric_title">填充密码</string>
+    <string name="autofill_biometric_use_passphrase">使用 PGP 密码</string>
     <string name="autofill_password_source">来自 Pars 的密码</string>
     <string name="autofill_candidate_title">%1$s · Pars</string>
     <string name="autofill_no_matches_title">没有匹配的密码</string>
     <string name="autofill_no_matches_toast">Pars 中没有匹配的凭据</string>
-    <string name="autofill_passphrase_title">PGP 口令</string>
-    <string name="autofill_passphrase_message">Pars 需要 PGP 口令才能解密这条密码。口令仅用于本次解密，不会保存。</string>
-    <string name="autofill_passphrase_rejected">该口令无法解密这条密码，请重试。</string>
-    <string name="autofill_passphrase_hint">PGP 口令</string>
-    <string name="autofill_passphrase_unlock">解锁</string>
+    <string name="autofill_passphrase_title">需要 PGP 密码</string>
+    <string name="autofill_passphrase_label">PGP 密码</string>
+    <string name="autofill_passphrase_empty">请输入密码。</string>
+    <string name="autofill_passphrase_rejected">该密码无法解锁私钥，请重试。</string>
+    <string name="autofill_passphrase_unlock">解锁条目</string>
     <string name="autofill_passphrase_failed_toast">Pars 无法解密所选密码</string>
 </resources>

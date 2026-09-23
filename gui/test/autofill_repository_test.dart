@@ -27,7 +27,7 @@ void main() {
       () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, null),
     );
-    final security = InMemorySecurityRepository();
+    final security = InMemorySecurityRepository(biometricUnlockEnabled: true);
     await security.startPgpSession(
       fingerprint: 'ABC',
       passphrase: 'session-only',
@@ -63,8 +63,16 @@ void main() {
     );
     await repository.publishPlatformState();
     expect(published.last['passphrase'], 'explicitly-remembered');
+    expect(published.last['biometricUnlock'], isTrue);
     expect(validatedFingerprint, 'ABC');
     expect(validatedPassphrase, 'explicitly-remembered');
+
+    // Without biometric unlock the stored passphrase stays in app storage.
+    await security.setBiometricUnlockEnabled(false);
+    await repository.publishPlatformState();
+    expect(published.last['passphrase'], isNull);
+    expect(published.last['biometricUnlock'], isFalse);
+    await security.setBiometricUnlockEnabled(true);
 
     fingerprintUsable = false;
     await repository.publishPlatformState();
@@ -104,7 +112,7 @@ void main() {
 
       final validationStarted = Completer<void>();
       final validationGate = Completer<void>();
-      final security = InMemorySecurityRepository();
+      final security = InMemorySecurityRepository(biometricUnlockEnabled: true);
       await security.savePgpPassphrase(
         fingerprint: 'ABC',
         passphrase: 'remembered',

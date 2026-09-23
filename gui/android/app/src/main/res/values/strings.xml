@@ -3,17 +3,16 @@
     <string name="app_name">Pars</string>
     <string name="autofill_service_summary">Fill passwords from Pars</string>
     <string name="credential_provider_summary">Pars passwords</string>
-    <string name="autofill_unlock_title">Unlock Pars</string>
-    <string name="autofill_unlock_subtitle">Fill the selected password</string>
-    <string name="autofill_cancel">Cancel</string>
+    <string name="autofill_biometric_title">Fill password</string>
+    <string name="autofill_biometric_use_passphrase">Use PGP passphrase</string>
     <string name="autofill_password_source">Password from Pars</string>
     <string name="autofill_candidate_title">%1$s · Pars</string>
     <string name="autofill_no_matches_title">No matching passwords</string>
     <string name="autofill_no_matches_toast">No matching credentials in Pars</string>
-    <string name="autofill_passphrase_title">PGP passphrase</string>
-    <string name="autofill_passphrase_message">Pars needs your PGP passphrase to decrypt this password. It is used once and not saved.</string>
-    <string name="autofill_passphrase_rejected">That passphrase could not decrypt this password. Try again.</string>
-    <string name="autofill_passphrase_hint">PGP passphrase</string>
-    <string name="autofill_passphrase_unlock">Unlock</string>
+    <string name="autofill_passphrase_title">PGP passphrase required</string>
+    <string name="autofill_passphrase_label">PGP passphrase</string>
+    <string name="autofill_passphrase_empty">Enter a passphrase.</string>
+    <string name="autofill_passphrase_rejected">That passphrase did not unlock this key. Try again.</string>
+    <string name="autofill_passphrase_unlock">Unlock entry</string>
     <string name="autofill_passphrase_failed_toast">Pars could not decrypt the selected password</string>
 </resources>

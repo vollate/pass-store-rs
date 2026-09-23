@@ -97,6 +97,7 @@ class MainActivity : FlutterFragmentActivity() {
                             indexPath = args?.get("indexPath") as? String,
                             storeRoot = args?.get("storeRoot") as? String,
                             passphrase = args?.get("passphrase") as? String,
+                            biometricUnlock = args?.get("biometricUnlock") as? Boolean ?: false,
                         )
                     if (published) {
                         result.success(null)
@@ -130,6 +131,7 @@ class MainActivity : FlutterFragmentActivity() {
                             "enabled" to state.enabled,
                             "hasRoot" to !state.storeRoot.isNullOrBlank(),
                             "hasPassphrase" to !state.passphrase.isNullOrEmpty(),
+                            "biometricUnlock" to state.biometricUnlock,
                             "generation" to state.generation,
                         ),
                     )

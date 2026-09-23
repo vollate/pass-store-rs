@@ -143,7 +143,8 @@ import UIKit
         configPath: configPath,
         indexPath: indexPath,
         storeRoot: args["storeRoot"] as? String,
-        passphrase: args["passphrase"] as? String)
+        passphrase: args["passphrase"] as? String,
+        biometricUnlock: args["biometricUnlock"] as? Bool ?? false)
       ParsAutofillSharedState.syncCredentialIdentities { success in
         if success {
           result(nil)

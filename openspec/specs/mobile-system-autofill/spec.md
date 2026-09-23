@@ -81,30 +81,65 @@ Autofill matching SHALL rank an exact normalized parent-directory website match 
 - **THEN** more recently completed Autofill entries rank above otherwise equivalent entries
 - **AND** neither bonus outranks a stronger match class
 
-### Requirement: Autofill SHALL authenticate before returning credentials
+### Requirement: Autofill SHALL authorize decryption with the PGP passphrase, not the app lock
 
-System autofill providers SHALL require platform local authentication before
-decrypting and returning a selected credential. Failed or canceled
-authentication SHALL return no credential.
+Autofill is not app re-entry. System autofill providers SHALL NOT ask for the
+Pars gesture, the device passcode/pattern, or any other app-unlock step.
+Returning a selected credential SHALL instead require the PGP private-key
+passphrase, obtained exactly as the app obtains it:
 
-#### Scenario: Authentication cancellation does not fill
+- When biometric unlock is enabled in Pars and a key-bound passphrase is
+  stored, the provider SHALL show a biometric-only prompt (no device-credential
+  fallback) whose success releases the stored passphrase, with an explicit
+  option to type the passphrase instead.
+- Otherwise the provider SHALL go directly to a passphrase sheet whose layout,
+  wording, and colors match the Vault entry sheet's passphrase step.
 
-- GIVEN a user selects an autofill candidate
-- WHEN platform authentication is canceled
-- THEN Pars does not decrypt the entry
-- AND no username or password is returned to the requesting app or website
+Flutter SHALL publish the biometric-unlock setting with native state and SHALL
+publish the stored passphrase only while biometric unlock is enabled; native
+state SHALL ignore a stored passphrase when the published setting is off.
+Security-setting changes SHALL republish native state. Canceling the biometric
+prompt or the passphrase sheet SHALL return no credential; biometric lockout,
+missing enrollment, or unavailable hardware SHALL fall back to the passphrase
+sheet.
+
+Sources: `gui/android/app/src/main/kotlin/top/vollate/pars_gui/autofill/ParsAutofillUnlockActivity.kt`,
+`gui/ios/ParsCredentialProvider/CredentialProviderViewController.swift`,
+`gui/lib/services/autofill_repository.dart`
+
+#### Scenario: Biometrics disabled never shows a biometric or device prompt
+
+- **GIVEN** biometric unlock is disabled in Pars and the app unlocks with a gesture
+- **WHEN** a user selects an autofill candidate
+- **THEN** no fingerprint, face, device-credential, or gesture prompt is shown
+- **AND** the provider shows the PGP passphrase sheet directly
+
+#### Scenario: Biometrics release only the stored passphrase
+
+- **GIVEN** biometric unlock is enabled and a key-bound passphrase is stored
+- **WHEN** a user selects an autofill candidate
+- **THEN** a biometric-only prompt is shown
+- **AND** success decrypts the entry with the stored passphrase
+- **AND** choosing to type instead opens the PGP passphrase sheet
+
+#### Scenario: Cancellation does not fill
+
+- **GIVEN** a user selects an autofill candidate
+- **WHEN** the biometric prompt or passphrase sheet is canceled
+- **THEN** Pars does not decrypt the entry
+- **AND** no username or password is returned to the requesting app or website
 
 ### Requirement: Autofill SHALL decrypt credentials only on demand
 
-Autofill providers SHALL decrypt only the selected indexed entry after successful platform authentication. Decryption SHALL use the selected mobile PGP backend and the key-bound PGP private-key passphrase published from system-keystore storage when one is available. The returned username SHALL be the opted-in `login` value when available and otherwise the filename-stem username stored in the index; the returned password SHALL be the decrypted entry's first line. The credential-resolution primitive SHALL NOT update or enrich the index.
+Autofill providers SHALL decrypt only the selected indexed entry, and only after the passphrase has been authorized as above. Decryption SHALL use the selected mobile PGP backend and either the typed passphrase or the biometric-released key-bound passphrase published from system-keystore storage. The returned username SHALL be the opted-in `login` value when available and otherwise the filename-stem username stored in the index; the returned password SHALL be the decrypted entry's first line. The credential-resolution primitive SHALL NOT update or enrich the index.
 
-When no published passphrase decrypts the selected entry, the provider SHALL ask for the PGP private-key passphrase after platform authentication, use the typed value for that single decryption only, and SHALL NOT persist or publish it. Attempts SHALL be bounded, and cancellation or exhausted attempts SHALL return no credential. Every other resolution failure — disabled native state, store-root or generation mismatch, missing index, or missing entry — SHALL fail closed without asking for input.
+When the released passphrase does not decrypt the selected entry, the provider SHALL fall back to the passphrase sheet. A typed passphrase SHALL be used for that single decryption only and SHALL NOT be persisted or published. Attempts SHALL be bounded, and cancellation or exhausted attempts SHALL return no credential. Every other resolution failure — disabled native state, store-root or generation mismatch, missing index, or missing entry — SHALL fail closed without asking for input.
 
 #### Scenario: Selected entry is the only decrypted entry
 
 - **GIVEN** multiple entries are indexed
 - **AND** a usable key-bound PGP passphrase is available
-- **WHEN** local authentication succeeds for one selected candidate
+- **WHEN** the passphrase is authorized for one selected candidate
 - **THEN** Pars decrypts exactly that selected entry once
 - **AND** returns its opted-in login or path-derived fallback username and first-line password
 - **AND** the credential-resolution primitive does not write the Autofill index
@@ -120,8 +155,8 @@ When no published passphrase decrypts the selected entry, the provider SHALL ask
 #### Scenario: Unpublished passphrase is requested instead of failing silently
 
 - **GIVEN** a selected entry requires a passphrase-protected private key
-- **AND** the user has not enabled durable system-keystore passphrase storage
-- **WHEN** platform authentication succeeds and no published passphrase decrypts the entry
+- **AND** no passphrase is stored, or biometric unlock is disabled
+- **WHEN** the user selects the entry
 - **THEN** the provider asks for the PGP private-key passphrase
 - **AND** a correct passphrase decrypts only that entry and returns its credential
 - **AND** the typed passphrase is not written to secure storage or to native published state
@@ -140,7 +175,7 @@ When no published passphrase decrypts the selected entry, the provider SHALL ask
 
 ### Requirement: Native providers SHALL record only successful Autofill completions
 
-Android Autofill, Android Credential Manager, and the iOS Credential Provider SHALL record a completion only after platform authentication and credential resolution succeed and the platform response has been constructed for return. Recording SHALL atomically move the selected path to rank 0, shift other distinct paths, and retain at most 20 ranked paths. Candidate display, user cancellation, resolution failure, Vault access, and Vault copy SHALL NOT record completion. A recording failure SHALL affect only future ordering and SHALL NOT prevent the current credential from being returned.
+Android Autofill, Android Credential Manager, and the iOS Credential Provider SHALL record a completion only after passphrase authorization and credential resolution succeed and the platform response has been constructed for return. Recording SHALL atomically move the selected path to rank 0, shift other distinct paths, and retain at most 20 ranked paths. Candidate display, user cancellation, resolution failure, Vault access, and Vault copy SHALL NOT record completion. A recording failure SHALL affect only future ordering and SHALL NOT prevent the current credential from being returned.
 
 #### Scenario: Successful return records bounded MRU history
 
@@ -377,7 +412,7 @@ Android and iOS Autofill presentation SHALL expose the service/source, candidate
 
 ### Requirement: Autofill visual changes SHALL preserve path-first security and performance boundaries
 
-Changes to Flutter Autofill settings, Android `RemoteViews`, Android authentication UI, or iOS credential-provider presentation SHALL NOT change the shared path-first schema, matching inputs, ranking rules, fail-closed behavior, platform authentication requirement, or selected-path-only resolution. Presentation state SHALL NOT cause whole-vault decryption or index rebuilding.
+Changes to Flutter Autofill settings, Android `RemoteViews`, Android authentication UI, or iOS credential-provider presentation SHALL NOT change the shared path-first schema, matching inputs, ranking rules, fail-closed behavior, passphrase authorization requirement, or selected-path-only resolution. Presentation state SHALL NOT cause whole-vault decryption or index rebuilding.
 
 #### Scenario: Rendering a candidate performs no decryption
 - **WHEN** Android or iOS renders one or more candidate presentations

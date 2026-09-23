@@ -19,6 +19,7 @@ data class ParsAutofillState(
     val storeRoot: String?,
     val passphrase: String?,
     val generation: String?,
+    val biometricUnlock: Boolean = false,
 )
 
 object ParsAutofillStateStore {
@@ -28,6 +29,7 @@ object ParsAutofillStateStore {
     private const val KEY_INDEX_PATH = "index_path"
     private const val KEY_STORE_ROOT = "store_root"
     private const val KEY_GENERATION = "generation"
+    private const val KEY_BIOMETRIC_UNLOCK = "biometric_unlock"
     private const val KEY_PASSPHRASE_CIPHERTEXT = "passphrase_ciphertext"
     private const val KEY_PASSPHRASE_IV = "passphrase_iv"
     private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
@@ -40,13 +42,17 @@ object ParsAutofillStateStore {
         indexPath: String?,
         storeRoot: String?,
         passphrase: String?,
+        biometricUnlock: Boolean = false,
     ): Boolean {
         val resolvedIndexPath = indexPath ?: defaultIndexPath(context)
         if (storeRoot.isNullOrBlank() || !File(resolvedIndexPath).isFile) {
             clear(context)
             return false
         }
-        val encrypted = passphrase?.takeIf { it.isNotEmpty() }?.let(::encrypt)
+        // Like the app, the stored passphrase is only released by a biometric
+        // unlock, so without one it is never republished for Autofill.
+        val encrypted =
+            passphrase?.takeIf { biometricUnlock && it.isNotEmpty() }?.let(::encrypt)
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.edit().apply {
             clear()
@@ -54,6 +60,7 @@ object ParsAutofillStateStore {
             putString(KEY_INDEX_PATH, resolvedIndexPath)
             putString(KEY_STORE_ROOT, storeRoot)
             putString(KEY_GENERATION, UUID.randomUUID().toString())
+            putBoolean(KEY_BIOMETRIC_UNLOCK, biometricUnlock)
             if (encrypted != null) {
                 putString(KEY_PASSPHRASE_CIPHERTEXT, encrypted.ciphertext)
                 putString(KEY_PASSPHRASE_IV, encrypted.iv)
@@ -76,10 +83,11 @@ object ParsAutofillStateStore {
         val enabled = prefs.getBoolean(KEY_ENABLED, false)
         val configPath = prefs.getString(KEY_CONFIG_PATH, null) ?: defaultConfigPath(context)
         val indexPath = prefs.getString(KEY_INDEX_PATH, null) ?: defaultIndexPath(context)
+        val biometricUnlock = enabled && prefs.getBoolean(KEY_BIOMETRIC_UNLOCK, false)
         val ciphertext = prefs.getString(KEY_PASSPHRASE_CIPHERTEXT, null)
         val iv = prefs.getString(KEY_PASSPHRASE_IV, null)
         val passphrase =
-            if (!enabled || ciphertext == null || iv == null) {
+            if (!biometricUnlock || ciphertext == null || iv == null) {
                 null
             } else {
                 decryptOrNull(ciphertext, iv)
@@ -91,8 +99,14 @@ object ParsAutofillStateStore {
             storeRoot = if (enabled) prefs.getString(KEY_STORE_ROOT, null) else null,
             passphrase = passphrase,
             generation = if (enabled) prefs.getString(KEY_GENERATION, null) else null,
+            biometricUnlock = biometricUnlock,
         )
     }
+
+    // Biometrics only ever stand in for typing the stored passphrase; they are
+    // not the app lock, so without a stored passphrase there is nothing to offer.
+    internal fun offersBiometricUnlock(state: ParsAutofillState): Boolean =
+        state.enabled && state.biometricUnlock && !state.passphrase.isNullOrEmpty()
 
     internal fun canServe(state: ParsAutofillState, indexExists: Boolean): Boolean =
         state.enabled &&

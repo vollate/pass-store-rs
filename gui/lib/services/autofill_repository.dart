@@ -433,7 +433,11 @@ class BridgeAutofillRepository implements AutofillRepository {
       await _clearPlatformState();
       return;
     }
-    final passphrase = await _storedPlatformPassphrase(capturedRoot);
+    // The app only loads the stored passphrase after a biometric unlock, so
+    // native Autofill receives it only under the same condition.
+    final biometricUnlock = securityRepository?.biometricUnlockEnabled ?? false;
+    final passphrase =
+        biometricUnlock ? await _storedPlatformPassphrase(capturedRoot) : null;
     if (!_isCapturedStoreReady(capturedRoot)) {
       await _clearPlatformState();
       return;
@@ -444,6 +448,7 @@ class BridgeAutofillRepository implements AutofillRepository {
         'indexPath': indexPath,
         'storeRoot': capturedRoot,
         'passphrase': passphrase,
+        'biometricUnlock': biometricUnlock,
       });
     } on MissingPluginException {
       return;

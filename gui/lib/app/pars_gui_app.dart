@@ -224,7 +224,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
           clipboardService: _clipboardService,
           privacyEvents: _privacyEpoch,
           onLock: _lock,
-          onSecuritySettingsChanged: _scheduleAutoLock,
+          onSecuritySettingsChanged: _handleSecuritySettingsChanged,
           runDuringSystemAuthentication: _runDuringSystemAuthentication,
           onStoreLifecycleChanged:
               _lifecycleSource == null ? _handleStoreLifecycleChanged : null,
@@ -239,7 +239,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
   void _handleOnboardingComplete() {
     if (!mounted) return;
     setState(() => _isLocked = false);
-    _scheduleAutoLock();
+    _handleSecuritySettingsChanged();
   }
 
   StoreLifecycleChangeSource? get _lifecycleSource =>
@@ -280,6 +280,12 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
       if (mounted) setState(() => _localePreference = previous);
       rethrow;
     }
+  }
+
+  void _handleSecuritySettingsChanged() {
+    _scheduleAutoLock();
+    // Native Autofill follows the biometric switch and stored passphrase.
+    unawaited(_refreshNativeAutofillSecurityState());
   }
 
   void _scheduleAutoLock() {

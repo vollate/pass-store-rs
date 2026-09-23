@@ -24,6 +24,13 @@ class ParsAutofillService : AutofillService() {
             return
         }
 
+        val requester =
+            request.fillContexts.lastOrNull()?.structure?.activityComponent?.packageName
+        if (requester == packageName) {
+            callback.onSuccess(null)
+            return
+        }
+
         val parsed = parseRequest(request)
         if (parsed == null) {
             callback.onSuccess(null)

@@ -128,6 +128,11 @@ object ParsAutofillNativeBridge {
         }
     }
 
+    fun offersBiometricUnlock(context: Context): Boolean =
+        ParsAutofillStateStore.offersBiometricUnlock(ParsAutofillStateStore.read(context))
+
+    // A null passphrase decrypts with the stored one, which callers may only
+    // request after a successful biometric prompt.
     fun resolveCredential(
         context: Context,
         path: String,

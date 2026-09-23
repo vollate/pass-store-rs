@@ -1,7 +1,7 @@
-"autofill_authentication_reason" = "解锁 Pars 以填充所选密码";
-"autofill_passphrase_title" = "PGP 口令";
-"autofill_passphrase_message" = "Pars 需要 PGP 口令才能解密这条密码。口令仅用于本次解密，不会保存。";
-"autofill_passphrase_rejected" = "该口令无法解密这条密码，请重试。";
-"autofill_passphrase_hint" = "PGP 口令";
-"autofill_passphrase_unlock" = "解锁";
+"autofill_authentication_reason" = "使用已保存的 PGP 密码填充此密码";
+"autofill_biometric_use_passphrase" = "使用 PGP 密码";
+"autofill_passphrase_title" = "需要 PGP 密码";
+"autofill_passphrase_rejected" = "该密码无法解锁私钥，请重试。";
+"autofill_passphrase_hint" = "PGP 密码";
+"autofill_passphrase_unlock" = "解锁条目";
 "autofill_cancel" = "取消";

@@ -65,6 +65,24 @@ class ParsAutofillStateGateTest {
     }
 
     @Test
+    fun biometricsAreOfferedOnlyToReleaseAStoredPassphrase() {
+        val state =
+            ParsAutofillState(
+                enabled = true,
+                configPath = "/config",
+                indexPath = "/index.json",
+                storeRoot = "/store",
+                passphrase = "stored",
+                generation = "generation-a",
+                biometricUnlock = true,
+            )
+        assertTrue(ParsAutofillStateStore.offersBiometricUnlock(state))
+        assertFalse(ParsAutofillStateStore.offersBiometricUnlock(state.copy(biometricUnlock = false)))
+        assertFalse(ParsAutofillStateStore.offersBiometricUnlock(state.copy(passphrase = null)))
+        assertFalse(ParsAutofillStateStore.offersBiometricUnlock(state.copy(enabled = false)))
+    }
+
+    @Test
     fun decryptFailureAsksForAPassphraseWhileOtherFailuresFailClosed() {
         val directory = Files.createTempDirectory("pars-autofill-resolution").toFile()
         try {

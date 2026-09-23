@@ -54,14 +54,31 @@ class ParsAutofillStateStoreInstrumentedTest {
                 indexPath = index.absolutePath,
                 storeRoot = store.absolutePath,
                 passphrase = "synthetic-passphrase",
+                biometricUnlock = true,
             ),
         )
         val published = ParsAutofillStateStore.read(context)
         assertTrue(published.enabled)
         assertEquals(store.absolutePath, published.storeRoot)
         assertEquals("synthetic-passphrase", published.passphrase)
+        assertTrue(published.biometricUnlock)
         assertFalse(published.generation.isNullOrBlank())
         assertTrue(ParsAutofillStateStore.canServe(published, index.exists()))
+
+        assertTrue(
+            ParsAutofillStateStore.publish(
+                context = context,
+                configPath = File(context.filesDir, "pars_config.toml").absolutePath,
+                indexPath = index.absolutePath,
+                storeRoot = store.absolutePath,
+                passphrase = "synthetic-passphrase",
+                biometricUnlock = false,
+            ),
+        )
+        val withoutBiometrics = ParsAutofillStateStore.read(context)
+        assertTrue(withoutBiometrics.enabled)
+        assertFalse(withoutBiometrics.biometricUnlock)
+        assertNull(withoutBiometrics.passphrase)
 
         assertTrue(ParsAutofillStateStore.clear(context))
         val cleared = ParsAutofillStateStore.read(context)

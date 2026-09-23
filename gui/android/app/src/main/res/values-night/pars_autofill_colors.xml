@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ParsTheme.dark() ColorScheme.fromSeed(0xFF0F766E) roles used by the
+     native Autofill passphrase sheet. Keep in sync with gui/lib/app/pars_theme.dart. -->
+<resources>
+    <color name="pars_autofill_primary">#FF81D5CB</color>
+    <color name="pars_autofill_on_primary">#FF003733</color>
+    <color name="pars_autofill_sheet">#FF161D1C</color>
+    <color name="pars_autofill_field">#FF303635</color>
+    <color name="pars_autofill_on_surface">#FFDDE4E2</color>
+    <color name="pars_autofill_on_surface_variant">#FFBEC9C6</color>
+    <color name="pars_autofill_outline_variant">#FF3F4947</color>
+    <color name="pars_autofill_error">#FFFFB4AB</color>
+    <color name="pars_autofill_disabled_container">#1FDDE4E2</color>
+    <color name="pars_autofill_disabled_content">#61DDE4E2</color>
+    <color name="pars_autofill_scrim">#8A000000</color>
+</resources>
