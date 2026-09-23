@@ -560,7 +560,7 @@ class _PgpPassphraseStorageSheetBodyState
                   value,
                 );
                 if (!value) {
-                  await widget.autofillRepository?.clearIndex();
+                  await _dropEncryptedLoginAndUrlIndex();
                 }
                 widget.onSecuritySettingsChanged?.call();
                 setState(() {});
@@ -700,6 +700,26 @@ class _PgpPassphraseStorageSheetBodyState
         ),
       ),
     );
+  }
+
+  /// Enrichment can no longer be refreshed once the durable passphrase is
+  /// gone, so its decrypted metadata is dropped and the index falls back to
+  /// path-derived records, which never require a passphrase.
+  Future<void> _dropEncryptedLoginAndUrlIndex() async {
+    final repository = widget.autofillRepository;
+    if (repository == null) return;
+    try {
+      await repository.forgetEncryptedLoginAndUrls();
+      await repository.rebuildIndex(widget.entries);
+    } catch (error) {
+      repository.recordSyncFailure(error);
+      if (!mounted) return;
+      AppNotification.show(
+        context,
+        UiProblem.fromError(context.l10n, error).summary,
+        severity: AppNotificationSeverity.error,
+      );
+    }
   }
 
   KeyRecord? _keyForFingerprint(String fingerprint) {

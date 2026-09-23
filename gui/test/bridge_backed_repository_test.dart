@@ -13,6 +13,7 @@ import 'package:pars_gui/services/mobile_pgp_backend.dart';
 import 'package:pars_gui/services/security_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
 import 'package:pars_gui/services/vault_metadata_store.dart';
+import 'package:pars_gui/services/vault_snapshot_cache.dart';
 
 void main() {
   test('legacy recentPaths metadata is ignored and never written again', () {
@@ -72,6 +73,97 @@ void main() {
       expect(repository.keys.single.name, 'github-mobile');
     },
   );
+
+  test(
+    'refresh persists a snapshot that hydrate replays without the bridge',
+    () async {
+      final cache = InMemoryVaultSnapshotCache();
+      final metadata = InMemoryVaultMetadataStore();
+      final scanned = BridgeBackedRepository(
+        bridge: _LifecycleBridge(),
+        configPath: '/tmp/pars_config.toml',
+        snapshotCache: cache,
+        metadataStore: metadata,
+      );
+      await scanned.refresh();
+
+      final restoreBridge = _LifecycleBridge();
+      final restored = BridgeBackedRepository(
+        bridge: restoreBridge,
+        configPath: '/tmp/pars_config.toml',
+        snapshotCache: cache,
+        metadataStore: metadata,
+      );
+
+      expect(await restored.hydrateFromCache(), isTrue);
+      expect(restoreBridge.calledMethods, isEmpty);
+      expect(restored.currentRepoName, 'Personal');
+      expect(restored.gitStatus, scanned.gitStatus);
+      expect(
+        restored.entries.map((entry) => entry.path),
+        scanned.entries.map((entry) => entry.path),
+      );
+    },
+  );
+
+  test('hydrate is skipped once the store has been removed', () async {
+    final cache = InMemoryVaultSnapshotCache();
+    final metadata = InMemoryVaultMetadataStore();
+    final seed = BridgeBackedRepository(
+      bridge: _LifecycleBridge(),
+      configPath: '/tmp/pars_config.toml',
+      snapshotCache: cache,
+      metadataStore: metadata,
+    );
+    await seed.refresh();
+    await metadata.markStoreRemoved();
+
+    final restored = BridgeBackedRepository(
+      bridge: _LifecycleBridge(),
+      configPath: '/tmp/pars_config.toml',
+      snapshotCache: cache,
+      metadataStore: metadata,
+    );
+
+    expect(await restored.hydrateFromCache(), isFalse);
+    expect(restored.entries, isEmpty);
+  });
+
+  test('pull-to-refresh sync pulls and pushes local commits ahead', () async {
+    final bridge = _LifecycleBridge()..gitStatusStdout = '## main [ahead 1]\n';
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      snapshotCache: InMemoryVaultSnapshotCache(),
+      metadataStore: InMemoryVaultMetadataStore(),
+    );
+    await repository.refresh();
+    bridge.calledMethods.clear();
+
+    await repository.syncWithRemote();
+
+    expect(
+      bridge.calledMethods,
+      containsAllInOrder(<String>['git_pull', 'git_push']),
+    );
+  });
+
+  test('pull-to-refresh sync skips push when nothing is ahead', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      snapshotCache: InMemoryVaultSnapshotCache(),
+      metadataStore: InMemoryVaultMetadataStore(),
+    );
+    await repository.refresh();
+    bridge.calledMethods.clear();
+
+    await repository.syncWithRemote();
+
+    expect(bridge.calledMethods, contains('git_pull'));
+    expect(bridge.calledMethods, isNot(contains('git_push')));
+  });
 
   test(
     'bridge-backed repository exposes password-store PGP references',
@@ -1282,6 +1374,7 @@ class _LifecycleBridge implements ParsBridgeApi {
   String storeRoot;
   bool storePresent = true;
   bool failDisconnect = false;
+  String gitStatusStdout = '## main\n M example.gpg\n';
   frb.StoreGitModeDto gitMode;
   final bool failGitInitialization;
   final List<frb.KeyRecordDto> listedKeys;
@@ -1456,10 +1549,10 @@ class _LifecycleBridge implements ParsBridgeApi {
     required frb.GitRequest request,
   }) async {
     calledMethods.add('git_status');
-    return const frb.GitCommandResponse(
+    return frb.GitCommandResponse(
       output: frb.GitCommandOutputDto(
         command: 'git status --short --branch',
-        stdout: '## main\n M example.gpg\n',
+        stdout: gitStatusStdout,
         stderr: '',
         success: true,
       ),

@@ -32,9 +32,9 @@ Sources: `gui/lib/services/security_repository.dart`,
 ### Requirement: Secure storage repository SHALL persist durable security settings
 
 The secure-storage security repository SHALL persist gesture verifier,
-lock-on-resume, biometric enablement, PGP passphrase storage enablement, cached
-PGP passphrase, onboarding completion, PGP session expiration, and auto-lock
-timeout through the configured secure storage adapter.
+lock-on-resume, biometric enablement, PGP passphrase storage enablement, the
+key-bound PGP private-key passphrase, onboarding completion, PGP session
+expiration, and auto-lock timeout through the configured secure storage adapter.
 
 Sources: `gui/lib/services/security_repository.dart`,
 `gui/test/security_repository_test.dart`
@@ -44,6 +44,42 @@ Sources: `gui/lib/services/security_repository.dart`,
 - GIVEN a repository is marked unlocked
 - WHEN a new repository is loaded from the same storage
 - THEN the new repository should lock until unlocked again
+
+### Requirement: The PGP private-key passphrase SHALL be the only durable secret and SHALL live in system keystore storage
+
+The passphrase that unlocks a local PGP private key SHALL be the only secret
+Pars persists. Its durable storage SHALL remain opt-in and bound to one key
+fingerprint, and it SHALL be written exclusively through platform
+keystore-backed secure storage: Android Keystore on Android and the Keychain on
+Apple platforms. Native Autofill publication SHALL re-protect the republished
+copy with the same platform keystore facilities. Wherever this specification or
+the Autofill specification mentions a stored, cached, or published passphrase, it
+means that PGP private-key passphrase and never decrypted store content.
+
+Decrypted entry content — passwords, parsed fields, TOTP values, and notes —
+SHALL NEVER be persisted by app storage, an on-disk cache, the Autofill index,
+or native published state. In-memory PGP sessions and passphrases typed for a
+single operation SHALL stay in memory and SHALL NOT be written anywhere.
+
+Sources: `gui/lib/services/security_repository.dart`,
+`gui/android/app/src/main/kotlin/top/vollate/pars_gui/autofill/ParsAutofillStateStore.kt`,
+`gui/ios/Shared/ParsAutofillSharedState.swift`
+
+#### Scenario: Durable passphrase storage is keystore-backed and opt-in
+
+- GIVEN the user has not enabled durable passphrase storage
+- THEN no PGP passphrase is readable from secure storage
+- WHEN the user explicitly saves a passphrase for a selected private key
+- THEN it is written only through the platform keystore-backed adapter
+- AND disabling storage removes it again
+
+#### Scenario: No decrypted content becomes durable
+
+- GIVEN an entry has been decrypted and displayed, autofilled, or enriched
+- WHEN app storage, on-disk caches, the Autofill index, and native published
+  state are inspected
+- THEN none of them contains the decrypted password, fields, TOTP value, or
+  notes
 
 ### Requirement: App lock SHALL depend on gesture setup, unlock timestamp, and auto-lock timeout
 
@@ -547,5 +583,5 @@ Flutter SHALL expose PGP key selection, generation, or import only while creatin
   this is sufficient for the intended threat model needs security review.
 - Biometric availability and secure storage behavior depend on platform
   adapters and device state; tests use fakes.
-- PGP passphrase storage uses platform secure storage, but bridge PGP decrypt
-  APIs do not currently accept an active passphrase from Flutter.
+- Platform keystore guarantees for the stored PGP passphrase depend on device
+  hardware and OS state; tests use fake secure-storage adapters.

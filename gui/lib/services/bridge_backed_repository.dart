@@ -18,6 +18,7 @@ import 'settings_repository.dart';
 import 'store_lifecycle.dart';
 import 'vault_metadata_store.dart';
 import 'vault_repository.dart';
+import 'vault_snapshot_cache.dart';
 
 class BridgeRepositoryException implements Exception {
   const BridgeRepositoryException(this.message);
@@ -47,8 +48,11 @@ class BridgeBackedRepository
     this.securityRepository,
     this.autofillRepository,
     VaultMetadataStore? metadataStore,
+    VaultSnapshotCache? snapshotCache,
   }) : _metadataStore =
            metadataStore ?? FileVaultMetadataStore.forConfigPath(configPath),
+       _snapshotCache =
+           snapshotCache ?? FileVaultSnapshotCache.forConfigPath(configPath),
        _lifecycle = StoreLifecycleSnapshot.empty(configPath);
 
   factory BridgeBackedRepository.defaultInstance({
@@ -80,6 +84,7 @@ class BridgeBackedRepository
   final SecurityRepository? securityRepository;
   final AutofillRepository? autofillRepository;
   final VaultMetadataStore _metadataStore;
+  final VaultSnapshotCache _snapshotCache;
 
   StoreLifecycleSnapshot _lifecycle;
   List<PasswordEntry> _entries = const <PasswordEntry>[];
@@ -194,6 +199,35 @@ class BridgeBackedRepository
     await _refreshState(reconcileAutofill: true);
   });
 
+  /// Publishes the last persisted snapshot so the first frame can render the
+  /// vault without waiting for a full store rescan. A later [refresh] replaces
+  /// whatever is restored here.
+  Future<bool> hydrateFromCache() => _serializeStoreSideEffects(() async {
+    if (_storeRemovalInProgress || _refreshEpoch != 0) return false;
+    if (await _metadataStore.wasStoreRemoved()) return false;
+    final snapshot = await _snapshotCache.load();
+    if (snapshot == null || _refreshEpoch != 0) return false;
+    _lifecycle = snapshot.lifecycle;
+    _entries = snapshot.entries;
+    _gitStatus = snapshot.gitStatus;
+    _publishLifecycle();
+    return true;
+  });
+
+  Future<void> _saveSnapshot() async {
+    try {
+      await _snapshotCache.save(
+        VaultSnapshot(
+          lifecycle: _lifecycle,
+          entries: _entries,
+          gitStatus: _gitStatus,
+        ),
+      );
+    } catch (_) {
+      // A stale or missing cache only costs a cold scan on the next launch.
+    }
+  }
+
   Future<T> _serializeStoreSideEffects<T>(Future<T> Function() operation) {
     final result = Completer<T>();
     _storeSideEffectTail = _storeSideEffectTail
@@ -244,7 +278,10 @@ class BridgeBackedRepository
     final currentStore = _lifecycle.store;
     if (currentStore == null || !currentStore.exists) {
       await _clearStoreScopedState();
-      if (refreshEpoch == _refreshEpoch) _publishLifecycle();
+      if (refreshEpoch == _refreshEpoch) {
+        await _snapshotCache.clear();
+        _publishLifecycle();
+      }
       return;
     }
 
@@ -285,7 +322,10 @@ class BridgeBackedRepository
         (repository) => repository.reconcileIndex(_entries),
       );
     }
-    if (refreshEpoch == _refreshEpoch) _publishLifecycle();
+    if (refreshEpoch == _refreshEpoch) {
+      await _saveSnapshot();
+      _publishLifecycle();
+    }
   }
 
   @override
@@ -1173,6 +1213,19 @@ class BridgeBackedRepository
     return pull();
   }
 
+  @override
+  Future<GitOperationResult> syncWithRemote() async {
+    if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
+      await refresh();
+      return _gitDisabledResult('git sync', message: 'Skipped: no Git remote.');
+    }
+    final pulled = await pull();
+    if (!pulled.success) return pulled;
+    final status = await refreshGitStatus();
+    if (!status.success || !status.stdout.contains('ahead')) return pulled;
+    return push();
+  }
+
   static String defaultConfigPath() {
     final explicit = Platform.environment['PARS_CONFIG'];
     if (explicit != null && explicit.trim().isNotEmpty) {
@@ -1676,6 +1729,11 @@ class BridgeBackedRepository
   Future<void> _clearStoreScopedDurableState() async {
     var removalMarkerPersisted = false;
     var metadataTombstonePersisted = false;
+    try {
+      await _snapshotCache.clear();
+    } catch (_) {
+      // The metadata tombstone still keeps a stale snapshot from being restored.
+    }
     try {
       await _metadataStore.markStoreRemoved();
       removalMarkerPersisted = true;

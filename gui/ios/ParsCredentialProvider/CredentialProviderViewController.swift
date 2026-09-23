@@ -6,6 +6,8 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
   private let tableView = UITableView(frame: .zero, style: .insetGrouped)
   private var candidates: [ParsAutofillIosCandidate] = []
   private var candidateGenerations: [String: String] = [:]
+  private var passphraseAttempts = 0
+  private static let maxPassphraseAttempts = 3
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -99,8 +101,8 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     }
   }
 
-  private func complete(path: String, generation: String) {
-    guard let credential: ParsAutofillIosCredential = ParsAutofillSharedState.performIfCurrent(
+  private func complete(path: String, generation: String, passphrase: String? = nil) {
+    let resolution: ParsAutofillIosResolution? = ParsAutofillSharedState.performIfCurrent(
       generation: generation,
       load: { ParsAutofillSharedState.loadState() },
       operation: {
@@ -112,12 +114,69 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
           indexPath: state.indexPath,
           root: root,
           path: path,
-          passphrase: ParsAutofillSharedState.loadPassphrase())
+          passphrase: passphrase ?? ParsAutofillSharedState.loadPassphrase())
       })
-    else {
+    guard let resolution else {
       cancel(code: .credentialIdentityNotFound)
       return
     }
+    switch resolution {
+    case .resolved(let credential):
+      deliver(credential: credential, generation: generation)
+    case .passphraseRequired:
+      promptForPassphrase(path: path, generation: generation, rejected: passphrase != nil)
+    case .unavailable:
+      cancel(code: .credentialIdentityNotFound)
+    }
+  }
+
+  /// Asks for the PGP passphrase when none was published, so Autofill still
+  /// works without durable passphrase storage. Input is used for this single
+  /// decryption and never persisted.
+  private func promptForPassphrase(path: String, generation: String, rejected: Bool) {
+    guard passphraseAttempts < Self.maxPassphraseAttempts else {
+      cancel(code: .failed)
+      return
+    }
+    passphraseAttempts += 1
+    let message =
+      rejected
+      ? NSLocalizedString(
+        "autofill_passphrase_rejected", comment: "Shown after a passphrase failed to decrypt")
+      : NSLocalizedString(
+        "autofill_passphrase_message", comment: "Explains why Pars needs the PGP passphrase")
+    let alert = UIAlertController(
+      title: NSLocalizedString(
+        "autofill_passphrase_title", comment: "Title of the PGP passphrase prompt"),
+      message: message,
+      preferredStyle: .alert)
+    alert.addTextField { field in
+      field.isSecureTextEntry = true
+      field.textContentType = .password
+      field.placeholder = NSLocalizedString(
+        "autofill_passphrase_hint", comment: "Placeholder of the PGP passphrase field")
+    }
+    alert.addAction(
+      UIAlertAction(
+        title: NSLocalizedString("autofill_cancel", comment: "Dismisses the passphrase prompt"),
+        style: .cancel
+      ) { [weak self] _ in
+        self?.cancel(code: .userCanceled)
+      })
+    alert.addAction(
+      UIAlertAction(
+        title: NSLocalizedString("autofill_passphrase_unlock", comment: "Confirms the passphrase"),
+        style: .default
+      ) { [weak self] _ in
+        self?.complete(
+          path: path,
+          generation: generation,
+          passphrase: alert.textFields?.first?.text ?? "")
+      })
+    present(alert, animated: true)
+  }
+
+  private func deliver(credential: ParsAutofillIosCredential, generation: String) {
     let passwordCredential = ASPasswordCredential(
       user: credential.username,
       password: credential.password)

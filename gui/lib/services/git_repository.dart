@@ -52,4 +52,8 @@ abstract interface class GitOperationsRepository
   Future<GitOperationResult> autoPullOnOpen();
 
   Future<GitOperationResult> recoverByPull();
+
+  /// Pulls, then pushes when the pull left local commits to publish. Used by
+  /// pull-to-refresh so the list reflects the remote instead of a local rescan.
+  Future<GitOperationResult> syncWithRemote();
 }

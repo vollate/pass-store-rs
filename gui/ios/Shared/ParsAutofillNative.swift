@@ -25,7 +25,19 @@ struct ParsAutofillIosCredential {
   let password: String
 }
 
+/// Why a credential resolution ended, so callers can tell a passphrase the user
+/// can still correct from a publication that must fail closed.
+enum ParsAutofillIosResolution {
+  case resolved(ParsAutofillIosCredential)
+  /// Decryption failed; another passphrase may still unlock the entry.
+  case passphraseRequired
+  /// State, index, or generation no longer serves this request.
+  case unavailable
+}
+
 enum ParsAutofillNative {
+  private static let pgpErrorCategory = "PgpError"
+
   static func queryCandidates(
     indexPath: String,
     website: String?,
@@ -67,7 +79,7 @@ enum ParsAutofillNative {
     root: String,
     path: String,
     passphrase: String?
-  ) -> ParsAutofillIosCredential? {
+  ) -> ParsAutofillIosResolution {
     let request: [String: Any?] = [
       "configPath": configPath,
       "indexPath": indexPath,
@@ -76,19 +88,26 @@ enum ParsAutofillNative {
       "pgpExecutable": nil,
       "passphrase": passphrase,
     ]
-    guard let response = call(request: request, handler: parsAutofillResolveCredentialJson),
-      response["error"] is NSNull || response["error"] == nil,
-      let credential = response["credential"] as? [String: Any],
+    guard let response = call(request: request, handler: parsAutofillResolveCredentialJson) else {
+      return .unavailable
+    }
+    if let error = response["error"] as? [String: Any] {
+      // Only a failed decrypt can be retried with different input.
+      return (error["category"] as? String) == pgpErrorCategory
+        ? .passphraseRequired : .unavailable
+    }
+    guard let credential = response["credential"] as? [String: Any],
       let resolvedPath = credential["path"] as? String,
       let username = credential["username"] as? String,
       let password = credential["password"] as? String
     else {
-      return nil
+      return .unavailable
     }
-    return ParsAutofillIosCredential(
-      path: resolvedPath,
-      username: username,
-      password: password)
+    return .resolved(
+      ParsAutofillIosCredential(
+        path: resolvedPath,
+        username: username,
+        password: password))
   }
 
   static func recordCompletion(indexPath: String, path: String) -> Bool {

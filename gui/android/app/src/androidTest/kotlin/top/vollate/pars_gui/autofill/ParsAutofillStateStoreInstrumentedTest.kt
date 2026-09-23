@@ -97,7 +97,7 @@ class ParsAutofillStateStoreInstrumentedTest {
         val first = ParsAutofillStateStore.read(context)
         val generation = requireNotNull(first.generation)
         var reads = 0
-        val credential =
+        val resolution =
             ParsAutofillNativeBridge.resolveCredentialWith(
                 path = "example.com/alice",
                 generation = generation,
@@ -113,7 +113,7 @@ class ParsAutofillStateStoreInstrumentedTest {
                     """{"error":null,"credential":{"path":"example.com/alice","username":"alice","password":"synthetic"}}"""
                 },
             )
-        assertNull(credential)
+        assertEquals(ParsAutofillResolution.Unavailable, resolution)
 
         index.writeText("{}")
         assertTrue(ParsAutofillStateStore.publish(context, "/config", index.path, store.path, null))

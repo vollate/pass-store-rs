@@ -10,4 +10,10 @@
     <string name="autofill_candidate_title">%1$s · Pars</string>
     <string name="autofill_no_matches_title">没有匹配的密码</string>
     <string name="autofill_no_matches_toast">Pars 中没有匹配的凭据</string>
+    <string name="autofill_passphrase_title">PGP 口令</string>
+    <string name="autofill_passphrase_message">Pars 需要 PGP 口令才能解密这条密码。口令仅用于本次解密，不会保存。</string>
+    <string name="autofill_passphrase_rejected">该口令无法解密这条密码，请重试。</string>
+    <string name="autofill_passphrase_hint">PGP 口令</string>
+    <string name="autofill_passphrase_unlock">解锁</string>
+    <string name="autofill_passphrase_failed_toast">Pars 无法解密所选密码</string>
 </resources>

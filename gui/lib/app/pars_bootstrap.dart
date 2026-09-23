@@ -90,7 +90,9 @@ class _BootstrapStatusScreen extends StatelessWidget {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: ParsContentWidth.narrow),
+            constraints: const BoxConstraints(
+              maxWidth: ParsContentWidth.narrow,
+            ),
             child: Padding(
               padding: ParsInsets.page,
               child: Column(
@@ -204,18 +206,24 @@ Future<Widget> createParsGuiApp() async {
     securityRepository: securityRepository,
     autofillRepository: autofillRepository,
   );
+  // A cached snapshot is enough to route and paint the first frame; the vault
+  // rescans on mount. Only a cache miss has to block startup on a full scan.
+  var hydrated = false;
   try {
-    debugPrint('pars bootstrap: refresh');
-    await repository.refresh();
+    debugPrint('pars bootstrap: hydrate');
+    hydrated = await repository.hydrateFromCache();
   } catch (error) {
-    debugPrint('pars bootstrap: refresh failed: $error');
+    debugPrint('pars bootstrap: hydrate failed: $error');
+  }
+  if (!hydrated) {
+    try {
+      debugPrint('pars bootstrap: refresh');
+      await repository.refresh();
+    } catch (error) {
+      debugPrint('pars bootstrap: refresh failed: $error');
+    }
   }
   unawaited(() async {
-    try {
-      await repository.autoPullOnOpen();
-    } catch (error) {
-      debugPrint('pars bootstrap: auto-pull failed: $error');
-    }
     try {
       await autofillRepository.publishPlatformState();
     } catch (error) {

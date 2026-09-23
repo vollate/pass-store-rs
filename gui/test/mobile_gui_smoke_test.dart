@@ -1282,6 +1282,40 @@ void main() {
     expect(find.text('pgp-passphrase'), findsNothing);
   });
 
+  testWidgets('disabling passphrase storage keeps the path-derived index', (
+    tester,
+  ) async {
+    final repository = _KeyManagementSettingsRepository();
+    final securityRepository = InMemorySecurityRepository(
+      pgpPassphraseStorageEnabled: true,
+      pgpPassphrase: const PgpPassphraseCache(
+        fingerprint: 'PGP-BACKUP',
+        passphrase: 'pgp-passphrase',
+      ),
+    );
+    final autofillRepository = FakeAutofillRepository();
+
+    await _pumpSettingsScreen(
+      tester,
+      repository: repository,
+      securityRepository: securityRepository,
+      autofillRepository: autofillRepository,
+    );
+
+    await tester.tap(find.text('KMS / Keychain passphrase'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Store PGP passphrase'));
+    await tester.pumpAndSettle();
+
+    expect(securityRepository.pgpPassphraseStorageEnabled, isFalse);
+    expect(autofillRepository.operations, <String>[
+      'clear-enrichment',
+      'rebuild',
+    ]);
+    expect(autofillRepository.cleared, isFalse);
+    expect(autofillRepository.status.kind, AutofillStatusKind.ready);
+  });
+
   testWidgets('settings does not persist an unvalidated PGP passphrase', (
     tester,
   ) async {
@@ -3281,6 +3315,9 @@ class _GitSettingsRepository extends _InjectedRepository
 
   @override
   Future<GitOperationResult> recoverByPull() => pull();
+
+  @override
+  Future<GitOperationResult> syncWithRemote() => pull();
 }
 
 class _EmptyVaultRepository implements VaultRepository, GitRepository {

@@ -10,4 +10,10 @@
     <string name="autofill_candidate_title">%1$s · Pars</string>
     <string name="autofill_no_matches_title">No matching passwords</string>
     <string name="autofill_no_matches_toast">No matching credentials in Pars</string>
+    <string name="autofill_passphrase_title">PGP passphrase</string>
+    <string name="autofill_passphrase_message">Pars needs your PGP passphrase to decrypt this password. It is used once and not saved.</string>
+    <string name="autofill_passphrase_rejected">That passphrase could not decrypt this password. Try again.</string>
+    <string name="autofill_passphrase_hint">PGP passphrase</string>
+    <string name="autofill_passphrase_unlock">Unlock</string>
+    <string name="autofill_passphrase_failed_toast">Pars could not decrypt the selected password</string>
 </resources>

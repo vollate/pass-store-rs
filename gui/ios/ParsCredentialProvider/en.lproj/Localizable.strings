@@ -1,1 +1,7 @@
 "autofill_authentication_reason" = "Unlock Pars to fill the selected password";
+"autofill_passphrase_title" = "PGP passphrase";
+"autofill_passphrase_message" = "Pars needs your PGP passphrase to decrypt this password. It is used once and not saved.";
+"autofill_passphrase_rejected" = "That passphrase could not decrypt this password. Try again.";
+"autofill_passphrase_hint" = "PGP passphrase";
+"autofill_passphrase_unlock" = "Unlock";
+"autofill_cancel" = "Cancel";

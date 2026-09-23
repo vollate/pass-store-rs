@@ -57,7 +57,21 @@ data class ParsAutofillCredential(
     val password: String,
 )
 
+// Why a credential resolution ended, so callers can tell a passphrase the user
+// can still correct from a publication that must fail closed.
+sealed interface ParsAutofillResolution {
+    data class Resolved(val credential: ParsAutofillCredential) : ParsAutofillResolution
+
+    // Decryption failed; another passphrase may still unlock the entry.
+    data object PassphraseRequired : ParsAutofillResolution
+
+    // State, index, or generation no longer serves this request.
+    data object Unavailable : ParsAutofillResolution
+}
+
 object ParsAutofillNativeBridge {
+    private const val PGP_ERROR_CATEGORY = "PgpError"
+
     fun queryCandidates(
         context: Context,
         website: String?,
@@ -118,10 +132,12 @@ object ParsAutofillNativeBridge {
         context: Context,
         path: String,
         generation: String,
-    ): ParsAutofillCredential? =
+        passphrase: String? = null,
+    ): ParsAutofillResolution =
         resolveCredentialWith(
             path = path,
             generation = generation,
+            passphrase = passphrase,
             stateReader = { ParsAutofillStateStore.read(context) },
             nativeResolve = ParsAutofillNative::resolveCredential,
         )
@@ -129,14 +145,17 @@ object ParsAutofillNativeBridge {
     internal fun resolveCredentialWith(
         path: String,
         generation: String,
+        passphrase: String? = null,
         stateReader: () -> ParsAutofillState,
         nativeResolve: (String) -> String,
-    ): ParsAutofillCredential? {
+    ): ParsAutofillResolution {
         val state = stateReader()
         if (state.generation != generation ||
             !ParsAutofillStateStore.canServe(state, File(state.indexPath).isFile)
-        ) return null
-        val storeRoot = state.storeRoot ?: return null
+        ) return ParsAutofillResolution.Unavailable
+        val storeRoot = state.storeRoot ?: return ParsAutofillResolution.Unavailable
+        // A supplied passphrase is session-only and overrides the published one.
+        val effective = passphrase?.takeIf { it.isNotEmpty() } ?: state.passphrase
         val request =
             JSONObject()
                 .put("configPath", state.configPath)
@@ -144,15 +163,30 @@ object ParsAutofillNativeBridge {
                 .put("root", storeRoot)
                 .put("path", path)
                 .put("pgpExecutable", JSONObject.NULL)
-                .put("passphrase", state.passphrase ?: JSONObject.NULL)
-        val response = JSONObject(nativeResolve(request.toString()))
-        if (!response.isNull("error") || response.isNull("credential")) return null
+                .put("passphrase", effective ?: JSONObject.NULL)
+        val response =
+            runCatching { JSONObject(nativeResolve(request.toString())) }.getOrNull()
+                ?: return ParsAutofillResolution.Unavailable
+        if (!response.isNull("error")) {
+            // Only a failed decrypt can be retried with different input.
+            val category = response.optJSONObject("error")?.optString("category")
+            return if (category == PGP_ERROR_CATEGORY) {
+                ParsAutofillResolution.PassphraseRequired
+            } else {
+                ParsAutofillResolution.Unavailable
+            }
+        }
+        if (response.isNull("credential")) return ParsAutofillResolution.Unavailable
         val credential = response.getJSONObject("credential")
-        if (!ParsAutofillStateStore.samePublication(state, stateReader())) return null
-        return ParsAutofillCredential(
-            path = credential.getString("path"),
-            username = credential.getString("username"),
-            password = credential.getString("password"),
+        if (!ParsAutofillStateStore.samePublication(state, stateReader())) {
+            return ParsAutofillResolution.Unavailable
+        }
+        return ParsAutofillResolution.Resolved(
+            ParsAutofillCredential(
+                path = credential.getString("path"),
+                username = credential.getString("username"),
+                password = credential.getString("password"),
+            ),
         )
     }
 

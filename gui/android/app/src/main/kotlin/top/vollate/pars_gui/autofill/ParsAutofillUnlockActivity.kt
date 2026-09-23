@@ -1,6 +1,7 @@
 package top.vollate.pars_gui.autofill
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -13,9 +14,11 @@ import android.net.Uri
 import android.os.CancellationSignal
 import android.service.autofill.Dataset
 import android.service.credentials.CredentialProviderService
+import android.util.Log
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillManager
 import android.view.autofill.AutofillValue
+import android.widget.EditText
 import android.widget.RemoteViews
 import android.widget.Toast
 import java.util.UUID
@@ -24,6 +27,9 @@ import top.vollate.pars_gui.R
 
 class ParsAutofillUnlockActivity : Activity() {
     private var cancellationSignal: CancellationSignal? = null
+    private var passphraseDialog: AlertDialog? = null
+    private var attempts = 0
+    private var authenticationStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,14 +43,34 @@ class ParsAutofillUnlockActivity : Activity() {
             return
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            Log.w(TAG, "Autofill unlock needs Android P or newer, got ${Build.VERSION.SDK_INT}")
             finishCanceled()
             return
         }
+    }
+
+    // BiometricPrompt rejects callers that are not yet in the foreground, and this
+    // activity is launched from a backgrounded process, so authentication waits for
+    // the first window focus instead of starting during onCreate.
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus || authenticationStarted || isFinishing) {
+            return
+        }
+        if (intent.getStringExtra(EXTRA_MODE) == MODE_NO_MATCHES) {
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            return
+        }
+        authenticationStarted = true
         authenticate()
     }
 
     override fun onDestroy() {
         cancellationSignal?.cancel()
+        passphraseDialog?.dismiss()
+        passphraseDialog = null
         super.onDestroy()
     }
 
@@ -78,11 +104,12 @@ class ParsAutofillUnlockActivity : Activity() {
             directExecutor(),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
-                    resolveAndReturn()
+                    runOnUiThread { resolveAndReturn() }
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
-                    finishCanceled()
+                    Log.w(TAG, "Autofill unlock authentication failed: code=$errorCode, message=$errString")
+                    runOnUiThread { finishCanceled() }
                 }
 
                 override fun onAuthenticationFailed() {
@@ -95,14 +122,70 @@ class ParsAutofillUnlockActivity : Activity() {
     private fun resolveAndReturn() {
         val path = intent.getStringExtra(EXTRA_PATH) ?: return finishCanceled()
         val generation = intent.getStringExtra(EXTRA_GENERATION) ?: return finishCanceled()
-        val credential =
-            ParsAutofillNativeBridge.resolveCredential(this, path, generation)
-                ?: return finishCanceled()
-        when (intent.getStringExtra(EXTRA_MODE)) {
-            MODE_AUTOFILL -> finishAutofill(credential, generation)
-            MODE_CREDENTIAL -> finishCredentialManager(credential, generation)
-            else -> finishCanceled()
+        deliver(path = path, generation = generation, passphrase = null)
+    }
+
+    private fun deliver(path: String, generation: String, passphrase: String?) {
+        val resolution =
+            ParsAutofillNativeBridge.resolveCredential(this, path, generation, passphrase)
+        when (resolution) {
+            is ParsAutofillResolution.Resolved ->
+                when (intent.getStringExtra(EXTRA_MODE)) {
+                    MODE_AUTOFILL -> finishAutofill(resolution.credential, generation)
+                    MODE_CREDENTIAL -> finishCredentialManager(resolution.credential, generation)
+                    else -> finishCanceled()
+                }
+            ParsAutofillResolution.PassphraseRequired ->
+                promptForPassphrase(
+                    path = path,
+                    generation = generation,
+                    rejected = passphrase != null,
+                )
+            ParsAutofillResolution.Unavailable -> {
+                Log.w(TAG, "Autofill credential is unavailable for the published state")
+                finishCanceled()
+            }
         }
+    }
+
+    // Asks for the PGP passphrase when none was published, so Autofill still
+    // works without durable passphrase storage. Input is used for this single
+    // decryption and never persisted.
+    private fun promptForPassphrase(path: String, generation: String, rejected: Boolean) {
+        if (attempts >= MAX_PASSPHRASE_ATTEMPTS) {
+            Toast.makeText(
+                this,
+                getString(R.string.autofill_passphrase_failed_toast),
+                Toast.LENGTH_SHORT,
+            ).show()
+            finishCanceled()
+            return
+        }
+        attempts += 1
+        val input =
+            layoutInflater.inflate(R.layout.pars_autofill_passphrase, null).also { view ->
+                view.findViewById<EditText>(R.id.autofill_passphrase).hint =
+                    getString(R.string.autofill_passphrase_hint)
+            }
+        passphraseDialog =
+            AlertDialog.Builder(this)
+                .setTitle(R.string.autofill_passphrase_title)
+                .setMessage(
+                    if (rejected) {
+                        R.string.autofill_passphrase_rejected
+                    } else {
+                        R.string.autofill_passphrase_message
+                    },
+                )
+                .setView(input)
+                .setCancelable(false)
+                .setNegativeButton(R.string.autofill_cancel) { _, _ -> finishCanceled() }
+                .setPositiveButton(R.string.autofill_passphrase_unlock) { _, _ ->
+                    val entered =
+                        input.findViewById<EditText>(R.id.autofill_passphrase).text.toString()
+                    deliver(path = path, generation = generation, passphrase = entered)
+                }
+                .show()
     }
 
     private fun finishAutofill(credential: ParsAutofillCredential, generation: String) {
@@ -167,6 +250,7 @@ class ParsAutofillUnlockActivity : Activity() {
         }
 
     companion object {
+        private const val TAG = "ParsAutofillUnlock"
         private const val EXTRA_MODE = "top.vollate.pars_gui.autofill.MODE"
         private const val EXTRA_PATH = "top.vollate.pars_gui.autofill.PATH"
         private const val EXTRA_GENERATION = "top.vollate.pars_gui.autofill.GENERATION"
@@ -175,6 +259,7 @@ class ParsAutofillUnlockActivity : Activity() {
         private const val MODE_AUTOFILL = "autofill"
         private const val MODE_CREDENTIAL = "credential"
         private const val MODE_NO_MATCHES = "no_matches"
+        private const val MAX_PASSPHRASE_ATTEMPTS = 3
 
         fun autofillIntent(
             context: Context,

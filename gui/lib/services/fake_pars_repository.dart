@@ -190,6 +190,9 @@ class FakeParsRepository
   Future<GitOperationResult> recoverByPull() => pull();
 
   @override
+  Future<GitOperationResult> syncWithRemote() => pull();
+
+  @override
   List<PasswordEntry> get entries => const <PasswordEntry>[
     PasswordEntry(
       path: 'work/dev/github',

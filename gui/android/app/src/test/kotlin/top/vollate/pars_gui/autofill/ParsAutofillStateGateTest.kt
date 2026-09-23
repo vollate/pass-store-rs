@@ -1,6 +1,8 @@
 package top.vollate.pars_gui.autofill
 
 import java.nio.file.Files
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -60,6 +62,75 @@ class ParsAutofillStateGateTest {
         assertTrue(ParsAutofillStateStore.canServe(enabled, indexExists = true))
         assertFalse(ParsAutofillStateStore.canServe(enabled, indexExists = false))
         assertFalse(ParsAutofillStateStore.canServe(missingRoot, indexExists = true))
+    }
+
+    @Test
+    fun decryptFailureAsksForAPassphraseWhileOtherFailuresFailClosed() {
+        val directory = Files.createTempDirectory("pars-autofill-resolution").toFile()
+        try {
+            val index = directory.resolve("index.json").apply { writeText("{}") }
+            val state =
+                ParsAutofillState(
+                    enabled = true,
+                    configPath = "/config",
+                    indexPath = index.path,
+                    storeRoot = "/store",
+                    passphrase = null,
+                    generation = "generation-a",
+                )
+
+            var forwarded: String? = null
+            assertEquals(
+                ParsAutofillResolution.PassphraseRequired,
+                ParsAutofillNativeBridge.resolveCredentialWith(
+                    path = "example.com/alice",
+                    generation = "generation-a",
+                    stateReader = { state },
+                    nativeResolve = {
+                        forwarded = JSONObject(it).optString("passphrase")
+                        """{"error":{"category":"PgpError","message":"decrypt failed"}}"""
+                    },
+                ),
+            )
+            assertEquals("", forwarded)
+
+            assertEquals(
+                ParsAutofillResolution.Unavailable,
+                ParsAutofillNativeBridge.resolveCredentialWith(
+                    path = "example.com/alice",
+                    generation = "generation-a",
+                    stateReader = { state },
+                    nativeResolve = {
+                        """{"error":{"category":"StoreError","message":"entry does not exist"}}"""
+                    },
+                ),
+            )
+
+            val resolved =
+                ParsAutofillNativeBridge.resolveCredentialWith(
+                    path = "example.com/alice",
+                    generation = "generation-a",
+                    passphrase = "typed once",
+                    stateReader = { state },
+                    nativeResolve = {
+                        forwarded = JSONObject(it).getString("passphrase")
+                        """{"error":null,"credential":{"path":"example.com/alice","username":"alice","password":"secret"}}"""
+                    },
+                )
+            assertEquals("typed once", forwarded)
+            assertEquals(
+                ParsAutofillResolution.Resolved(
+                    ParsAutofillCredential(
+                        path = "example.com/alice",
+                        username = "alice",
+                        password = "secret",
+                    ),
+                ),
+                resolved,
+            )
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     @Test

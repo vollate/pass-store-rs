@@ -96,7 +96,9 @@ authentication SHALL return no credential.
 
 ### Requirement: Autofill SHALL decrypt credentials only on demand
 
-Autofill providers SHALL decrypt only the selected indexed entry after successful platform authentication. Decryption SHALL use the selected mobile PGP backend and the key-bound cached PGP passphrase when available. The returned username SHALL be the opted-in `login` value when available and otherwise the filename-stem username stored in the index; the returned password SHALL be the decrypted entry's first line. The credential-resolution primitive SHALL NOT update or enrich the index. If no usable passphrase or key is available for the selected entry, autofill SHALL fail closed.
+Autofill providers SHALL decrypt only the selected indexed entry after successful platform authentication. Decryption SHALL use the selected mobile PGP backend and the key-bound PGP private-key passphrase published from system-keystore storage when one is available. The returned username SHALL be the opted-in `login` value when available and otherwise the filename-stem username stored in the index; the returned password SHALL be the decrypted entry's first line. The credential-resolution primitive SHALL NOT update or enrich the index.
+
+When no published passphrase decrypts the selected entry, the provider SHALL ask for the PGP private-key passphrase after platform authentication, use the typed value for that single decryption only, and SHALL NOT persist or publish it. Attempts SHALL be bounded, and cancellation or exhausted attempts SHALL return no credential. Every other resolution failure — disabled native state, store-root or generation mismatch, missing index, or missing entry — SHALL fail closed without asking for input.
 
 #### Scenario: Selected entry is the only decrypted entry
 
@@ -115,12 +117,26 @@ Autofill providers SHALL decrypt only the selected indexed entry after successfu
 - **WHEN** the credential is successfully resolved
 - **THEN** the returned username is `bob`
 
-#### Scenario: Missing passphrase fails closed
+#### Scenario: Unpublished passphrase is requested instead of failing silently
 
 - **GIVEN** a selected entry requires a passphrase-protected private key
-- **AND** no usable cached passphrase is available
-- **WHEN** autofill tries to resolve the selected entry
+- **AND** the user has not enabled durable system-keystore passphrase storage
+- **WHEN** platform authentication succeeds and no published passphrase decrypts the entry
+- **THEN** the provider asks for the PGP private-key passphrase
+- **AND** a correct passphrase decrypts only that entry and returns its credential
+- **AND** the typed passphrase is not written to secure storage or to native published state
+
+#### Scenario: Cancelled or exhausted passphrase entry returns nothing
+
+- **GIVEN** the provider is asking for the PGP private-key passphrase
+- **WHEN** the user cancels or the bounded number of incorrect attempts is reached
 - **THEN** no plaintext credential is returned
+
+#### Scenario: Non-passphrase failures never ask for input
+
+- **GIVEN** native state is disabled, its generation is stale, or the selected entry is absent
+- **WHEN** autofill tries to resolve the selected entry
+- **THEN** it fails closed without asking for a passphrase
 
 ### Requirement: Native providers SHALL record only successful Autofill completions
 
@@ -177,7 +193,7 @@ The Android AutofillService SHALL use a localized, system-safe `RemoteViews` pre
 
 ### Requirement: Settings SHALL expose automatic path indexing and optional enrichment
 
-Settings SHALL show a concise localized system Autofill state such as Ready with indexed count, Busy, or Unavailable. Path-derived data SHALL be created and reconciled automatically whenever a valid store is loaded. Settings SHALL expose exactly two metadata actions: use encrypted login and URL fields, and forget encrypted login and URL fields. Raw parser field lists, private app-storage paths, and backend error strings SHALL NOT be used as the Settings tile subtitle; bounded non-secret diagnostics SHALL be available only through explicit Details or Runtime diagnostics. Automatic path indexing SHALL NOT require a PGP session or passphrase and SHALL NOT decrypt entries. Encrypted-field enrichment SHALL remain disabled by default and SHALL clearly disclose that every encrypted entry will be read once.
+Settings SHALL show a concise localized system Autofill state such as Ready with indexed count, Busy, or Unavailable. Path-derived data SHALL be created and reconciled automatically whenever a valid store is loaded. Settings SHALL expose exactly two metadata actions: use encrypted login and URL fields, and forget encrypted login and URL fields. Raw parser field lists, private app-storage paths, and backend error strings SHALL NOT be used as the Settings tile subtitle; bounded non-secret diagnostics SHALL be available only through explicit Details or Runtime diagnostics. Automatic path indexing SHALL NOT require a PGP session or passphrase and SHALL NOT decrypt entries. Encrypted-field enrichment SHALL remain disabled by default and SHALL clearly disclose that every encrypted entry will be read once. Disabling durable passphrase storage SHALL discard encrypted-field enrichment and rebuild the path-derived index, and SHALL NOT clear the index or disable native Autofill.
 
 #### Scenario: Ready status is concise
 - **GIVEN** the Autofill index is valid and contains entries
@@ -207,6 +223,13 @@ Settings SHALL show a concise localized system Autofill state such as Ready with
 - **WHEN** Settings refreshes or re-renders the concise Autofill status
 - **THEN** it reads public index/platform status only
 - **AND** status presentation does not decrypt an entry or start a PGP session
+
+#### Scenario: Disabling passphrase storage keeps path-derived indexing
+- **GIVEN** enriched login and URL metadata exists and durable passphrase storage is enabled
+- **WHEN** the user disables durable passphrase storage
+- **THEN** enriched logins and aliases are discarded
+- **AND** the index is rebuilt from password-entry paths without decryption
+- **AND** native Autofill stays enabled and keeps offering path-derived candidates
 
 ### Requirement: Autofill index lifecycle SHALL support non-decrypting incremental updates
 

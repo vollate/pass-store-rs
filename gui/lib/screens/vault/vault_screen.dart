@@ -97,6 +97,10 @@ class _VaultScreenState extends State<VaultScreen> {
       widget.vaultRepository is ManageRepository
           ? widget.vaultRepository as ManageRepository
           : null;
+  GitOperationsRepository? get _gitOperations =>
+      widget.gitRepository is GitOperationsRepository
+          ? widget.gitRepository as GitOperationsRepository
+          : null;
   List<PasswordEntry> get _selectedEntries => widget.vaultRepository.entries
       .where(
         (entry) =>
@@ -131,7 +135,7 @@ class _VaultScreenState extends State<VaultScreen> {
                 child: const Icon(Icons.add),
               ),
       body: RefreshIndicator(
-        onRefresh: _refreshVault,
+        onRefresh: _syncVault,
         child: CustomScrollView(
           controller: _viewState.scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
@@ -509,7 +513,17 @@ class _VaultScreenState extends State<VaultScreen> {
     _showBatchOperationResult(result);
   }
 
-  Future<void> _refreshVault() async {
+  Future<void> _refreshVault() => _runVaultLoad(widget.vaultRepository.refresh);
+
+  /// Pull-to-refresh syncs with the remote first; the Git operations refresh
+  /// the entry list themselves once the remote state has landed.
+  Future<void> _syncVault() {
+    final git = _gitOperations;
+    if (git == null) return _refreshVault();
+    return _runVaultLoad(git.syncWithRemote);
+  }
+
+  Future<void> _runVaultLoad(Future<void> Function() operation) async {
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -517,7 +531,7 @@ class _VaultScreenState extends State<VaultScreen> {
       });
     }
     try {
-      await widget.vaultRepository.refresh();
+      await operation();
       if (!mounted) {
         return;
       }
