@@ -18,83 +18,100 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(
-                          context.l10n.sshKeysTitle,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w800),
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                context.l10n.sshKeysTitle,
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: context.l10n.githubSettings,
+                              onPressed: () => openGithubSshSettings(context),
+                              icon: const Icon(Icons.open_in_new),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: ParsSpacing.xs),
                         Text(context.l10n.sshKeysGitOnlyDescription),
                         const SizedBox(height: ParsSpacing.sm),
-                        if (keys.isEmpty)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.vpn_key_off_outlined),
-                            title: Text(context.l10n.noSshKeys),
-                            subtitle: Text(context.l10n.sshOptionalDescription),
-                          ),
-                        for (final key in keys)
-                          Card(
-                            child: ListTile(
-                              leading: const Icon(Icons.vpn_key_outlined),
-                              title: Text(key.name),
-                              subtitle: Text(key.fingerprint),
-                              trailing: PopupMenuButton<String>(
-                                tooltip: context.l10n.keyActionsTooltip(
-                                  context.l10n.sshStep,
-                                  key.name,
-                                ),
-                                onSelected: (action) {
-                                  switch (action) {
-                                    case 'export_public':
-                                      _exportSshPublic(context, key);
-                                    case 'export_private':
-                                      _showExportSshPrivate(context, key);
-                                    case 'delete':
-                                      _showDeleteSshKey(
-                                        context,
-                                        key,
-                                        setSheetState,
-                                      );
-                                  }
-                                },
-                                itemBuilder:
-                                    (context) => <PopupMenuEntry<String>>[
-                                      PopupMenuItem(
-                                        value: 'export_public',
-                                        child: Text(context.l10n.exportPublic),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'export_private',
-                                        child: Text(context.l10n.exportPrivate),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text(context.l10n.delete),
-                                      ),
-                                    ],
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: ParsSpacing.sm),
-                        Wrap(
-                          spacing: ParsSpacing.xs,
-                          runSpacing: ParsSpacing.xs,
+                        AppSectionBox(
+                          padding: EdgeInsets.zero,
+                          title: context.l10n.sshKeysTitle,
+                          emptyLabel: context.l10n.noSshKeys,
                           children: <Widget>[
-                            FilledButton.icon(
-                              onPressed: () => _showGenerateSshKey(context),
+                            for (final key in keys)
+                              ParsSectionRow(
+                                leading: const ParsSectionRowIcon(
+                                  icon: Icons.vpn_key_outlined,
+                                ),
+                                title: key.name,
+                                subtitle: key.fingerprint,
+                                onTap: () => _exportSshPublic(context, key),
+                                trailing: PopupMenuButton<String>(
+                                  tooltip: context.l10n.keyActionsTooltip(
+                                    context.l10n.sshStep,
+                                    key.name,
+                                  ),
+                                  onSelected: (action) {
+                                    switch (action) {
+                                      case 'export_public':
+                                        _exportSshPublic(context, key);
+                                      case 'export_private':
+                                        _showExportSshPrivate(context, key);
+                                      case 'delete':
+                                        _showDeleteSshKey(
+                                          context,
+                                          key,
+                                          setSheetState,
+                                        );
+                                    }
+                                  },
+                                  itemBuilder:
+                                      (context) => <PopupMenuEntry<String>>[
+                                        PopupMenuItem(
+                                          value: 'export_public',
+                                          child: Text(
+                                            context.l10n.exportPublic,
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'export_private',
+                                          child: Text(
+                                            context.l10n.exportPrivate,
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text(context.l10n.delete),
+                                        ),
+                                      ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: ParsSpacing.md),
+                        ParsButtonGrid(
+                          children: <Widget>[
+                            FilledButton.tonalIcon(
+                              onPressed:
+                                  () => _showGenerateSshKey(
+                                    context,
+                                    setSheetState,
+                                  ),
                               icon: const Icon(Icons.add),
-                              label: Text(context.l10n.generateSshKey),
+                              label: Text(context.l10n.generateAction),
                             ),
                             OutlinedButton.icon(
-                              onPressed: () => _showImportSshOptions(context),
+                              onPressed:
+                                  () => _showImportSshOptions(
+                                    context,
+                                    setSheetState,
+                                  ),
                               icon: const Icon(Icons.file_upload_outlined),
-                              label: Text(context.l10n.importSshKey),
-                            ),
-                            TextButton.icon(
-                              onPressed: () => _showGithubSshSettings(context),
-                              icon: const Icon(Icons.open_in_new),
-                              label: Text(context.l10n.githubSettings),
+                              label: Text(context.l10n.importAction),
                             ),
                           ],
                         ),
@@ -108,9 +125,13 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
     );
   }
 
-  void _showGenerateSshKey(BuildContext context) {
+  Future<void> _showGenerateSshKey(
+    BuildContext context,
+    StateSetter refreshSheet,
+  ) async {
     final name = TextEditingController(text: 'github-mobile-ed25519');
-    _showSshActionForm(
+    KeyRecord? generated;
+    await _showSshActionForm(
       context: context,
       title: context.l10n.generateSshKey,
       fields: <Widget>[
@@ -122,42 +143,36 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
       ],
       submitLabel: context.l10n.generateSshKey,
       onSubmit: () async {
-        await keyRepository.generateSshKey(name.text.trim());
+        generated = await keyRepository.generateSshKey(name.text.trim());
         await settingsRepository.refresh();
       },
     );
+    if (!context.mounted) return;
+    refreshSheet(() {});
+    final key = generated;
+    if (key != null) await _exportSshPublic(context, key);
   }
 
-  void _showImportSshOptions(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: Text(dialogContext.l10n.importSshKey),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  _showImportSshText(context);
-                },
-                child: Text(dialogContext.l10n.textSource),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  _showImportSshFile(context);
-                },
-                child: Text(dialogContext.l10n.fileSource),
-              ),
-            ],
-          ),
-    );
+  Future<void> _showImportSshOptions(
+    BuildContext context,
+    StateSetter refreshSheet,
+  ) async {
+    final source = await chooseSshImportSource(context);
+    if (!context.mounted || source == null) return;
+    if (source == 'file') {
+      await _showImportSshFile(context, refreshSheet);
+    } else {
+      await _showImportSshText(context, refreshSheet);
+    }
   }
 
-  void _showImportSshText(BuildContext context) {
+  Future<void> _showImportSshText(
+    BuildContext context,
+    StateSetter refreshSheet,
+  ) async {
     final name = TextEditingController();
     final privateKey = TextEditingController();
-    _showSshActionForm(
+    await _showSshActionForm(
       context: context,
       title: context.l10n.importSshKey,
       fields: <Widget>[
@@ -188,12 +203,16 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
         }
       },
     );
+    if (context.mounted) refreshSheet(() {});
   }
 
-  Future<void> _showImportSshFile(BuildContext context) async {
-    String? selectedPath;
+  Future<void> _showImportSshFile(
+    BuildContext context,
+    StateSetter refreshSheet,
+  ) async {
+    SelectedKeyFile? selectedFile;
     final name = TextEditingController();
-    showModalBottomSheet<void>(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder:
@@ -207,42 +226,52 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
                       decoration: InputDecoration(
                         labelText: context.l10n.nameField,
                       ),
+                      onChanged: (_) => setSheetState(() {}),
                     ),
                     const SizedBox(height: ParsSpacing.sm),
                     PathPickerRow(
                       title: context.l10n.keyFileField,
-                      path: selectedPath ?? _defaultSshKeyFileBasePath(),
-                      isSelected: selectedPath != null,
+                      path:
+                          selectedFile?.location ??
+                          _defaultSshKeyFileBasePath(),
+                      isSelected: selectedFile != null,
                       onPressed: () async {
-                        final path = await pathPickerService.pickFile(
+                        final selected = await pathPickerService.pickKeyFile(
                           initialDirectory: _defaultSshKeyFileBasePath(),
                         );
-                        if (path != null) {
-                          setSheetState(() => selectedPath = path);
-                        }
+                        if (selected == null) return;
+                        selectedFile = selected;
+                        name.text = selected.fileName;
+                        setSheetState(() {});
                       },
                     ),
                   ],
                   submitLabel: context.l10n.importAction,
                   canSubmit:
-                      () => selectedPath != null && name.text.trim().isNotEmpty,
+                      () => selectedFile != null && name.text.trim().isNotEmpty,
                   onSubmit: () async {
-                    await keyRepository.importSshPrivateKeyFile(
+                    final privateKey = await selectedFile!.readText();
+                    await keyRepository.importSshPrivateKeyText(
                       name: name.text.trim(),
-                      path: selectedPath!,
+                      privateKey: privateKey,
                     );
                     await settingsRepository.refresh();
                   },
                 ),
           ),
     );
+    if (context.mounted) refreshSheet(() {});
   }
 
   Future<void> _exportSshPublic(BuildContext context, KeyRecord key) async {
     try {
       final value = await keyRepository.exportSshPublicKey(key.name);
       if (!context.mounted) return;
-      _showKeyExport(context, context.l10n.exportPublic, value);
+      await showSshPublicKeyDialog(
+        context,
+        keyName: key.name,
+        publicKey: value,
+      );
     } catch (error) {
       if (context.mounted) {
         AppNotification.show(
@@ -279,66 +308,41 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
     );
   }
 
-  void _showDeleteSshKey(
+  Future<void> _showDeleteSshKey(
     BuildContext context,
     KeyRecord key,
     StateSetter refreshSheet,
-  ) {
-    final confirmation = TextEditingController();
-    _showSshActionForm(
-      context: context,
-      title: context.l10n.delete,
-      fields: <Widget>[
-        Text(context.l10n.typeToConfirm(key.name)),
-        TextField(
-          controller: confirmation,
-          decoration: InputDecoration(labelText: context.l10n.confirmation),
-        ),
-      ],
-      submitLabel: context.l10n.delete,
-      onSubmit: () async {
-        if (confirmation.text != key.name) {
-          throw StateError(context.l10n.typeToConfirm(key.name));
-        }
-        await keyRepository.deleteSshKey(key.name);
-        await settingsRepository.refresh();
-        refreshSheet(() {});
-      },
-    );
-  }
-
-  Future<void> _showGithubSshSettings(BuildContext context) async {
-    final uri = await keyRepository.githubSshSettingsUri();
-    if (!context.mounted) return;
-    showDialog<void>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(context.l10n.githubSshSettings),
-            content: SelectableText(uri.toString()),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(context.l10n.close),
-              ),
-            ],
-          ),
-    );
+  ) async {
+    if (!await confirmDeleteSshKey(context, key.name)) return;
+    try {
+      await keyRepository.deleteSshKey(key.name);
+      await settingsRepository.refresh();
+      if (context.mounted) refreshSheet(() {});
+    } catch (error) {
+      if (context.mounted) {
+        AppNotification.show(
+          context,
+          UiProblem.fromError(context.l10n, error).summary,
+          severity: AppNotificationSeverity.error,
+        );
+      }
+    }
   }
 
   void _showKeyExport(BuildContext context, String title, String value) {
     showDialog<void>(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: Text(title),
-            content: SingleChildScrollView(child: SelectableText(value)),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(context.l10n.close),
-              ),
-            ],
+          (context) => ParsDialog(
+            title: title,
+            content: SelectableText(
+              value,
+              style: const TextStyle(fontFamily: 'monospace'),
+            ),
+            primary: ParsDialogAction(
+              label: context.l10n.close,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
           ),
     );
   }
@@ -349,14 +353,14 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
     return defaultUserDirectory();
   }
 
-  void _showSshActionForm({
+  Future<void> _showSshActionForm({
     required BuildContext context,
     required String title,
     required List<Widget> fields,
     required String submitLabel,
     required Future<void> Function() onSubmit,
   }) {
-    showModalBottomSheet<void>(
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder:

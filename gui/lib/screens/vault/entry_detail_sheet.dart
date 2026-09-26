@@ -14,6 +14,7 @@ import '../../services/sensitive_clipboard_service.dart';
 import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
+import '../../widgets/pars_action_group.dart';
 
 enum _EntryDetailMenuAction { edit, move, rename, qr, regenerate, delete }
 
@@ -350,9 +351,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                 ),
               ),
               const SizedBox(height: ParsSpacing.sm),
-              Wrap(
-                spacing: ParsSpacing.xs,
-                runSpacing: ParsSpacing.xs,
+              ParsButtonGrid(
                 children: <Widget>[
                   FilledButton.icon(
                     onPressed: _copyPassword,

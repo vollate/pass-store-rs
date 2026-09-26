@@ -121,6 +121,16 @@ class SensitiveClipboardService {
     });
   }
 
+  /// Copies text that is safe to share, such as an SSH public key. It is not
+  /// marked sensitive and is not cleared automatically.
+  Future<void> copyPublic(String text) {
+    return _platform.write(
+      text,
+      sensitive: false,
+      ownerToken: 'public:${DateTime.now().microsecondsSinceEpoch}',
+    );
+  }
+
   Future<void> clearNow() async {
     final expected = _lastSecret;
     final ownerToken = _lastOwnerToken;

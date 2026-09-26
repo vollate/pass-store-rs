@@ -11,14 +11,22 @@ typedef _CreateLocalStoreSubmit =
 typedef _ImportLocalStoreSubmit = Future<void> Function(String root);
 
 typedef _CloneStoreSubmit =
-    Future<void> Function({required String remoteUrl, required String root});
+    Future<void> Function({
+      required String remoteUrl,
+      required String root,
+      bool overwrite,
+    });
+
+class CloneOverwriteDeclined implements Exception {
+  const CloneOverwriteDeclined();
+}
 
 class _StoreSetupActions extends StatelessWidget {
   const _StoreSetupActions({
     required this.lifecycle,
     required this.managedPaths,
     required this.selectedPgpFingerprint,
-    required this.hasSshKey,
+    required this.readSshKeys,
     required this.pathPickerService,
     required this.onCreateNeedsRecipient,
     required this.onGenerateSshKey,
@@ -32,7 +40,7 @@ class _StoreSetupActions extends StatelessWidget {
   final StoreLifecycleSnapshot lifecycle;
   final AppManagedPathRepository? managedPaths;
   final String? selectedPgpFingerprint;
-  final bool hasSshKey;
+  final List<KeyRecord> Function() readSshKeys;
   final PathPickerService pathPickerService;
   final VoidCallback onCreateNeedsRecipient;
   final Future<bool> Function() onGenerateSshKey;
@@ -238,23 +246,19 @@ class _StoreSetupActions extends StatelessWidget {
     return await showDialog<bool>(
           context: context,
           builder:
-              (dialogContext) => AlertDialog(
-                title: Text(dialogContext.l10n.storeImportDirectAccessTitle),
+              (dialogContext) => ParsDialog(
+                title: dialogContext.l10n.storeImportDirectAccessTitle,
                 content: Text(
                   dialogContext.l10n.storeImportDirectAccessMessage,
                 ),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(false),
-                    child: Text(dialogContext.l10n.cancel),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(true),
-                    child: Text(
-                      dialogContext.l10n.storeImportDirectAccessAction,
-                    ),
-                  ),
-                ],
+                secondary: ParsDialogAction(
+                  label: dialogContext.l10n.cancel,
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                ),
+                primary: ParsDialogAction(
+                  label: dialogContext.l10n.storeImportDirectAccessAction,
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                ),
               ),
         ) ??
         false;
@@ -266,60 +270,87 @@ class _StoreSetupActions extends StatelessWidget {
     return await showDialog<ManagedStoreGitDecision>(
           context: context,
           builder:
-              (dialogContext) => AlertDialog(
-                title: Text(dialogContext.l10n.gitMetadataNotFoundTitle),
+              (dialogContext) => ParsDialog(
+                title: dialogContext.l10n.gitMetadataNotFoundTitle,
                 content: Text(dialogContext.l10n.gitMetadataNotFoundMessage),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed:
-                        () => Navigator.of(
-                          dialogContext,
-                        ).pop(ManagedStoreGitDecision.cancel),
-                    child: Text(dialogContext.l10n.cancel),
-                  ),
-                  TextButton(
-                    onPressed:
-                        () => Navigator.of(
-                          dialogContext,
-                        ).pop(ManagedStoreGitDecision.continueWithoutGit),
-                    child: Text(dialogContext.l10n.continueWithoutGit),
-                  ),
-                  FilledButton(
-                    onPressed:
-                        () => Navigator.of(
-                          dialogContext,
-                        ).pop(ManagedStoreGitDecision.initialize),
-                    child: Text(dialogContext.l10n.initializeGit),
-                  ),
-                ],
+                showClose: true,
+                secondary: ParsDialogAction(
+                  label: dialogContext.l10n.continueWithoutGit,
+                  onPressed:
+                      () => Navigator.of(
+                        dialogContext,
+                      ).pop(ManagedStoreGitDecision.continueWithoutGit),
+                ),
+                primary: ParsDialogAction(
+                  label: dialogContext.l10n.initializeGit,
+                  onPressed:
+                      () => Navigator.of(
+                        dialogContext,
+                      ).pop(ManagedStoreGitDecision.initialize),
+                ),
               ),
         ) ??
         ManagedStoreGitDecision.cancel;
   }
 
-  void _showCloneStore(BuildContext context) {
+  Future<bool> _confirmCloneOverwrite(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return ParsDialog(
+          title: dialogContext.l10n.cloneTargetExistsTitle,
+          content: Text(dialogContext.l10n.cloneTargetExistsMessage),
+          destructive: true,
+          secondary: ParsDialogAction(
+            label: dialogContext.l10n.cancel,
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+          ),
+          primary: ParsDialogAction(
+            label: dialogContext.l10n.replaceCloneTarget,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+          ),
+        );
+      },
+    ).then((value) => value ?? false);
+  }
+
+  Future<void> _showCloneStore(BuildContext context) async {
     final remote = TextEditingController();
     final defaultBase = _defaultStoreBasePath();
     String? selectedBase;
-    var sshReady = hasSshKey;
+    var sshReady = _importedSshKeys(readSshKeys()).isNotEmpty;
+    var selectedSshKey = await _initialSshKeyName();
+    if (!context.mounted) return;
     _showPickerStoreForm(
       context: context,
       title: context.l10n.cloneGitStore,
       submitLabel: context.l10n.cloneAction,
       canSubmit:
           () =>
-              (!remoteUrlUsesSsh(remote.text) || sshReady) &&
+              (!remoteUrlUsesSsh(remote.text) ||
+                  (sshReady && selectedSshKey != null)) &&
               (managedPaths != null || selectedBase != null),
-      onSubmit:
-          () => onCloneStore(
+      onSubmit: () async {
+        final keyName = selectedSshKey;
+        if (remoteUrlUsesSsh(remote.text) && keyName != null) {
+          await saveSelectedSshKey(lifecycle.configPath, keyName);
+        }
+        final root =
+            managedPaths?.storeRootForRemote(remote.text) ??
+            joinFilesystemPath(selectedBase!, slugFromRemoteUrl(remote.text));
+        try {
+          await onCloneStore(remoteUrl: remote.text, root: root);
+        } on StoreCloneTargetExists {
+          if (!context.mounted) return;
+          final replace = await _confirmCloneOverwrite(context);
+          if (!replace) throw const CloneOverwriteDeclined();
+          await onCloneStore(
             remoteUrl: remote.text,
-            root:
-                managedPaths?.storeRootForRemote(remote.text) ??
-                joinFilesystemPath(
-                  selectedBase!,
-                  slugFromRemoteUrl(remote.text),
-                ),
-          ),
+            root: root,
+            overwrite: true,
+          );
+        }
+      },
       builder:
           (sheetContext, setSheetState) => <Widget>[
             _CloneStoreFields(
@@ -339,6 +370,12 @@ class _StoreSetupActions extends StatelessWidget {
                             }),
                       )
                       : null,
+              sshKeys: _importedSshKeys(readSshKeys()),
+              selectedSshKey: selectedSshKey,
+              onSelectSshKey:
+                  (name) => setSheetState(() {
+                    selectedSshKey = name;
+                  }),
             ),
             if (remoteUrlUsesSsh(remote.text) && !sshReady) ...<Widget>[
               const SizedBox(height: ParsSpacing.sm),
@@ -348,31 +385,63 @@ class _StoreSetupActions extends StatelessWidget {
                 title: Text(context.l10n.sshKeyRequiredForRemote),
                 subtitle: Text(context.l10n.sshRequiredForThisClone),
               ),
-              Wrap(
-                spacing: ParsSpacing.xs,
-                runSpacing: ParsSpacing.xs,
+              ParsButtonGrid(
                 children: <Widget>[
                   FilledButton.tonalIcon(
                     onPressed: () async {
                       final ready = await onGenerateSshKey();
-                      setSheetState(() => sshReady = ready);
+                      setSheetState(() {
+                        sshReady = ready;
+                        selectedSshKey = _selectedSshKeyAfterRefresh(
+                          selectedSshKey,
+                        );
+                      });
                     },
                     icon: const Icon(Icons.add),
-                    label: Text(context.l10n.generateSshKey),
+                    label: Text(context.l10n.generateAction),
                   ),
                   OutlinedButton.icon(
                     onPressed: () async {
                       final ready = await onImportSshKey();
-                      setSheetState(() => sshReady = ready);
+                      setSheetState(() {
+                        sshReady = ready;
+                        selectedSshKey = _selectedSshKeyAfterRefresh(
+                          selectedSshKey,
+                        );
+                      });
                     },
                     icon: const Icon(Icons.file_upload_outlined),
-                    label: Text(context.l10n.importSshKey),
+                    label: Text(context.l10n.importAction),
                   ),
                 ],
               ),
             ],
           ],
     );
+  }
+
+  List<KeyRecord> _importedSshKeys(List<KeyRecord> keys) => <KeyRecord>[
+    for (final key in keys)
+      if (key.type == KeyRecordType.ssh && key.hasPrivateKey) key,
+  ];
+
+  Future<String?> _initialSshKeyName() async {
+    final keys = _importedSshKeys(readSshKeys());
+    if (keys.isEmpty) return null;
+    if (keys.length == 1) return keys.single.name;
+    final saved = await loadSelectedSshKey(lifecycle.configPath);
+    if (saved != null && keys.any((key) => key.name == saved)) return saved;
+    return null;
+  }
+
+  String? _selectedSshKeyAfterRefresh(String? current) {
+    final keys = _importedSshKeys(readSshKeys());
+    if (keys.isEmpty) return null;
+    if (current != null && keys.any((key) => key.name == current)) {
+      return current;
+    }
+    if (keys.length == 1) return keys.single.name;
+    return null;
   }
 
   Future<void> _chooseFolder(
@@ -509,6 +578,9 @@ class _CloneStoreFields extends StatelessWidget {
     required this.selectedBase,
     required this.onRemoteChanged,
     required this.onChooseBase,
+    required this.sshKeys,
+    required this.selectedSshKey,
+    required this.onSelectSshKey,
   });
 
   final TextEditingController remote;
@@ -517,6 +589,9 @@ class _CloneStoreFields extends StatelessWidget {
   final String? selectedBase;
   final VoidCallback onRemoteChanged;
   final VoidCallback? onChooseBase;
+  final List<KeyRecord> sshKeys;
+  final String? selectedSshKey;
+  final ValueChanged<String> onSelectSshKey;
 
   @override
   Widget build(BuildContext context) {
@@ -528,18 +603,40 @@ class _CloneStoreFields extends StatelessWidget {
           decoration: InputDecoration(labelText: context.l10n.remoteUrlField),
           onChanged: (_) => onRemoteChanged(),
         ),
-        const SizedBox(height: ParsSpacing.sm),
-        PathPickerRow(
-          title: context.l10n.storeFolder,
-          path:
-              managedPaths?.storeRootForRemote(remote.text) ??
-              joinFilesystemPath(
-                selectedBase ?? defaultBase,
-                slugFromRemoteUrl(remote.text),
-              ),
-          isSelected: selectedBase != null,
-          onPressed: onChooseBase,
-        ),
+        if (managedPaths == null) ...<Widget>[
+          const SizedBox(height: ParsSpacing.sm),
+          PathPickerRow(
+            title: context.l10n.storeFolder,
+            path: joinFilesystemPath(
+              selectedBase ?? defaultBase,
+              slugFromRemoteUrl(remote.text),
+            ),
+            isSelected: selectedBase != null,
+            onPressed: onChooseBase,
+          ),
+        ],
+        if (remoteUrlUsesSsh(remote.text) && sshKeys.isNotEmpty) ...<Widget>[
+          const SizedBox(height: ParsSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              context.l10n.sshKeysTitle,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          for (final key in sshKeys)
+            RadioListTile<String>(
+              contentPadding: EdgeInsets.zero,
+              value: key.name,
+              groupValue: selectedSshKey,
+              title: Text(key.name),
+              onChanged: (value) {
+                if (value != null) onSelectSshKey(value);
+              },
+            ),
+        ],
       ],
     );
   }
@@ -570,7 +667,7 @@ class _StorePickerFormSheet extends StatefulWidget {
 
 class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
   bool _isSubmitting = false;
-  String? _error;
+  UiProblem? _error;
 
   @override
   Widget build(BuildContext context) {
@@ -597,10 +694,7 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
               ...widget.builder(context, setState),
               if (_error != null) ...<Widget>[
                 const SizedBox(height: ParsSpacing.sm),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+                FailureNotice(problem: _error!),
               ],
               const SizedBox(height: ParsSpacing.md),
               FilledButton(
@@ -635,17 +729,21 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
       if (mounted) {
         Navigator.of(context).pop();
       }
+    } on CloneOverwriteDeclined {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
     } catch (caught) {
       if (!mounted) return;
       setState(() {
-        _error =
-            caught is PathPickerException &&
-                    caught.code == 'store_import_no_passwords'
-                ? context.l10n.storeImportNoPasswords
-                : caught is PathPickerException &&
-                    caught.code == 'store_import_provider_unlistable'
-                ? context.l10n.storeImportProviderUnlistable
-                : UiProblem.fromError(context.l10n, caught).summary;
+        _error = switch (caught) {
+          PathPickerException(:final code)
+              when code == 'store_import_no_passwords' =>
+            UiProblem(summary: context.l10n.storeImportNoPasswords),
+          PathPickerException(:final code)
+              when code == 'store_import_provider_unlistable' =>
+            UiProblem(summary: context.l10n.storeImportProviderUnlistable),
+          _ => UiProblem.fromError(context.l10n, caught),
+        };
         _isSubmitting = false;
       });
     }

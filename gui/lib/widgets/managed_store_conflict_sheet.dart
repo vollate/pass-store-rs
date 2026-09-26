@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/pars_design_tokens.dart';
 import '../l10n/l10n.dart';
 import '../services/path_picker_service.dart';
+import 'pars_action_group.dart';
 
 Future<ManagedStoreConflictPolicy?> showManagedStoreConflictSheet(
   BuildContext context,
@@ -49,18 +50,6 @@ class _ManagedStoreConflictSheet extends StatelessWidget {
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: ParsSpacing.lg),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed:
-                      () => Navigator.of(
-                        context,
-                      ).pop(ManagedStoreConflictPolicy.replace),
-                  icon: const Icon(Icons.folder_copy_outlined),
-                  label: Text(localizations.managedStoreReplaceLabel),
-                ),
-              ),
               const SizedBox(height: ParsSpacing.xs),
               Text(
                 localizations.managedStoreReplaceDescription,
@@ -68,13 +57,25 @@ class _ManagedStoreConflictSheet extends StatelessWidget {
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: ParsSpacing.sm),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(localizations.cancel),
-                ),
+              const SizedBox(height: ParsSpacing.lg),
+              ParsButtonGrid(
+                children: <Widget>[
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(localizations.cancel),
+                  ),
+                  FilledButton.icon(
+                    onPressed:
+                        () => Navigator.of(
+                          context,
+                        ).pop(ManagedStoreConflictPolicy.replace),
+                    icon: const Icon(Icons.folder_copy_outlined),
+                    label: Text(
+                      localizations.managedStoreReplaceLabel,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

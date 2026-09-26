@@ -13,7 +13,9 @@ import '../../services/security_repository.dart';
 import '../../services/sensitive_clipboard_service.dart';
 import '../../services/store_lifecycle.dart';
 import '../../services/vault_repository.dart';
+import '../../services/ui_problem.dart';
 import '../../widgets/app_notification.dart';
+import '../../widgets/failure_notice.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/entry_tile.dart';
 import '../../widgets/pars_action_group.dart';
@@ -62,7 +64,7 @@ class _VaultScreenState extends State<VaultScreen> {
   late final SensitiveClipboardService _clipboardService;
   late final bool _ownsClipboardService;
   bool _isLoading = false;
-  String? _loadError;
+  UiProblem? _loadError;
 
   @override
   void initState() {
@@ -247,15 +249,27 @@ class _VaultScreenState extends State<VaultScreen> {
                     0,
                   ),
                   child: Card(
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.error_outline,
-                        color: Theme.of(context).colorScheme.error,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        ParsSpacing.md,
+                        ParsSpacing.sm,
+                        ParsSpacing.sm,
+                        ParsSpacing.sm,
                       ),
-                      title: Text(_loadError!),
-                      trailing: TextButton(
-                        onPressed: _refreshVault,
-                        child: Text(localizations.retry),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Icon(
+                            Icons.error_outline,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: ParsSpacing.sm),
+                          Expanded(child: FailureNotice(problem: _loadError!)),
+                          TextButton(
+                            onPressed: _refreshVault,
+                            child: Text(localizations.retry),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -520,7 +534,16 @@ class _VaultScreenState extends State<VaultScreen> {
   Future<void> _syncVault() {
     final git = _gitOperations;
     if (git == null) return _refreshVault();
-    return _runVaultLoad(git.syncWithRemote);
+    return _runVaultLoad(() async {
+      final result = await git.syncWithRemote();
+      if (!result.success) {
+        final detail = [
+          result.stderr.trim(),
+          result.stdout.trim(),
+        ].where((part) => part.isNotEmpty).join('\n');
+        throw StateError(detail.isEmpty ? 'Git sync failed' : detail);
+      }
+    });
   }
 
   Future<void> _runVaultLoad(Future<void> Function() operation) async {
@@ -542,7 +565,10 @@ class _VaultScreenState extends State<VaultScreen> {
       }
       setState(() {
         _isLoading = false;
-        _loadError = context.l10n.couldNotLoadVault;
+        _loadError = UiProblem(
+          summary: context.l10n.couldNotLoadVault,
+          diagnostics: UiProblem.fromError(context.l10n, error).diagnostics,
+        );
       });
     }
   }

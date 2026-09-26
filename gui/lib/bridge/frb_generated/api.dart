@@ -517,6 +517,8 @@ class CloneStoreRequest {
   final String root;
   final String? sshPrivateKeyPath;
   final String? sshDir;
+  final String? knownHosts;
+  final bool overwrite;
 
   const CloneStoreRequest({
     required this.configPath,
@@ -524,6 +526,8 @@ class CloneStoreRequest {
     required this.root,
     this.sshPrivateKeyPath,
     this.sshDir,
+    this.knownHosts,
+    this.overwrite = false,
   });
 
   @override
@@ -532,7 +536,9 @@ class CloneStoreRequest {
       remoteUrl.hashCode ^
       root.hashCode ^
       sshPrivateKeyPath.hashCode ^
-      sshDir.hashCode;
+      sshDir.hashCode ^
+      knownHosts.hashCode ^
+      overwrite.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -543,7 +549,9 @@ class CloneStoreRequest {
           remoteUrl == other.remoteUrl &&
           root == other.root &&
           sshPrivateKeyPath == other.sshPrivateKeyPath &&
-          sshDir == other.sshDir;
+          sshDir == other.sshDir &&
+          knownHosts == other.knownHosts &&
+          overwrite == other.overwrite;
 }
 
 class ConfigResponse {
@@ -1235,12 +1243,21 @@ class GitRequest {
   final String root;
   final String? sshPrivateKeyPath;
   final String? sshDir;
+  final String? knownHosts;
 
-  const GitRequest({required this.root, this.sshPrivateKeyPath, this.sshDir});
+  const GitRequest({
+    required this.root,
+    this.sshPrivateKeyPath,
+    this.sshDir,
+    this.knownHosts,
+  });
 
   @override
   int get hashCode =>
-      root.hashCode ^ sshPrivateKeyPath.hashCode ^ sshDir.hashCode;
+      root.hashCode ^
+      sshPrivateKeyPath.hashCode ^
+      sshDir.hashCode ^
+      knownHosts.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1249,7 +1266,8 @@ class GitRequest {
           runtimeType == other.runtimeType &&
           root == other.root &&
           sshPrivateKeyPath == other.sshPrivateKeyPath &&
-          sshDir == other.sshDir;
+          sshDir == other.sshDir &&
+          knownHosts == other.knownHosts;
 }
 
 class ImportKeyFileRequest {

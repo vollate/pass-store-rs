@@ -12,7 +12,9 @@ class _OnboardingProgress extends StatelessWidget {
     final rawIndex = safeSteps.indexOf(currentStep);
     final index = rawIndex < 0 ? safeSteps.length - 1 : rawIndex;
     final current = index + 1;
-    final optional = currentStep == _OnboardingStep.biometrics;
+    final optional =
+        currentStep == _OnboardingStep.biometrics ||
+        currentStep == _OnboardingStep.ssh;
     final progressLabel = context.l10n.onboardingProgress(
       current,
       safeSteps.length,
@@ -78,30 +80,35 @@ class _BiometricSetupStep extends StatelessWidget {
               subtitle: Text(_biometricSubtitle(context.l10n, status)),
             ),
             const SizedBox(height: ParsSpacing.sm),
-            FilledButton.icon(
-              onPressed:
-                  status == BiometricUnlockStatus.unavailable
-                      ? null
-                      : () async {
-                        try {
-                          await securityRepository.setBiometricUnlockEnabled(
-                            true,
-                          );
-                          onEnable();
-                        } catch (error) {
-                          onError(error);
-                        }
-                      },
-              icon: const Icon(Icons.fingerprint),
-              label: Text(context.l10n.enableBiometricUnlock),
-            ),
-            const SizedBox(height: ParsSpacing.xs),
-            OutlinedButton(
-              onPressed: onSkip,
-              child: SizedBox(
-                width: double.infinity,
-                child: Center(child: Text(context.l10n.skipBiometrics)),
-              ),
+            ParsButtonGrid(
+              children: <Widget>[
+                OutlinedButton(
+                  onPressed: onSkip,
+                  child: Text(
+                    context.l10n.skipBiometrics,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed:
+                      status == BiometricUnlockStatus.unavailable
+                          ? null
+                          : () async {
+                            try {
+                              await securityRepository
+                                  .setBiometricUnlockEnabled(true);
+                              onEnable();
+                            } catch (error) {
+                              onError(error);
+                            }
+                          },
+                  icon: const Icon(Icons.fingerprint),
+                  label: Text(
+                    context.l10n.enableBiometricUnlock,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ),
           ],
         );

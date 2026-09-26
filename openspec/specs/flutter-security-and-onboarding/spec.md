@@ -102,7 +102,10 @@ Sources: `gui/lib/services/security_repository.dart`,
 
 The app SHALL cancel pending lock timers while backgrounded. On resume, it
 SHALL lock if lock-on-resume is enabled, the background auto-lock window
-expired, or the security repository reports `shouldLock`.
+expired, or the security repository reports `shouldLock`. System file pickers,
+folder pickers, and managed-store import SHALL suppress that lock while the
+system UI is open and for a short grace period after it returns, so the form
+that opened the picker stays mounted and keeps the selected path.
 
 Sources: `gui/lib/app/pars_gui_app.dart`
 
@@ -111,6 +114,13 @@ Sources: `gui/lib/app/pars_gui_app.dart`
 - WHEN an action runs through `runDuringSystemAuthentication`
 - THEN lifecycle locks are suppressed while system auth is active
 - AND for a short grace period after it completes
+
+#### Scenario: Returning from a file picker does not lock
+
+- GIVEN lock-on-resume is enabled and the session is unlocked
+- WHEN a file picker sends the app to the background and then returns
+- THEN the lock screen is not shown
+- AND the picker result remains on the form that requested it
 
 ### Requirement: Biometric unlock SHALL authenticate before enabling and before unlocking
 
@@ -149,7 +159,7 @@ Sources: `gui/lib/services/security_repository.dart`,
 
 ### Requirement: Onboarding SHALL progress through local unlock, optional biometrics, keys, store, and review
 
-Onboarding SHALL separate first-run local security from password-store setup. It SHALL require an accessible local gesture verifier, MAY offer biometrics without blocking progress, and SHALL then present Import and Clone as primary store-source actions plus Create as a secondary action. Import or Clone SHALL be completed before PGP repair so `.gpg-id` determines required private material. Create SHALL request recipients only as part of creating `.gpg-id`. SSH setup SHALL appear only for an SSH-form clone or later Git transport configuration. When security and the canonical store are ready, onboarding SHALL enter Vault without a fixed expert step rail or mandatory review step.
+Onboarding SHALL separate first-run local security from password-store setup. It SHALL require an accessible local gesture verifier, MAY offer biometrics without blocking progress, and SHALL then present Import and Clone as primary store-source actions plus Create as a secondary action. Import or Clone SHALL be completed before PGP repair so `.gpg-id` determines required private material. Create SHALL request recipients only as part of creating `.gpg-id`. Whenever onboarding needs store setup, including after a previously completed onboarding loses its store, it SHALL show a required PGP step and then an optional SSH step after biometrics and before store setup, and progress SHALL count the full gesture, biometrics, PGP, SSH, and store sequence. The PGP step lists local private PGP keys, offers Create and Import, and continues only once a private key exists; the chosen key (implicitly the only one) becomes the recipient of a newly created store. The SSH step lets a key be imported or generated before a store is cloned; the store setup page itself keeps only the Import, Clone, and Create actions. Generating an SSH key SHALL immediately show its public key with a copy action, and every listed SSH key SHALL expose its public key. The store remains usable when SSH is skipped. An SSH-form clone SHALL still offer import or generation when no key is present. When security and the canonical store are ready, onboarding SHALL enter Vault without a fixed expert step rail or mandatory review step.
 
 Sources: `gui/lib/screens/onboarding/onboarding_screen.dart`, `gui/lib/services/store_lifecycle.dart`, `gui/lib/services/key_repository.dart`
 
@@ -175,6 +185,24 @@ Sources: `gui/lib/screens/onboarding/onboarding_screen.dart`, `gui/lib/services/
 - **WHEN** Import finalizes a password store
 - **THEN** onboarding inspects that store's `.gpg-id`
 - **AND** it requests PGP repair only if required private material is unavailable
+
+#### Scenario: First-run onboarding offers SSH before store setup
+
+- **GIVEN** gesture and biometrics are already handled, on first run or after the store was removed
+- **WHEN** a store still needs to be set up
+- **THEN** a required PGP step offers key creation and import as step 3 of 5
+- **AND** Continue stays disabled until a private PGP key exists
+- **AND** an optional SSH step offers key import and generation as step 4 of 5
+- **AND** store setup is step 5 of 5
+- **AND** Skip SSH or Continue leads to store setup with Import, Clone, and Create
+- **AND** the store setup page does not repeat the SSH import and generation block
+
+#### Scenario: Generated SSH key shows its public key
+
+- **GIVEN** the user generates an SSH key in onboarding or Settings
+- **WHEN** generation succeeds
+- **THEN** the public key is shown with Copy and GitHub settings actions
+- **AND** the key appears in the SSH key list without reopening it
 
 #### Scenario: Clone requests only relevant transport setup
 
@@ -264,7 +292,12 @@ selectors as the primary UI for user-facing filesystem path choices. Affected
 forms SHALL show a compact no-icon picker row that displays the default/base
 path before selection and the selected path after selection. The store-folder
 selection UI and key-file selection UI SHALL remain in their existing separate
-interfaces and SHALL NOT be merged into one popup or form.
+interfaces and SHALL NOT be merged into one popup or form. SSH key-file
+selection SHALL display the location the user selected and SHALL NOT copy the
+source file into app storage during selection. The name field SHALL be filled
+from the selected file name and SHALL remain editable. Submitting SHALL read
+that selection, and SHALL write the converted OpenSSH private key into app data
+only after the material is accepted.
 
 #### Scenario: Store folder picker shows default path before selection
 
@@ -294,6 +327,21 @@ interfaces and SHALL NOT be merged into one popup or form.
   store name or remote URL slug
 - **AND** the derived root is shown as the selected path before submission
 
+#### Scenario: App-managed clone does not show a store folder
+
+- **GIVEN** clone stores its result in app-managed storage
+- **WHEN** the clone form is shown
+- **THEN** the form asks for the remote URL
+- **AND** it does not show a store folder row
+- **AND** the clone root is the app-managed path derived from the remote URL
+
+#### Scenario: Clone failure can be opened in Details
+
+- **GIVEN** submitting the clone form fails
+- **WHEN** the form shows the failure
+- **THEN** the summary stays the localized operation-failed text
+- **AND** a Details action reveals the sanitized failure text
+
 #### Scenario: Key file import uses a separate file picker row
 
 - **GIVEN** the user opens a PGP or SSH key-file import flow
@@ -304,13 +352,30 @@ interfaces and SHALL NOT be merged into one popup or form.
   from store folder selection interfaces
 - **AND** the form does not show an editable path text field
 
-#### Scenario: Key file import submits selected file path
+#### Scenario: PGP key file import submits selected file path
 
-- **GIVEN** a PGP or SSH key-file import form shows a key file picker row
+- **GIVEN** a PGP key-file import form shows a key file picker row
 - **WHEN** the platform file selector returns a file path
 - **THEN** the row displays `Selected: <path>` with that file path
 - **AND** submitting the form passes that selected file path to the existing key
   import repository operation
+
+#### Scenario: SSH key file selection shows the chosen location
+
+- **GIVEN** an SSH key-file import form
+- **WHEN** the user selects a private key file
+- **THEN** the row displays `Selected:` with the location the user selected
+- **AND** the source file is not copied into app storage
+- **AND** the name field is filled with the selected file name
+- **AND** the name field remains editable
+
+#### Scenario: SSH key file import stores the converted key only after it is accepted
+
+- **GIVEN** an SSH key-file import form has a selected private key file
+- **WHEN** the user submits the import
+- **THEN** the selected file is read and checked before anything is written
+- **AND** a rejected key leaves app storage unchanged
+- **AND** an accepted key is written to app data as the converted OpenSSH private key
 
 #### Scenario: Picker cancellation preserves default state
 

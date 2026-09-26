@@ -17,6 +17,12 @@ extension _SettingsScreenGitSheets on SettingsScreen {
             gitMode: settingsRepository.store?.gitMode ?? StoreGitMode.disabled,
             combineGitOutput: _combineGitOutput,
             onManageSshKeys: () => _showSshKeys(context),
+            configPath: settingsRepository.lifecycle.configPath,
+            sshKeys: keyRepository.keys
+                .where(
+                  (key) => key.type == KeyRecordType.ssh && key.hasPrivateKey,
+                )
+                .toList(growable: false),
           ),
     );
   }
@@ -40,6 +46,8 @@ class _GitSyncSheetBody extends StatefulWidget {
     required this.gitMode,
     required this.combineGitOutput,
     required this.onManageSshKeys,
+    required this.configPath,
+    required this.sshKeys,
   });
 
   final GitOperationsRepository git;
@@ -48,6 +56,8 @@ class _GitSyncSheetBody extends StatefulWidget {
   final GitOperationResult Function(GitOperationResult, GitOperationResult)
   combineGitOutput;
   final VoidCallback onManageSshKeys;
+  final String configPath;
+  final List<KeyRecord> sshKeys;
 
   @override
   State<_GitSyncSheetBody> createState() => _GitSyncSheetBodyState();
@@ -62,7 +72,8 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
   var _running = false;
   GitOperationResult? _output;
   List<GitRemote> _remotes = const <GitRemote>[];
-  String? _errorText;
+  UiProblem? _error;
+  String? _selectedSshKey;
 
   @override
   void initState() {
@@ -71,6 +82,26 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
         widget.gitMode == StoreGitMode.remote) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refreshRemotes());
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSelectedSshKey());
+  }
+
+  Future<void> _loadSelectedSshKey() async {
+    final saved = await loadSelectedSshKey(widget.configPath);
+    if (!mounted) return;
+    final names = widget.sshKeys.map((key) => key.name).toSet();
+    setState(() {
+      if (saved != null && names.contains(saved)) {
+        _selectedSshKey = saved;
+      } else if (widget.sshKeys.length == 1) {
+        _selectedSshKey = widget.sshKeys.single.name;
+      }
+    });
+  }
+
+  Future<void> _selectSshKey(String name) async {
+    await saveSelectedSshKey(widget.configPath, name);
+    if (!mounted) return;
+    setState(() => _selectedSshKey = name);
   }
 
   @override
@@ -131,9 +162,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
               ],
               if (hasGit) ...<Widget>[
                 const SizedBox(height: ParsSpacing.sm),
-                Wrap(
-                  spacing: ParsSpacing.xs,
-                  runSpacing: ParsSpacing.xs,
+                ParsButtonGrid(
                   children: <Widget>[
                     FilledButton.icon(
                       onPressed:
@@ -241,11 +270,22 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                       child: Text(context.l10n.sshKeysTitle),
                     ),
                   ),
+                  for (final key in widget.sshKeys)
+                    RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      value: key.name,
+                      groupValue: _selectedSshKey,
+                      title: Text(key.name),
+                      onChanged:
+                          _running
+                              ? null
+                              : (value) {
+                                if (value != null) _selectSshKey(value);
+                              },
+                    ),
                 ],
                 const SizedBox(height: ParsSpacing.xs),
-                Wrap(
-                  spacing: ParsSpacing.xs,
-                  runSpacing: ParsSpacing.xs,
+                ParsButtonGrid(
                   children: <Widget>[
                     FilledButton(
                       onPressed:
@@ -288,12 +328,9 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
                 SizedBox(height: ParsSpacing.sm),
                 LinearProgressIndicator(),
               ],
-              if (_errorText != null) ...<Widget>[
+              if (_error != null) ...<Widget>[
                 const SizedBox(height: ParsSpacing.sm),
-                Text(
-                  _errorText!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+                FailureNotice(problem: _error!),
               ],
               if (_output != null) ...<Widget>[
                 const SizedBox(height: ParsSpacing.sm),
@@ -332,9 +369,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
       }
     } catch (error) {
       if (mounted) {
-        setState(
-          () => _errorText = UiProblem.fromError(context.l10n, error).summary,
-        );
+        setState(() => _error = UiProblem.fromError(context.l10n, error));
       }
     }
   }
@@ -342,7 +377,7 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
   Future<void> _run(Future<GitOperationResult> Function() action) async {
     setState(() {
       _running = true;
-      _errorText = null;
+      _error = null;
     });
     try {
       final result = await action();
@@ -350,17 +385,35 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
         setState(() {
           _output = result;
           _running = false;
+          if (!result.success) {
+            _error = _gitResultProblem(context, result);
+          }
         });
       }
     } catch (error) {
       if (mounted) {
         setState(() {
-          _errorText = UiProblem.fromError(context.l10n, error).summary;
+          _error = UiProblem.fromError(context.l10n, error);
           _running = false;
         });
       }
     }
   }
+}
+
+UiProblem _gitResultProblem(BuildContext context, GitOperationResult result) {
+  final detail = [
+    result.stderr.trim(),
+    result.stdout.trim(),
+  ].where((part) => part.isNotEmpty).join('\n');
+  if (detail.isEmpty) {
+    return UiProblem(summary: context.l10n.operationFailed);
+  }
+  return UiProblem(
+    summary: context.l10n.operationFailed,
+    diagnostics:
+        UiProblem.fromError(context.l10n, StateError(detail)).diagnostics,
+  );
 }
 
 class _GitArgsSheetBody extends StatefulWidget {
@@ -377,7 +430,7 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
   var _argsText = '';
   var _running = false;
   GitOperationResult? _output;
-  String? _errorText;
+  UiProblem? _error;
 
   @override
   Widget build(BuildContext context) {
@@ -438,12 +491,9 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
                 SizedBox(height: ParsSpacing.sm),
                 LinearProgressIndicator(),
               ],
-              if (_errorText != null) ...<Widget>[
+              if (_error != null) ...<Widget>[
                 const SizedBox(height: ParsSpacing.sm),
-                Text(
-                  _errorText!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+                FailureNotice(problem: _error!),
               ],
               if (_output != null) ...<Widget>[
                 const SizedBox(height: ParsSpacing.sm),
@@ -459,16 +509,21 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
   Future<void> _run() async {
     final git = widget.git;
     if (git == null) {
-      setState(() => _errorText = context.l10n.gitOperationsUnavailable);
+      setState(
+        () =>
+            _error = UiProblem(summary: context.l10n.gitOperationsUnavailable),
+      );
       return;
     }
     if (_argsText.trim().isEmpty) {
-      setState(() => _errorText = context.l10n.gitArgumentRequired);
+      setState(
+        () => _error = UiProblem(summary: context.l10n.gitArgumentRequired),
+      );
       return;
     }
     setState(() {
       _running = true;
-      _errorText = null;
+      _error = null;
     });
     try {
       final result = await git.runArgs(widget.parseGitArgs(_argsText));
@@ -481,7 +536,7 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _errorText = UiProblem.fromError(context.l10n, error).summary;
+          _error = UiProblem.fromError(context.l10n, error);
           _running = false;
         });
       }

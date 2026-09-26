@@ -1,5 +1,7 @@
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
+#[cfg(all(unix, not(any(target_os = "android", target_os = "ios"))))]
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -7,8 +9,8 @@ use git2::build::CheckoutBuilder;
 #[cfg(any(target_os = "android", target_os = "ios"))]
 use git2::build::RepoBuilder;
 use git2::{
-    BranchType, Cred, CredentialType, FetchOptions, IndexAddOption, PushOptions, RemoteCallbacks,
-    Repository, Signature, Status, StatusOptions,
+    BranchType, CertificateCheckStatus, Cred, CredentialType, FetchOptions, IndexAddOption,
+    PushOptions, RemoteCallbacks, Repository, Signature, Status, StatusOptions,
 };
 use pars_core::autofill::{
     self, AutofillCredential, AutofillCredentialRequest as CoreAutofillCredentialRequest,
@@ -402,6 +404,7 @@ pub struct GitRequest {
     pub root: String,
     pub ssh_private_key_path: Option<String>,
     pub ssh_dir: Option<String>,
+    pub known_hosts: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -467,6 +470,8 @@ pub struct CloneStoreRequest {
     pub root: String,
     pub ssh_private_key_path: Option<String>,
     pub ssh_dir: Option<String>,
+    pub known_hosts: Option<String>,
+    pub overwrite: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -1164,14 +1169,14 @@ pub async fn delete_entry(request: DeleteEntryRequest) -> DeleteEntryResponse {
 pub async fn git_status(request: GitRequest) -> GitCommandResponse {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
-        let _ = (request.ssh_private_key_path, request.ssh_dir);
+        let _ = (request.ssh_private_key_path, request.ssh_dir, request.known_hosts);
         return structured_git_response("git status --short --branch", || {
             structured_git_status(Path::new(&request.root))
         });
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        let _ = (request.ssh_private_key_path, request.ssh_dir);
+        let _ = (request.ssh_private_key_path, request.ssh_dir, request.known_hosts);
         run_git_command_response(request.root, vec!["status", "--short", "--branch"])
     }
 }
@@ -1184,13 +1189,14 @@ pub async fn git_pull(request: GitRequest) -> GitCommandResponse {
                 Path::new(&request.root),
                 request.ssh_private_key_path.as_deref().map(Path::new),
                 request.ssh_dir.as_deref().map(Path::new),
+                request.known_hosts.as_deref(),
             )
         });
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         let _ = (request.ssh_private_key_path, request.ssh_dir);
-        run_git_command_response(request.root, vec!["pull"])
+        run_git_command_with_known_hosts(request.root, vec!["pull"], request.known_hosts.as_deref())
     }
 }
 
@@ -1202,13 +1208,14 @@ pub async fn git_push(request: GitRequest) -> GitCommandResponse {
                 Path::new(&request.root),
                 request.ssh_private_key_path.as_deref().map(Path::new),
                 request.ssh_dir.as_deref().map(Path::new),
+                request.known_hosts.as_deref(),
             )
         });
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         let _ = (request.ssh_private_key_path, request.ssh_dir);
-        run_git_command_response(request.root, vec!["push"])
+        run_git_command_with_known_hosts(request.root, vec!["push"], request.known_hosts.as_deref())
     }
 }
 
@@ -2161,16 +2168,66 @@ fn import_local_store_inner(request: ImportLocalStoreRequest) -> Result<(), Brid
     save_config_for_mutation(&config, &request.config_path)
 }
 
+fn clone_target_present(root: &Path) -> bool {
+    fs::symlink_metadata(root).is_ok()
+}
+
+fn removable_clone_target(root: &Path) -> bool {
+    let Some(name) = root.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    !name.is_empty() && name != "." && name != ".." && root.parent().is_some()
+}
+
+fn remove_clone_target(root: &Path) -> Result<(), String> {
+    if !removable_clone_target(root) {
+        return Err("clone target cannot be removed".to_string());
+    }
+    let metadata = match fs::symlink_metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.to_string()),
+    };
+    let result = if metadata.file_type().is_symlink() || metadata.is_file() {
+        fs::remove_file(root)
+    } else if metadata.is_dir() {
+        fs::remove_dir_all(root)
+    } else {
+        return Err("clone target is not a file or directory".to_string());
+    };
+    result.map_err(|error| error.to_string())
+}
+
+fn discard_incomplete_clone(root: &Path) {
+    if !clone_target_present(root) {
+        return;
+    }
+    match remove_clone_target(root) {
+        Ok(()) => git_log("removed incomplete clone"),
+        Err(error) => git_log(&format!("incomplete clone cleanup failed: {error}")),
+    }
+}
+
 fn clone_store_inner(request: CloneStoreRequest) -> Result<(), BridgeFailure> {
     let root = normalize_store_root(&request.root)?;
     let root_path = PathBuf::from(&root);
     let mut config = load_config_for_mutation(&request.config_path)?;
     require_empty_canonical_store(&config)?;
-    if root_path.exists() {
-        return Err(BridgeFailure::from(CoreError::Conflict(gui::EntryConflict {
-            kind: gui::EntryConflictKind::EntryAlreadyExists,
-            path: root,
-        })));
+    if clone_target_present(&root_path) {
+        if !request.overwrite {
+            git_log("clone target already exists");
+            return Err(BridgeFailure::from(CoreError::Conflict(gui::EntryConflict {
+                kind: gui::EntryConflictKind::EntryAlreadyExists,
+                path: root,
+            })));
+        }
+        git_log("replacing existing clone target");
+        remove_clone_target(&root_path).map_err(|error| {
+            git_log(&format!("clone target replacement failed: {error}"));
+            BridgeFailure::from(CoreError::StoreError(bounded_git_detail(&sanitize_git_text(
+                &error,
+            ))))
+        })?;
     }
     if let Some(parent) = root_path.parent() {
         fs::create_dir_all(parent).map_err(store_failure)?;
@@ -2180,15 +2237,14 @@ fn clone_store_inner(request: CloneStoreRequest) -> Result<(), BridgeFailure> {
         &root_path,
         request.ssh_private_key_path.as_deref(),
         request.ssh_dir.as_deref(),
+        request.known_hosts.as_deref(),
     ) {
-        if root_path.exists() {
-            let _ = fs::remove_dir_all(&root_path);
-        }
+        discard_incomplete_clone(&root_path);
         return Err(error);
     }
     set_canonical_store(&mut config, &root_path.display().to_string());
     if let Err(error) = save_config_for_mutation(&config, &request.config_path) {
-        let _ = fs::remove_dir_all(&root_path);
+        discard_incomplete_clone(&root_path);
         return Err(error);
     }
     Ok(())
@@ -2468,9 +2524,92 @@ fn pgp_key_matches(required: &str, key: &PgpKeySummary) -> bool {
         || identity.to_lowercase().contains(&format!("<{}>", required.to_lowercase()))
 }
 
+fn ensure_git_trace() {
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    STARTED.call_once(|| {
+        let _ = git2::trace_set(git2::TraceLevel::Debug, libgit2_trace);
+    });
+}
+
+fn libgit2_trace(_level: git2::TraceLevel, message: &[u8]) {
+    let text = String::from_utf8_lossy(message);
+    git_log(&format!("libgit2: {text}"));
+}
+
+fn git_log(message: &str) {
+    let text = if message.contains("PRIVATE KEY") || message.contains("BEGIN OPENSSH") {
+        "[redacted]".to_string()
+    } else {
+        bounded_git_detail(&sanitize_git_text(message))
+    };
+    #[cfg(target_os = "android")]
+    android_log_line(&text);
+    #[cfg(not(target_os = "android"))]
+    eprintln!("pars_git: {text}");
+}
+
+#[cfg(target_os = "android")]
+const ANDROID_LOG_INFO: libc::c_int = 4;
+
+#[cfg(target_os = "android")]
+#[link(name = "log")]
+unsafe extern "C" {
+    fn __android_log_write(
+        priority: libc::c_int,
+        tag: *const libc::c_char,
+        text: *const libc::c_char,
+    ) -> libc::c_int;
+}
+
+#[cfg(target_os = "android")]
+fn android_log_line(message: &str) {
+    let tag = std::ffi::CString::new("pars_git").expect("log tag");
+    for line in message.split('\n') {
+        let Ok(text) = std::ffi::CString::new(line) else {
+            continue;
+        };
+        if text.as_bytes().is_empty() {
+            continue;
+        }
+        unsafe {
+            let _ = __android_log_write(ANDROID_LOG_INFO, tag.as_ptr(), text.as_ptr());
+        }
+    }
+}
+
 #[allow(dead_code)]
-fn git_failure(_error: git2::Error) -> BridgeFailure {
-    BridgeFailure::from(CoreError::GitError("Git operation failed".to_string()))
+fn git_failure(error: git2::Error) -> BridgeFailure {
+    ensure_git_trace();
+    let message = error.message().trim();
+    let detail = if message.is_empty() {
+        format!("{:?}", error.class())
+    } else {
+        format!("{message} ({:?})", error.class())
+    };
+    git_log(&format!("git failure: {detail}"));
+    BridgeFailure::from(CoreError::GitError(bounded_git_detail(&sanitize_git_text(&detail))))
+}
+
+fn git_process_failure(output: &std::process::Output) -> BridgeFailure {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let detail = if !stderr.trim().is_empty() { stderr.trim() } else { stdout.trim() };
+    let message = if detail.is_empty() {
+        "Git command failed".to_string()
+    } else {
+        bounded_git_detail(&sanitize_git_text(detail))
+    };
+    git_log(&format!("git failure: {message}"));
+    BridgeFailure::from(CoreError::GitError(message))
+}
+
+fn bounded_git_detail(value: &str) -> String {
+    const MAX_CHARS: usize = 500;
+    if value.chars().count() <= MAX_CHARS {
+        return value.to_string();
+    }
+    let truncated = value.chars().take(MAX_CHARS).collect::<String>();
+    format!("{truncated}…")
 }
 
 #[allow(dead_code)]
@@ -2767,6 +2906,8 @@ fn required_remote_url(request: &GitRemoteRequest) -> Result<&str, BridgeFailure
 fn git_remote_callbacks(
     ssh_private_key_path: Option<&Path>,
     ssh_dir: Option<&Path>,
+    known_hosts: Option<&str>,
+    remote_url: &str,
 ) -> Result<RemoteCallbacks<'static>, BridgeFailure> {
     let mut callbacks = RemoteCallbacks::new();
     if let Some(private_key_path) = ssh_private_key_path {
@@ -2789,13 +2930,97 @@ fn git_remote_callbacks(
             )));
         }
         callbacks.credentials(move |_url, username, allowed| {
-            if !allowed.contains(CredentialType::SSH_KEY) {
+            if !allowed.contains(CredentialType::SSH_KEY)
+                && !allowed.contains(CredentialType::SSH_MEMORY)
+            {
                 return Err(git2::Error::from_str("SSH key credentials are not accepted"));
             }
-            Cred::ssh_key(username.unwrap_or("git"), None, &key_path, None)
+            ssh_identity_credential(username.unwrap_or("git"), &key_path)
+        });
+    }
+    let _ = known_hosts;
+    if let Some((host_name, port)) = crate::known_hosts::ssh_remote_endpoint(remote_url) {
+        let ssh_dir = ssh_dir.ok_or_else(|| {
+            BridgeFailure::from(CoreError::ValidationError(
+                "SSH key directory is required".to_string(),
+            ))
+        })?;
+        let ssh_dir = ssh_dir.to_path_buf();
+        let stored = fs::read_to_string(ssh_dir.join("known_hosts")).unwrap_or_default();
+        callbacks.certificate_check(move |cert, connected_host| {
+            let Some(hostkey) = cert.as_hostkey() else {
+                return Ok(CertificateCheckStatus::CertificatePassthrough);
+            };
+            let raw = hostkey
+                .hostkey()
+                .ok_or_else(|| git2::Error::from_str("remote SSH host key is missing"))?;
+            let key_type = hostkey.hostkey_type().map(|kind| kind.name()).unwrap_or("unknown");
+            let hostname =
+                if connected_host.is_empty() { host_name.as_str() } else { connected_host };
+            match crate::known_hosts::remote_host_key_trust(&stored, hostname, port, key_type, raw)
+            {
+                crate::known_hosts::RemoteHostKeyTrust::Trusted => {
+                    git_log(&format!("ssh host {hostname}:{port} trusted ({key_type})"));
+                    Ok(CertificateCheckStatus::CertificateOk)
+                }
+                crate::known_hosts::RemoteHostKeyTrust::Changed => {
+                    git_log(&format!("ssh host {hostname}:{port} changed ({key_type})"));
+                    Err(git2::Error::from_str(
+                        "remote SSH host key does not match the remembered host key",
+                    ))
+                }
+                crate::known_hosts::RemoteHostKeyTrust::Unknown => {
+                    git_log(&format!(
+                        "ssh host {hostname}:{port} unknown; remembering ({key_type})"
+                    ));
+                    let line =
+                        crate::known_hosts::format_known_host_line(hostname, port, key_type, raw);
+                    remember_remote_host_key(&ssh_dir, &line).map_err(|_| {
+                        git2::Error::from_str("could not remember the remote SSH host key")
+                    })?;
+                    Ok(CertificateCheckStatus::CertificateOk)
+                }
+            }
         });
     }
     Ok(callbacks)
+}
+
+fn sibling_public_key_path(private_key: &Path) -> PathBuf {
+    let mut name = private_key.file_name().unwrap_or_default().to_os_string();
+    name.push(".pub");
+    private_key.with_file_name(name)
+}
+
+fn ssh_identity_credential(username: &str, private_key_path: &Path) -> Result<Cred, git2::Error> {
+    const MAX_SSH_KEY_BYTES: u64 = 1024 * 1024;
+    let metadata = fs::metadata(private_key_path)
+        .map_err(|_| git2::Error::from_str("unable to read SSH private key"))?;
+    if !metadata.is_file() || metadata.len() > MAX_SSH_KEY_BYTES {
+        return Err(git2::Error::from_str("unable to read SSH private key"));
+    }
+    let private_key = fs::read_to_string(private_key_path)
+        .map_err(|_| git2::Error::from_str("unable to read SSH private key"))?;
+    let public_key = fs::read_to_string(sibling_public_key_path(private_key_path))
+        .ok()
+        .filter(|text| text.len() <= 16 * 1024 && !text.contains("PRIVATE KEY"));
+    git_log("ssh identity loaded into memory");
+    Cred::ssh_key_from_memory(username, public_key.as_deref(), &private_key, None)
+}
+
+fn remember_remote_host_key(ssh_dir: &Path, line: &str) -> Result<(), BridgeFailure> {
+    fs::create_dir_all(ssh_dir).map_err(store_failure)?;
+    let path = ssh_dir.join("known_hosts");
+    let mut options = OpenOptions::new();
+    options.create(true).append(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path).map_err(store_failure)?;
+    file.write_all(line.as_bytes()).map_err(store_failure)?;
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -2849,12 +3074,21 @@ fn structured_git_pull(
     root: &Path,
     ssh_private_key_path: Option<&Path>,
     ssh_dir: Option<&Path>,
+    known_hosts: Option<&str>,
 ) -> Result<String, BridgeFailure> {
+    ensure_git_trace();
+    git_log("pull");
     let repo = Repository::open(root).map_err(git_failure)?;
     let upstream = configured_upstream(&repo)?;
     let mut remote = repo.find_remote(&upstream.remote_name).map_err(git_failure)?;
+    let remote_url = remote.url().unwrap_or("").to_string();
     let mut fetch_options = FetchOptions::new();
-    fetch_options.remote_callbacks(git_remote_callbacks(ssh_private_key_path, ssh_dir)?);
+    fetch_options.remote_callbacks(git_remote_callbacks(
+        ssh_private_key_path,
+        ssh_dir,
+        known_hosts,
+        &remote_url,
+    )?);
     remote
         .fetch(&[upstream.merge_ref.as_str()], Some(&mut fetch_options), None)
         .map_err(git_failure)?;
@@ -2891,13 +3125,22 @@ fn structured_git_push(
     root: &Path,
     ssh_private_key_path: Option<&Path>,
     ssh_dir: Option<&Path>,
+    known_hosts: Option<&str>,
 ) -> Result<String, BridgeFailure> {
+    ensure_git_trace();
+    git_log("push");
     let repo = Repository::open(root).map_err(git_failure)?;
     let upstream = configured_upstream(&repo)?;
     let refspec = format!("{}:{}", upstream.local_ref, upstream.merge_ref);
     let mut remote = repo.find_remote(&upstream.remote_name).map_err(git_failure)?;
+    let remote_url = remote.url().unwrap_or("").to_string();
     let mut push_options = PushOptions::new();
-    push_options.remote_callbacks(git_remote_callbacks(ssh_private_key_path, ssh_dir)?);
+    push_options.remote_callbacks(git_remote_callbacks(
+        ssh_private_key_path,
+        ssh_dir,
+        known_hosts,
+        &remote_url,
+    )?);
     remote.push(&[&refspec], Some(&mut push_options)).map_err(git_failure)?;
     Ok(format!("Pushed {} to {}.\n", upstream.local_ref, upstream.remote_name))
 }
@@ -2918,7 +3161,10 @@ fn clone_git_repository(
     root: &Path,
     ssh_private_key_path: Option<&str>,
     ssh_dir: Option<&str>,
+    known_hosts: Option<&str>,
 ) -> Result<(), BridgeFailure> {
+    ensure_git_trace();
+    git_log(&format!("clone {remote_url}"));
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         let mut builder = RepoBuilder::new();
@@ -2926,6 +3172,8 @@ fn clone_git_repository(
         fetch.remote_callbacks(git_remote_callbacks(
             ssh_private_key_path.map(Path::new),
             ssh_dir.map(Path::new),
+            known_hosts,
+            remote_url,
         )?);
         builder.fetch_options(fetch);
         builder.clone(remote_url, root).map(|_| ()).map_err(git_failure)
@@ -2933,18 +3181,120 @@ fn clone_git_repository(
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         let _ = (ssh_private_key_path, ssh_dir);
-        let output = Command::new("git")
-            .args(["clone", remote_url, &root.display().to_string()])
-            .output()
-            .map_err(|_| {
-                BridgeFailure::from(CoreError::GitError("Git command failed".to_string()))
-            })?;
-        if output.status.success() {
-            Ok(())
-        } else {
-            Err(BridgeFailure::from(CoreError::GitError("Git command failed".to_string())))
-        }
+        with_selected_known_hosts(known_hosts, |known_hosts_file| {
+            let mut command = Command::new("git");
+            command.args(["clone", remote_url, &root.display().to_string()]);
+            if let Some(file) = known_hosts_file {
+                command.env("GIT_SSH_COMMAND", git_ssh_command(file));
+            }
+            let output = command
+                .output()
+                .map_err(|error| BridgeFailure::from(CoreError::GitError(error.to_string())))?;
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(git_process_failure(&output))
+            }
+        })?
     }
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn run_git_command_with_known_hosts(
+    root: String,
+    args: Vec<&str>,
+    known_hosts: Option<&str>,
+) -> GitCommandResponse {
+    match with_selected_known_hosts(known_hosts, |known_hosts_file| {
+        let owned = args.iter().map(|arg| (*arg).to_string()).collect::<Vec<_>>();
+        match run_system_git_args_with_known_hosts(&root, owned, known_hosts_file) {
+            Ok(output) => GitCommandResponse { output: Some(output.into()), error: None },
+            Err(error) => GitCommandResponse { output: None, error: Some(error) },
+        }
+    }) {
+        Ok(response) => response,
+        Err(error) => GitCommandResponse { output: None, error: Some(error) },
+    }
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn run_system_git_args_with_known_hosts(
+    root: &str,
+    args: Vec<String>,
+    known_hosts_file: Option<&Path>,
+) -> Result<gui::GitCommandOutput, BridgeFailure> {
+    let request =
+        gui::GitOperationRequest::new(PathBuf::from(root), args).map_err(BridgeFailure::from)?;
+    if known_hosts_file.is_none() {
+        return gui::run_git_args(request).map_err(BridgeFailure::from);
+    }
+    if !request.root.is_dir() {
+        return Err(BridgeFailure::from(CoreError::StoreError(format!(
+            "git working directory does not exist: {}",
+            request.root.display()
+        ))));
+    }
+    let mut command = Command::new("git");
+    command.args(&request.args).current_dir(&request.root);
+    if let Some(file) = known_hosts_file {
+        command.env("GIT_SSH_COMMAND", git_ssh_command(file));
+    }
+    let output = command
+        .output()
+        .map_err(|error| BridgeFailure::from(CoreError::GitError(error.to_string())))?;
+    Ok(gui::GitCommandOutput {
+        command: format!("git {}", request.args.join(" ")),
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        exit_code: output.status.code(),
+        success: output.status.success(),
+    })
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn with_selected_known_hosts<T>(
+    known_hosts: Option<&str>,
+    use_file: impl FnOnce(Option<&Path>) -> T,
+) -> Result<T, BridgeFailure> {
+    let Some(text) = known_hosts else {
+        return Ok(use_file(None));
+    };
+    let path = std::env::temp_dir().join(format!(
+        "pars-known-hosts-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0)
+    ));
+    write_private_text(&path, text)?;
+    let result = use_file(Some(&path));
+    let _ = fs::remove_file(&path);
+    Ok(result)
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn write_private_text(path: &Path, text: &str) -> Result<(), BridgeFailure> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    options.mode(0o600);
+    let mut file = options.open(path).map_err(store_failure)?;
+    file.write_all(text.as_bytes()).map_err(store_failure)?;
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn git_ssh_command(known_hosts_file: &Path) -> String {
+    format!(
+        "ssh -o UserKnownHostsFile={}",
+        shell_single_quote(&known_hosts_file.display().to_string())
+    )
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 #[allow(dead_code)]
@@ -2957,7 +3307,7 @@ fn run_system_git(root: &Path, args: &[&str]) -> Result<(), BridgeFailure> {
     if output.status.success() {
         Ok(())
     } else {
-        Err(BridgeFailure::from(CoreError::GitError("Git command failed".to_string())))
+        Err(git_process_failure(&output))
     }
 }
 
@@ -3187,6 +3537,22 @@ mod tests {
     }
 
     #[test]
+    fn git_failure_keeps_the_libgit2_reason_and_redacts_secrets() {
+        let explained = git_failure(git2::Error::from_str("authentication required"));
+        assert!(explained.message.contains("authentication required"));
+        assert!(!explained.message.contains("Git operation failed"));
+
+        let redacted = git_failure(git2::Error::from_str(
+            "failed https://token@example.com/pass.git?access_token=secret at /data/user/0/store",
+        ));
+        assert!(redacted.message.contains("https://***@example.com/pass.git"));
+        assert!(redacted.message.contains("[path]"));
+        assert!(!redacted.message.contains("token@"));
+        assert!(!redacted.message.contains("access_token"));
+        assert!(!redacted.message.contains("/data/user"));
+    }
+
+    #[test]
     fn git_output_sanitization_redacts_credentials_uris_and_private_paths() {
         let raw =
             "git remote set-url origin https://token@example.com/pass.git?access_token=secret#x\n\
@@ -3251,10 +3617,10 @@ mod tests {
         let repo = init_test_repository(&root);
         fs::write(root.join(".gpg-id"), "ABC\n").unwrap();
         structured_git_commit(&root, "Initial").unwrap();
-        assert!(structured_git_push(&root, None, None).is_err());
+        assert!(structured_git_push(&root, None, None, None).is_err());
         let oid = repo.head().unwrap().target().unwrap();
         repo.set_head_detached(oid).unwrap();
-        assert!(structured_git_push(&root, None, None).is_err());
+        assert!(structured_git_push(&root, None, None, None).is_err());
     }
 
     #[test]
@@ -3273,7 +3639,7 @@ mod tests {
         let mut config = source.config().unwrap();
         config.set_str(&format!("branch.{branch_name}.remote"), "backup").unwrap();
         config.set_str(&format!("branch.{branch_name}.merge"), "refs/heads/mobile-main").unwrap();
-        structured_git_push(&source_path, None, None).expect("initial push");
+        structured_git_push(&source_path, None, None, None).expect("initial push");
         bare.set_head("refs/heads/mobile-main").expect("remote head");
 
         let clone_path = temp.path().join("clone");
@@ -3286,10 +3652,10 @@ mod tests {
             .unwrap();
         fs::write(source_path.join("entry.gpg"), b"ciphertext").expect("new entry");
         structured_git_commit(&source_path, "Second").expect("second commit");
-        structured_git_push(&source_path, None, None).expect("second push");
+        structured_git_push(&source_path, None, None, None).expect("second push");
 
         let before = Repository::open(&clone_path).unwrap().head().unwrap().target().unwrap();
-        let pull = structured_git_pull(&clone_path, None, None).expect("fast-forward pull");
+        let pull = structured_git_pull(&clone_path, None, None, None).expect("fast-forward pull");
         assert!(pull.contains("Fast-forwarded"));
         let after = Repository::open(&clone_path).unwrap().head().unwrap().target().unwrap();
         assert_ne!(before, after);
@@ -3303,11 +3669,31 @@ mod tests {
         fs::create_dir_all(&ssh_dir).unwrap();
         let key_path = ssh_dir.join("mobile-key");
         fs::write(&key_path, "synthetic-private-key").unwrap();
-        assert!(git_remote_callbacks(Some(&key_path), Some(&ssh_dir)).is_ok());
+        assert!(git_remote_callbacks(
+            Some(&key_path),
+            Some(&ssh_dir),
+            None,
+            "https://example.com/repo.git"
+        )
+        .is_ok());
+        assert!(git_remote_callbacks(None, None, None, "git@github.com:org/repo.git").is_err());
         let outside = temp.path().join("outside-key");
         fs::write(&outside, "synthetic-private-key").unwrap();
-        assert!(git_remote_callbacks(Some(&outside), Some(&ssh_dir)).is_err());
-        assert!(git_remote_callbacks(Some(&key_path), None).is_err());
+        assert!(git_remote_callbacks(
+            Some(&outside),
+            Some(&ssh_dir),
+            None,
+            "https://example.com/repo.git"
+        )
+        .is_err());
+        assert!(git_remote_callbacks(Some(&key_path), None, None, "https://example.com/repo.git")
+            .is_err());
+        fs::write(ssh_dir.join("mobile-key.pub"), "ssh-ed25519 AAAA comment\n").unwrap();
+        ssh_identity_credential("git", &key_path).expect("memory credential");
+        assert_eq!(
+            sibling_public_key_path(std::path::Path::new("/tmp/id_rsa")),
+            std::path::Path::new("/tmp/id_rsa.pub")
+        );
     }
 
     #[cfg(unix)]
@@ -3321,7 +3707,13 @@ mod tests {
         fs::write(&target, "synthetic-private-key").unwrap();
         let link = ssh_dir.join("link");
         symlink(&target, &link).unwrap();
-        assert!(git_remote_callbacks(Some(&link), Some(&ssh_dir)).is_err());
+        assert!(git_remote_callbacks(
+            Some(&link),
+            Some(&ssh_dir),
+            None,
+            "https://example.com/repo.git"
+        )
+        .is_err());
     }
 
     #[test]
@@ -3383,6 +3775,28 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(fs::read_to_string(raced.join("marker")).unwrap(), "raced");
         assert!(!raced.join(".gpg-id").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn remove_clone_target_removes_a_symlink_without_deleting_its_target() {
+        use std::os::unix::fs::symlink;
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("real");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("keep"), "ok").unwrap();
+        let link = temp.path().join("link");
+        symlink(&target, &link).unwrap();
+        remove_clone_target(&link).unwrap();
+        assert!(fs::symlink_metadata(&link).is_err());
+        assert_eq!(fs::read_to_string(target.join("keep")).unwrap(), "ok");
+
+        let directory = temp.path().join("partial");
+        fs::create_dir(&directory).unwrap();
+        fs::write(directory.join("residue"), "x").unwrap();
+        remove_clone_target(&directory).unwrap();
+        assert!(fs::symlink_metadata(&directory).is_err());
+        assert!(remove_clone_target(std::path::Path::new("/")).is_err());
     }
 
     #[test]

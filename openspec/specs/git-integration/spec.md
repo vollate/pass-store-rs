@@ -177,7 +177,7 @@ be treated as executable command input.
 
 ### Requirement: Structured GUI and mobile Git SHALL use libgit2 without emulating arbitrary args
 
-GUI/mobile repository discovery, validation, initialization, clone, status, remotes, commit, pull, and push SHALL use Rust libgit2 when a system Git executable is unavailable. CLI behavior and working desktop system-Git execution SHALL remain unchanged. HTTPS operations SHALL preserve default certificate verification. SSH operations SHALL use explicit app-managed private-key paths through credential callbacks and SHALL NOT log key material or passphrases. Arbitrary `run_git_args` SHALL return a typed Unsupported result on Android and iOS, and Flutter SHALL not expose an enabled Advanced Git args action there.
+GUI/mobile repository discovery, validation, initialization, clone, status, remotes, commit, pull, and push SHALL use Rust libgit2 when a system Git executable is unavailable. CLI behavior and working desktop system-Git execution SHALL remain unchanged. HTTPS operations SHALL preserve default certificate verification. SSH operations SHALL use an imported SSH private key selected by the user through credential callbacks and SHALL NOT log key material or passphrases. When only one imported SSH private key exists, that key is selected. Mobile SSH host verification SHALL remember a new remote host key in app storage and SHALL reject a later key that does not match the remembered one. It SHALL NOT ask the user to pick another key file for that check. Arbitrary `run_git_args` SHALL return a typed Unsupported result on Android and iOS, and Flutter SHALL not expose an enabled Advanced Git args action there.
 
 #### Scenario: Mobile structured status does not spawn system Git
 
@@ -197,8 +197,40 @@ GUI/mobile repository discovery, validation, initialization, clone, status, remo
 
 - **GIVEN** an SSH remote and an explicitly selected app-managed private-key path
 - **WHEN** libgit2 requests credentials
-- **THEN** the credential callback uses that key path
+- **THEN** the credential callback reads that imported key and supplies it from memory
+- **AND** libssh2 is not asked to open the key file
 - **AND** logs and errors contain no private key material or passphrase
+
+#### Scenario: SSH clone uses the imported key the user selected
+
+- **GIVEN** more than one imported SSH private key
+- **AND** the user selects one of those keys for an SSH remote
+- **WHEN** clone, pull, or push requests credentials
+- **THEN** the credential callback uses that imported key
+- **AND** the user is not asked to pick another key file
+
+#### Scenario: Mobile SSH remembers a new host key
+
+- **GIVEN** an SSH remote on mobile
+- **AND** the app has not remembered that host key
+- **WHEN** libgit2 checks the remote host key
+- **THEN** the app stores that host key
+- **AND** a later connection with a different host key is rejected
+
+#### Scenario: Git failure details keep the sanitized reason
+
+- **GIVEN** a clone, pull, push, commit, or sync fails in libgit2 or system Git
+- **WHEN** the failure is reported
+- **THEN** the message includes the sanitized Git reason
+- **AND** it does not replace that reason with only "Git operation failed"
+- **AND** credentials, private paths, and key material stay redacted
+
+#### Scenario: Mobile Git diagnostics go to the platform log
+
+- **GIVEN** a clone, pull, or push runs on Android
+- **WHEN** libgit2 traces the operation or the operation fails
+- **THEN** the sanitized diagnostic is written to logcat with the `pars_git` tag
+- **AND** the log contains no private key material or passphrase
 
 #### Scenario: Arbitrary args are unsupported on mobile
 

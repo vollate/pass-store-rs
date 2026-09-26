@@ -7,6 +7,26 @@ import 'package:pars_gui/l10n/app_localizations_zh.dart';
 import 'package:pars_gui/services/path_picker_service.dart';
 
 void main() {
+  test(
+    'Android key selection keeps the user location and reads it later',
+    () async {
+      const location = '/storage/emulated/0/Download/gh_vollate';
+      final selected = selectedKeyFileFromOpenableResult(<Object?, Object?>{
+        'location': location,
+        'fileName': 'gh_vollate',
+        'uri': 'content://documents/document/primary:Download/gh_vollate',
+      }, (uri) async => 'material-for:$uri');
+
+      expect(selected.location, location);
+      expect(selected.fileName, 'gh_vollate');
+      expect(
+        await selected.readText(),
+        'material-for:content://documents/document/primary:Download/gh_vollate',
+      );
+      expect(keyFileNameFromLocation(location), 'gh_vollate');
+    },
+  );
+
   test('provider fault and recovery prompt are localized', () {
     final english = AppLocalizationsEn();
     final chinese = AppLocalizationsZh();
@@ -83,9 +103,7 @@ void main() {
     final result = await stageAndroidDirectoryWithRecoveryForTesting(
       providerStage:
           () async =>
-              throw PlatformException(
-                code: 'store_import_provider_unlistable',
-              ),
+              throw PlatformException(code: 'store_import_provider_unlistable'),
       resolveProviderFault: () async => true,
       requestDirectReadAccess: () async => true,
       directStage: () async {

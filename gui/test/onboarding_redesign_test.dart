@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pars_gui/app/pars_design_tokens.dart';
 import 'package:pars_gui/app/pars_gui_app.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/pgp_key_import.dart';
@@ -10,6 +13,7 @@ import 'package:pars_gui/services/path_picker_service.dart';
 import 'package:pars_gui/services/security_repository.dart';
 import 'package:pars_gui/services/settings_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
+import 'package:pars_gui/widgets/app_section.dart';
 
 import 'support/gui_test_harness.dart';
 
@@ -74,7 +78,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Set up PGP key'), findsOneWidget);
+    expect(find.text('Step 3 of 5'), findsOneWidget);
+    await _passPgpStep(tester);
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+    expect(find.text('Step 4 of 5'), findsOneWidget);
+    await _skipSshStep(tester);
+
     expect(find.text('Set up password store'), findsOneWidget);
+    expect(find.text('Step 5 of 5'), findsOneWidget);
     expect(
       find.widgetWithText(FilledButton, 'Import local store'),
       findsOneWidget,
@@ -92,11 +104,345 @@ void main() {
     expect(find.text('Review setup'), findsNothing);
   });
 
+  testWidgets('PGP step requires a private key before SSH', (tester) async {
+    await configureGuiTestViewport(tester);
+    final repository = _OnboardingRepository(keysOverride: const <KeyRecord>[]);
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            onboardingComplete: false,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up PGP key'), findsOneWidget);
+    expect(find.text('Step 3 of 5'), findsOneWidget);
+    expect(find.text('Required'), findsOneWidget);
+    expect(find.text('No private PGP keys'), findsOneWidget);
+    final continueButton = find.widgetWithText(FilledButton, 'Continue');
+    expect(tester.widget<FilledButton>(continueButton).onPressed, isNull);
+
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'Alice');
+    await tester.enterText(find.byType(TextField).at(1), 'alice@example.com');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up PGP key'), findsOneWidget);
+    expect(find.text('Alice <alice@example.com>'), findsOneWidget);
+    expect(tester.widget<FilledButton>(continueButton).onPressed, isNotNull);
+    await tester.tap(continueButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+    expect(find.text('Step 4 of 5'), findsOneWidget);
+  });
+
+  testWidgets('first-run onboarding offers SSH before store setup', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    final repository = _OnboardingRepository(
+      keysOverride: const <KeyRecord>[_pgpKey],
+    );
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            onboardingComplete: false,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _passPgpStep(tester);
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+    expect(find.text('Optional'), findsOneWidget);
+    expect(find.text('No SSH keys configured'), findsOneWidget);
+    expect(find.text('Skip SSH'), findsOneWidget);
+    expect(find.text('Import local store'), findsNothing);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Text'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'laptop');
+    await tester.enterText(find.byType(TextField).at(1), 'PRIVATE KEY');
+    await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('laptop'), findsOneWidget);
+    expect(find.text('Skip SSH'), findsNothing);
+    await _tapOnboardingAction(tester, 'Continue');
+
+    expect(find.text('Set up password store'), findsOneWidget);
+    expect(
+      find.widgetWithText(FilledButton, 'Import local store'),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(FilledButton, 'Clone Git store'),
+      findsOneWidget,
+    );
+    expect(find.text('Generate SSH key'), findsNothing);
+  });
+
+  testWidgets('generated SSH key shows its public key for copying', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    final repository = _OnboardingRepository(
+      keysOverride: const <KeyRecord>[_pgpKey],
+    );
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            onboardingComplete: false,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _passPgpStep(tester);
+    await tester.tap(find.text('Generate'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Generate SSH key').last,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeKey'),
+      findsOneWidget,
+    );
+    expect(find.text('Copy'), findsOneWidget);
+    expect(find.text('GitHub settings'), findsOneWidget);
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Public key'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeKey'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('system back walks to earlier onboarding steps', (tester) async {
+    await configureGuiTestViewport(tester);
+    final repository = _OnboardingRepository(
+      keysOverride: const <KeyRecord>[_pgpKey],
+    );
+    final security = InMemorySecurityRepository.withPattern(
+      const <int>[0, 1, 2, 5],
+      biometricUnlockEnabled: true,
+      lastUnlockedAt: DateTime.now(),
+    );
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: security,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Set up PGP key'), findsOneWidget);
+    expect(find.byTooltip('Back'), findsOneWidget);
+
+    await _skipSshStep(tester);
+    expect(find.text('Set up password store'), findsOneWidget);
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Set up PGP key'), findsOneWidget);
+    expect(security.biometricUnlockEnabled, isTrue);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Skip biometrics'), findsOneWidget);
+    expect(security.biometricUnlockEnabled, isFalse);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Set gesture lock'), findsWidgets);
+    expect(find.text('Step 1 of 5'), findsOneWidget);
+    expect(find.byTooltip('Back'), findsNothing);
+    expect(find.text('Reset gesture'), findsOneWidget);
+    expect(find.text('Keep current gesture'), findsNothing);
+  });
+
+  testWidgets('first-run biometrics goes back to gesture setup', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    final repository = _OnboardingRepository(
+      keysOverride: const <KeyRecord>[_pgpKey],
+    );
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            onboardingComplete: false,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Skip biometrics'), findsOneWidget);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Set gesture lock'), findsWidgets);
+  });
+
+  testWidgets('SSH step keeps its actions pinned when many keys exist', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    final repository = _OnboardingRepository(
+      keysOverride: const <KeyRecord>[_pgpKey],
+    );
+    for (var index = 0; index < 15; index++) {
+      await repository.generateSshKey('key-$index');
+    }
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            onboardingComplete: false,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _passPgpStep(tester);
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    for (final label in <String>['Generate', 'Import', 'Continue']) {
+      final rect = tester.getRect(find.text(label));
+      expect(rect.bottom, lessThanOrEqualTo(screenHeight), reason: label);
+    }
+    final rowHeight = tester.getSize(find.byType(ParsSectionRow).first).height;
+    final listHeight = tester.getSize(find.byType(ListView).last).height;
+    final visibleRows =
+        (listHeight + ParsSizes.hairline) / (rowHeight + ParsSizes.hairline);
+    expect(visibleRows - visibleRows.floor(), closeTo(0.5, 0.05));
+    expect(
+      tester.widget<Scrollbar>(find.byType(Scrollbar)).thumbVisibility,
+      isTrue,
+    );
+
+    final continueTop = tester.getTopLeft(find.text('Continue')).dy;
+    expect(find.text('key-14'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('key-14'),
+      80,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('key-14'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Continue')).dy, continueTop);
+    expect(
+      tester.getRect(find.text('key-14')).bottom,
+      lessThan(tester.getTopLeft(find.text('Generate')).dy),
+    );
+    expectNoFlutterOverflow(tester);
+  });
+
+  testWidgets('SSH step deletes a key after a yes/no confirmation', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    final repository = _OnboardingRepository(
+      keysOverride: const <KeyRecord>[_pgpKey],
+    );
+    await repository.generateSshKey('old-key');
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            onboardingComplete: false,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _passPgpStep(tester);
+    expect(find.text('old-key'), findsOneWidget);
+    await tester.tap(find.byTooltip('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Delete old-key?'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(repository.actions, isNot(contains('delete-ssh:old-key')));
+    expect(find.text('old-key'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(repository.actions, contains('delete-ssh:old-key'));
+    expect(find.text('old-key'), findsNothing);
+    expect(find.text('No SSH keys configured'), findsOneWidget);
+  });
+
   testWidgets('HTTPS clone does not request SSH while SSH clone does', (
     tester,
   ) async {
     await configureGuiTestViewport(tester);
-    final repository = _OnboardingRepository(keysOverride: const <KeyRecord>[]);
+    final repository = _OnboardingRepository(
+      keysOverride: const <KeyRecord>[_pgpKey],
+    );
     await tester.pumpWidget(
       buildLocalizedTestApp(
         child: OnboardingScreen(
@@ -111,8 +457,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Clone Git store'));
-    await tester.pumpAndSettle();
+    await _tapOnboardingAction(tester, 'Clone Git store');
 
     await tester.enterText(
       find.byType(TextField).first,
@@ -127,15 +472,179 @@ void main() {
     );
     await tester.pump();
     expect(find.text('SSH key required for this remote'), findsOneWidget);
-    expect(find.text('Generate SSH key'), findsOneWidget);
-    expect(find.text('Import SSH key'), findsOneWidget);
-    await tester.tap(find.text('Generate SSH key'));
+    expect(find.text('Generate'), findsOneWidget);
+    expect(find.text('Import'), findsOneWidget);
+    await tester.tap(find.text('Generate'));
     await tester.pumpAndSettle();
     await tester.tap(
       find.widgetWithText(FilledButton, 'Generate SSH key').last,
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
     expect(find.text('SSH key required for this remote'), findsNothing);
+  });
+
+  testWidgets('app-managed clone does not show a store folder', (tester) async {
+    await configureGuiTestViewport(tester);
+    final repository = _ManagedOnboardingRepository(storeOverride: null);
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await _tapOnboardingAction(tester, 'Clone Git store');
+
+    expect(find.text('Store folder'), findsNothing);
+    expect(find.text('Remote URL'), findsOneWidget);
+    await tester.enterText(
+      find.byType(TextField),
+      'https://example.com/pass.git',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Clone'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      repository.actions.single,
+      'clone:https://example.com/pass.git:/app/support/stores/clone',
+    );
+  });
+
+  testWidgets('clone asks before replacing a leftover target', (tester) async {
+    await configureGuiTestViewport(tester);
+    final repository = _ManagedOnboardingRepository(storeOverride: null)
+      ..cloneExisting = true;
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await _tapOnboardingAction(tester, 'Clone Git store');
+    await tester.enterText(
+      find.byType(TextField),
+      'https://example.com/pass.git',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Clone'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Replace leftover clone?'), findsOneWidget);
+    expect(repository.actions, isEmpty);
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(repository.actions, isEmpty);
+    expect(find.text('Remote URL'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Clone'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Replace'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      repository.actions.single,
+      'clone-overwrite:https://example.com/pass.git:/app/support/stores/clone',
+    );
+  });
+
+  testWidgets('SSH clone selects an imported key', (tester) async {
+    await configureGuiTestViewport(tester);
+    final repository = _ManagedOnboardingRepository(
+      storeOverride: null,
+      keysOverride: const <KeyRecord>[
+        _pgpKey,
+        KeyRecord(
+          type: KeyRecordType.ssh,
+          name: 'v_github',
+          fingerprint: 'SHA256:test',
+          source: 'ssh',
+          hasPrivateKey: true,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await _tapOnboardingAction(tester, 'Clone Git store');
+    await tester.enterText(
+      find.byType(TextField),
+      'git@github.com:example/pass.git',
+    );
+    await tester.pump();
+
+    expect(
+      find.widgetWithText(RadioListTile<String>, 'v_github'),
+      findsOneWidget,
+    );
+    expect(find.text('Known hosts file'), findsNothing);
+  });
+
+  testWidgets('clone failure details are reachable', (tester) async {
+    await configureGuiTestViewport(tester);
+    final repository = _ManagedOnboardingRepository(storeOverride: null);
+    repository.cloneFailure = StateError('remote authentication failed');
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: OnboardingScreen(
+          onComplete: () {},
+          settingsRepository: repository,
+          keyRepository: repository,
+          securityRepository: InMemorySecurityRepository.withPattern(
+            const <int>[0, 1, 2, 5],
+            biometricUnlockEnabled: true,
+            lastUnlockedAt: DateTime.now(),
+          ),
+        ),
+      ),
+    );
+    await _tapOnboardingAction(tester, 'Clone Git store');
+    await tester.enterText(
+      find.byType(TextField),
+      'https://example.com/pass.git',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Clone'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.text('Operation failed. Try again or open Details.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('remote authentication failed'), findsNothing);
+    await tester.tap(find.text('Details'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('remote authentication failed'), findsOneWidget);
   });
 
   testWidgets('repair exposes only matching private PGP keys', (tester) async {
@@ -526,27 +1035,20 @@ void main() {
 
       switch (branch) {
         case 'create':
-          await tester.tap(find.text('Create local store'));
-          await tester.pumpAndSettle();
-          expect(find.text('Choose PGP key'), findsOneWidget);
-          await tester.tap(find.text('Use PGP key').first);
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Create local store'));
-          await tester.pumpAndSettle();
+          await _tapOnboardingAction(tester, 'Create local store');
+          expect(find.text('Choose PGP key'), findsNothing);
           await tester.tap(find.widgetWithText(TextButton, 'Choose'));
           await tester.pumpAndSettle();
           await tester.tap(find.widgetWithText(FilledButton, 'Create').last);
           break;
         case 'import':
-          await tester.tap(find.text('Import local store'));
-          await tester.pumpAndSettle();
+          await _tapOnboardingAction(tester, 'Import local store');
           await tester.tap(find.widgetWithText(TextButton, 'Choose'));
           await tester.pumpAndSettle();
           await tester.tap(find.widgetWithText(FilledButton, 'Import').last);
           break;
         case 'clone':
-          await tester.tap(find.text('Clone Git store'));
-          await tester.pumpAndSettle();
+          await _tapOnboardingAction(tester, 'Clone Git store');
           await tester.enterText(
             find.byType(TextField).first,
             'https://example.com/pass.git',
@@ -560,6 +1062,12 @@ void main() {
 
       expect(completed, isTrue);
       expect(repository.actions.single, startsWith(branch));
+      if (branch == 'create') {
+        expect(
+          repository.actions.single,
+          endsWith(':3A8E 9C12 77FA 22D1 90BD 48AA A991 D3B4 A702 91EF'),
+        );
+      }
       expect(find.text('Review setup'), findsNothing);
     });
   }
@@ -583,7 +1091,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await _skipSshStep(tester);
       final storeScrollable =
           find
               .descendant(
@@ -609,6 +1117,7 @@ void main() {
         'Create local store',
       );
       expect(createButton, findsOneWidget);
+      await tester.ensureVisible(createButton);
       await tester.tap(createButton);
       await tester.pumpAndSettle();
       final openedRecipientStep =
@@ -640,12 +1149,13 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _skipSshStep(tester);
     await tester.scrollUntilVisible(
       find.text('Import local store'),
       160,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.ensureVisible(find.text('Import local store'));
     await tester.tap(find.text('Import local store'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
@@ -662,6 +1172,119 @@ void main() {
     await tester.tap(find.text('Continue without Git'));
     await tester.pumpAndSettle();
   });
+
+  testWidgets('returning from the SSH file picker does not lock the session', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    final repository = _OnboardingRepository(
+      keysOverride: const <KeyRecord>[_pgpKey],
+    );
+    final picker = _DeferredFilePicker();
+    final now = DateTime(2026);
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: repository,
+        settingsRepository: repository,
+        keyRepository: repository,
+        gitRepository: repository,
+        securityRepository: InMemorySecurityRepository.withPattern(
+          const <int>[0, 1, 2, 5],
+          lockOnResume: true,
+          biometricUnlockEnabled: true,
+          onboardingComplete: false,
+          lastUnlockedAt: now,
+        ),
+        pathPickerService: picker,
+        now: () => now,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _passPgpStep(tester);
+    expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+    await _tapOnboardingAction(tester, 'Import');
+    await tester.tap(find.text('File'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Choose'));
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(find.text('Unlock Pars'), findsNothing);
+    expect(find.text('Import SSH key file'), findsOneWidget);
+
+    picker.complete('/tmp/id_rsa');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock Pars'), findsNothing);
+    expect(find.textContaining('/tmp/id_rsa'), findsOneWidget);
+    expect(find.text('id_rsa'), findsOneWidget);
+  });
+
+  testWidgets(
+    'SSH key file selection shows the chosen file and fills its name',
+    (tester) async {
+      await configureGuiTestViewport(tester);
+      final repository = _OnboardingRepository(
+        keysOverride: const <KeyRecord>[_pgpKey],
+      );
+      const location = '/storage/emulated/0/Download/gh_vollate';
+      const privateKey = 'OPENSSH-TEST-MATERIAL';
+      final picker = _ScriptedKeyFilePicker(
+        SelectedKeyFile(
+          location: location,
+          fileName: 'gh_vollate',
+          readText: () async => privateKey,
+        ),
+      );
+
+      await tester.pumpWidget(
+        buildLocalizedTestApp(
+          child: OnboardingScreen(
+            onComplete: () {},
+            settingsRepository: repository,
+            keyRepository: repository,
+            pathPickerService: picker,
+            securityRepository: InMemorySecurityRepository.withPattern(
+              const <int>[0, 1, 2, 5],
+              biometricUnlockEnabled: true,
+              onboardingComplete: false,
+            ),
+          ),
+        ),
+      );
+      await _passPgpStep(tester);
+      await _tapOnboardingAction(tester, 'Import');
+      await tester.tap(find.text('File'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Choose'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining(location), findsOneWidget);
+      expect(find.text('gh_vollate'), findsWidgets);
+      await tester.enterText(find.byType(TextField), 'work-key');
+      await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastImportedSshName, 'work-key');
+      expect(repository.lastImportedSshText, privateKey);
+      expect(repository.sshFileImportCalls, 0);
+      expect(find.text('Import SSH key file'), findsNothing);
+    },
+  );
 
   testWidgets('onboarding remains usable at 200 percent text scale', (
     tester,
@@ -686,6 +1309,52 @@ void main() {
   });
 }
 
+const _pgpKey = KeyRecord(
+  type: KeyRecordType.pgp,
+  name: 'Test <test@example.com>',
+  fingerprint: 'ABCD',
+  source: 'Imported in test',
+  hasPrivateKey: true,
+);
+
+Future<void> _passPgpStep(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  if (find.text('Set up PGP key').evaluate().isEmpty) return;
+  await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _skipSshStep(WidgetTester tester) async {
+  await _passPgpStep(tester);
+  if (find.text('Set up SSH for GitHub').evaluate().isEmpty) return;
+  final noKeys = find.text('No SSH keys configured').evaluate().isNotEmpty;
+  final next = find.text(noKeys ? 'Skip SSH' : 'Continue');
+  if (next.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      next,
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+  }
+  await tester.ensureVisible(next);
+  await tester.pumpAndSettle();
+  await tester.tap(next);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapOnboardingAction(WidgetTester tester, String label) async {
+  final finder = find.text(label);
+  if (finder.evaluate().isEmpty) await _skipSshStep(tester);
+  final scrollable = find.byType(Scrollable);
+  if (scrollable.evaluate().isNotEmpty) {
+    await tester.scrollUntilVisible(finder, 80, scrollable: scrollable.last);
+  }
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
 class _OnboardingRepository extends FakeParsRepository {
   _OnboardingRepository({
     StoreStatus? storeOverride,
@@ -699,6 +1368,11 @@ class _OnboardingRepository extends FakeParsRepository {
   final List<KeyRecord> _additionalKeys = <KeyRecord>[];
   final List<String> actions = <String>[];
   int pgpImportCalls = 0;
+  int sshFileImportCalls = 0;
+  String? lastImportedSshName;
+  String? lastImportedSshText;
+  Object? cloneFailure;
+  bool cloneExisting = false;
 
   @override
   Future<void> removeStore({required String root}) async {
@@ -778,10 +1452,46 @@ class _OnboardingRepository extends FakeParsRepository {
   }
 
   @override
+  Future<KeyRecord> generatePgpKey({
+    required String name,
+    required String email,
+    String? passphrase,
+  }) async {
+    final key = KeyRecord(
+      type: KeyRecordType.pgp,
+      name: '$name <$email>',
+      fingerprint: 'NEW-$name',
+      source: 'Generated in test',
+      hasPrivateKey: true,
+    );
+    _additionalKeys.add(key);
+    return key;
+  }
+
+  @override
+  Future<void> deleteSshKey(String name) async {
+    actions.add('delete-ssh:$name');
+    _additionalKeys.removeWhere((key) => key.name == name);
+  }
+
+  @override
   Future<KeyRecord> importSshPrivateKeyText({
     required String name,
     required String privateKey,
-  }) => generateSshKey(name);
+  }) {
+    lastImportedSshName = name;
+    lastImportedSshText = privateKey;
+    return generateSshKey(name);
+  }
+
+  @override
+  Future<KeyRecord> importSshPrivateKeyFile({
+    required String name,
+    required String path,
+  }) {
+    sshFileImportCalls += 1;
+    return super.importSshPrivateKeyFile(name: name, path: path);
+  }
 
   @override
   Future<void> createLocalStore({
@@ -807,8 +1517,16 @@ class _OnboardingRepository extends FakeParsRepository {
   Future<void> cloneStore({
     required String remoteUrl,
     required String root,
+    bool overwrite = false,
   }) async {
-    actions.add('clone:$remoteUrl:$root');
+    final failure = cloneFailure;
+    if (failure != null) throw failure;
+    if (cloneExisting && !overwrite) {
+      throw const StoreCloneTargetExists();
+    }
+    actions.add(
+      overwrite ? 'clone-overwrite:$remoteUrl:$root' : 'clone:$remoteUrl:$root',
+    );
     _setReady(root, gitMode: StoreGitMode.remote);
   }
 
@@ -834,7 +1552,10 @@ class _OnboardingRepository extends FakeParsRepository {
 
 class _ManagedOnboardingRepository extends _OnboardingRepository
     implements AppManagedPathRepository {
-  _ManagedOnboardingRepository({required super.storeOverride});
+  _ManagedOnboardingRepository({
+    required super.storeOverride,
+    super.keysOverride,
+  });
 
   @override
   bool get usesAppManagedPaths => true;
@@ -848,6 +1569,42 @@ class _ManagedOnboardingRepository extends _OnboardingRepository
 
   @override
   String storeRootForRemote(String remoteUrl) => '/app/support/stores/clone';
+}
+
+class _DeferredFilePicker implements PathPickerService {
+  final Completer<String?> _result = Completer<String?>();
+
+  void complete(String? path) {
+    if (!_result.isCompleted) _result.complete(path);
+  }
+
+  @override
+  Future<String?> pickFile({required String initialDirectory}) =>
+      _result.future;
+
+  @override
+  Future<SelectedKeyFile?> pickKeyFile({
+    required String initialDirectory,
+  }) async {
+    final path = await _result.future;
+    if (path == null) return null;
+    return SelectedKeyFile(
+      location: path,
+      fileName: keyFileNameFromLocation(path),
+      readText: () async => '',
+    );
+  }
+
+  @override
+  Future<String?> pickFolder({required String initialDirectory}) async => null;
+
+  @override
+  Future<ManagedStoreImportTransaction?> importFolderToManagedStorage({
+    required String destinationBaseDirectory,
+    required ManagedStoreConflictResolver resolveConflict,
+    required ManagedStoreGitDecisionResolver resolveMissingGit,
+    required ManagedStoreProviderFaultResolver resolveProviderFault,
+  }) async => null;
 }
 
 class _MissingGitPicker implements PathPickerService {
@@ -866,7 +1623,37 @@ class _MissingGitPicker implements PathPickerService {
   Future<String?> pickFile({required String initialDirectory}) async => null;
 
   @override
+  Future<SelectedKeyFile?> pickKeyFile({
+    required String initialDirectory,
+  }) async => null;
+
+  @override
   Future<String?> pickFolder({required String initialDirectory}) async => null;
+}
+
+class _ScriptedKeyFilePicker implements PathPickerService {
+  _ScriptedKeyFilePicker(this.selection);
+
+  final SelectedKeyFile? selection;
+
+  @override
+  Future<SelectedKeyFile?> pickKeyFile({
+    required String initialDirectory,
+  }) async => selection;
+
+  @override
+  Future<String?> pickFile({required String initialDirectory}) async => null;
+
+  @override
+  Future<String?> pickFolder({required String initialDirectory}) async => null;
+
+  @override
+  Future<ManagedStoreImportTransaction?> importFolderToManagedStorage({
+    required String destinationBaseDirectory,
+    required ManagedStoreConflictResolver resolveConflict,
+    required ManagedStoreGitDecisionResolver resolveMissingGit,
+    required ManagedStoreProviderFaultResolver resolveProviderFault,
+  }) async => null;
 }
 
 class _FolderPicker implements PathPickerService {
@@ -881,6 +1668,11 @@ class _FolderPicker implements PathPickerService {
 
   @override
   Future<String?> pickFile({required String initialDirectory}) async => null;
+
+  @override
+  Future<SelectedKeyFile?> pickKeyFile({
+    required String initialDirectory,
+  }) async => null;
 
   @override
   Future<ManagedStoreImportTransaction?> importFolderToManagedStorage({

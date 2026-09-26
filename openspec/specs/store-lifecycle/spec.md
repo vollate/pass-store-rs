@@ -178,7 +178,7 @@ GUI lifecycle loading SHALL treat `default_repo` as the sole canonical store whe
 
 ### Requirement: Create, import, and clone SHALL establish the sole configured store
 
-Create SHALL require an absent target, prepare `.gpg-id` and optional Git metadata in a unique sibling staging directory, reserve the final root without replacing any raced file, directory, or symlink, and remove only the newly created tree if preparation or config persistence fails. Import SHALL register only a finalized staged store. Clone SHALL reject an existing target, run Git clone, and register the result only after clone and store inspection succeed. Each successful operation SHALL replace the empty canonical path and normalize the compatibility `repos` mirror to that one path; none SHALL add another selectable store.
+Create SHALL require an absent target, prepare `.gpg-id` and optional Git metadata in a unique sibling staging directory, reserve the final root without replacing any raced file, directory, or symlink, and remove only the newly created tree if preparation or config persistence fails. Import SHALL register only a finalized staged store. Clone SHALL leave an existing unregistered target in place until the user confirms replacement, remove only that target after confirmation, run Git clone, and register the result only after clone and store inspection succeed. A failed clone SHALL remove the incomplete tree; if that cleanup fails, the next clone asks for replacement again. A declined replacement leaves the existing target unchanged. Each successful operation SHALL replace the empty canonical path and normalize the compatibility `repos` mirror to that one path; none SHALL add another selectable store.
 
 #### Scenario: Create supports a store without Git
 
@@ -201,6 +201,15 @@ Create SHALL require an absent target, prepare `.gpg-id` and optional Git metada
 - **WHEN** Git preparation, final-name reservation, or canonical config persistence fails
 - **THEN** the staged or newly installed tree is removed
 - **AND** any concurrently created target remains untouched
+
+#### Scenario: Clone asks before replacing a leftover target
+
+- **GIVEN** no canonical store is configured
+- **AND** the requested clone target already exists from a previous incomplete clone
+- **WHEN** Clone is submitted
+- **THEN** the existing target stays in place until the user confirms replacement
+- **AND** a confirmed replacement removes that target and clones again
+- **AND** a declined replacement leaves the target unchanged
 
 #### Scenario: Clone establishes one Git-backed store
 

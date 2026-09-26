@@ -188,9 +188,16 @@ void main() {
     await tester.tap(find.text('Skip biometrics'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Set up password store'), findsOneWidget);
-    expect(find.text('Import local store'), findsOneWidget);
-    expect(find.text('Clone Git store'), findsOneWidget);
+    expect(find.text('Set up PGP key'), findsOneWidget);
+    expect(find.text('Set up password store'), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Continue'))
+          .onPressed,
+      isNull,
+    );
+    expect(find.text('Create'), findsOneWidget);
+    expect(find.text('Import'), findsOneWidget);
   });
 
   testWidgets('existing gesture resumes prerequisite key setup', (
@@ -212,8 +219,8 @@ void main() {
       ),
     );
 
-    expect(find.text('Set up password store'), findsOneWidget);
-    expect(find.text('Import local store'), findsOneWidget);
+    expect(find.text('Set up PGP key'), findsOneWidget);
+    expect(find.text('Step 3 of 5'), findsOneWidget);
     expect(find.text('Vault'), findsNothing);
   });
 
@@ -311,7 +318,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sensitive route content'), findsNothing);
-    expect(find.text('Set up password store'), findsOneWidget);
+    expect(find.text('Set up PGP key'), findsOneWidget);
     expect(find.text('Vault'), findsNothing);
   });
 
@@ -352,24 +359,20 @@ void main() {
           .map((widget) => widget.data)
           .whereType<String>()
           .join(' | ');
-      expect(
-        find.text('Set up password store'),
-        findsOneWidget,
-        reason: visibleText,
+      expect(find.text('Set up PGP key'), findsOneWidget, reason: visibleText);
+      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Set up SSH for GitHub'), findsOneWidget);
+      await tester.tap(
+        find.text(
+          find.text('No SSH keys configured').evaluate().isEmpty
+              ? 'Continue'
+              : 'Skip SSH',
+        ),
       );
-      final setupScrollable =
-          find
-              .descendant(
-                of: find.byType(ListView).last,
-                matching: find.byType(Scrollable),
-              )
-              .first;
-      await tester.scrollUntilVisible(
-        find.text('Import local store'),
-        160,
-        scrollable: setupScrollable,
-      );
-      expect(find.text('Import local store'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text('Set up password store'), findsOneWidget);
+      expect(find.text('Step 5 of 5'), findsOneWidget);
       expect(find.text('Vault'), findsNothing);
       expect(security.onboardingComplete, isTrue);
       expect(security.hasGestureVerifier, isTrue);
@@ -435,10 +438,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unlock Pars'), findsOneWidget);
-    expect(find.text('Import local store'), findsNothing);
+    expect(find.text('Set up PGP key'), findsNothing);
     await _drawGesture(tester);
     await tester.pumpAndSettle();
-    expect(find.text('Import local store'), findsOneWidget);
+    expect(find.text('Set up PGP key'), findsOneWidget);
     expect(find.text('Vault'), findsNothing);
   });
 
@@ -1612,7 +1615,8 @@ void main() {
     );
     await tester.tap(find.text('SSH keys'));
     await tester.pumpAndSettle();
-    expect(find.text('Generate SSH key'), findsOneWidget);
+    expect(find.text('Generate'), findsOneWidget);
+    expect(find.text('Import'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -2460,6 +2464,7 @@ class _InjectedRepository
   Future<void> cloneStore({
     required String remoteUrl,
     required String root,
+    bool overwrite = false,
   }) async {}
 
   @override
@@ -2759,6 +2764,19 @@ class _FakePathPickerService implements PathPickerService {
   }
 
   @override
+  Future<SelectedKeyFile?> pickKeyFile({
+    required String initialDirectory,
+  }) async {
+    final path = await pickFile(initialDirectory: initialDirectory);
+    if (path == null) return null;
+    return SelectedKeyFile(
+      location: path,
+      fileName: keyFileNameFromLocation(path),
+      readText: () async => '',
+    );
+  }
+
+  @override
   Future<ManagedStoreImportTransaction?> importFolderToManagedStorage({
     required String destinationBaseDirectory,
     required ManagedStoreConflictResolver resolveConflict,
@@ -2884,6 +2902,7 @@ class _OnboardingBranchRepository extends _InjectedRepository {
   Future<void> cloneStore({
     required String remoteUrl,
     required String root,
+    bool overwrite = false,
   }) async {
     storeActions.add('clone:$remoteUrl:$root');
     storeReady = true;
@@ -3938,6 +3957,7 @@ class _StoreSetupRepository
   Future<void> cloneStore({
     required String remoteUrl,
     required String root,
+    bool overwrite = false,
   }) async {}
 
   @override

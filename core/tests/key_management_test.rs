@@ -1,12 +1,17 @@
 use std::fs;
 
+use p256::pkcs8::EncodePrivateKey;
 use pars_core::key_management::{
     add_pgp_key_to_gpg_id, delete_ssh_key, detect_imported_key_material, export_ssh_private_key,
     export_ssh_public_key, generate_ssh_ed25519_key, import_ssh_private_key_text, list_ssh_keys,
     ImportedKeyKind, PrivateKeyConfirmation,
 };
 use pars_core::pgp::import::inspect_pgp_key_bytes;
+use rand08::rngs::OsRng;
+use rsa::pkcs1::{EncodeRsaPrivateKey, LineEnding as Pkcs1LineEnding};
 use serial_test::serial;
+use ssh_key::private::RsaKeypair;
+use ssh_key::{Algorithm, EcdsaCurve, LineEnding, PrivateKey};
 
 const PGP_PUBLIC: &str =
     "-----BEGIN PGP PUBLIC KEY BLOCK-----\nabc\n-----END PGP PUBLIC KEY BLOCK-----";
@@ -168,10 +173,63 @@ fn rejecting_an_unsupported_ssh_key_writes_nothing() {
     let err = import_ssh_private_key_text(dest.path(), "work-key", PEM_RSA_PRIVATE).unwrap_err();
 
     let message = err.to_string();
-    assert!(message.contains("ed25519"), "{message}");
+    assert!(message.contains("parse") || message.contains("SSH"), "{message}");
+    assert!(!message.contains("MIIBOgIBAAJB"), "{message}");
     assert!(!dest.path().join("work-key").exists());
     assert!(!dest.path().join("work-key.pub").exists());
     assert!(list_ssh_keys(dest.path()).unwrap().is_empty());
+}
+
+#[test]
+fn imports_openssh_rsa_ecdsa_and_pkcs1_private_keys() {
+    let dest = tempfile::tempdir().unwrap();
+    let rsa = rsa::RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+    let openssh = PrivateKey::from(RsaKeypair::try_from(&rsa).unwrap());
+    let rsa_text = openssh.to_openssh(LineEnding::LF).unwrap();
+    let imported = import_ssh_private_key_text(dest.path(), "rsa-key", &rsa_text).unwrap();
+    let public = fs::read_to_string(dest.path().join("rsa-key.pub")).unwrap();
+    assert!(imported.fingerprint.starts_with("SHA256:"));
+    assert!(public.starts_with("ssh-rsa "));
+
+    let pem = rsa.to_pkcs1_pem(Pkcs1LineEnding::LF).unwrap();
+    let pem_imported = import_ssh_private_key_text(dest.path(), "pem-rsa", pem.as_str()).unwrap();
+    assert!(pem_imported.fingerprint.starts_with("SHA256:"));
+    let pem_public = fs::read_to_string(dest.path().join("pem-rsa.pub")).unwrap();
+    assert!(pem_public.starts_with("ssh-rsa "));
+    let stored = fs::read_to_string(dest.path().join("pem-rsa")).unwrap();
+    assert!(stored.contains("BEGIN OPENSSH PRIVATE KEY"));
+
+    let ecdsa =
+        PrivateKey::random(&mut OsRng, Algorithm::Ecdsa { curve: EcdsaCurve::NistP256 }).unwrap();
+    let ecdsa_text = ecdsa.to_openssh(LineEnding::LF).unwrap();
+    import_ssh_private_key_text(dest.path(), "ecdsa-key", &ecdsa_text).unwrap();
+    let ecdsa_public = fs::read_to_string(dest.path().join("ecdsa-key.pub")).unwrap();
+    assert!(ecdsa_public.starts_with("ecdsa-sha2-nistp256 "));
+
+    let ec = p256::SecretKey::random(&mut OsRng);
+    let sec1 = ec.to_sec1_pem(Default::default()).unwrap();
+    import_ssh_private_key_text(dest.path(), "sec1-p256", sec1.as_str()).unwrap();
+    let sec1_public = fs::read_to_string(dest.path().join("sec1-p256.pub")).unwrap();
+    assert!(sec1_public.starts_with("ecdsa-sha2-nistp256 "));
+
+    let pkcs8 = ec.to_pkcs8_pem(Default::default()).unwrap();
+    import_ssh_private_key_text(dest.path(), "pkcs8-p256", pkcs8.as_str()).unwrap();
+    let pkcs8_public = fs::read_to_string(dest.path().join("pkcs8-p256.pub")).unwrap();
+    assert!(pkcs8_public.starts_with("ecdsa-sha2-nistp256 "));
+}
+
+#[test]
+fn rejecting_an_encrypted_ssh_key_writes_nothing() {
+    let dest = tempfile::tempdir().unwrap();
+    let key = PrivateKey::random(&mut OsRng, Algorithm::Ed25519).unwrap();
+    let encrypted = key.encrypt(&mut OsRng, "hunter2").unwrap();
+    let text = encrypted.to_openssh(LineEnding::LF).unwrap();
+
+    let err = import_ssh_private_key_text(dest.path(), "locked", &text).unwrap_err();
+
+    assert!(err.to_string().contains("encrypted"), "{}", err);
+    assert!(!dest.path().join("locked").exists());
+    assert!(!dest.path().join("locked.pub").exists());
 }
 
 #[test]

@@ -138,21 +138,19 @@ class _AutofillSettingsSheetBodyState
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
-          (dialogContext) => AlertDialog(
-            title: Text(dialogContext.l10n.useLoginAndUrlFields),
+          (dialogContext) => ParsDialog(
+            title: dialogContext.l10n.useLoginAndUrlFields,
             content: Text(
               dialogContext.l10n.confirmUseLoginAndUrlFields(entries.length),
             ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: Text(dialogContext.l10n.cancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: Text(dialogContext.l10n.useFields),
-              ),
-            ],
+            secondary: ParsDialogAction(
+              label: dialogContext.l10n.cancel,
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+            ),
+            primary: ParsDialogAction(
+              label: dialogContext.l10n.useFields,
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+            ),
           ),
     );
     if (confirmed != true || !mounted) return;

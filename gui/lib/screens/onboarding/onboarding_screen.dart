@@ -6,14 +6,20 @@ import '../../l10n/l10n.dart';
 import '../../models/key_record.dart';
 import '../../services/key_repository.dart';
 import '../../services/path_picker_service.dart';
+import '../../services/selected_ssh_key.dart';
 import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
 import '../../services/ui_problem.dart';
+import '../../widgets/app_section.dart';
 import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/managed_store_conflict_sheet.dart';
+import '../../widgets/failure_notice.dart';
+import '../../widgets/pars_action_group.dart';
+import '../../widgets/pars_dialog.dart';
 import '../../widgets/path_picker_row.dart';
 import '../../widgets/pgp_key_import_body.dart';
+import '../../widgets/ssh_key_dialogs.dart';
 
 part 'widgets/onboarding_key_setup_widgets.dart';
 part 'widgets/onboarding_step_widgets.dart';
@@ -39,7 +45,15 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-enum _OnboardingStep { gesture, biometrics, store, createRecipients, repair }
+enum _OnboardingStep {
+  gesture,
+  biometrics,
+  pgp,
+  ssh,
+  store,
+  createRecipients,
+  repair,
+}
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late _OnboardingStep _step;
@@ -107,7 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope<void>(
-      canPop: _stepHistory.isEmpty,
+      canPop: _previousStep == null,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _goBack();
       },
@@ -124,7 +138,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         const SizedBox(height: ParsSpacing.xl),
                         Row(
                           children: <Widget>[
-                            if (_stepHistory.isNotEmpty)
+                            if (_previousStep != null)
                               IconButton(
                                 tooltip: context.l10n.back,
                                 onPressed: _goBack,
@@ -188,7 +202,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   const SizedBox(height: ParsSpacing.xl),
                   Row(
                     children: <Widget>[
-                      if (_stepHistory.isNotEmpty)
+                      if (_previousStep != null)
                         IconButton(
                           tooltip: context.l10n.back,
                           onPressed: _goBack,
@@ -237,20 +251,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         !widget.securityRepository.biometricUnlockEnabled) {
       return _OnboardingStep.biometrics;
     }
-    if (_needsStoreSetup) return _OnboardingStep.store;
+    if (_needsStoreSetup) return _OnboardingStep.pgp;
     return _OnboardingStep.repair;
   }
 
+  bool get _includesKeySteps =>
+      _needsStoreSetup ||
+      _step == _OnboardingStep.pgp ||
+      _step == _OnboardingStep.ssh ||
+      _stepHistory.contains(_OnboardingStep.pgp) ||
+      _stepHistory.contains(_OnboardingStep.ssh);
+
   List<_OnboardingStep> get _progressSteps {
-    if (widget.securityRepository.onboardingComplete) {
-      return <_OnboardingStep>[
-        _OnboardingStep.store,
-        if (_needsStoreRepair) _OnboardingStep.repair,
-      ];
-    }
     return <_OnboardingStep>[
       _OnboardingStep.gesture,
       _OnboardingStep.biometrics,
+      if (_includesKeySteps) ...<_OnboardingStep>[
+        _OnboardingStep.pgp,
+        _OnboardingStep.ssh,
+      ],
       _OnboardingStep.store,
       if (_step == _OnboardingStep.createRecipients)
         _OnboardingStep.createRecipients,
@@ -273,6 +292,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onSkip: _advanceAfterSecurity,
           onError: _showError,
         );
+      case _OnboardingStep.pgp:
+        return _buildPgpStep(context);
+      case _OnboardingStep.ssh:
+        return _buildSshStep(context);
       case _OnboardingStep.store:
         return _buildStoreStep(context);
       case _OnboardingStep.createRecipients:
@@ -284,12 +307,75 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _advanceAfterSecurity() {
     if (_needsStoreSetup) {
-      _setStep(_OnboardingStep.store);
+      _setStep(_OnboardingStep.pgp);
     } else if (_needsStoreRepair) {
       _setStep(_OnboardingStep.repair);
     } else {
       _finishOnboarding();
     }
+  }
+
+  Widget _buildPgpStep(BuildContext context) {
+    final repository = _keyRepository;
+    if (repository == null) {
+      return _EmptyOnboardingStep(
+        icon: Icons.key_off_outlined,
+        title: context.l10n.noKeyRepository,
+        buttonLabel: context.l10n.continueAction,
+        onPressed: () => _setStep(_OnboardingStep.ssh),
+      );
+    }
+    final keys = _privatePgpKeys;
+    return _PgpKeysStep(
+      keys: keys,
+      selectedFingerprint: _effectivePgpFingerprint(keys),
+      onSelectKey:
+          (key) => setState(() => _selectedPgpFingerprint = key.fingerprint),
+      onCreateKey: () => _showCreatePgpKeyForm(context, repository),
+      onImportKey: () => _showImportPgpKeyForm(context, repository),
+      onContinue: () {
+        _selectedPgpFingerprint = _effectivePgpFingerprint(keys);
+        _setStep(_OnboardingStep.ssh);
+      },
+    );
+  }
+
+  // The chosen key becomes the recipient of a newly created store. A single
+  // key is chosen implicitly; with several, the most recent choice wins.
+  String? _effectivePgpFingerprint(List<KeyRecord> keys) {
+    if (keys.any((key) => key.fingerprint == _selectedPgpFingerprint)) {
+      return _selectedPgpFingerprint;
+    }
+    return keys.length == 1 ? keys.single.fingerprint : null;
+  }
+
+  Widget _buildSshStep(BuildContext context) {
+    if (_keyRepository == null) {
+      return _EmptyOnboardingStep(
+        icon: Icons.vpn_key_off_outlined,
+        title: context.l10n.noSshRepository,
+        buttonLabel: context.l10n.continueAction,
+        onPressed: () => _setStep(_OnboardingStep.store),
+      );
+    }
+    return _SshSetupStep(
+      keys: _sshKeys,
+      onGenerateKey: () => _showCreateSshKeyForm(context),
+      onImportKey: () => _showImportSshKeyForm(context),
+      onShowPublicKey: (key) => _showSshPublicKey(context, key.name),
+      onDeleteKey: (key) => _confirmDeleteSshKey(context, key.name),
+      onContinue: () => _setStep(_OnboardingStep.store),
+    );
+  }
+
+  Future<void> _confirmDeleteSshKey(BuildContext context, String name) async {
+    final repository = _keyRepository;
+    if (repository == null) return;
+    if (!await confirmDeleteSshKey(context, name) || !mounted) return;
+    await _runOnboardingAction(() async {
+      await repository.deleteSshKey(name);
+      if (mounted) setState(() {});
+    });
   }
 
   Widget _buildStoreStep(BuildContext context) {
@@ -317,7 +403,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       lifecycle: lifecycle,
       managedPaths: managedPaths,
       selectedPgpFingerprint: _selectedPgpFingerprint,
-      hasSshKey: _sshKeys.isNotEmpty,
+      readSshKeys: () => _sshKeys,
       pathPickerService: widget.pathPickerService,
       onCreateNeedsRecipient: () => _setStep(_OnboardingStep.createRecipients),
       onGenerateSshKey: () => _showCreateSshKeyForm(context),
@@ -336,8 +422,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
       onImportLocalStore: (root) => repository.importLocalStore(root: root),
       onCloneStore:
-          ({required remoteUrl, required root}) =>
-              repository.cloneStore(remoteUrl: remoteUrl, root: root),
+          ({required remoteUrl, required root, bool overwrite = false}) =>
+              repository.cloneStore(
+                remoteUrl: remoteUrl,
+                root: root,
+                overwrite: overwrite,
+              ),
       onStoreChanged: _handleStoreChanged,
     );
   }
@@ -510,9 +600,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
   }
 
-  void _goBack() {
-    if (_stepHistory.isEmpty) return;
-    final previous = _stepHistory.removeLast();
+  // Steps that were already satisfied before this screen opened are not in the
+  // history, so back falls through to the fixed order.
+  _OnboardingStep? get _previousStep {
+    if (_stepHistory.isNotEmpty) return _stepHistory.last;
+    return switch (_step) {
+      _OnboardingStep.store || _OnboardingStep.createRecipients =>
+        _needsStoreSetup ? _OnboardingStep.ssh : null,
+      _OnboardingStep.ssh => _OnboardingStep.pgp,
+      _OnboardingStep.pgp => _OnboardingStep.biometrics,
+      _OnboardingStep.biometrics => _OnboardingStep.gesture,
+      _OnboardingStep.gesture || _OnboardingStep.repair => null,
+    };
+  }
+
+  // Returning to biometrics reopens the choice: it is switched off, so turning
+  // it on again goes through the system biometric prompt.
+  Future<void> _goBack() async {
+    final previous = _previousStep;
+    if (previous == null) return;
+    if (previous == _OnboardingStep.biometrics &&
+        widget.securityRepository.biometricUnlockEnabled) {
+      try {
+        await widget.securityRepository.setBiometricUnlockEnabled(false);
+      } catch (error) {
+        _showError(error);
+        return;
+      }
+      if (!mounted) return;
+    }
+    if (_stepHistory.isNotEmpty) _stepHistory.removeLast();
     _setStep(previous, recordHistory: false);
   }
 
@@ -547,7 +664,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             await _completePgpRepair(key);
           } else {
             _selectedPgpFingerprint = key.fingerprint;
-            _setStep(_OnboardingStep.store);
+            _returnAfterPgpKeyAdded();
           }
         } finally {
           passphrase.clear();
@@ -641,7 +758,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           await _completePgpRepair(completion.key);
                         } else {
                           _selectedPgpFingerprint = completion.key.fingerprint;
-                          _setStep(_OnboardingStep.store);
+                          _returnAfterPgpKeyAdded();
                         }
                       },
                     ),
@@ -651,6 +768,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
     );
+  }
+
+  // Adding a key from the PGP step stays there so more keys can be added; from
+  // the create-store recipient picker it returns to store setup.
+  void _returnAfterPgpKeyAdded() {
+    if (!mounted) return;
+    if (_step == _OnboardingStep.pgp) {
+      setState(() {});
+    } else {
+      _setStep(_OnboardingStep.store);
+    }
   }
 
   String _defaultKeyFileBasePath() {
@@ -667,25 +795,60 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final repository = _keyRepository;
     if (repository == null) return false;
     final name = TextEditingController(text: 'github-mobile-ed25519');
+    KeyRecord? generated;
     await _showOnboardingForm(
       context: context,
       title: context.l10n.generateSshKey,
       fields: <Widget>[_CreateSshKeyFields(name: name)],
       submitLabel: context.l10n.generateSshKey,
       onSubmit: () async {
-        await repository.generateSshKey(name.text);
+        generated = await repository.generateSshKey(name.text.trim());
         if (mounted) setState(() {});
       },
     );
+    final key = generated;
+    if (key != null && context.mounted) {
+      await _showSshPublicKey(context, key.name);
+    }
     return _sshKeys.isNotEmpty;
+  }
+
+  Future<void> _showSshPublicKey(BuildContext context, String name) async {
+    final repository = _keyRepository;
+    if (repository == null) return;
+    try {
+      final publicKey = await repository.exportSshPublicKey(name);
+      if (!context.mounted) return;
+      await showSshPublicKeyDialog(
+        context,
+        keyName: name,
+        publicKey: publicKey,
+      );
+    } catch (error) {
+      _showError(error);
+    }
   }
 
   Future<bool> _showImportSshKeyForm(BuildContext context) async {
     final repository = _keyRepository;
     if (repository == null) return false;
+    final source = await chooseSshImportSource(context);
+    if (!context.mounted || source == null) return _sshKeys.isNotEmpty;
+    if (source == 'file') {
+      await _showImportSshKeyFileForm(context, repository);
+    } else {
+      await _showImportSshKeyTextForm(context, repository);
+    }
+    return _sshKeys.isNotEmpty;
+  }
+
+  Future<void> _showImportSshKeyTextForm(
+    BuildContext context,
+    KeyRepository repository,
+  ) {
     final name = TextEditingController();
     final privateKey = TextEditingController();
-    await _showOnboardingForm(
+    return _showOnboardingForm(
       context: context,
       title: context.l10n.importSshKey,
       fields: <Widget>[_ImportSshKeyFields(name: name, privateKey: privateKey)],
@@ -702,7 +865,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
       },
     );
-    return _sshKeys.isNotEmpty;
+  }
+
+  Future<void> _showImportSshKeyFileForm(
+    BuildContext context,
+    KeyRepository repository,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder:
+          (sheetContext) => _ImportSshFileSheet(
+            repository: repository,
+            pathPickerService: widget.pathPickerService,
+            initialDirectory: _defaultKeyFileBasePath(),
+            onImported: () {
+              if (mounted) setState(() {});
+            },
+          ),
+    );
   }
 
   Future<void> _showOnboardingForm({
@@ -751,6 +932,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       switch (step) {
         _OnboardingStep.gesture => l10n.setGestureLock,
         _OnboardingStep.biometrics => l10n.enableBiometricUnlock,
+        _OnboardingStep.pgp => l10n.setupPgpKey,
+        _OnboardingStep.ssh => l10n.setupSshGithub,
         _OnboardingStep.store => l10n.setupPasswordStore,
         _OnboardingStep.createRecipients => l10n.choosePgpKey,
         _OnboardingStep.repair => l10n.repairPasswordStore,
@@ -760,6 +943,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       switch (step) {
         _OnboardingStep.gesture => l10n.gestureStepSubtitle,
         _OnboardingStep.biometrics => l10n.biometricsStepSubtitle,
+        _OnboardingStep.pgp => l10n.pgpStepSubtitle,
+        _OnboardingStep.ssh => l10n.sshStepSubtitle,
         _OnboardingStep.store => l10n.storeFirstSetupSubtitle,
         _OnboardingStep.createRecipients => l10n.createStoreRecipientSubtitle,
         _OnboardingStep.repair => l10n.contextualRepairSubtitle,
@@ -792,9 +977,9 @@ class _DeleteStoreConfirmationDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: true,
-      title: Text(context.l10n.deleteAppCopy),
+    return ParsDialog(
+      title: context.l10n.deleteAppCopy,
+      destructive: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -811,19 +996,17 @@ class _DeleteStoreConfirmationDialogState
           ),
         ],
       ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(context.l10n.cancel),
-        ),
-        FilledButton(
-          onPressed:
-              _confirmation.text == widget.storeName
-                  ? () => Navigator.of(context).pop(true)
-                  : null,
-          child: Text(context.l10n.delete),
-        ),
-      ],
+      secondary: ParsDialogAction(
+        label: context.l10n.cancel,
+        onPressed: () => Navigator.of(context).pop(false),
+      ),
+      primary: ParsDialogAction(
+        label: context.l10n.delete,
+        onPressed:
+            _confirmation.text == widget.storeName
+                ? () => Navigator.of(context).pop(true)
+                : null,
+      ),
     );
   }
 }

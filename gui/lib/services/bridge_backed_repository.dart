@@ -11,6 +11,8 @@ import '../models/password_entry.dart';
 import '../models/pgp_key_import.dart';
 import 'autofill_repository.dart';
 import 'git_repository.dart';
+import 'path_picker_service.dart';
+import 'selected_ssh_key.dart';
 import 'key_repository.dart';
 import 'runtime_diagnostics.dart';
 import 'security_repository.dart';
@@ -650,17 +652,23 @@ class BridgeBackedRepository
   Future<void> cloneStore({
     required String remoteUrl,
     required String root,
+    bool overwrite = false,
   }) async {
     final response = await bridge.cloneStore(
       request: frb.CloneStoreRequest(
         configPath: configPath,
         remoteUrl: remoteUrl,
         root: root,
-        sshPrivateKeyPath: _sshPrivateKeyPathForRemote(remoteUrl),
+        sshPrivateKeyPath: await _sshPrivateKeyForUrl(remoteUrl),
         sshDir: sshDir,
+        overwrite: overwrite,
       ),
     );
-    _throwIfFailure(response.error);
+    final failure = response.error;
+    if (failure != null && failure.conflictKind == 'EntryAlreadyExists') {
+      throw const StoreCloneTargetExists();
+    }
+    _throwIfFailure(failure);
     await refresh();
   }
 
@@ -1029,10 +1037,11 @@ class BridgeBackedRepository
     if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
       return _gitDisabledResult('git pull', message: 'Skipped: no Git remote.');
     }
+    final ssh = await _sshMaterialForConfiguredRemote();
     final response = await bridge.gitPull(
       request: frb.GitRequest(
         root: _requiredStoreRoot(),
-        sshPrivateKeyPath: await _sshPrivateKeyPathForConfiguredRemote(),
+        sshPrivateKeyPath: ssh,
         sshDir: sshDir,
       ),
     );
@@ -1046,10 +1055,11 @@ class BridgeBackedRepository
     if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
       return _gitDisabledResult('git push', message: 'Skipped: no Git remote.');
     }
+    final ssh = await _sshMaterialForConfiguredRemote();
     final response = await bridge.gitPush(
       request: frb.GitRequest(
         root: _requiredStoreRoot(),
-        sshPrivateKeyPath: await _sshPrivateKeyPathForConfiguredRemote(),
+        sshPrivateKeyPath: ssh,
         sshDir: sshDir,
       ),
     );
@@ -1800,24 +1810,59 @@ class BridgeBackedRepository
     return export.armoredText;
   }
 
-  String? _sshPrivateKeyPathForRemote(String remoteUrl) {
-    final value = remoteUrl.trim().toLowerCase();
-    final usesSsh =
-        value.startsWith('ssh://') ||
-        (!value.contains('://') && value.contains('@') && value.contains(':'));
-    if (!usesSsh || sshDir == null || sshDir!.trim().isEmpty) return null;
-    for (final key in _keys) {
-      if (key.type == KeyRecordType.ssh && key.hasPrivateKey) {
-        return _joinFilesystemPath(sshDir!, key.name);
+  String? _sshPrivateKeyPathForRemote(
+    String remoteUrl, {
+    String? preferredName,
+  }) {
+    if (!remoteUrlUsesSsh(remoteUrl) ||
+        sshDir == null ||
+        sshDir!.trim().isEmpty) {
+      return null;
+    }
+    final keys = <KeyRecord>[
+      for (final key in _keys)
+        if (key.type == KeyRecordType.ssh && key.hasPrivateKey) key,
+    ];
+    final preferred = preferredName?.trim();
+    if (preferred != null && preferred.isNotEmpty) {
+      for (final key in keys) {
+        if (key.name == preferred) {
+          return _joinFilesystemPath(sshDir!, key.name);
+        }
       }
+    }
+    if (keys.length == 1) {
+      return _joinFilesystemPath(sshDir!, keys.single.name);
     }
     return null;
   }
 
-  Future<String?> _sshPrivateKeyPathForConfiguredRemote() async {
+  Future<String?> _sshPrivateKeyForUrl(String remoteUrl) async {
+    if (!remoteUrlUsesSsh(remoteUrl)) return null;
+    final preferred = await loadSelectedSshKey(configPath);
+    final path = _sshPrivateKeyPathForRemote(
+      remoteUrl,
+      preferredName: preferred,
+    );
+    if (path != null) return path;
+    final imported =
+        _keys
+            .where((key) => key.type == KeyRecordType.ssh && key.hasPrivateKey)
+            .length;
+    if (imported > 1) {
+      throw const BridgeRepositoryException(
+        'Choose an imported SSH key for this remote.',
+      );
+    }
+    return null;
+  }
+
+  Future<String?> _sshMaterialForConfiguredRemote() async {
     for (final remote in await listRemotes()) {
-      final path = _sshPrivateKeyPathForRemote(remote.pushUrl);
-      if (path != null) return path;
+      for (final url in <String>[remote.pushUrl, remote.fetchUrl]) {
+        if (!remoteUrlUsesSsh(url)) continue;
+        return _sshPrivateKeyForUrl(url);
+      }
     }
     return null;
   }

@@ -10,6 +10,74 @@ const MethodChannel _androidStoreImportChannel = MethodChannel(
   'top.vollate.pars_gui/store_import',
 );
 
+const MethodChannel _openableFileChannel = MethodChannel(
+  'top.vollate.pars_gui/openable_file',
+);
+
+/// A file the user selected, without copying it into app storage.
+class SelectedKeyFile {
+  const SelectedKeyFile({
+    required this.location,
+    required this.fileName,
+    this.contentUri,
+    required Future<String> Function() readText,
+  }) : _readText = readText;
+
+  /// Location the user selected. This is what the picker row shows.
+  final String location;
+
+  /// File name used to prefill the key name. The field stays editable.
+  final String fileName;
+
+  /// Android content URI for reading the same file later. Desktop leaves this empty.
+  final String? contentUri;
+
+  final Future<String> Function() _readText;
+
+  /// Reads the selection when the user confirms import.
+  Future<String> readText() => _readText();
+}
+
+String keyFileNameFromLocation(String location) {
+  final name =
+      location
+          .trim()
+          .replaceAll('\\', '/')
+          .split('/')
+          .where((part) => part.isNotEmpty)
+          .lastOrNull;
+  if (name == null || name == '.' || name == '..') {
+    throw const PathPickerException('The selected file has no name.');
+  }
+  return name;
+}
+
+@visibleForTesting
+SelectedKeyFile selectedKeyFileFromOpenableResult(
+  Map<Object?, Object?> result,
+  Future<String> Function(String uri) readText,
+) {
+  final location = result['location'];
+  final fileName = result['fileName'];
+  final uri = result['uri'];
+  if (location is! String ||
+      fileName is! String ||
+      uri is! String ||
+      location.trim().isEmpty ||
+      fileName.trim().isEmpty ||
+      uri.trim().isEmpty) {
+    throw const PathPickerException(
+      'Android returned an invalid file selection.',
+    );
+  }
+  return SelectedKeyFile(
+    location: location,
+    fileName: fileName,
+    contentUri: uri,
+    readText: () => readText(uri),
+  );
+}
+
 enum ManagedStoreConflictPolicy { replace }
 
 enum ManagedStoreGitDecision { initialize, continueWithoutGit, cancel }
@@ -127,10 +195,68 @@ Future<T> finalizeAndroidStagedImportForTesting<T>({
   }
 }
 
+typedef SystemUiActionRunner =
+    Future<T> Function<T>(Future<T> Function() action);
+
+/// Keeps the session unlocked while a system picker is in front of the app.
+class LockSuppressingPathPickerService implements PathPickerService {
+  const LockSuppressingPathPickerService({
+    required this.inner,
+    required this.runDuringSystemUi,
+  });
+
+  final PathPickerService inner;
+  final SystemUiActionRunner runDuringSystemUi;
+
+  @override
+  Future<String?> pickFolder({required String initialDirectory}) {
+    return runDuringSystemUi(
+      () => inner.pickFolder(initialDirectory: initialDirectory),
+    );
+  }
+
+  @override
+  Future<String?> pickFile({required String initialDirectory}) {
+    return runDuringSystemUi(
+      () => inner.pickFile(initialDirectory: initialDirectory),
+    );
+  }
+
+  @override
+  Future<SelectedKeyFile?> pickKeyFile({required String initialDirectory}) {
+    return runDuringSystemUi(
+      () => inner.pickKeyFile(initialDirectory: initialDirectory),
+    );
+  }
+
+  @override
+  Future<ManagedStoreImportTransaction?> importFolderToManagedStorage({
+    required String destinationBaseDirectory,
+    required ManagedStoreConflictResolver resolveConflict,
+    required ManagedStoreGitDecisionResolver resolveMissingGit,
+    required ManagedStoreProviderFaultResolver resolveProviderFault,
+  }) {
+    return runDuringSystemUi(
+      () => inner.importFolderToManagedStorage(
+        destinationBaseDirectory: destinationBaseDirectory,
+        resolveConflict: resolveConflict,
+        resolveMissingGit: resolveMissingGit,
+        resolveProviderFault: resolveProviderFault,
+      ),
+    );
+  }
+}
+
 abstract interface class PathPickerService {
   Future<String?> pickFolder({required String initialDirectory});
 
   Future<String?> pickFile({required String initialDirectory});
+
+  /// Selects a key file and returns the user's location without copying it.
+  ///
+  /// [SelectedKeyFile.readText] reads the selection only when import is
+  /// confirmed. App data receives the converted key after that read succeeds.
+  Future<SelectedKeyFile?> pickKeyFile({required String initialDirectory});
 
   /// Lets the user choose a store and copies it into app-managed storage.
   ///
@@ -184,6 +310,70 @@ class SystemPathPickerService implements PathPickerService {
       throw const PathPickerException('File picker unavailable.');
     } on PlatformException catch (error) {
       throw PathPickerException(error.message ?? 'File picker failed.');
+    }
+  }
+
+  @override
+  Future<SelectedKeyFile?> pickKeyFile({
+    required String initialDirectory,
+  }) async {
+    if (Platform.isAndroid) {
+      return _pickAndroidKeyFile(initialDirectory);
+    }
+    try {
+      final file = await openFile(initialDirectory: initialDirectory);
+      if (file == null) return null;
+      final location = file.path;
+      final named = file.name.trim();
+      return SelectedKeyFile(
+        location: location,
+        fileName: keyFileNameFromLocation(named.isEmpty ? location : named),
+        readText: () => File(location).readAsString(),
+      );
+    } on UnimplementedError catch (error) {
+      throw PathPickerException(error.message ?? 'File picker unavailable.');
+    } on MissingPluginException {
+      throw const PathPickerException('File picker unavailable.');
+    } on PlatformException catch (error) {
+      throw PathPickerException(error.message ?? 'File picker failed.');
+    }
+  }
+
+  Future<SelectedKeyFile?> _pickAndroidKeyFile(String initialDirectory) async {
+    try {
+      final result = await _openableFileChannel
+          .invokeMapMethod<Object?, Object?>('pick', <String, Object>{
+            'initialDirectory': initialDirectory,
+          });
+      if (result == null) return null;
+      return selectedKeyFileFromOpenableResult(result, _readAndroidKeyFile);
+    } on PathPickerException {
+      rethrow;
+    } on MissingPluginException {
+      throw const PathPickerException('File picker unavailable.');
+    } on PlatformException catch (error) {
+      throw PathPickerException(error.message ?? 'File picker failed.');
+    }
+  }
+
+  Future<String> _readAndroidKeyFile(String uri) async {
+    try {
+      final text = await _openableFileChannel.invokeMethod<String>(
+        'read',
+        <String, Object>{'uri': uri},
+      );
+      if (text == null) {
+        throw const PathPickerException('The selected file could not be read.');
+      }
+      return text;
+    } on PathPickerException {
+      rethrow;
+    } on MissingPluginException {
+      throw const PathPickerException('File picker unavailable.');
+    } on PlatformException catch (error) {
+      throw PathPickerException(
+        error.message ?? 'The selected file could not be read.',
+      );
     }
   }
 

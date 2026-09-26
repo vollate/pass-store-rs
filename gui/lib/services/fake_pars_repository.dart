@@ -427,6 +427,7 @@ class FakeParsRepository
   Future<void> cloneStore({
     required String remoteUrl,
     required String root,
+    bool overwrite = false,
   }) async {}
 
   @override

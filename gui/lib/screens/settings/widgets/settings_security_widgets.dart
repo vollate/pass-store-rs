@@ -609,9 +609,7 @@ class _PgpPassphraseStorageSheetBodyState
               ),
             ),
             const SizedBox(height: ParsSpacing.sm),
-            Wrap(
-              spacing: ParsSpacing.xs,
-              runSpacing: ParsSpacing.xs,
+            ParsButtonGrid(
               children: <Widget>[
                 FilledButton.icon(
                   onPressed:

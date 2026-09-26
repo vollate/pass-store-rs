@@ -77,7 +77,6 @@ void main() {
         isNot(contains('_showKeys(context, KeyRecordType.pgp)')),
       );
       expect(onboarding, isNot(contains('addPgpKeyToSelectedStore')));
-      expect(onboarding, isNot(contains('_OnboardingStep.ssh')));
       expect(onboarding, isNot(contains('_OnboardingStep.review')));
     },
   );

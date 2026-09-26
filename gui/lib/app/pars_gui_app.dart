@@ -196,7 +196,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
           settingsRepository: widget.settingsRepository,
           keyRepository: widget.keyRepository,
           securityRepository: widget.securityRepository,
-          pathPickerService: widget.pathPickerService,
+          pathPickerService: _pathPicker,
           onComplete: _handleOnboardingComplete,
         );
       case _RootPresentationState.locked:
@@ -218,7 +218,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
           gitRepository: widget.gitRepository,
           securityRepository: widget.securityRepository,
           autofillRepository: _autofillRepository,
-          pathPickerService: widget.pathPickerService,
+          pathPickerService: _pathPicker,
           localePreference: _localePreference,
           onLocalePreferenceChanged: _setLocalePreference,
           clipboardService: _clipboardService,
@@ -385,6 +385,11 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     }
     return true;
   }
+
+  PathPickerService get _pathPicker => LockSuppressingPathPickerService(
+    inner: widget.pathPickerService,
+    runDuringSystemUi: _runDuringSystemAuthentication,
+  );
 
   Future<T> _runDuringSystemAuthentication<T>(
     Future<T> Function() action,

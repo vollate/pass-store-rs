@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../app/pars_design_tokens.dart';
 
@@ -39,11 +40,21 @@ class AppSectionBox extends StatelessWidget {
     required this.title,
     required this.children,
     this.emptyLabel,
+    this.scrollable = false,
+    this.padding,
   });
 
   final String title;
   final List<Widget> children;
   final String? emptyLabel;
+
+  // Defaults to the page gutter; surfaces that already pad their content,
+  // such as sheets and onboarding steps, pass EdgeInsets.zero.
+  final EdgeInsetsGeometry? padding;
+
+  // Rows scroll inside the outline, which shrinks to its rows until it hits
+  // the available height. Requires a height-bounded parent.
+  final bool scrollable;
 
   @override
   Widget build(BuildContext context) {
@@ -51,9 +62,49 @@ class AppSectionBox extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final style = context.parsSection;
     final isEmpty = children.isEmpty;
+    final rows =
+        isEmpty
+            ? <Widget>[_EmptyRow(label: emptyLabel)]
+            : <Widget>[
+              for (var index = 0; index < children.length; index++) ...<Widget>[
+                children[index],
+                if (index != children.length - 1)
+                  Divider(
+                    height: ParsSizes.hairline,
+                    thickness: ParsSizes.hairline,
+                    indent: style.dividerIndent,
+                    endIndent: 0,
+                  ),
+              ],
+            ];
+    final decoration = BoxDecoration(
+      color: colorScheme.surfaceContainerLowest,
+      borderRadius: style.borderRadius,
+      border: Border.all(
+        color: colorScheme.outlineVariant,
+        width: style.borderWidth,
+      ),
+    );
+    final Widget outline =
+        scrollable && !isEmpty
+            ? _ScrollableSectionRows(
+              rowCount: children.length,
+              decoration: decoration,
+              rows: rows,
+            )
+            : DecoratedBox(
+              decoration: decoration,
+              child: ClipRRect(
+                borderRadius: style.borderRadius,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: rows,
+                ),
+              ),
+            );
 
     return Padding(
-      padding: style.padding,
+      padding: padding ?? style.padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -69,44 +120,123 @@ class AppSectionBox extends StatelessWidget {
               ),
             ),
           ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerLowest,
-              borderRadius: style.borderRadius,
-              border: Border.all(
-                color: colorScheme.outlineVariant,
-                width: style.borderWidth,
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: style.borderRadius,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children:
-                    isEmpty
-                        ? <Widget>[_EmptyRow(label: emptyLabel)]
-                        : <Widget>[
-                          for (
-                            var index = 0;
-                            index < children.length;
-                            index++
-                          ) ...<Widget>[
-                            children[index],
-                            if (index != children.length - 1)
-                              Divider(
-                                height: ParsSizes.hairline,
-                                thickness: ParsSizes.hairline,
-                                indent: style.dividerIndent,
-                                endIndent: 0,
-                              ),
-                          ],
-                        ],
-              ),
-            ),
-          ),
+          if (scrollable) Flexible(child: outline) else outline,
         ],
       ),
     );
+  }
+}
+
+// When the rows overflow, the outline stops half-way through a row so the cut
+// row signals that the list scrolls; a whole number of rows would read as a
+// complete list. Row height depends on text scale, so it is measured from the
+// first row rather than derived from the style.
+class _ScrollableSectionRows extends StatefulWidget {
+  const _ScrollableSectionRows({
+    required this.rowCount,
+    required this.decoration,
+    required this.rows,
+  });
+
+  final int rowCount;
+  final BoxDecoration decoration;
+  final List<Widget> rows;
+
+  @override
+  State<_ScrollableSectionRows> createState() => _ScrollableSectionRowsState();
+}
+
+class _ScrollableSectionRowsState extends State<_ScrollableSectionRows> {
+  final ScrollController _controller = ScrollController();
+  double? _rowHeight;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleRowHeight(double height) {
+    if (!mounted || height <= 0 || height == _rowHeight) return;
+    setState(() => _rowHeight = height);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = context.parsSection;
+    final borders = style.borderWidth * 2;
+    final rows = <Widget>[
+      _HeightReporter(onHeight: _handleRowHeight, child: widget.rows.first),
+      ...widget.rows.skip(1),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double? height;
+        final rowHeight = _rowHeight;
+        if (rowHeight != null && constraints.maxHeight.isFinite) {
+          final step = rowHeight + ParsSizes.hairline;
+          final content = widget.rowCount * step - ParsSizes.hairline;
+          final available = constraints.maxHeight - borders;
+          if (content > available) {
+            final whole = (available / step).floor();
+            height = (whole - 0.5).clamp(0.5, double.infinity) * step + borders;
+          }
+        }
+        return SizedBox(
+          height: height,
+          child: DecoratedBox(
+            decoration: widget.decoration,
+            child: ClipRRect(
+              borderRadius: style.borderRadius,
+              child: Scrollbar(
+                controller: _controller,
+                thumbVisibility: true,
+                child: ListView(
+                  controller: _controller,
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  children: rows,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HeightReporter extends SingleChildRenderObjectWidget {
+  const _HeightReporter({required this.onHeight, super.child});
+
+  final ValueChanged<double> onHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderHeightReporter(onHeight);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderHeightReporter renderObject,
+  ) {
+    renderObject.onHeight = onHeight;
+  }
+}
+
+class _RenderHeightReporter extends RenderProxyBox {
+  _RenderHeightReporter(this.onHeight);
+
+  ValueChanged<double> onHeight;
+  double? _reported;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final height = size.height;
+    if (height == _reported) return;
+    _reported = height;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onHeight(height));
   }
 }
 

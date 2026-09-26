@@ -2662,14 +2662,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CloneStoreRequest dco_decode_clone_store_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return CloneStoreRequest(
       configPath: dco_decode_String(arr[0]),
       remoteUrl: dco_decode_String(arr[1]),
       root: dco_decode_String(arr[2]),
       sshPrivateKeyPath: dco_decode_opt_String(arr[3]),
       sshDir: dco_decode_opt_String(arr[4]),
+      knownHosts: dco_decode_opt_String(arr[5]),
+      overwrite: dco_decode_bool(arr[6]),
     );
   }
 
@@ -3049,12 +3051,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   GitRequest dco_decode_git_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return GitRequest(
       root: dco_decode_String(arr[0]),
       sshPrivateKeyPath: dco_decode_opt_String(arr[1]),
       sshDir: dco_decode_opt_String(arr[2]),
+      knownHosts: dco_decode_opt_String(arr[3]),
     );
   }
 
@@ -4574,12 +4577,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_root = sse_decode_String(deserializer);
     var var_sshPrivateKeyPath = sse_decode_opt_String(deserializer);
     var var_sshDir = sse_decode_opt_String(deserializer);
+    var var_knownHosts = sse_decode_opt_String(deserializer);
+    var var_overwrite = sse_decode_bool(deserializer);
     return CloneStoreRequest(
       configPath: var_configPath,
       remoteUrl: var_remoteUrl,
       root: var_root,
       sshPrivateKeyPath: var_sshPrivateKeyPath,
       sshDir: var_sshDir,
+      knownHosts: var_knownHosts,
+      overwrite: var_overwrite,
     );
   }
 
@@ -4966,10 +4973,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_root = sse_decode_String(deserializer);
     var var_sshPrivateKeyPath = sse_decode_opt_String(deserializer);
     var var_sshDir = sse_decode_opt_String(deserializer);
+    var var_knownHosts = sse_decode_opt_String(deserializer);
     return GitRequest(
       root: var_root,
       sshPrivateKeyPath: var_sshPrivateKeyPath,
       sshDir: var_sshDir,
+      knownHosts: var_knownHosts,
     );
   }
 
@@ -6637,6 +6646,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.root, serializer);
     sse_encode_opt_String(self.sshPrivateKeyPath, serializer);
     sse_encode_opt_String(self.sshDir, serializer);
+    sse_encode_opt_String(self.knownHosts, serializer);
+    sse_encode_bool(self.overwrite, serializer);
   }
 
   @protected
@@ -6959,6 +6970,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.root, serializer);
     sse_encode_opt_String(self.sshPrivateKeyPath, serializer);
     sse_encode_opt_String(self.sshDir, serializer);
+    sse_encode_opt_String(self.knownHosts, serializer);
   }
 
   @protected

@@ -87,12 +87,15 @@ Sources: `core/src/util/fs_util.rs`, `core/src/pgp/backend.rs`,
 
 The core key management layer SHALL generate OpenSSH ed25519 keys directly,
 write private keys with private permissions on Unix, write `.pub` public keys,
-compute `SHA256:` fingerprints, list `.pub` keys, import unencrypted OpenSSH
-ed25519 private keys, and export public/private SSH keys.
+compute `SHA256:` fingerprints, list `.pub` keys, and export public/private SSH
+keys. Generation SHALL stay Ed25519.
 
-Imported key material SHALL be parsed before any file is written, so a rejected
-key never leaves a private key file behind. Unsupported material SHALL be
-reported as an ed25519-only error rather than a low-level parse failure.
+Import SHALL accept unencrypted Ed25519, RSA (at least 2048 bits), and ECDSA
+(NIST P-256, P-384, and P-521) private keys in OpenSSH format, PKCS#1 PEM,
+SEC1 EC PEM, and PKCS#8 PEM. Imported keys SHALL be stored as unencrypted
+OpenSSH private keys so Git can use the file without a passphrase. Encrypted
+keys, hardware-backed SK keys, and unreadable material SHALL be rejected
+before any file is written, and the error SHALL NOT echo key material.
 
 Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
 `bridge/src/api.rs`, `gui/lib/services/key_repository.dart`
@@ -104,12 +107,20 @@ Sources: `core/src/key_management.rs`, `core/tests/key_management_test.rs`,
 - AND `<ssh_dir>/mobile-key.pub` exists
 - AND the fingerprint starts with `SHA256:`
 
+#### Scenario: Classic unencrypted SSH keys import
+
+- WHEN an unencrypted OpenSSH RSA, OpenSSH ECDSA P-256, or PKCS#1 RSA private key is imported
+- THEN the import succeeds
+- AND the public key line starts with `ssh-rsa ` or `ecdsa-sha2-nistp256 `
+- AND the fingerprint starts with `SHA256:`
+- AND a PKCS#1 import is rewritten as an OpenSSH private key
+
 #### Scenario: Rejected SSH import leaves the key name reusable
 
-- GIVEN a PEM-encoded RSA private key is imported as `work-key`
-- THEN the import fails with an error naming ed25519 support
+- GIVEN invalid or encrypted SSH private key material is imported as `work-key`
+- THEN the import fails without echoing the key material
 - AND neither `<ssh_dir>/work-key` nor `<ssh_dir>/work-key.pub` exists
-- AND a later import of a supported ed25519 key as `work-key` succeeds
+- AND a later import of a supported key as `work-key` succeeds
 
 #### Scenario: Private SSH export requires confirmation
 

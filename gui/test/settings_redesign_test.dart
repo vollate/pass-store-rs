@@ -217,7 +217,7 @@ void main() {
     expect(find.text('SSH key required for this remote'), findsOneWidget);
   });
 
-  testWidgets('SSH deletion requires the human-readable key name', (
+  testWidgets('SSH deletion asks a yes/no question with the key name', (
     tester,
   ) async {
     await configureGuiTestViewport(tester, viewport: GuiTestViewport.expanded);
@@ -242,15 +242,25 @@ void main() {
     await tester.tap(find.text('Delete').last);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('github-mobile-ed25519'), findsWidgets);
-    await tester.enterText(find.byType(TextField).last, 'wrong');
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
-    await tester.pump();
-    expect(repository.deletedName, isNull);
-    await tester.enterText(
-      find.byType(TextField).last,
-      'github-mobile-ed25519',
+    expect(
+      find.textContaining('Delete github-mobile-ed25519?'),
+      findsOneWidget,
     );
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      findsNothing,
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(repository.deletedName, isNull);
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
     await tester.pumpAndSettle();
     expect(repository.deletedName, 'github-mobile-ed25519');

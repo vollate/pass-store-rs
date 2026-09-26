@@ -23,6 +23,52 @@ void main() {
     }
   });
 
+  testWidgets('button grid pairs short labels and stacks long ones', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    Future<void> pumpGrid(String first, String second) {
+      return tester.pumpWidget(
+        buildLocalizedTestApp(
+          child: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 360,
+                child: ParsButtonGrid(
+                  children: <Widget>[
+                    OutlinedButton(onPressed: () {}, child: Text(first)),
+                    FilledButton(onPressed: () {}, child: Text(second)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await pumpGrid('Skip', 'Go');
+    final skip = tester.getRect(find.byType(OutlinedButton));
+    final go = tester.getRect(find.byType(FilledButton));
+    expect(skip.top, go.top);
+    expect(skip.width, go.width);
+    expect(skip.width, lessThan(180));
+
+    await pumpGrid('Skip', 'Enable biometric unlock on this device');
+    final stackedSkip = tester.getRect(find.byType(OutlinedButton));
+    final stackedEnable = tester.getRect(find.byType(FilledButton));
+    expect(stackedEnable.top, greaterThan(stackedSkip.bottom));
+    expect(stackedSkip.width, 360);
+    expect(stackedEnable.width, 360);
+    expect(
+      tester
+          .getSize(find.text('Enable biometric unlock on this device'))
+          .height,
+      lessThan(stackedEnable.height),
+    );
+    expectNoFlutterOverflow(tester);
+  });
+
   testWidgets('status and destructive actions use matching semantics', (
     tester,
   ) async {

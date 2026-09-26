@@ -2279,12 +2279,16 @@ impl SseDecode for crate::api::CloneStoreRequest {
         let mut var_root = <String>::sse_decode(deserializer);
         let mut var_sshPrivateKeyPath = <Option<String>>::sse_decode(deserializer);
         let mut var_sshDir = <Option<String>>::sse_decode(deserializer);
+        let mut var_knownHosts = <Option<String>>::sse_decode(deserializer);
+        let mut var_overwrite = <bool>::sse_decode(deserializer);
         return crate::api::CloneStoreRequest {
             config_path: var_configPath,
             remote_url: var_remoteUrl,
             root: var_root,
             ssh_private_key_path: var_sshPrivateKeyPath,
             ssh_dir: var_sshDir,
+            known_hosts: var_knownHosts,
+            overwrite: var_overwrite,
         };
     }
 }
@@ -2652,10 +2656,12 @@ impl SseDecode for crate::api::GitRequest {
         let mut var_root = <String>::sse_decode(deserializer);
         let mut var_sshPrivateKeyPath = <Option<String>>::sse_decode(deserializer);
         let mut var_sshDir = <Option<String>>::sse_decode(deserializer);
+        let mut var_knownHosts = <Option<String>>::sse_decode(deserializer);
         return crate::api::GitRequest {
             root: var_root,
             ssh_private_key_path: var_sshPrivateKeyPath,
             ssh_dir: var_sshDir,
+            known_hosts: var_knownHosts,
         };
     }
 }
@@ -3894,6 +3900,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::CloneStoreRequest {
             self.root.into_into_dart().into_dart(),
             self.ssh_private_key_path.into_into_dart().into_dart(),
             self.ssh_dir.into_into_dart().into_dart(),
+            self.known_hosts.into_into_dart().into_dart(),
+            self.overwrite.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4460,6 +4468,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::GitRequest {
             self.root.into_into_dart().into_dart(),
             self.ssh_private_key_path.into_into_dart().into_dart(),
             self.ssh_dir.into_into_dart().into_dart(),
+            self.known_hosts.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -5545,6 +5554,8 @@ impl SseEncode for crate::api::CloneStoreRequest {
         <String>::sse_encode(self.root, serializer);
         <Option<String>>::sse_encode(self.ssh_private_key_path, serializer);
         <Option<String>>::sse_encode(self.ssh_dir, serializer);
+        <Option<String>>::sse_encode(self.known_hosts, serializer);
+        <bool>::sse_encode(self.overwrite, serializer);
     }
 }
 
@@ -5809,6 +5820,7 @@ impl SseEncode for crate::api::GitRequest {
         <String>::sse_encode(self.root, serializer);
         <Option<String>>::sse_encode(self.ssh_private_key_path, serializer);
         <Option<String>>::sse_encode(self.ssh_dir, serializer);
+        <Option<String>>::sse_encode(self.known_hosts, serializer);
     }
 }
 

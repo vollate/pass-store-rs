@@ -20,6 +20,7 @@ import top.vollate.pars_gui.autofill.ParsAutofillStateStore
 
 class MainActivity : FlutterFragmentActivity() {
     internal lateinit var managedStoreImporter: ManagedStoreImporter
+    private lateinit var openableFilePicker: OpenableFilePicker
     private val clipboardHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,10 +33,15 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         managedStoreImporter = ManagedStoreImporter(this)
+        openableFilePicker = OpenableFilePicker(this)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             ManagedStoreImporter.CHANNEL_NAME,
         ).setMethodCallHandler(managedStoreImporter::handleMethodCall)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "top.vollate.pars_gui/openable_file",
+        ).setMethodCallHandler(openableFilePicker::handleMethodCall)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "top.vollate.pars_gui/sensitive_clipboard",
@@ -170,6 +176,9 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onDestroy() {
         if (::managedStoreImporter.isInitialized) {
             managedStoreImporter.dispose()
+        }
+        if (::openableFilePicker.isInitialized) {
+            openableFilePicker.dispose()
         }
         super.onDestroy()
     }

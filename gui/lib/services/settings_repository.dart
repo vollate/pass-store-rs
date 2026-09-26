@@ -18,7 +18,11 @@ abstract interface class SettingsRepository {
 
   Future<void> importLocalStore({required String root});
 
-  Future<void> cloneStore({required String remoteUrl, required String root});
+  Future<void> cloneStore({
+    required String remoteUrl,
+    required String root,
+    bool overwrite = false,
+  });
 
   Future<void> removeStore({required String root});
 
@@ -26,6 +30,13 @@ abstract interface class SettingsRepository {
     required String root,
     required String confirmation,
   });
+}
+
+class StoreCloneTargetExists implements Exception {
+  const StoreCloneTargetExists();
+
+  @override
+  String toString() => 'entry already exists';
 }
 
 abstract interface class StoreLifecycleChangeSource {
