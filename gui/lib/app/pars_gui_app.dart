@@ -162,7 +162,10 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
     if (_isLocked) {
       return;
     }
-    if (widget.securityRepository.lockOnResume ||
+    // `inactive` alone (notification shade, control center, a system dialog)
+    // never set `backgroundedAt`, so it does not count as leaving the app.
+    final leftApp = backgroundedAt != null;
+    if ((leftApp && widget.securityRepository.lockOnResume) ||
         _backgroundAutoLockExpired(backgroundedAt, now) ||
         widget.securityRepository.shouldLock(now)) {
       _lock();

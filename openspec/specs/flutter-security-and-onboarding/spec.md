@@ -100,9 +100,13 @@ Sources: `gui/lib/services/security_repository.dart`,
 
 ### Requirement: App lifecycle SHALL lock on resume when configured or expired
 
-The app SHALL cancel pending lock timers while backgrounded. On resume, it
-SHALL lock if lock-on-resume is enabled, the background auto-lock window
-expired, or the security repository reports `shouldLock`. System file pickers,
+The app SHALL cancel pending lock timers while backgrounded. The app counts as
+backgrounded only after a `hidden` or `paused` lifecycle state; `inactive`
+alone, such as when the notification shade or control center covers the app,
+SHALL NOT count as leaving it. On resume after being backgrounded, it SHALL
+lock if lock-on-resume is enabled or the background auto-lock window expired.
+On any resume it SHALL lock if the security repository reports `shouldLock`.
+System file pickers,
 folder pickers, and managed-store import SHALL suppress that lock while the
 system UI is open and for a short grace period after it returns, so the form
 that opened the picker stays mounted and keeps the selected path.
@@ -114,6 +118,13 @@ Sources: `gui/lib/app/pars_gui_app.dart`
 - WHEN an action runs through `runDuringSystemAuthentication`
 - THEN lifecycle locks are suppressed while system auth is active
 - AND for a short grace period after it completes
+
+#### Scenario: Pulling down the notification shade does not lock
+
+- GIVEN lock-on-resume is enabled and the session is unlocked
+- WHEN the app goes `inactive` and then `resumed` without becoming `hidden` or `paused`
+- THEN the lock screen is not shown
+- AND the active PGP session is kept
 
 #### Scenario: Returning from a file picker does not lock
 

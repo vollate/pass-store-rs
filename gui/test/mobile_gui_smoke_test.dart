@@ -1743,6 +1743,40 @@ void main() {
     expect(securityRepository.hasActivePgpSession, isFalse);
   });
 
+  testWidgets('pulling down the notification shade does not lock', (
+    tester,
+  ) async {
+    final securityRepository = InMemorySecurityRepository.withPattern(
+      const <int>[0, 1, 2, 5],
+      lockOnResume: true,
+      activePgpPassphrase: const PgpPassphraseCache(
+        fingerprint: _testPgpFingerprint,
+        passphrase: 'pgp-passphrase',
+      ),
+      lastUnlockedAt: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      ParsGuiApp(
+        vaultRepository: const FakeParsRepository(),
+        settingsRepository: const FakeParsRepository(),
+        keyRepository: const FakeParsRepository(),
+        gitRepository: const FakeParsRepository(),
+        securityRepository: securityRepository,
+      ),
+    );
+    expect(find.text('Vault'), findsWidgets);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock Pars'), findsNothing);
+    expect(find.text('Vault'), findsWidgets);
+    expect(securityRepository.hasActivePgpSession, isTrue);
+  });
+
   testWidgets('locks after auto-lock timeout while backgrounded', (
     tester,
   ) async {
