@@ -3,7 +3,6 @@ part of '../vault_operations.dart';
 class _EditEntrySheet extends StatefulWidget {
   const _EditEntrySheet({
     required this.entry,
-    required this.canCommit,
     required this.onReadEntry,
     required this.onSaveRawNotes,
     required this.onReplacePassword,
@@ -11,7 +10,6 @@ class _EditEntrySheet extends StatefulWidget {
   });
 
   final PasswordEntry entry;
-  final bool canCommit;
   final String? title;
   final _ReadEntryForEdit onReadEntry;
   final _SaveEditedEntrySubmit onSaveRawNotes;
@@ -27,7 +25,6 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
   String _notes = '';
   var _loading = false;
   var _saving = false;
-  var _commit = false;
   String? _error;
 
   @override
@@ -65,14 +62,14 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
   Future<void> _saveRawNotes() async {
     final entry = widget.entry;
     await _submit(() async {
-      return widget.onSaveRawNotes(entry, _password, _fields, _notes, _commit);
+      return widget.onSaveRawNotes(entry, _password, _fields, _notes);
     });
   }
 
   Future<void> _replacePasswordLine() async {
     final entry = widget.entry;
     await _submit(() async {
-      return widget.onReplacePassword(entry, _password, _commit);
+      return widget.onReplacePassword(entry, _password);
     });
   }
 
@@ -124,11 +121,6 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
             maxLines: 6,
             decoration: InputDecoration(labelText: context.l10n.rawNotes),
             onChanged: (value) => _notes = value,
-          ),
-          _CommitCheckbox(
-            enabled: widget.canCommit && !_saving,
-            value: _commit,
-            onChanged: (value) => setState(() => _commit = value ?? false),
           ),
           _ErrorText(_error),
           Row(

@@ -4,7 +4,8 @@ use std::process::{self, Command};
 
 use pars_core::gui::{
     delete_entry, edit_entry, generate_entry, insert_entry, list_entries, move_entry,
-    parse_entry_secret, read_entry, run_git_args, validate_git_args, CoreError, DeleteEntryRequest,
+    parse_entry_secret, parse_git_command_line, read_entry, run_git_args, validate_git_args,
+    CoreError, DeleteEntryRequest,
     EditEntryRequest, EntryConflictKind, EntryRef, EntryType, GenerateEntryRequest,
     GitOperationRequest, InsertEntryRequest, ListEntriesRequest, MoveEntryRequest,
     ReadEntryRequest,
@@ -103,20 +104,47 @@ fn git_operation_request_accepts_plain_git_args() {
 }
 
 #[test]
-fn validate_git_args_rejects_shell_syntax() {
-    let rejected_args = [
-        vec!["status", ";", "rm"],
-        vec!["status", "|", "cat"],
-        vec!["status", "&&", "push"],
-        vec!["status", ">", "out.txt"],
-        vec!["status", "$(whoami)"],
-    ];
-
-    for args in rejected_args {
-        let args = args.iter().map(|arg| arg.to_string()).collect::<Vec<_>>();
-        let err = validate_git_args(&args).unwrap_err();
-        assert!(err.to_string().contains("shell syntax is not allowed"));
+fn command_line_rejects_unquoted_shell_syntax() {
+    for line in ["status ; rm", "status | cat", "status && push", "status > out.txt", "status $(whoami)", "log `id`"] {
+        let err = parse_git_command_line(line).unwrap_err();
+        assert!(err.to_string().contains("shell syntax is not allowed"), "{line}: {err}");
     }
+}
+
+#[test]
+fn command_line_keeps_quoted_values_together() {
+    assert_eq!(
+        parse_git_command_line(r#"config user.name "Ada Lovelace""#).unwrap(),
+        vec!["config", "user.name", "Ada Lovelace"]
+    );
+    assert_eq!(
+        parse_git_command_line("commit -m 'Fix A & B'").unwrap(),
+        vec!["commit", "-m", "Fix A & B"]
+    );
+    assert_eq!(
+        parse_git_command_line(r#"commit -m "say \"hi\" \\ done""#).unwrap(),
+        vec!["commit", "-m", r#"say "hi" \ done"#]
+    );
+    assert_eq!(parse_git_command_line(r"log --grep=a\ b").unwrap(), vec!["log", "--grep=a b"]);
+    assert_eq!(parse_git_command_line("  pull   --rebase ").unwrap(), vec!["pull", "--rebase"]);
+    assert!(parse_git_command_line("commit -m ''").unwrap_err().to_string().contains("empty"));
+}
+
+#[test]
+fn command_line_rejects_bad_input() {
+    for line in ["commit -m \"unfinished", "commit -m 'open", "status\nrm", "", "   ", "git status"] {
+        assert!(parse_git_command_line(line).is_err(), "{line:?}");
+    }
+}
+
+#[test]
+fn validate_git_args_allows_shell_characters_in_values() {
+    let args = ["commit", "-m", "A & B; see <notes>"].map(str::to_string).to_vec();
+    validate_git_args(&args).unwrap();
+    let with_git_later = ["commit", "-m", "git"].map(str::to_string).to_vec();
+    validate_git_args(&with_git_later).unwrap();
+    let leading_git = ["git", "status"].map(str::to_string).to_vec();
+    assert!(validate_git_args(&leading_git).is_err());
 }
 
 #[test]

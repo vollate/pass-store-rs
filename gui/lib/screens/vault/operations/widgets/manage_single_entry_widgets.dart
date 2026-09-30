@@ -1,9 +1,8 @@
 part of '../vault_operations.dart';
 
 class _GenerateEntrySheet extends StatefulWidget {
-  const _GenerateEntrySheet({required this.canCommit, required this.onSubmit});
+  const _GenerateEntrySheet({required this.onSubmit});
 
-  final bool canCommit;
   final _GenerateEntrySubmit onSubmit;
 
   @override
@@ -14,7 +13,6 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
   var _path = '';
   var _noSymbols = false;
   var _overwrite = false;
-  var _commit = false;
   var _saving = false;
   String? _errorText;
 
@@ -24,12 +22,7 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
       _errorText = null;
     });
     try {
-      final result = await widget.onSubmit(
-        _path,
-        _noSymbols,
-        _overwrite,
-        _commit,
-      );
+      final result = await widget.onSubmit(_path, _noSymbols, _overwrite);
       if (mounted) {
         Navigator.of(context).pop(result);
       }
@@ -74,11 +67,6 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
                   : (value) => setState(() => _overwrite = value ?? false),
           title: Text(context.l10n.overwriteEntry),
         ),
-        _CommitCheckbox(
-          enabled: widget.canCommit && !_saving,
-          value: _commit,
-          onChanged: (value) => setState(() => _commit = value ?? false),
-        ),
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
@@ -91,12 +79,8 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
 }
 
 class _SaveExistingEntrySheet extends StatefulWidget {
-  const _SaveExistingEntrySheet({
-    required this.canCommit,
-    required this.onSubmit,
-  });
+  const _SaveExistingEntrySheet({required this.onSubmit});
 
-  final bool canCommit;
   final _SaveExistingEntrySubmit onSubmit;
 
   @override
@@ -109,7 +93,6 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
   var _password = '';
   var _notes = '';
   var _overwrite = false;
-  var _commit = false;
   var _saving = false;
   String? _errorText;
 
@@ -124,7 +107,6 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
         _password,
         _notes,
         _overwrite,
-        _commit,
       );
       if (mounted) {
         Navigator.of(context).pop(result);
@@ -177,11 +159,6 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
                   : (value) => setState(() => _overwrite = value ?? false),
           title: Text(context.l10n.overwriteEntry),
         ),
-        _CommitCheckbox(
-          enabled: widget.canCommit && !_saving,
-          value: _commit,
-          onChanged: (value) => setState(() => _commit = value ?? false),
-        ),
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
@@ -197,13 +174,11 @@ class _MoveOrRenameEntrySheet extends StatefulWidget {
   const _MoveOrRenameEntrySheet({
     required this.entry,
     required this.rename,
-    required this.canCommit,
     required this.onSubmit,
   });
 
   final PasswordEntry entry;
   final bool rename;
-  final bool canCommit;
   final _MoveOrRenameEntrySubmit onSubmit;
 
   @override
@@ -214,7 +189,6 @@ class _MoveOrRenameEntrySheet extends StatefulWidget {
 class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
   var _target = '';
   var _overwrite = false;
-  var _commit = false;
   var _saving = false;
   String? _errorText;
 
@@ -230,12 +204,7 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
       _errorText = null;
     });
     try {
-      final result = await widget.onSubmit(
-        widget.entry,
-        _target,
-        _overwrite,
-        _commit,
-      );
+      final result = await widget.onSubmit(widget.entry, _target, _overwrite);
       if (mounted) {
         Navigator.of(context).pop(result);
       }
@@ -279,11 +248,6 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
                   : (value) => setState(() => _overwrite = value ?? false),
           title: Text(context.l10n.overwriteTarget),
         ),
-        _CommitCheckbox(
-          enabled: widget.canCommit && !_saving,
-          value: _commit,
-          onChanged: (value) => setState(() => _commit = value ?? false),
-        ),
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
@@ -296,14 +260,9 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
 }
 
 class _DeleteEntrySheet extends StatefulWidget {
-  const _DeleteEntrySheet({
-    required this.entry,
-    required this.canCommit,
-    required this.onSubmit,
-  });
+  const _DeleteEntrySheet({required this.entry, required this.onSubmit});
 
   final PasswordEntry entry;
-  final bool canCommit;
   final _DeleteEntrySubmit onSubmit;
 
   @override
@@ -312,7 +271,6 @@ class _DeleteEntrySheet extends StatefulWidget {
 
 class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
   var _confirmation = '';
-  var _commit = false;
   var _saving = false;
   String? _errorText;
 
@@ -327,7 +285,7 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
       _errorText = null;
     });
     try {
-      final result = await widget.onSubmit(widget.entry, _commit);
+      final result = await widget.onSubmit(widget.entry);
       if (mounted) {
         Navigator.of(context).pop(result);
       }
@@ -357,11 +315,6 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
             ),
           ),
           onChanged: (value) => _confirmation = value,
-        ),
-        _CommitCheckbox(
-          enabled: widget.canCommit && !_saving,
-          value: _commit,
-          onChanged: (value) => setState(() => _commit = value ?? false),
         ),
         _ErrorText(_errorText),
         _SubmitButton(

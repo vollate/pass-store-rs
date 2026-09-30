@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1435473710;
+  int get rustContentHash => -289220842;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -150,16 +150,42 @@ abstract class RustLibApi extends BaseApi {
     required GitCommitRequest request,
   });
 
+  Future<GitStatusSummaryResponse> crateApiGitFetch({
+    required GitRequest request,
+  });
+
+  Future<GitIdentityResponse> crateApiGitIdentity({
+    required GitIdentityRequest request,
+  });
+
+  Future<GitRemoteBranchesResponse> crateApiGitListRemoteBranches({
+    required GitRequest request,
+  });
+
   Future<GitCommandResponse> crateApiGitListRemotes({
     required GitRequest request,
   });
+
+  Future<GitLogResponse> crateApiGitLog({required GitLogRequest request});
 
   Future<GitCommandResponse> crateApiGitPull({required GitRequest request});
 
   Future<GitCommandResponse> crateApiGitPush({required GitRequest request});
 
+  Future<GitCommandResponse> crateApiGitPushBranch({
+    required GitPushBranchRequest request,
+  });
+
   Future<GitCommandResponse> crateApiGitRemoveRemote({
     required GitRemoteRequest request,
+  });
+
+  Future<GitResetResponse> crateApiGitResetToUpstream({
+    required GitResetRequest request,
+  });
+
+  Future<UnitResponse> crateApiGitSetIdentity({
+    required GitSetIdentityRequest request,
   });
 
   Future<GitCommandResponse> crateApiGitSetRemoteUrl({
@@ -167,6 +193,16 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<GitCommandResponse> crateApiGitStatus({required GitRequest request});
+
+  Future<GitStatusSummaryResponse> crateApiGitStatusSummary({
+    required GitRequest request,
+  });
+
+  Future<GitStatusSummaryResponse> crateApiGitSwitchBranch({
+    required GitSwitchBranchRequest request,
+  });
+
+  Future<GitSyncResponse> crateApiGitSync({required GitSyncRequest request});
 
   Future<UnitResponse> crateApiImportLocalStore({
     required ImportLocalStoreRequest request,
@@ -896,7 +932,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "git_commit", argNames: ["request"]);
 
   @override
-  Future<GitCommandResponse> crateApiGitListRemotes({
+  Future<GitStatusSummaryResponse> crateApiGitFetch({
     required GitRequest request,
   }) {
     return handler.executeNormal(
@@ -908,6 +944,99 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 20,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_status_summary_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitFetchConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitFetchConstMeta =>
+      const TaskConstMeta(debugName: "git_fetch", argNames: ["request"]);
+
+  @override
+  Future<GitIdentityResponse> crateApiGitIdentity({
+    required GitIdentityRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_identity_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_identity_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitIdentityConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitIdentityConstMeta =>
+      const TaskConstMeta(debugName: "git_identity", argNames: ["request"]);
+
+  @override
+  Future<GitRemoteBranchesResponse> crateApiGitListRemoteBranches({
+    required GitRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_remote_branches_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitListRemoteBranchesConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitListRemoteBranchesConstMeta =>
+      const TaskConstMeta(
+        debugName: "git_list_remote_branches",
+        argNames: ["request"],
+      );
+
+  @override
+  Future<GitCommandResponse> crateApiGitListRemotes({
+    required GitRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 23,
             port: port_,
           );
         },
@@ -926,6 +1055,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "git_list_remotes", argNames: ["request"]);
 
   @override
+  Future<GitLogResponse> crateApiGitLog({required GitLogRequest request}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_log_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_log_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitLogConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitLogConstMeta =>
+      const TaskConstMeta(debugName: "git_log", argNames: ["request"]);
+
+  @override
   Future<GitCommandResponse> crateApiGitPull({required GitRequest request}) {
     return handler.executeNormal(
       NormalTask(
@@ -935,7 +1092,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 25,
             port: port_,
           );
         },
@@ -963,7 +1120,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 26,
             port: port_,
           );
         },
@@ -982,6 +1139,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "git_push", argNames: ["request"]);
 
   @override
+  Future<GitCommandResponse> crateApiGitPushBranch({
+    required GitPushBranchRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_push_branch_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_command_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitPushBranchConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitPushBranchConstMeta =>
+      const TaskConstMeta(debugName: "git_push_branch", argNames: ["request"]);
+
+  @override
   Future<GitCommandResponse> crateApiGitRemoveRemote({
     required GitRemoteRequest request,
   }) {
@@ -993,7 +1180,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1014,6 +1201,68 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<GitResetResponse> crateApiGitResetToUpstream({
+    required GitResetRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_reset_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 29,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_reset_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitResetToUpstreamConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitResetToUpstreamConstMeta => const TaskConstMeta(
+    debugName: "git_reset_to_upstream",
+    argNames: ["request"],
+  );
+
+  @override
+  Future<UnitResponse> crateApiGitSetIdentity({
+    required GitSetIdentityRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_set_identity_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 30,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitSetIdentityConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitSetIdentityConstMeta =>
+      const TaskConstMeta(debugName: "git_set_identity", argNames: ["request"]);
+
+  @override
   Future<GitCommandResponse> crateApiGitSetRemoteUrl({
     required GitRemoteRequest request,
   }) {
@@ -1025,7 +1274,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1055,7 +1304,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1074,6 +1323,98 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "git_status", argNames: ["request"]);
 
   @override
+  Future<GitStatusSummaryResponse> crateApiGitStatusSummary({
+    required GitRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 33,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_status_summary_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitStatusSummaryConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitStatusSummaryConstMeta => const TaskConstMeta(
+    debugName: "git_status_summary",
+    argNames: ["request"],
+  );
+
+  @override
+  Future<GitStatusSummaryResponse> crateApiGitSwitchBranch({
+    required GitSwitchBranchRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_switch_branch_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 34,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_status_summary_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitSwitchBranchConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitSwitchBranchConstMeta => const TaskConstMeta(
+    debugName: "git_switch_branch",
+    argNames: ["request"],
+  );
+
+  @override
+  Future<GitSyncResponse> crateApiGitSync({required GitSyncRequest request}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_git_sync_request(request, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 35,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_git_sync_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiGitSyncConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiGitSyncConstMeta =>
+      const TaskConstMeta(debugName: "git_sync", argNames: ["request"]);
+
+  @override
   Future<UnitResponse> crateApiImportLocalStore({
     required ImportLocalStoreRequest request,
   }) {
@@ -1088,7 +1429,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1123,7 +1464,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1158,7 +1499,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1190,7 +1531,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1223,7 +1564,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1259,7 +1600,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1295,7 +1636,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1328,7 +1669,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1358,7 +1699,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1393,7 +1734,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1428,7 +1769,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 46,
             port: port_,
           );
         },
@@ -1460,7 +1801,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 47,
             port: port_,
           );
         },
@@ -1492,7 +1833,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 48,
             port: port_,
           );
         },
@@ -1522,7 +1863,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 49,
             port: port_,
           );
         },
@@ -1552,7 +1893,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 50,
             port: port_,
           );
         },
@@ -1585,7 +1926,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 51,
             port: port_,
           );
         },
@@ -1618,7 +1959,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 52,
             port: port_,
           );
         },
@@ -1651,7 +1992,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 53,
             port: port_,
           );
         },
@@ -1687,7 +2028,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 54,
             port: port_,
           );
         },
@@ -1720,7 +2061,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 55,
             port: port_,
           );
         },
@@ -1753,7 +2094,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 56,
             port: port_,
           );
         },
@@ -1786,7 +2127,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 47,
+            funcId: 57,
             port: port_,
           );
         },
@@ -1822,7 +2163,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 48,
+            funcId: 58,
             port: port_,
           );
         },
@@ -1858,7 +2199,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 59,
             port: port_,
           );
         },
@@ -1894,7 +2235,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 50,
+            funcId: 60,
             port: port_,
           );
         },
@@ -1930,7 +2271,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 51,
+            funcId: 61,
             port: port_,
           );
         },
@@ -1963,7 +2304,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 62,
             port: port_,
           );
         },
@@ -1993,7 +2334,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 53,
+            funcId: 63,
             port: port_,
           );
         },
@@ -2026,7 +2367,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 54,
+            funcId: 64,
             port: port_,
           );
         },
@@ -2375,6 +2716,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitIdentityDto dco_decode_box_autoadd_git_identity_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_identity_dto(raw);
+  }
+
+  @protected
+  GitIdentityRequest dco_decode_box_autoadd_git_identity_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_identity_request(raw);
+  }
+
+  @protected
+  GitLogRequest dco_decode_box_autoadd_git_log_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_log_request(raw);
+  }
+
+  @protected
+  GitPushBranchRequest dco_decode_box_autoadd_git_push_branch_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_push_branch_request(raw);
+  }
+
+  @protected
   GitRemoteRequest dco_decode_box_autoadd_git_remote_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_git_remote_request(raw);
@@ -2387,9 +2754,69 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitResetRequest dco_decode_box_autoadd_git_reset_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_reset_request(raw);
+  }
+
+  @protected
+  GitResetResultDto dco_decode_box_autoadd_git_reset_result_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_reset_result_dto(raw);
+  }
+
+  @protected
+  GitSetIdentityRequest dco_decode_box_autoadd_git_set_identity_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_set_identity_request(raw);
+  }
+
+  @protected
+  GitStatusSummaryDto dco_decode_box_autoadd_git_status_summary_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_status_summary_dto(raw);
+  }
+
+  @protected
+  GitSwitchBranchRequest dco_decode_box_autoadd_git_switch_branch_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_switch_branch_request(raw);
+  }
+
+  @protected
+  GitSyncConflictDto dco_decode_box_autoadd_git_sync_conflict_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_sync_conflict_dto(raw);
+  }
+
+  @protected
+  GitSyncRequest dco_decode_box_autoadd_git_sync_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_sync_request(raw);
+  }
+
+  @protected
+  GitSyncResultDto dco_decode_box_autoadd_git_sync_result_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_git_sync_result_dto(raw);
+  }
+
+  @protected
   int dco_decode_box_autoadd_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
+  }
+
+  @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_i_64(raw);
   }
 
   @protected
@@ -2662,8 +3089,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CloneStoreRequest dco_decode_clone_store_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return CloneStoreRequest(
       configPath: dco_decode_String(arr[0]),
       remoteUrl: dco_decode_String(arr[1]),
@@ -2672,6 +3099,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       sshDir: dco_decode_opt_String(arr[4]),
       knownHosts: dco_decode_opt_String(arr[5]),
       overwrite: dco_decode_bool(arr[6]),
+      httpsUsername: dco_decode_opt_String(arr[7]),
+      httpsToken: dco_decode_opt_String(arr[8]),
+      sshPassphrase: dco_decode_opt_String(arr[9]),
     );
   }
 
@@ -2991,7 +3421,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
     return GitArgsRequest(
       root: dco_decode_String(arr[0]),
-      args: dco_decode_list_String(arr[1]),
+      commandLine: dco_decode_String(arr[1]),
     );
   }
 
@@ -3035,6 +3465,114 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitIdentityDto dco_decode_git_identity_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return GitIdentityDto(
+      name: dco_decode_String(arr[0]),
+      email: dco_decode_String(arr[1]),
+      local: dco_decode_bool(arr[2]),
+    );
+  }
+
+  @protected
+  GitIdentityRequest dco_decode_git_identity_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 1)
+      throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
+    return GitIdentityRequest(root: dco_decode_String(arr[0]));
+  }
+
+  @protected
+  GitIdentityResponse dco_decode_git_identity_response(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitIdentityResponse(
+      identity: dco_decode_opt_box_autoadd_git_identity_dto(arr[0]),
+      error: dco_decode_opt_box_autoadd_bridge_failure(arr[1]),
+    );
+  }
+
+  @protected
+  GitIntegrationStrategyDto dco_decode_git_integration_strategy_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return GitIntegrationStrategyDto.values[raw as int];
+  }
+
+  @protected
+  GitLogEntryDto dco_decode_git_log_entry_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return GitLogEntryDto(
+      id: dco_decode_String(arr[0]),
+      summary: dco_decode_String(arr[1]),
+      author: dco_decode_String(arr[2]),
+      time: dco_decode_i_64(arr[3]),
+    );
+  }
+
+  @protected
+  GitLogRequest dco_decode_git_log_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitLogRequest(
+      root: dco_decode_String(arr[0]),
+      limit: dco_decode_u_32(arr[1]),
+    );
+  }
+
+  @protected
+  GitLogResponse dco_decode_git_log_response(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitLogResponse(
+      entries: dco_decode_list_git_log_entry_dto(arr[0]),
+      error: dco_decode_opt_box_autoadd_bridge_failure(arr[1]),
+    );
+  }
+
+  @protected
+  GitPushBranchRequest dco_decode_git_push_branch_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitPushBranchRequest(
+      git: dco_decode_git_request(arr[0]),
+      branch: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  GitRemoteBranchesResponse dco_decode_git_remote_branches_response(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return GitRemoteBranchesResponse(
+      remote: dco_decode_opt_String(arr[0]),
+      current: dco_decode_opt_String(arr[1]),
+      branches: dco_decode_list_String(arr[2]),
+      error: dco_decode_opt_box_autoadd_bridge_failure(arr[3]),
+    );
+  }
+
+  @protected
   GitRemoteRequest dco_decode_git_remote_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -3051,13 +3589,168 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   GitRequest dco_decode_git_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return GitRequest(
       root: dco_decode_String(arr[0]),
       sshPrivateKeyPath: dco_decode_opt_String(arr[1]),
       sshDir: dco_decode_opt_String(arr[2]),
       knownHosts: dco_decode_opt_String(arr[3]),
+      httpsUsername: dco_decode_opt_String(arr[4]),
+      httpsToken: dco_decode_opt_String(arr[5]),
+      sshPassphrase: dco_decode_opt_String(arr[6]),
+    );
+  }
+
+  @protected
+  GitResetRequest dco_decode_git_reset_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitResetRequest(
+      git: dco_decode_git_request(arr[0]),
+      message: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  GitResetResponse dco_decode_git_reset_response(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitResetResponse(
+      result: dco_decode_opt_box_autoadd_git_reset_result_dto(arr[0]),
+      error: dco_decode_opt_box_autoadd_bridge_failure(arr[1]),
+    );
+  }
+
+  @protected
+  GitResetResultDto dco_decode_git_reset_result_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return GitResetResultDto(
+      committed: dco_decode_bool(arr[0]),
+      backupBranch: dco_decode_opt_String(arr[1]),
+      summary: dco_decode_git_status_summary_dto(arr[2]),
+    );
+  }
+
+  @protected
+  GitSetIdentityRequest dco_decode_git_set_identity_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return GitSetIdentityRequest(
+      root: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      email: dco_decode_String(arr[2]),
+    );
+  }
+
+  @protected
+  GitStatusOperationDto dco_decode_git_status_operation_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return GitStatusOperationDto.values[raw as int];
+  }
+
+  @protected
+  GitStatusSummaryDto dco_decode_git_status_summary_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return GitStatusSummaryDto(
+      branch: dco_decode_opt_String(arr[0]),
+      upstream: dco_decode_opt_String(arr[1]),
+      ahead: dco_decode_u_32(arr[2]),
+      behind: dco_decode_u_32(arr[3]),
+      changed: dco_decode_u_32(arr[4]),
+      conflicted: dco_decode_u_32(arr[5]),
+      operation: dco_decode_git_status_operation_dto(arr[6]),
+      lastFetchedAt: dco_decode_opt_box_autoadd_i_64(arr[7]),
+    );
+  }
+
+  @protected
+  GitStatusSummaryResponse dco_decode_git_status_summary_response(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitStatusSummaryResponse(
+      summary: dco_decode_opt_box_autoadd_git_status_summary_dto(arr[0]),
+      error: dco_decode_opt_box_autoadd_bridge_failure(arr[1]),
+    );
+  }
+
+  @protected
+  GitSwitchBranchRequest dco_decode_git_switch_branch_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitSwitchBranchRequest(
+      root: dco_decode_String(arr[0]),
+      branch: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  GitSyncConflictDto dco_decode_git_sync_conflict_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitSyncConflictDto(
+      backupBranch: dco_decode_opt_String(arr[0]),
+      paths: dco_decode_list_String(arr[1]),
+    );
+  }
+
+  @protected
+  GitSyncRequest dco_decode_git_sync_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return GitSyncRequest(
+      git: dco_decode_git_request(arr[0]),
+      message: dco_decode_String(arr[1]),
+      commitPending: dco_decode_bool(arr[2]),
+      strategy: dco_decode_git_integration_strategy_dto(arr[3]),
+    );
+  }
+
+  @protected
+  GitSyncResponse dco_decode_git_sync_response(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GitSyncResponse(
+      result: dco_decode_opt_box_autoadd_git_sync_result_dto(arr[0]),
+      error: dco_decode_opt_box_autoadd_bridge_failure(arr[1]),
+    );
+  }
+
+  @protected
+  GitSyncResultDto dco_decode_git_sync_result_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return GitSyncResultDto(
+      committed: dco_decode_bool(arr[0]),
+      pulled: dco_decode_u_32(arr[1]),
+      pushed: dco_decode_bool(arr[2]),
+      blockedByChanges: dco_decode_bool(arr[3]),
+      conflict: dco_decode_opt_box_autoadd_git_sync_conflict_dto(arr[4]),
+      summary: dco_decode_git_status_summary_dto(arr[5]),
     );
   }
 
@@ -3065,6 +3758,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
+  }
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeI64(raw);
   }
 
   @protected
@@ -3306,14 +4005,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   KeyRecordDto dco_decode_key_record_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return KeyRecordDto(
       keyType: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
       fingerprint: dco_decode_String(arr[2]),
       source: dco_decode_String(arr[3]),
       hasPrivateKey: dco_decode_bool(arr[4]),
+      encrypted: dco_decode_bool(arr[5]),
     );
   }
 
@@ -3362,6 +4062,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<EntrySummaryDto> dco_decode_list_entry_summary_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_entry_summary_dto).toList();
+  }
+
+  @protected
+  List<GitLogEntryDto> dco_decode_list_git_log_entry_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_git_log_entry_dto).toList();
   }
 
   @protected
@@ -3568,9 +4274,59 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitIdentityDto? dco_decode_opt_box_autoadd_git_identity_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_git_identity_dto(raw);
+  }
+
+  @protected
+  GitResetResultDto? dco_decode_opt_box_autoadd_git_reset_result_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_git_reset_result_dto(raw);
+  }
+
+  @protected
+  GitStatusSummaryDto? dco_decode_opt_box_autoadd_git_status_summary_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_git_status_summary_dto(raw);
+  }
+
+  @protected
+  GitSyncConflictDto? dco_decode_opt_box_autoadd_git_sync_conflict_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_git_sync_conflict_dto(raw);
+  }
+
+  @protected
+  GitSyncResultDto? dco_decode_opt_box_autoadd_git_sync_result_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_git_sync_result_dto(raw);
+  }
+
+  @protected
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_i_32(raw);
+  }
+
+  @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_i_64(raw);
   }
 
   @protected
@@ -4235,6 +4991,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitIdentityDto sse_decode_box_autoadd_git_identity_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_identity_dto(deserializer));
+  }
+
+  @protected
+  GitIdentityRequest sse_decode_box_autoadd_git_identity_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_identity_request(deserializer));
+  }
+
+  @protected
+  GitLogRequest sse_decode_box_autoadd_git_log_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_log_request(deserializer));
+  }
+
+  @protected
+  GitPushBranchRequest sse_decode_box_autoadd_git_push_branch_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_push_branch_request(deserializer));
+  }
+
+  @protected
   GitRemoteRequest sse_decode_box_autoadd_git_remote_request(
     SseDeserializer deserializer,
   ) {
@@ -4249,9 +5037,79 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitResetRequest sse_decode_box_autoadd_git_reset_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_reset_request(deserializer));
+  }
+
+  @protected
+  GitResetResultDto sse_decode_box_autoadd_git_reset_result_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_reset_result_dto(deserializer));
+  }
+
+  @protected
+  GitSetIdentityRequest sse_decode_box_autoadd_git_set_identity_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_set_identity_request(deserializer));
+  }
+
+  @protected
+  GitStatusSummaryDto sse_decode_box_autoadd_git_status_summary_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_status_summary_dto(deserializer));
+  }
+
+  @protected
+  GitSwitchBranchRequest sse_decode_box_autoadd_git_switch_branch_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_switch_branch_request(deserializer));
+  }
+
+  @protected
+  GitSyncConflictDto sse_decode_box_autoadd_git_sync_conflict_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_sync_conflict_dto(deserializer));
+  }
+
+  @protected
+  GitSyncRequest sse_decode_box_autoadd_git_sync_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_sync_request(deserializer));
+  }
+
+  @protected
+  GitSyncResultDto sse_decode_box_autoadd_git_sync_result_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_git_sync_result_dto(deserializer));
+  }
+
+  @protected
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_i_32(deserializer));
+  }
+
+  @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_i_64(deserializer));
   }
 
   @protected
@@ -4579,6 +5437,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_sshDir = sse_decode_opt_String(deserializer);
     var var_knownHosts = sse_decode_opt_String(deserializer);
     var var_overwrite = sse_decode_bool(deserializer);
+    var var_httpsUsername = sse_decode_opt_String(deserializer);
+    var var_httpsToken = sse_decode_opt_String(deserializer);
+    var var_sshPassphrase = sse_decode_opt_String(deserializer);
     return CloneStoreRequest(
       configPath: var_configPath,
       remoteUrl: var_remoteUrl,
@@ -4587,6 +5448,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       sshDir: var_sshDir,
       knownHosts: var_knownHosts,
       overwrite: var_overwrite,
+      httpsUsername: var_httpsUsername,
+      httpsToken: var_httpsToken,
+      sshPassphrase: var_sshPassphrase,
     );
   }
 
@@ -4915,8 +5779,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   GitArgsRequest sse_decode_git_args_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_root = sse_decode_String(deserializer);
-    var var_args = sse_decode_list_String(deserializer);
-    return GitArgsRequest(root: var_root, args: var_args);
+    var var_commandLine = sse_decode_String(deserializer);
+    return GitArgsRequest(root: var_root, commandLine: var_commandLine);
   }
 
   @protected
@@ -4959,6 +5823,103 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitIdentityDto sse_decode_git_identity_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_email = sse_decode_String(deserializer);
+    var var_local = sse_decode_bool(deserializer);
+    return GitIdentityDto(name: var_name, email: var_email, local: var_local);
+  }
+
+  @protected
+  GitIdentityRequest sse_decode_git_identity_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_root = sse_decode_String(deserializer);
+    return GitIdentityRequest(root: var_root);
+  }
+
+  @protected
+  GitIdentityResponse sse_decode_git_identity_response(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_identity = sse_decode_opt_box_autoadd_git_identity_dto(
+      deserializer,
+    );
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return GitIdentityResponse(identity: var_identity, error: var_error);
+  }
+
+  @protected
+  GitIntegrationStrategyDto sse_decode_git_integration_strategy_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return GitIntegrationStrategyDto.values[inner];
+  }
+
+  @protected
+  GitLogEntryDto sse_decode_git_log_entry_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_summary = sse_decode_String(deserializer);
+    var var_author = sse_decode_String(deserializer);
+    var var_time = sse_decode_i_64(deserializer);
+    return GitLogEntryDto(
+      id: var_id,
+      summary: var_summary,
+      author: var_author,
+      time: var_time,
+    );
+  }
+
+  @protected
+  GitLogRequest sse_decode_git_log_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_root = sse_decode_String(deserializer);
+    var var_limit = sse_decode_u_32(deserializer);
+    return GitLogRequest(root: var_root, limit: var_limit);
+  }
+
+  @protected
+  GitLogResponse sse_decode_git_log_response(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_entries = sse_decode_list_git_log_entry_dto(deserializer);
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return GitLogResponse(entries: var_entries, error: var_error);
+  }
+
+  @protected
+  GitPushBranchRequest sse_decode_git_push_branch_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_git = sse_decode_git_request(deserializer);
+    var var_branch = sse_decode_String(deserializer);
+    return GitPushBranchRequest(git: var_git, branch: var_branch);
+  }
+
+  @protected
+  GitRemoteBranchesResponse sse_decode_git_remote_branches_response(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_remote = sse_decode_opt_String(deserializer);
+    var var_current = sse_decode_opt_String(deserializer);
+    var var_branches = sse_decode_list_String(deserializer);
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return GitRemoteBranchesResponse(
+      remote: var_remote,
+      current: var_current,
+      branches: var_branches,
+      error: var_error,
+    );
+  }
+
+  @protected
   GitRemoteRequest sse_decode_git_remote_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_root = sse_decode_String(deserializer);
@@ -4974,11 +5935,179 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_sshPrivateKeyPath = sse_decode_opt_String(deserializer);
     var var_sshDir = sse_decode_opt_String(deserializer);
     var var_knownHosts = sse_decode_opt_String(deserializer);
+    var var_httpsUsername = sse_decode_opt_String(deserializer);
+    var var_httpsToken = sse_decode_opt_String(deserializer);
+    var var_sshPassphrase = sse_decode_opt_String(deserializer);
     return GitRequest(
       root: var_root,
       sshPrivateKeyPath: var_sshPrivateKeyPath,
       sshDir: var_sshDir,
       knownHosts: var_knownHosts,
+      httpsUsername: var_httpsUsername,
+      httpsToken: var_httpsToken,
+      sshPassphrase: var_sshPassphrase,
+    );
+  }
+
+  @protected
+  GitResetRequest sse_decode_git_reset_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_git = sse_decode_git_request(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return GitResetRequest(git: var_git, message: var_message);
+  }
+
+  @protected
+  GitResetResponse sse_decode_git_reset_response(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_result = sse_decode_opt_box_autoadd_git_reset_result_dto(
+      deserializer,
+    );
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return GitResetResponse(result: var_result, error: var_error);
+  }
+
+  @protected
+  GitResetResultDto sse_decode_git_reset_result_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_committed = sse_decode_bool(deserializer);
+    var var_backupBranch = sse_decode_opt_String(deserializer);
+    var var_summary = sse_decode_git_status_summary_dto(deserializer);
+    return GitResetResultDto(
+      committed: var_committed,
+      backupBranch: var_backupBranch,
+      summary: var_summary,
+    );
+  }
+
+  @protected
+  GitSetIdentityRequest sse_decode_git_set_identity_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_root = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_email = sse_decode_String(deserializer);
+    return GitSetIdentityRequest(
+      root: var_root,
+      name: var_name,
+      email: var_email,
+    );
+  }
+
+  @protected
+  GitStatusOperationDto sse_decode_git_status_operation_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return GitStatusOperationDto.values[inner];
+  }
+
+  @protected
+  GitStatusSummaryDto sse_decode_git_status_summary_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_branch = sse_decode_opt_String(deserializer);
+    var var_upstream = sse_decode_opt_String(deserializer);
+    var var_ahead = sse_decode_u_32(deserializer);
+    var var_behind = sse_decode_u_32(deserializer);
+    var var_changed = sse_decode_u_32(deserializer);
+    var var_conflicted = sse_decode_u_32(deserializer);
+    var var_operation = sse_decode_git_status_operation_dto(deserializer);
+    var var_lastFetchedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return GitStatusSummaryDto(
+      branch: var_branch,
+      upstream: var_upstream,
+      ahead: var_ahead,
+      behind: var_behind,
+      changed: var_changed,
+      conflicted: var_conflicted,
+      operation: var_operation,
+      lastFetchedAt: var_lastFetchedAt,
+    );
+  }
+
+  @protected
+  GitStatusSummaryResponse sse_decode_git_status_summary_response(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_summary = sse_decode_opt_box_autoadd_git_status_summary_dto(
+      deserializer,
+    );
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return GitStatusSummaryResponse(summary: var_summary, error: var_error);
+  }
+
+  @protected
+  GitSwitchBranchRequest sse_decode_git_switch_branch_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_root = sse_decode_String(deserializer);
+    var var_branch = sse_decode_String(deserializer);
+    return GitSwitchBranchRequest(root: var_root, branch: var_branch);
+  }
+
+  @protected
+  GitSyncConflictDto sse_decode_git_sync_conflict_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_backupBranch = sse_decode_opt_String(deserializer);
+    var var_paths = sse_decode_list_String(deserializer);
+    return GitSyncConflictDto(backupBranch: var_backupBranch, paths: var_paths);
+  }
+
+  @protected
+  GitSyncRequest sse_decode_git_sync_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_git = sse_decode_git_request(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_commitPending = sse_decode_bool(deserializer);
+    var var_strategy = sse_decode_git_integration_strategy_dto(deserializer);
+    return GitSyncRequest(
+      git: var_git,
+      message: var_message,
+      commitPending: var_commitPending,
+      strategy: var_strategy,
+    );
+  }
+
+  @protected
+  GitSyncResponse sse_decode_git_sync_response(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_result = sse_decode_opt_box_autoadd_git_sync_result_dto(
+      deserializer,
+    );
+    var var_error = sse_decode_opt_box_autoadd_bridge_failure(deserializer);
+    return GitSyncResponse(result: var_result, error: var_error);
+  }
+
+  @protected
+  GitSyncResultDto sse_decode_git_sync_result_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_committed = sse_decode_bool(deserializer);
+    var var_pulled = sse_decode_u_32(deserializer);
+    var var_pushed = sse_decode_bool(deserializer);
+    var var_blockedByChanges = sse_decode_bool(deserializer);
+    var var_conflict = sse_decode_opt_box_autoadd_git_sync_conflict_dto(
+      deserializer,
+    );
+    var var_summary = sse_decode_git_status_summary_dto(deserializer);
+    return GitSyncResultDto(
+      committed: var_committed,
+      pulled: var_pulled,
+      pushed: var_pushed,
+      blockedByChanges: var_blockedByChanges,
+      conflict: var_conflict,
+      summary: var_summary,
     );
   }
 
@@ -4986,6 +6115,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
+  }
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getPlatformInt64();
   }
 
   @protected
@@ -5234,12 +6369,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_fingerprint = sse_decode_String(deserializer);
     var var_source = sse_decode_String(deserializer);
     var var_hasPrivateKey = sse_decode_bool(deserializer);
+    var var_encrypted = sse_decode_bool(deserializer);
     return KeyRecordDto(
       keyType: var_keyType,
       name: var_name,
       fingerprint: var_fingerprint,
       source: var_source,
       hasPrivateKey: var_hasPrivateKey,
+      encrypted: var_encrypted,
     );
   }
 
@@ -5304,6 +6441,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <EntrySummaryDto>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_entry_summary_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<GitLogEntryDto> sse_decode_list_git_log_entry_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <GitLogEntryDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_git_log_entry_dto(deserializer));
     }
     return ans_;
   }
@@ -5559,11 +6710,87 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GitIdentityDto? sse_decode_opt_box_autoadd_git_identity_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_git_identity_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  GitResetResultDto? sse_decode_opt_box_autoadd_git_reset_result_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_git_reset_result_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  GitStatusSummaryDto? sse_decode_opt_box_autoadd_git_status_summary_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_git_status_summary_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  GitSyncConflictDto? sse_decode_opt_box_autoadd_git_sync_conflict_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_git_sync_conflict_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  GitSyncResultDto? sse_decode_opt_box_autoadd_git_sync_result_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_git_sync_result_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_i_32(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_i_64(deserializer));
     } else {
       return null;
     }
@@ -6284,6 +7511,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_git_identity_dto(
+    GitIdentityDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_identity_dto(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_identity_request(
+    GitIdentityRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_identity_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_log_request(
+    GitLogRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_log_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_push_branch_request(
+    GitPushBranchRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_push_branch_request(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_git_remote_request(
     GitRemoteRequest self,
     SseSerializer serializer,
@@ -6302,9 +7565,90 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_git_reset_request(
+    GitResetRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_reset_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_reset_result_dto(
+    GitResetResultDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_reset_result_dto(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_set_identity_request(
+    GitSetIdentityRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_set_identity_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_status_summary_dto(
+    GitStatusSummaryDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_status_summary_dto(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_switch_branch_request(
+    GitSwitchBranchRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_switch_branch_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_sync_conflict_dto(
+    GitSyncConflictDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_sync_conflict_dto(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_sync_request(
+    GitSyncRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_sync_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_git_sync_result_dto(
+    GitSyncResultDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_sync_result_dto(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self, serializer);
   }
 
   @protected
@@ -6648,6 +7992,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.sshDir, serializer);
     sse_encode_opt_String(self.knownHosts, serializer);
     sse_encode_bool(self.overwrite, serializer);
+    sse_encode_opt_String(self.httpsUsername, serializer);
+    sse_encode_opt_String(self.httpsToken, serializer);
+    sse_encode_opt_String(self.sshPassphrase, serializer);
   }
 
   @protected
@@ -6917,7 +8264,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.root, serializer);
-    sse_encode_list_String(self.args, serializer);
+    sse_encode_String(self.commandLine, serializer);
   }
 
   @protected
@@ -6954,6 +8301,99 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_git_identity_dto(
+    GitIdentityDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.email, serializer);
+    sse_encode_bool(self.local, serializer);
+  }
+
+  @protected
+  void sse_encode_git_identity_request(
+    GitIdentityRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.root, serializer);
+  }
+
+  @protected
+  void sse_encode_git_identity_response(
+    GitIdentityResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_git_identity_dto(self.identity, serializer);
+    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_git_integration_strategy_dto(
+    GitIntegrationStrategyDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_git_log_entry_dto(
+    GitLogEntryDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.summary, serializer);
+    sse_encode_String(self.author, serializer);
+    sse_encode_i_64(self.time, serializer);
+  }
+
+  @protected
+  void sse_encode_git_log_request(
+    GitLogRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.root, serializer);
+    sse_encode_u_32(self.limit, serializer);
+  }
+
+  @protected
+  void sse_encode_git_log_response(
+    GitLogResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_git_log_entry_dto(self.entries, serializer);
+    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_git_push_branch_request(
+    GitPushBranchRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_request(self.git, serializer);
+    sse_encode_String(self.branch, serializer);
+  }
+
+  @protected
+  void sse_encode_git_remote_branches_response(
+    GitRemoteBranchesResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.remote, serializer);
+    sse_encode_opt_String(self.current, serializer);
+    sse_encode_list_String(self.branches, serializer);
+    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
+  }
+
+  @protected
   void sse_encode_git_remote_request(
     GitRemoteRequest self,
     SseSerializer serializer,
@@ -6971,12 +8411,154 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.sshPrivateKeyPath, serializer);
     sse_encode_opt_String(self.sshDir, serializer);
     sse_encode_opt_String(self.knownHosts, serializer);
+    sse_encode_opt_String(self.httpsUsername, serializer);
+    sse_encode_opt_String(self.httpsToken, serializer);
+    sse_encode_opt_String(self.sshPassphrase, serializer);
+  }
+
+  @protected
+  void sse_encode_git_reset_request(
+    GitResetRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_request(self.git, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_git_reset_response(
+    GitResetResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_git_reset_result_dto(self.result, serializer);
+    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_git_reset_result_dto(
+    GitResetResultDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.committed, serializer);
+    sse_encode_opt_String(self.backupBranch, serializer);
+    sse_encode_git_status_summary_dto(self.summary, serializer);
+  }
+
+  @protected
+  void sse_encode_git_set_identity_request(
+    GitSetIdentityRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.root, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.email, serializer);
+  }
+
+  @protected
+  void sse_encode_git_status_operation_dto(
+    GitStatusOperationDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_git_status_summary_dto(
+    GitStatusSummaryDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.branch, serializer);
+    sse_encode_opt_String(self.upstream, serializer);
+    sse_encode_u_32(self.ahead, serializer);
+    sse_encode_u_32(self.behind, serializer);
+    sse_encode_u_32(self.changed, serializer);
+    sse_encode_u_32(self.conflicted, serializer);
+    sse_encode_git_status_operation_dto(self.operation, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.lastFetchedAt, serializer);
+  }
+
+  @protected
+  void sse_encode_git_status_summary_response(
+    GitStatusSummaryResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_git_status_summary_dto(self.summary, serializer);
+    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_git_switch_branch_request(
+    GitSwitchBranchRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.root, serializer);
+    sse_encode_String(self.branch, serializer);
+  }
+
+  @protected
+  void sse_encode_git_sync_conflict_dto(
+    GitSyncConflictDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.backupBranch, serializer);
+    sse_encode_list_String(self.paths, serializer);
+  }
+
+  @protected
+  void sse_encode_git_sync_request(
+    GitSyncRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_git_request(self.git, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_bool(self.commitPending, serializer);
+    sse_encode_git_integration_strategy_dto(self.strategy, serializer);
+  }
+
+  @protected
+  void sse_encode_git_sync_response(
+    GitSyncResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_git_sync_result_dto(self.result, serializer);
+    sse_encode_opt_box_autoadd_bridge_failure(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_git_sync_result_dto(
+    GitSyncResultDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.committed, serializer);
+    sse_encode_u_32(self.pulled, serializer);
+    sse_encode_bool(self.pushed, serializer);
+    sse_encode_bool(self.blockedByChanges, serializer);
+    sse_encode_opt_box_autoadd_git_sync_conflict_dto(self.conflict, serializer);
+    sse_encode_git_status_summary_dto(self.summary, serializer);
   }
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
+  }
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putPlatformInt64(self);
   }
 
   @protected
@@ -7184,6 +8766,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.fingerprint, serializer);
     sse_encode_String(self.source, serializer);
     sse_encode_bool(self.hasPrivateKey, serializer);
+    sse_encode_bool(self.encrypted, serializer);
   }
 
   @protected
@@ -7237,6 +8820,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_entry_summary_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_git_log_entry_dto(
+    List<GitLogEntryDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_git_log_entry_dto(item, serializer);
     }
   }
 
@@ -7480,12 +9075,90 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_git_identity_dto(
+    GitIdentityDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_git_identity_dto(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_git_reset_result_dto(
+    GitResetResultDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_git_reset_result_dto(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_git_status_summary_dto(
+    GitStatusSummaryDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_git_status_summary_dto(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_git_sync_conflict_dto(
+    GitSyncConflictDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_git_sync_conflict_dto(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_git_sync_result_dto(
+    GitSyncResultDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_git_sync_result_dto(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_i_32(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_i_64(self, serializer);
     }
   }
 

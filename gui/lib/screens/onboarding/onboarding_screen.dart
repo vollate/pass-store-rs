@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../app/pars_design_tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../../models/git_sync.dart';
 import '../../models/key_record.dart';
+import '../../services/git_repository.dart';
 import '../../services/key_repository.dart';
 import '../../services/path_picker_service.dart';
 import '../../services/selected_ssh_key.dart';
@@ -13,6 +15,7 @@ import '../../services/store_lifecycle.dart';
 import '../../services/ui_problem.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/gesture_setup_panel.dart';
+import '../../widgets/git_flows.dart';
 import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/failure_notice.dart';
 import '../../widgets/pars_action_group.dart';
@@ -421,13 +424,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             initializeGit: initializeGit,
           ),
       onImportLocalStore: (root) => repository.importLocalStore(root: root),
-      onCloneStore:
-          ({required remoteUrl, required root, bool overwrite = false}) =>
-              repository.cloneStore(
-                remoteUrl: remoteUrl,
-                root: root,
-                overwrite: overwrite,
-              ),
+      onCloneStore: ({
+        required remoteUrl,
+        required root,
+        bool overwrite = false,
+      }) async {
+        final git =
+            repository is GitOperationsRepository
+                ? repository as GitOperationsRepository
+                : null;
+        final cloned = await runGitWithPrompts(context, git, () async {
+          await repository.cloneStore(
+            remoteUrl: remoteUrl,
+            root: root,
+            overwrite: overwrite,
+          );
+          return true;
+        });
+        if (cloned == null) {
+          throw const GitAuthenticationRequiredException('Clone cancelled.');
+        }
+      },
       onStoreChanged: _handleStoreChanged,
     );
   }

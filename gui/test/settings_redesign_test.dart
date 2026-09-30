@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/l10n/app_localizations_en.dart';
+import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/screens/settings/settings_screen.dart';
 import 'package:pars_gui/services/autofill_repository.dart';
 import 'package:pars_gui/services/fake_pars_repository.dart';
@@ -207,14 +208,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SSH keys'), findsNothing);
-    final remoteUrl = find.widgetWithText(TextField, 'Remote URL');
-    await tester.enterText(remoteUrl, 'https://example.com/pass.git');
-    await tester.pump();
+
+    Future<void> addRemote(String name, String url) async {
+      final add = find.widgetWithText(OutlinedButton, 'Add remote');
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Remote name'),
+        name,
+      );
+      await tester.enterText(find.widgetWithText(TextField, 'Remote URL'), url);
+      await tester.tap(find.widgetWithText(FilledButton, 'Add remote'));
+      await tester.pumpAndSettle();
+    }
+
+    await addRemote('mirror', 'https://example.com/pass.git');
+    expect(find.text('mirror'), findsOneWidget);
     expect(find.text('SSH keys'), findsNothing);
-    await tester.enterText(remoteUrl, 'git@example.com:pass.git');
-    await tester.pump();
+    await addRemote('origin', 'git@example.com:pass.git');
     expect(find.text('SSH keys'), findsOneWidget);
-    expect(find.text('SSH key required for this remote'), findsOneWidget);
   });
 
   testWidgets('SSH deletion asks a yes/no question with the key name', (
@@ -237,7 +250,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('SSH keys'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byType(PopupMenuButton<String>).last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete').last);
     await tester.pumpAndSettle();
@@ -257,7 +270,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.deletedName, isNull);
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byType(PopupMenuButton<String>).last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete').last);
     await tester.pumpAndSettle();
@@ -326,8 +339,19 @@ class _LocalOnlyRepository extends FakeParsRepository {
   @override
   StoreGitMode get gitMode => StoreGitMode.local;
 
+  final List<GitRemote> remotes = <GitRemote>[];
+
   @override
-  Future<List<GitRemote>> listRemotes() async => const <GitRemote>[];
+  Future<List<GitRemote>> listRemotes() async => List.of(remotes);
+
+  @override
+  Future<GitOperationResult> addRemote({
+    required String name,
+    required String url,
+  }) async {
+    remotes.add(GitRemote(name: name, fetchUrl: url, pushUrl: url));
+    return super.addRemote(name: name, url: url);
+  }
 
   @override
   StoreLifecycleSnapshot get lifecycle => const StoreLifecycleSnapshot(

@@ -6,9 +6,9 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `clear_canonical_store`, `clone_git_repository`, `clone_store_inner`, `configure_pgp_backend_inner`, `configured_upstream`, `create_local_store_inner`, `create_new_store_tree`, `default_ssh_dir`, `delete_local_store_inner`, `disconnect_store_inner`, `entry_ref`, `export_pgp_private_key_inner`, `git_failure`, `git_remote_callbacks`, `import_local_store_inner`, `imported_key_kind`, `init_git_repository`, `initialize_store_recipients_inner`, `inspect_app_state_inner`, `inspect_git_mode`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `lifecycle_state`, `list_keys_inner`, `load_config_copy`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_matches`, `pgp_key_missing`, `pgp_key_record`, `pgp_preparation_failure`, `read_entry_inner`, `read_regular_gpg_id`, `rename_directory_noreplace`, `require_app_managed_root`, `require_canonical_store`, `require_empty_canonical_store`, `required_remote_url`, `run_git_command_response_owned`, `run_git_command_response`, `run_system_git`, `sanitize_git_text`, `sanitize_git_token`, `sanitized_remote_url`, `save_config_for_mutation`, `set_canonical_store`, `simple`, `status_code`, `store_failure`, `store_name`, `structured_git_commit`, `structured_git_list_remotes`, `structured_git_pull`, `structured_git_push`, `structured_git_remote_mutation`, `structured_git_response`, `structured_git_status`, `structured_or_system_remote_response`, `validated_recipients`, `write_new_gpg_id`
+// These functions are ignored because they are not marked as `pub`: `bounded_git_detail`, `clear_canonical_store`, `clone_git_repository`, `clone_store_inner`, `clone_target_present`, `configure_pgp_backend_inner`, `configured_upstream`, `create_local_store_inner`, `create_new_store_tree`, `default_ssh_dir`, `delete_local_store_inner`, `discard_incomplete_clone`, `disconnect_store_inner`, `ensure_git_trace`, `entry_ref`, `export_pgp_private_key_inner`, `git_failure`, `git_process_failure`, `git_ssh_command`, `import_local_store_inner`, `imported_key_kind`, `init_git_repository`, `initialize_store_recipients_inner`, `inspect_app_state_inner`, `inspect_git_mode`, `inspect_store`, `legacy_import_pgp_key_text`, `legacy_key_mutation_response`, `libgit2_trace`, `lifecycle_state`, `list_keys_inner`, `load_config_copy`, `load_config_for_mutation`, `normalize_store_root`, `normalized_keys`, `pgp_backend`, `pgp_import_source_label`, `pgp_key_identity_for_confirmation`, `pgp_key_import_response`, `pgp_key_matches`, `pgp_key_missing`, `pgp_key_record`, `pgp_preparation_failure`, `read_entry_inner`, `read_regular_gpg_id`, `remember_remote_host_key`, `removable_clone_target`, `remove_clone_target`, `rename_directory_noreplace`, `require_app_managed_root`, `require_canonical_store`, `require_empty_canonical_store`, `required_remote_url`, `run_git_command_response_owned`, `run_git_command_response`, `run_git_command_with_known_hosts`, `run_system_git_args_with_known_hosts`, `run_system_git`, `sanitize_git_text`, `sanitize_git_token`, `sanitized_remote_url`, `save_config_for_mutation`, `scp_style_remote`, `set_canonical_store`, `shell_single_quote`, `sibling_public_key_path`, `simple`, `ssh_identity_credential`, `status_code`, `store_failure`, `store_name`, `structured_git_commit`, `structured_git_list_remotes`, `structured_git_pull`, `structured_git_push`, `structured_git_remote_mutation`, `structured_git_response`, `structured_git_status`, `structured_or_system_remote_response`, `trace_git`, `validated_recipients`, `with_selected_known_hosts`, `write_new_gpg_id`, `write_private_text`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AddPgpKeyToGpgIdRequest`, `ConfiguredUpstream`, `DeletePgpKeyRequest`, `DeletePgpKeyResponse`, `ExportPgpKeyRequest`, `GitRemoteMutation`, `PgpKeyDeletionFailureKind`, `PgpKeyDeletionResultDto`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 // These functions are ignored (category: IgnoreBecauseExplicitAttribute): `add_pgp_key_to_gpg_id`, `delete_pgp_key`, `export_pgp_private_key`, `export_pgp_public_key`, `import_pgp_private_key_file`, `import_pgp_private_key_text`, `import_pgp_public_key`
 
 Future<ConfigResponse> loadConfig({required LoadConfigRequest request}) =>
@@ -105,6 +105,42 @@ Future<GitCommandResponse> gitPush({required GitRequest request}) =>
 
 Future<GitCommandResponse> gitCommit({required GitCommitRequest request}) =>
     RustLib.instance.api.crateApiGitCommit(request: request);
+
+Future<GitStatusSummaryResponse> gitStatusSummary({
+  required GitRequest request,
+}) => RustLib.instance.api.crateApiGitStatusSummary(request: request);
+
+Future<GitStatusSummaryResponse> gitFetch({required GitRequest request}) =>
+    RustLib.instance.api.crateApiGitFetch(request: request);
+
+Future<GitSyncResponse> gitSync({required GitSyncRequest request}) =>
+    RustLib.instance.api.crateApiGitSync(request: request);
+
+Future<GitResetResponse> gitResetToUpstream({
+  required GitResetRequest request,
+}) => RustLib.instance.api.crateApiGitResetToUpstream(request: request);
+
+Future<GitCommandResponse> gitPushBranch({
+  required GitPushBranchRequest request,
+}) => RustLib.instance.api.crateApiGitPushBranch(request: request);
+
+Future<GitLogResponse> gitLog({required GitLogRequest request}) =>
+    RustLib.instance.api.crateApiGitLog(request: request);
+
+Future<GitRemoteBranchesResponse> gitListRemoteBranches({
+  required GitRequest request,
+}) => RustLib.instance.api.crateApiGitListRemoteBranches(request: request);
+
+Future<GitStatusSummaryResponse> gitSwitchBranch({
+  required GitSwitchBranchRequest request,
+}) => RustLib.instance.api.crateApiGitSwitchBranch(request: request);
+
+Future<GitIdentityResponse> gitIdentity({
+  required GitIdentityRequest request,
+}) => RustLib.instance.api.crateApiGitIdentity(request: request);
+
+Future<UnitResponse> gitSetIdentity({required GitSetIdentityRequest request}) =>
+    RustLib.instance.api.crateApiGitSetIdentity(request: request);
 
 Future<GitCommandResponse> gitListRemotes({required GitRequest request}) =>
     RustLib.instance.api.crateApiGitListRemotes(request: request);
@@ -493,6 +529,9 @@ enum BridgeFailureCategory {
   validationError,
   conflict,
   unsupportedPlatform,
+  identityRequired,
+  authenticationRequired,
+  sshPassphraseRequired,
 }
 
 class ClearAutofillIndexRequest {
@@ -519,6 +558,9 @@ class CloneStoreRequest {
   final String? sshDir;
   final String? knownHosts;
   final bool overwrite;
+  final String? httpsUsername;
+  final String? httpsToken;
+  final String? sshPassphrase;
 
   const CloneStoreRequest({
     required this.configPath,
@@ -527,7 +569,10 @@ class CloneStoreRequest {
     this.sshPrivateKeyPath,
     this.sshDir,
     this.knownHosts,
-    this.overwrite = false,
+    required this.overwrite,
+    this.httpsUsername,
+    this.httpsToken,
+    this.sshPassphrase,
   });
 
   @override
@@ -538,7 +583,10 @@ class CloneStoreRequest {
       sshPrivateKeyPath.hashCode ^
       sshDir.hashCode ^
       knownHosts.hashCode ^
-      overwrite.hashCode;
+      overwrite.hashCode ^
+      httpsUsername.hashCode ^
+      httpsToken.hashCode ^
+      sshPassphrase.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -551,7 +599,10 @@ class CloneStoreRequest {
           sshPrivateKeyPath == other.sshPrivateKeyPath &&
           sshDir == other.sshDir &&
           knownHosts == other.knownHosts &&
-          overwrite == other.overwrite;
+          overwrite == other.overwrite &&
+          httpsUsername == other.httpsUsername &&
+          httpsToken == other.httpsToken &&
+          sshPassphrase == other.sshPassphrase;
 }
 
 class ConfigResponse {
@@ -1132,12 +1183,14 @@ class GenerateSshKeyRequest {
 
 class GitArgsRequest {
   final String root;
-  final List<String> args;
 
-  const GitArgsRequest({required this.root, required this.args});
+  /// Tokenized in Rust; Flutter sends the text exactly as typed.
+  final String commandLine;
+
+  const GitArgsRequest({required this.root, required this.commandLine});
 
   @override
-  int get hashCode => root.hashCode ^ args.hashCode;
+  int get hashCode => root.hashCode ^ commandLine.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1145,7 +1198,7 @@ class GitArgsRequest {
       other is GitArgsRequest &&
           runtimeType == other.runtimeType &&
           root == other.root &&
-          args == other.args;
+          commandLine == other.commandLine;
 }
 
 class GitCommandOutputDto {
@@ -1219,6 +1272,180 @@ class GitCommitRequest {
           message == other.message;
 }
 
+class GitIdentityDto {
+  final String name;
+  final String email;
+
+  /// True when both values come from the repository's own config.
+  final bool local;
+
+  const GitIdentityDto({
+    required this.name,
+    required this.email,
+    required this.local,
+  });
+
+  @override
+  int get hashCode => name.hashCode ^ email.hashCode ^ local.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitIdentityDto &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          email == other.email &&
+          local == other.local;
+}
+
+class GitIdentityRequest {
+  final String root;
+
+  const GitIdentityRequest({required this.root});
+
+  @override
+  int get hashCode => root.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitIdentityRequest &&
+          runtimeType == other.runtimeType &&
+          root == other.root;
+}
+
+class GitIdentityResponse {
+  final GitIdentityDto? identity;
+  final BridgeFailure? error;
+
+  const GitIdentityResponse({this.identity, this.error});
+
+  @override
+  int get hashCode => identity.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitIdentityResponse &&
+          runtimeType == other.runtimeType &&
+          identity == other.identity &&
+          error == other.error;
+}
+
+enum GitIntegrationStrategyDto { rebase, merge }
+
+class GitLogEntryDto {
+  final String id;
+  final String summary;
+  final String author;
+
+  /// Unix seconds.
+  final PlatformInt64 time;
+
+  const GitLogEntryDto({
+    required this.id,
+    required this.summary,
+    required this.author,
+    required this.time,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ summary.hashCode ^ author.hashCode ^ time.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitLogEntryDto &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          summary == other.summary &&
+          author == other.author &&
+          time == other.time;
+}
+
+class GitLogRequest {
+  final String root;
+  final int limit;
+
+  const GitLogRequest({required this.root, required this.limit});
+
+  @override
+  int get hashCode => root.hashCode ^ limit.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitLogRequest &&
+          runtimeType == other.runtimeType &&
+          root == other.root &&
+          limit == other.limit;
+}
+
+class GitLogResponse {
+  final List<GitLogEntryDto> entries;
+  final BridgeFailure? error;
+
+  const GitLogResponse({required this.entries, this.error});
+
+  @override
+  int get hashCode => entries.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitLogResponse &&
+          runtimeType == other.runtimeType &&
+          entries == other.entries &&
+          error == other.error;
+}
+
+class GitPushBranchRequest {
+  final GitRequest git;
+  final String branch;
+
+  const GitPushBranchRequest({required this.git, required this.branch});
+
+  @override
+  int get hashCode => git.hashCode ^ branch.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitPushBranchRequest &&
+          runtimeType == other.runtimeType &&
+          git == other.git &&
+          branch == other.branch;
+}
+
+class GitRemoteBranchesResponse {
+  final String? remote;
+  final String? current;
+  final List<String> branches;
+  final BridgeFailure? error;
+
+  const GitRemoteBranchesResponse({
+    this.remote,
+    this.current,
+    required this.branches,
+    this.error,
+  });
+
+  @override
+  int get hashCode =>
+      remote.hashCode ^ current.hashCode ^ branches.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitRemoteBranchesResponse &&
+          runtimeType == other.runtimeType &&
+          remote == other.remote &&
+          current == other.current &&
+          branches == other.branches &&
+          error == other.error;
+}
+
 class GitRemoteRequest {
   final String root;
   final String name;
@@ -1245,11 +1472,23 @@ class GitRequest {
   final String? sshDir;
   final String? knownHosts;
 
+  /// Mobile only. Desktop keeps the system Git credential helpers.
+  final String? httpsUsername;
+
+  /// Mobile only. Never logged, returned, or persisted by the bridge.
+  final String? httpsToken;
+
+  /// Mobile only. Never logged, returned, or persisted by the bridge.
+  final String? sshPassphrase;
+
   const GitRequest({
     required this.root,
     this.sshPrivateKeyPath,
     this.sshDir,
     this.knownHosts,
+    this.httpsUsername,
+    this.httpsToken,
+    this.sshPassphrase,
   });
 
   @override
@@ -1257,7 +1496,10 @@ class GitRequest {
       root.hashCode ^
       sshPrivateKeyPath.hashCode ^
       sshDir.hashCode ^
-      knownHosts.hashCode;
+      knownHosts.hashCode ^
+      httpsUsername.hashCode ^
+      httpsToken.hashCode ^
+      sshPassphrase.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1267,7 +1509,289 @@ class GitRequest {
           root == other.root &&
           sshPrivateKeyPath == other.sshPrivateKeyPath &&
           sshDir == other.sshDir &&
-          knownHosts == other.knownHosts;
+          knownHosts == other.knownHosts &&
+          httpsUsername == other.httpsUsername &&
+          httpsToken == other.httpsToken &&
+          sshPassphrase == other.sshPassphrase;
+}
+
+class GitResetRequest {
+  final GitRequest git;
+  final String message;
+
+  const GitResetRequest({required this.git, required this.message});
+
+  @override
+  int get hashCode => git.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitResetRequest &&
+          runtimeType == other.runtimeType &&
+          git == other.git &&
+          message == other.message;
+}
+
+class GitResetResponse {
+  final GitResetResultDto? result;
+  final BridgeFailure? error;
+
+  const GitResetResponse({this.result, this.error});
+
+  @override
+  int get hashCode => result.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitResetResponse &&
+          runtimeType == other.runtimeType &&
+          result == other.result &&
+          error == other.error;
+}
+
+class GitResetResultDto {
+  final bool committed;
+  final String? backupBranch;
+  final GitStatusSummaryDto summary;
+
+  const GitResetResultDto({
+    required this.committed,
+    this.backupBranch,
+    required this.summary,
+  });
+
+  @override
+  int get hashCode =>
+      committed.hashCode ^ backupBranch.hashCode ^ summary.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitResetResultDto &&
+          runtimeType == other.runtimeType &&
+          committed == other.committed &&
+          backupBranch == other.backupBranch &&
+          summary == other.summary;
+}
+
+class GitSetIdentityRequest {
+  final String root;
+  final String name;
+  final String email;
+
+  const GitSetIdentityRequest({
+    required this.root,
+    required this.name,
+    required this.email,
+  });
+
+  @override
+  int get hashCode => root.hashCode ^ name.hashCode ^ email.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitSetIdentityRequest &&
+          runtimeType == other.runtimeType &&
+          root == other.root &&
+          name == other.name &&
+          email == other.email;
+}
+
+enum GitStatusOperationDto { none, rebasing, merging, other }
+
+class GitStatusSummaryDto {
+  final String? branch;
+  final String? upstream;
+  final int ahead;
+  final int behind;
+  final int changed;
+  final int conflicted;
+  final GitStatusOperationDto operation;
+
+  /// Unix seconds of the last fetch, from `FETCH_HEAD`.
+  final PlatformInt64? lastFetchedAt;
+
+  const GitStatusSummaryDto({
+    this.branch,
+    this.upstream,
+    required this.ahead,
+    required this.behind,
+    required this.changed,
+    required this.conflicted,
+    required this.operation,
+    this.lastFetchedAt,
+  });
+
+  @override
+  int get hashCode =>
+      branch.hashCode ^
+      upstream.hashCode ^
+      ahead.hashCode ^
+      behind.hashCode ^
+      changed.hashCode ^
+      conflicted.hashCode ^
+      operation.hashCode ^
+      lastFetchedAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitStatusSummaryDto &&
+          runtimeType == other.runtimeType &&
+          branch == other.branch &&
+          upstream == other.upstream &&
+          ahead == other.ahead &&
+          behind == other.behind &&
+          changed == other.changed &&
+          conflicted == other.conflicted &&
+          operation == other.operation &&
+          lastFetchedAt == other.lastFetchedAt;
+}
+
+class GitStatusSummaryResponse {
+  final GitStatusSummaryDto? summary;
+  final BridgeFailure? error;
+
+  const GitStatusSummaryResponse({this.summary, this.error});
+
+  @override
+  int get hashCode => summary.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitStatusSummaryResponse &&
+          runtimeType == other.runtimeType &&
+          summary == other.summary &&
+          error == other.error;
+}
+
+class GitSwitchBranchRequest {
+  final String root;
+  final String branch;
+
+  const GitSwitchBranchRequest({required this.root, required this.branch});
+
+  @override
+  int get hashCode => root.hashCode ^ branch.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitSwitchBranchRequest &&
+          runtimeType == other.runtimeType &&
+          root == other.root &&
+          branch == other.branch;
+}
+
+class GitSyncConflictDto {
+  /// Absent when the repository was already mid-rebase or mid-merge before sync started.
+  final String? backupBranch;
+  final List<String> paths;
+
+  const GitSyncConflictDto({this.backupBranch, required this.paths});
+
+  @override
+  int get hashCode => backupBranch.hashCode ^ paths.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitSyncConflictDto &&
+          runtimeType == other.runtimeType &&
+          backupBranch == other.backupBranch &&
+          paths == other.paths;
+}
+
+class GitSyncRequest {
+  final GitRequest git;
+  final String message;
+  final bool commitPending;
+  final GitIntegrationStrategyDto strategy;
+
+  const GitSyncRequest({
+    required this.git,
+    required this.message,
+    required this.commitPending,
+    required this.strategy,
+  });
+
+  @override
+  int get hashCode =>
+      git.hashCode ^
+      message.hashCode ^
+      commitPending.hashCode ^
+      strategy.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitSyncRequest &&
+          runtimeType == other.runtimeType &&
+          git == other.git &&
+          message == other.message &&
+          commitPending == other.commitPending &&
+          strategy == other.strategy;
+}
+
+class GitSyncResponse {
+  final GitSyncResultDto? result;
+  final BridgeFailure? error;
+
+  const GitSyncResponse({this.result, this.error});
+
+  @override
+  int get hashCode => result.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitSyncResponse &&
+          runtimeType == other.runtimeType &&
+          result == other.result &&
+          error == other.error;
+}
+
+class GitSyncResultDto {
+  final bool committed;
+  final int pulled;
+  final bool pushed;
+  final bool blockedByChanges;
+  final GitSyncConflictDto? conflict;
+  final GitStatusSummaryDto summary;
+
+  const GitSyncResultDto({
+    required this.committed,
+    required this.pulled,
+    required this.pushed,
+    required this.blockedByChanges,
+    this.conflict,
+    required this.summary,
+  });
+
+  @override
+  int get hashCode =>
+      committed.hashCode ^
+      pulled.hashCode ^
+      pushed.hashCode ^
+      blockedByChanges.hashCode ^
+      conflict.hashCode ^
+      summary.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GitSyncResultDto &&
+          runtimeType == other.runtimeType &&
+          committed == other.committed &&
+          pulled == other.pulled &&
+          pushed == other.pushed &&
+          blockedByChanges == other.blockedByChanges &&
+          conflict == other.conflict &&
+          summary == other.summary;
 }
 
 class ImportKeyFileRequest {
@@ -1704,12 +2228,16 @@ class KeyRecordDto {
   final String source;
   final bool hasPrivateKey;
 
+  /// Only SSH keys can be encrypted; they need a passphrase before use.
+  final bool encrypted;
+
   const KeyRecordDto({
     required this.keyType,
     required this.name,
     required this.fingerprint,
     required this.source,
     required this.hasPrivateKey,
+    required this.encrypted,
   });
 
   @override
@@ -1718,7 +2246,8 @@ class KeyRecordDto {
       name.hashCode ^
       fingerprint.hashCode ^
       source.hashCode ^
-      hasPrivateKey.hashCode;
+      hasPrivateKey.hashCode ^
+      encrypted.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1729,7 +2258,8 @@ class KeyRecordDto {
           name == other.name &&
           fingerprint == other.fingerprint &&
           source == other.source &&
-          hasPrivateKey == other.hasPrivateKey;
+          hasPrivateKey == other.hasPrivateKey &&
+          encrypted == other.encrypted;
 }
 
 class ListEntriesRequest {

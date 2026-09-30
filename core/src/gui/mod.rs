@@ -208,6 +208,7 @@ pub struct SshKeySummary {
     pub name: String,
     pub fingerprint: String,
     pub has_private_key: bool,
+    pub encrypted: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -291,32 +292,115 @@ impl GitOperationRequest {
 }
 
 pub fn validate_git_args(args: &[String]) -> GuiResult<()> {
-    if args.is_empty() {
+    let Some(first) = args.first() else {
         return Err(CoreError::ValidationError("git args cannot be empty".to_string()));
+    };
+
+    if first.trim() == "git" {
+        return Err(CoreError::ValidationError(
+            "enter only args after git, for example: status".to_string(),
+        ));
     }
 
     for arg in args {
-        let trimmed = arg.trim();
-        if trimmed.is_empty() {
+        if arg.trim().is_empty() {
             return Err(CoreError::ValidationError(
                 "git args cannot contain empty values".to_string(),
             ));
         }
-
-        if trimmed == "git" {
+        if arg.contains(['\n', '\r', '\0']) {
             return Err(CoreError::ValidationError(
-                "enter only args after git, for example: status".to_string(),
+                "git args cannot contain line breaks".to_string(),
             ));
-        }
-
-        if contains_shell_syntax(trimmed) {
-            return Err(CoreError::ValidationError(format!(
-                "shell syntax is not allowed in git args: {trimmed}"
-            )));
         }
     }
 
     Ok(())
+}
+
+/// Splits a typed command line into Git args without running a shell.
+///
+/// Whitespace separates tokens, single quotes are literal, and double quotes allow `\"` and
+/// `\\`. Shell operators are rejected unless quoted, because the text is never given to a shell
+/// and a user typing `status | less` would otherwise get a confusing Git error.
+pub fn parse_git_command_line(line: &str) -> GuiResult<Vec<String>> {
+    if line.contains(['\n', '\r', '\0']) {
+        return Err(CoreError::ValidationError(
+            "git args cannot contain line breaks".to_string(),
+        ));
+    }
+
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_token = false;
+    let mut chars = line.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            ch if ch.is_whitespace() => {
+                if in_token {
+                    args.push(std::mem::take(&mut current));
+                    in_token = false;
+                }
+            }
+            '\'' => {
+                in_token = true;
+                loop {
+                    match chars.next() {
+                        Some('\'') => break,
+                        Some(value) => current.push(value),
+                        None => return Err(unterminated_quote()),
+                    }
+                }
+            }
+            '"' => {
+                in_token = true;
+                loop {
+                    match chars.next() {
+                        Some('"') => break,
+                        Some('\\') => match chars.next() {
+                            Some(value @ ('"' | '\\')) => current.push(value),
+                            Some(value) => {
+                                current.push('\\');
+                                current.push(value);
+                            }
+                            None => return Err(unterminated_quote()),
+                        },
+                        Some(value) => current.push(value),
+                        None => return Err(unterminated_quote()),
+                    }
+                }
+            }
+            '\\' => {
+                in_token = true;
+                match chars.next() {
+                    Some(value) => current.push(value),
+                    None => current.push('\\'),
+                }
+            }
+            ';' | '|' | '&' | '>' | '<' | '`' => return Err(shell_syntax_error(ch)),
+            '$' if chars.peek() == Some(&'(') => return Err(shell_syntax_error('$')),
+            value => {
+                in_token = true;
+                current.push(value);
+            }
+        }
+    }
+    if in_token {
+        args.push(current);
+    }
+
+    validate_git_args(&args)?;
+    Ok(args)
+}
+
+fn unterminated_quote() -> CoreError {
+    CoreError::ValidationError("git args contain an unterminated quote".to_string())
+}
+
+fn shell_syntax_error(ch: char) -> CoreError {
+    CoreError::ValidationError(format!(
+        "shell syntax is not allowed in git args: {ch} (quote it to pass it to Git)"
+    ))
 }
 
 pub fn run_git_args(request: GitOperationRequest) -> GuiResult<GitCommandOutput> {
@@ -714,18 +798,6 @@ fn normalize_entry_path(path: &str) -> GuiResult<String> {
     }
 
     Ok(parts.join("/"))
-}
-
-fn contains_shell_syntax(arg: &str) -> bool {
-    arg.contains("$(")
-        || arg.contains(';')
-        || arg.contains('|')
-        || arg.contains('&')
-        || arg.contains('>')
-        || arg.contains('<')
-        || arg.contains('`')
-        || arg.contains('\n')
-        || arg.contains('\r')
 }
 
 fn store_path_from_fs_path(root: &Path, path: &Path, trim_gpg: bool) -> GuiResult<String> {

@@ -74,5 +74,8 @@ abstract interface class ManageRepository implements VaultRepository {
     required bool noSymbols,
   });
 
+  /// True when Git is enabled and the "Commit every change" setting is on.
+  bool get commitsEveryChange;
+
   Future<GitOperationResult> commitChanges(String message);
 }

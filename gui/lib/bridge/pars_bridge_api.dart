@@ -73,6 +73,42 @@ abstract interface class ParsBridgeApi {
     required frb.GitArgsRequest request,
   });
 
+  Future<frb.GitStatusSummaryResponse> gitStatusSummary({
+    required frb.GitRequest request,
+  });
+
+  Future<frb.GitStatusSummaryResponse> gitFetch({
+    required frb.GitRequest request,
+  });
+
+  Future<frb.GitSyncResponse> gitSync({required frb.GitSyncRequest request});
+
+  Future<frb.GitResetResponse> gitResetToUpstream({
+    required frb.GitResetRequest request,
+  });
+
+  Future<frb.GitCommandResponse> gitPushBranch({
+    required frb.GitPushBranchRequest request,
+  });
+
+  Future<frb.GitLogResponse> gitLog({required frb.GitLogRequest request});
+
+  Future<frb.GitRemoteBranchesResponse> gitListRemoteBranches({
+    required frb.GitRequest request,
+  });
+
+  Future<frb.GitStatusSummaryResponse> gitSwitchBranch({
+    required frb.GitSwitchBranchRequest request,
+  });
+
+  Future<frb.GitIdentityResponse> gitIdentity({
+    required frb.GitIdentityRequest request,
+  });
+
+  Future<frb.UnitResponse> gitSetIdentity({
+    required frb.GitSetIdentityRequest request,
+  });
+
   Future<frb.InspectStoreGitResponse> inspectStoreGit({
     required frb.InspectStoreGitRequest request,
   });
@@ -265,6 +301,54 @@ final class FrbParsBridgeApi implements ParsBridgeApi {
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
   }) => frb.runGitArgs(request: request);
+
+  @override
+  Future<frb.GitStatusSummaryResponse> gitStatusSummary({
+    required frb.GitRequest request,
+  }) => frb.gitStatusSummary(request: request);
+
+  @override
+  Future<frb.GitStatusSummaryResponse> gitFetch({
+    required frb.GitRequest request,
+  }) => frb.gitFetch(request: request);
+
+  @override
+  Future<frb.GitSyncResponse> gitSync({required frb.GitSyncRequest request}) =>
+      frb.gitSync(request: request);
+
+  @override
+  Future<frb.GitResetResponse> gitResetToUpstream({
+    required frb.GitResetRequest request,
+  }) => frb.gitResetToUpstream(request: request);
+
+  @override
+  Future<frb.GitCommandResponse> gitPushBranch({
+    required frb.GitPushBranchRequest request,
+  }) => frb.gitPushBranch(request: request);
+
+  @override
+  Future<frb.GitLogResponse> gitLog({required frb.GitLogRequest request}) =>
+      frb.gitLog(request: request);
+
+  @override
+  Future<frb.GitRemoteBranchesResponse> gitListRemoteBranches({
+    required frb.GitRequest request,
+  }) => frb.gitListRemoteBranches(request: request);
+
+  @override
+  Future<frb.GitStatusSummaryResponse> gitSwitchBranch({
+    required frb.GitSwitchBranchRequest request,
+  }) => frb.gitSwitchBranch(request: request);
+
+  @override
+  Future<frb.GitIdentityResponse> gitIdentity({
+    required frb.GitIdentityRequest request,
+  }) => frb.gitIdentity(request: request);
+
+  @override
+  Future<frb.UnitResponse> gitSetIdentity({
+    required frb.GitSetIdentityRequest request,
+  }) => frb.gitSetIdentity(request: request);
 
   @override
   Future<frb.InspectStoreGitResponse> inspectStoreGit({

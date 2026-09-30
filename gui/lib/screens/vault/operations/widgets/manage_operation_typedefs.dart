@@ -5,7 +5,6 @@ typedef _GenerateEntrySubmit =
       String path,
       bool noSymbols,
       bool overwrite,
-      bool commit,
     );
 
 typedef _SaveExistingEntrySubmit =
@@ -14,7 +13,6 @@ typedef _SaveExistingEntrySubmit =
       String password,
       String notes,
       bool overwrite,
-      bool commit,
     );
 
 typedef _MoveOrRenameEntrySubmit =
@@ -22,11 +20,10 @@ typedef _MoveOrRenameEntrySubmit =
       PasswordEntry entry,
       String target,
       bool overwrite,
-      bool commit,
     );
 
 typedef _DeleteEntrySubmit =
-    Future<EntryOperationResult> Function(PasswordEntry entry, bool commit);
+    Future<EntryOperationResult> Function(PasswordEntry entry);
 
 typedef _ReadEntryForEdit = Future<SecretContent> Function(PasswordEntry entry);
 
@@ -36,32 +33,22 @@ typedef _SaveEditedEntrySubmit =
       String password,
       List<ParsedSecretField> fields,
       String notes,
-      bool commit,
     );
 
 typedef _ReplaceEntryPasswordSubmit =
-    Future<EntryOperationResult> Function(
-      PasswordEntry entry,
-      String password,
-      bool commit,
-    );
+    Future<EntryOperationResult> Function(PasswordEntry entry, String password);
 
 typedef _BatchMoveSubmit =
-    Future<BatchOperationResult> Function(
-      String destination,
-      bool overwrite,
-      bool commit,
-    );
+    Future<BatchOperationResult> Function(String destination, bool overwrite);
 
 typedef _BatchRenameSubmit =
     Future<BatchOperationResult> Function(
       String prefix,
       String suffix,
       bool overwrite,
-      bool commit,
     );
 
-typedef _BatchDeleteSubmit = Future<BatchOperationResult> Function(bool commit);
+typedef _BatchDeleteSubmit = Future<BatchOperationResult> Function();
 
 typedef _BatchRegenerateSubmit =
-    Future<BatchOperationResult> Function(bool noSymbols, bool commit);
+    Future<BatchOperationResult> Function(bool noSymbols);

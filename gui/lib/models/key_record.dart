@@ -9,6 +9,7 @@ class KeyRecord {
     required this.hasPrivateKey,
     this.hasLocalKeyMaterial = true,
     this.referencedByStores = const <String>[],
+    this.encrypted = false,
   });
 
   final KeyRecordType type;
@@ -16,6 +17,9 @@ class KeyRecord {
   final String fingerprint;
   final String source;
   final bool hasPrivateKey;
+
+  /// An SSH key that needs its passphrase before Git can use it.
+  final bool encrypted;
   final bool hasLocalKeyMaterial;
   final List<String> referencedByStores;
 

@@ -9,7 +9,10 @@ import '../bridge/pars_bridge_api.dart';
 import '../models/key_record.dart';
 import '../models/password_entry.dart';
 import '../models/pgp_key_import.dart';
+import '../models/git_sync.dart';
 import 'autofill_repository.dart';
+import 'git_credential_store.dart';
+import 'git_preferences.dart';
 import 'git_repository.dart';
 import 'path_picker_service.dart';
 import 'selected_ssh_key.dart';
@@ -51,10 +54,12 @@ class BridgeBackedRepository
     this.autofillRepository,
     VaultMetadataStore? metadataStore,
     VaultSnapshotCache? snapshotCache,
+    GitCredentialStore? gitCredentials,
   }) : _metadataStore =
            metadataStore ?? FileVaultMetadataStore.forConfigPath(configPath),
        _snapshotCache =
            snapshotCache ?? FileVaultSnapshotCache.forConfigPath(configPath),
+       _gitCredentials = gitCredentials ?? GitCredentialStore(null),
        _lifecycle = StoreLifecycleSnapshot.empty(configPath);
 
   factory BridgeBackedRepository.defaultInstance({
@@ -87,11 +92,20 @@ class BridgeBackedRepository
   final AutofillRepository? autofillRepository;
   final VaultMetadataStore _metadataStore;
   final VaultSnapshotCache _snapshotCache;
+  final GitCredentialStore _gitCredentials;
 
   StoreLifecycleSnapshot _lifecycle;
   List<PasswordEntry> _entries = const <PasswordEntry>[];
   List<KeyRecord> _keys = const <KeyRecord>[];
   RepoGitStatus _gitStatus = RepoGitStatus.disabled;
+  GitStatusSummary? _statusSummary;
+  GitSyncConflict? _lastConflict;
+  bool _lastSyncFailed = false;
+  bool _lastRemoteCheckFailed = false;
+  bool _launchCheckDone = false;
+  GitPreferences _gitPreferences = const GitPreferences();
+  HttpsCredentials? _pendingHttps;
+  ({String passphrase, bool persist})? _pendingSshPassphrase;
   int _refreshEpoch = 0;
   Future<void> _storeSideEffectTail = Future<void>.value();
   bool _storeRemovalInProgress = false;
@@ -302,22 +316,21 @@ class BridgeBackedRepository
         .map((entry) => _passwordEntryFromBridge(entry, currentStore))
         .toList(growable: false);
 
+    _gitPreferences = await loadGitPreferences(configPath);
     switch (currentStore.gitMode) {
       case StoreGitMode.disabled:
+        _statusSummary = null;
         _gitStatus = RepoGitStatus.disabled;
       case StoreGitMode.invalid:
+        _statusSummary = null;
         _gitStatus = RepoGitStatus.invalid;
       case StoreGitMode.local:
       case StoreGitMode.remote:
-        final gitResponse = await bridge.gitStatus(
-          request: frb.GitRequest(
-            root: currentStore.root,
-            sshPrivateKeyPath: null,
-            sshDir: sshDir,
-          ),
+        final summaryResponse = await bridge.gitStatusSummary(
+          request: frb.GitRequest(root: currentStore.root, sshDir: sshDir),
         );
         if (refreshEpoch != _refreshEpoch) return;
-        _gitStatus = _gitStatusFromBridge(gitResponse);
+        _applySummaryResponse(summaryResponse, currentStore.gitMode);
     }
     if (reconcileAutofill) {
       await _runAutofillUpdate(
@@ -616,6 +629,11 @@ class BridgeBackedRepository
   }
 
   @override
+  bool get commitsEveryChange =>
+      _gitPreferences.commitEveryChange &&
+      (gitMode == StoreGitMode.local || gitMode == StoreGitMode.remote);
+
+  @override
   Future<GitOperationResult> commitChanges(String message) async {
     return commit(message.trim().isEmpty ? 'Update password store' : message);
   }
@@ -654,21 +672,27 @@ class BridgeBackedRepository
     required String root,
     bool overwrite = false,
   }) async {
-    final response = await bridge.cloneStore(
-      request: frb.CloneStoreRequest(
-        configPath: configPath,
-        remoteUrl: remoteUrl,
-        root: root,
-        sshPrivateKeyPath: await _sshPrivateKeyForUrl(remoteUrl),
-        sshDir: sshDir,
-        overwrite: overwrite,
-      ),
-    );
-    final failure = response.error;
-    if (failure != null && failure.conflictKind == 'EntryAlreadyExists') {
-      throw const StoreCloneTargetExists();
-    }
-    _throwIfFailure(failure);
+    final transport = await _transport(root: root, remoteUrl: remoteUrl);
+    await _withTransport(transport, () async {
+      final response = await bridge.cloneStore(
+        request: frb.CloneStoreRequest(
+          configPath: configPath,
+          remoteUrl: remoteUrl,
+          root: root,
+          sshPrivateKeyPath: transport.request.sshPrivateKeyPath,
+          sshDir: sshDir,
+          overwrite: overwrite,
+          httpsUsername: transport.request.httpsUsername,
+          httpsToken: transport.request.httpsToken,
+          sshPassphrase: transport.request.sshPassphrase,
+        ),
+      );
+      final failure = response.error;
+      if (failure != null && failure.conflictKind == 'EntryAlreadyExists') {
+        throw const StoreCloneTargetExists();
+      }
+      _throwIfFailure(failure);
+    });
     await refresh();
   }
 
@@ -963,6 +987,7 @@ class BridgeBackedRepository
       request: frb.DeleteSshKeyRequest(sshDir: _requiredSshDir(), name: name),
     );
     _throwIfFailure(response.error);
+    await _gitCredentials.deletePassphrase(name);
     await refresh();
   }
 
@@ -1011,25 +1036,66 @@ class BridgeBackedRepository
   }
 
   @override
+  GitStatusSummary? get statusSummary => _statusSummary;
+
+  @override
+  GitSyncConflict? get lastConflict => _lastConflict;
+
+  @override
+  bool get lastRemoteCheckFailed => _lastRemoteCheckFailed;
+
+  @override
+  GitPreferences get preferences => _gitPreferences;
+
+  @override
+  Future<void> updatePreferences(GitPreferences preferences) async {
+    await saveGitPreferences(configPath, preferences);
+    _gitPreferences = preferences;
+  }
+
+  @override
   Future<GitOperationResult> refreshGitStatus() async {
     final mode = _lifecycle.store?.gitMode;
     if (mode == null || mode == StoreGitMode.disabled) {
+      _statusSummary = null;
       _gitStatus = RepoGitStatus.disabled;
       return _gitDisabledResult('git status');
     }
     if (mode == StoreGitMode.invalid) {
+      _statusSummary = null;
       _gitStatus = RepoGitStatus.invalid;
       return _gitInvalidResult('git status');
     }
-    final response = await bridge.gitStatus(
-      request: frb.GitRequest(
-        root: _requiredStoreRoot(),
-        sshPrivateKeyPath: null,
-        sshDir: sshDir,
-      ),
+    final root = _requiredStoreRoot();
+    final summaryResponse = await bridge.gitStatusSummary(
+      request: frb.GitRequest(root: root, sshDir: sshDir),
     );
-    _gitStatus = _gitStatusFromBridge(response);
+    _applySummaryResponse(summaryResponse, mode);
+    final response = await bridge.gitStatus(
+      request: frb.GitRequest(root: root, sshDir: sshDir),
+    );
     return _gitResultFromBridge(response);
+  }
+
+  @override
+  Future<void> checkRemoteOnLaunch() async {
+    if (_launchCheckDone) return;
+    final store = _lifecycle.store;
+    if (store == null || store.gitMode != StoreGitMode.remote) return;
+    _launchCheckDone = true;
+    if (!_gitPreferences.checkRemoteOnLaunch) return;
+    try {
+      final transport = await _transport(root: store.root);
+      final response = await _withTransport(
+        transport,
+        () => bridge.gitFetch(request: transport.request),
+      );
+      _throwIfFailure(response.error);
+      _lastRemoteCheckFailed = false;
+      _applySummaryResponse(response, store.gitMode);
+    } catch (_) {
+      _lastRemoteCheckFailed = true;
+    }
   }
 
   @override
@@ -1037,15 +1103,14 @@ class BridgeBackedRepository
     if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
       return _gitDisabledResult('git pull', message: 'Skipped: no Git remote.');
     }
-    final ssh = await _sshMaterialForConfiguredRemote();
-    final response = await bridge.gitPull(
-      request: frb.GitRequest(
-        root: _requiredStoreRoot(),
-        sshPrivateKeyPath: ssh,
-        sshDir: sshDir,
-      ),
+    final transport = await _transport(root: _requiredStoreRoot());
+    final result = await _recordingSyncFailure(
+      () => _withTransport(transport, () async {
+        return _gitResultFromBridge(
+          await bridge.gitPull(request: transport.request),
+        );
+      }),
     );
-    final result = _gitResultFromBridge(response);
     await refresh();
     return result;
   }
@@ -1055,15 +1120,14 @@ class BridgeBackedRepository
     if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
       return _gitDisabledResult('git push', message: 'Skipped: no Git remote.');
     }
-    final ssh = await _sshMaterialForConfiguredRemote();
-    final response = await bridge.gitPush(
-      request: frb.GitRequest(
-        root: _requiredStoreRoot(),
-        sshPrivateKeyPath: ssh,
-        sshDir: sshDir,
-      ),
+    final transport = await _transport(root: _requiredStoreRoot());
+    final result = await _recordingSyncFailure(
+      () => _withTransport(transport, () async {
+        return _gitResultFromBridge(
+          await bridge.gitPush(request: transport.request),
+        );
+      }),
     );
-    final result = _gitResultFromBridge(response);
     await refresh();
     return result;
   }
@@ -1089,27 +1153,266 @@ class BridgeBackedRepository
   }
 
   @override
-  Future<GitOperationResult> runArgs(List<String> args) async {
+  Future<GitSyncOutcome> sync({
+    required bool commitPending,
+    String message = 'Sync password store',
+  }) async {
+    if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
+      throw const BridgeRepositoryException('Git sync needs a remote.');
+    }
+    final transport = await _transport(root: _requiredStoreRoot());
+    final outcome = await _recordingSyncFailure(
+      () => _withTransport(transport, () async {
+        final response = await bridge.gitSync(
+          request: frb.GitSyncRequest(
+            git: transport.request,
+            message: message,
+            commitPending: commitPending,
+            strategy: switch (_gitPreferences.strategy) {
+              GitIntegrationStrategy.rebase =>
+                frb.GitIntegrationStrategyDto.rebase,
+              GitIntegrationStrategy.merge =>
+                frb.GitIntegrationStrategyDto.merge,
+            },
+          ),
+        );
+        _throwIfFailure(response.error);
+        final result = response.result;
+        if (result == null) {
+          throw const BridgeRepositoryException(
+            'Bridge did not return a sync result.',
+          );
+        }
+        return _syncOutcomeFromBridge(result);
+      }),
+    );
+    _lastConflict = outcome.conflict;
+    _lastRemoteCheckFailed = false;
+    await refresh();
+    return outcome;
+  }
+
+  @override
+  Future<GitResetOutcome> resetToUpstream() async {
+    if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
+      throw const BridgeRepositoryException('Reset needs a Git remote.');
+    }
+    final transport = await _transport(root: _requiredStoreRoot());
+    final outcome = await _withTransport(transport, () async {
+      final response = await bridge.gitResetToUpstream(
+        request: frb.GitResetRequest(
+          git: transport.request,
+          message: 'Save local changes before reset',
+        ),
+      );
+      _throwIfFailure(response.error);
+      final result = response.result;
+      if (result == null) {
+        throw const BridgeRepositoryException(
+          'Bridge did not return a reset result.',
+        );
+      }
+      return GitResetOutcome(
+        committed: result.committed,
+        backupBranch: result.backupBranch,
+        summary: _summaryFromBridge(result.summary),
+      );
+    });
+    _lastConflict = null;
+    _lastSyncFailed = false;
+    await refresh();
+    return outcome;
+  }
+
+  @override
+  Future<GitOperationResult> pushBackupBranch(String branch) async {
+    if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
+      return _gitDisabledResult('git push', message: 'Skipped: no Git remote.');
+    }
+    final transport = await _transport(root: _requiredStoreRoot());
+    final result = await _withTransport(transport, () async {
+      return _gitResultFromBridge(
+        await bridge.gitPushBranch(
+          request: frb.GitPushBranchRequest(
+            git: transport.request,
+            branch: branch,
+          ),
+        ),
+      );
+    });
+    if (_lastConflict?.backupBranch == branch) {
+      _lastConflict = null;
+    }
+    await refresh();
+    return result;
+  }
+
+  @override
+  Future<List<GitLogEntry>> history({int limit = 50}) async {
     final mode = _lifecycle.store?.gitMode;
+    if (mode != StoreGitMode.local && mode != StoreGitMode.remote) {
+      return const <GitLogEntry>[];
+    }
+    final response = await bridge.gitLog(
+      request: frb.GitLogRequest(root: _requiredStoreRoot(), limit: limit),
+    );
+    _throwIfFailure(response.error);
+    return response.entries
+        .map(
+          (entry) => GitLogEntry(
+            id: entry.id,
+            summary: entry.summary,
+            author: entry.author,
+            time: DateTime.fromMillisecondsSinceEpoch(
+              entry.time.toInt() * 1000,
+            ),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<GitRemoteBranches> remoteBranches() async {
+    if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
+      return const GitRemoteBranches(
+        remote: null,
+        current: null,
+        branches: <String>[],
+      );
+    }
+    final root = _requiredStoreRoot();
+    final transport = await _transport(root: root);
+    final fetched = await _withTransport(
+      transport,
+      () => bridge.gitFetch(request: transport.request),
+    );
+    _throwIfFailure(fetched.error);
+    _applySummaryResponse(fetched, StoreGitMode.remote);
+    final response = await bridge.gitListRemoteBranches(
+      request: frb.GitRequest(root: root, sshDir: sshDir),
+    );
+    _throwIfFailure(response.error);
+    return GitRemoteBranches(
+      remote: response.remote,
+      current: response.current,
+      branches: response.branches,
+    );
+  }
+
+  @override
+  Future<void> switchBranch(String branch) async {
+    final response = await bridge.gitSwitchBranch(
+      request: frb.GitSwitchBranchRequest(
+        root: _requiredStoreRoot(),
+        branch: branch,
+      ),
+    );
+    _throwIfFailure(response.error);
+    await refresh();
+  }
+
+  @override
+  Future<GitIdentity?> identity() async {
+    final mode = _lifecycle.store?.gitMode;
+    if (mode != StoreGitMode.local && mode != StoreGitMode.remote) return null;
+    final response = await bridge.gitIdentity(
+      request: frb.GitIdentityRequest(root: _requiredStoreRoot()),
+    );
+    _throwIfFailure(response.error);
+    final identity = response.identity;
+    if (identity == null) return null;
+    return GitIdentity(
+      name: identity.name,
+      email: identity.email,
+      local: identity.local,
+    );
+  }
+
+  @override
+  GitIdentity? suggestedIdentity() {
+    GitIdentity? fallback;
+    for (final key in _keys) {
+      if (key.type != KeyRecordType.pgp || !key.hasPrivateKey) continue;
+      final parsed = GitIdentity.fromUserId(key.name);
+      if (parsed == null) continue;
+      if (key.referencedByStores.isNotEmpty) return parsed;
+      fallback ??= parsed;
+    }
+    return fallback;
+  }
+
+  @override
+  Future<void> setIdentity({
+    required String name,
+    required String email,
+  }) async {
+    final response = await bridge.gitSetIdentity(
+      request: frb.GitSetIdentityRequest(
+        root: _requiredStoreRoot(),
+        name: name,
+        email: email,
+      ),
+    );
+    _throwIfFailure(response.error);
+  }
+
+  @override
+  Future<bool> hasHttpsCredentials() async {
+    final url = await _primaryRemoteUrl();
+    if (url == null || !_isHttpsRemote(url)) return false;
+    return await _gitCredentials.readHttps(url) != null;
+  }
+
+  @override
+  Future<void> rememberHttpsCredentials(HttpsCredentials credentials) async {
+    _pendingHttps = credentials;
+  }
+
+  @override
+  Future<void> forgetHttpsCredentials() async {
+    _pendingHttps = null;
+    final url = await _primaryRemoteUrl();
+    if (url != null) await _gitCredentials.deleteHttps(url);
+  }
+
+  @override
+  Future<void> rememberSshPassphrase(
+    String passphrase, {
+    required bool persist,
+  }) async {
+    _pendingSshPassphrase = (passphrase: passphrase, persist: persist);
+  }
+
+  @override
+  Future<GitOperationResult> runCommandLine(String commandLine) async {
+    final mode = _lifecycle.store?.gitMode;
+    final command = 'git ${commandLine.trim()}';
     if (mode == null || mode == StoreGitMode.disabled) {
-      return _gitDisabledResult('git ${args.join(' ')}');
+      return _gitDisabledResult(command);
     }
     if (mode == StoreGitMode.invalid) {
-      return _gitInvalidResult('git ${args.join(' ')}');
+      return _gitInvalidResult(command);
     }
     if (Platform.isAndroid || Platform.isIOS) {
       return GitOperationResult(
-        command: 'git ${args.join(' ')}',
+        command: command,
         stdout: '',
         stderr: 'Advanced Git arguments are unavailable on mobile.',
         exitCode: 1,
         success: false,
       );
     }
-    final response = await bridge.runGitArgs(
-      request: frb.GitArgsRequest(root: _requiredStoreRoot(), args: args),
-    );
-    return _gitResultFromBridge(response);
+    try {
+      final response = await bridge.runGitArgs(
+        request: frb.GitArgsRequest(
+          root: _requiredStoreRoot(),
+          commandLine: commandLine,
+        ),
+      );
+      return _gitResultFromBridge(response);
+    } finally {
+      await refresh();
+    }
   }
 
   @override
@@ -1121,11 +1424,7 @@ class BridgeBackedRepository
       return const <GitRemote>[];
     }
     final response = await bridge.gitListRemotes(
-      request: frb.GitRequest(
-        root: _requiredStoreRoot(),
-        sshPrivateKeyPath: null,
-        sshDir: sshDir,
-      ),
+      request: frb.GitRequest(root: _requiredStoreRoot(), sshDir: sshDir),
     );
     return _parseRemotes(_gitResultFromBridge(response).stdout);
   }
@@ -1203,37 +1502,205 @@ class BridgeBackedRepository
     return result;
   }
 
-  @override
-  Future<GitOperationResult> autoPullOnOpen() async {
-    final store = _lifecycle.store;
-    if (store == null || store.gitMode != StoreGitMode.remote) {
-      return const GitOperationResult(
-        command: 'git pull',
-        stdout: 'Skipped: no canonical Git remote.',
-        stderr: '',
-        exitCode: 0,
-        success: true,
+  /// Marks an explicit network failure as sync failed. Credential prompts are
+  /// not failures: the caller asks the user and retries.
+  Future<T> _recordingSyncFailure<T>(Future<T> Function() operation) async {
+    try {
+      final result = await operation();
+      _lastSyncFailed = false;
+      return result;
+    } on GitIdentityRequiredException {
+      rethrow;
+    } on GitAuthenticationRequiredException {
+      rethrow;
+    } on GitSshPassphraseRequiredException {
+      rethrow;
+    } catch (_) {
+      _lastSyncFailed = true;
+      _gitStatus = RepoGitStatus.syncFailed;
+      rethrow;
+    }
+  }
+
+  Future<String?> _primaryRemoteUrl() async {
+    final remotes = await listRemotes();
+    if (remotes.isEmpty) return null;
+    final upstreamRemote = _statusSummary?.upstream?.split('/').first;
+    final remote = remotes.firstWhere(
+      (remote) => remote.name == upstreamRemote,
+      orElse: () => remotes.first,
+    );
+    return remote.pushUrl.isNotEmpty ? remote.pushUrl : remote.fetchUrl;
+  }
+
+  bool _isHttpsRemote(String url) {
+    final lower = url.trim().toLowerCase();
+    return lower.startsWith('https://') || lower.startsWith('http://');
+  }
+
+  /// Resolves the SSH key and any credentials for one network operation.
+  /// Values the user just typed are only persisted once the remote accepts
+  /// them; stored values the remote rejects are forgotten.
+  Future<_GitTransport> _transport({
+    required String root,
+    String? remoteUrl,
+  }) async {
+    final url = remoteUrl ?? await _primaryRemoteUrl();
+    final sshKeyPath = url == null ? null : await _sshPrivateKeyForUrl(url);
+    final mobile = Platform.isAndroid || Platform.isIOS;
+
+    HttpsCredentials? https;
+    var httpsFromStore = false;
+    var httpsFromPending = false;
+    if (mobile && url != null && _isHttpsRemote(url)) {
+      final pending = _pendingHttps;
+      if (pending != null) {
+        https = pending;
+        httpsFromPending = true;
+      } else {
+        https = await _gitCredentials.readHttps(url);
+        httpsFromStore = https != null;
+      }
+    }
+
+    String? keyName;
+    String? passphrase;
+    var passphraseFromPending = false;
+    if (mobile && sshKeyPath != null) {
+      keyName = sshKeyPath.split(RegExp(r'[/\\]')).last;
+      final encrypted = _keys.any(
+        (key) =>
+            key.type == KeyRecordType.ssh &&
+            key.name == keyName &&
+            key.encrypted,
+      );
+      if (encrypted) {
+        final pending = _pendingSshPassphrase;
+        if (pending != null) {
+          passphrase = pending.passphrase;
+          passphraseFromPending = true;
+        } else {
+          passphrase = await _gitCredentials.readPassphrase(keyName);
+        }
+      }
+    }
+
+    return _GitTransport(
+      request: frb.GitRequest(
+        root: root,
+        sshPrivateKeyPath: sshKeyPath,
+        sshDir: sshDir,
+        httpsUsername: https?.username,
+        httpsToken: https?.token,
+        sshPassphrase: passphrase,
+      ),
+      remoteUrl: url,
+      httpsFromStore: httpsFromStore,
+      httpsFromPending: httpsFromPending,
+      sshKeyName: keyName,
+      passphraseFromPending: passphraseFromPending,
+    );
+  }
+
+  Future<T> _withTransport<T>(
+    _GitTransport transport,
+    Future<T> Function() operation,
+  ) async {
+    try {
+      final result = await operation();
+      await _acceptTransport(transport);
+      return result;
+    } on GitAuthenticationRequiredException {
+      _pendingHttps = null;
+      final url = transport.remoteUrl;
+      if (transport.httpsFromStore && url != null) {
+        await _gitCredentials.deleteHttps(url);
+      }
+      rethrow;
+    } on GitSshPassphraseRequiredException {
+      _pendingSshPassphrase = null;
+      final keyName = transport.sshKeyName;
+      if (keyName != null) await _gitCredentials.deletePassphrase(keyName);
+      rethrow;
+    }
+  }
+
+  Future<void> _acceptTransport(_GitTransport transport) async {
+    final url = transport.remoteUrl;
+    final https = _pendingHttps;
+    if (transport.httpsFromPending && https != null && url != null) {
+      _pendingHttps = null;
+      await _gitCredentials.writeHttps(url, https);
+    }
+    final pending = _pendingSshPassphrase;
+    final keyName = transport.sshKeyName;
+    if (transport.passphraseFromPending && pending != null && keyName != null) {
+      _pendingSshPassphrase = null;
+      await _gitCredentials.writePassphrase(
+        keyName,
+        pending.passphrase,
+        remember: pending.persist,
       );
     }
-    return pull();
   }
 
-  @override
-  Future<GitOperationResult> recoverByPull() {
-    return pull();
-  }
-
-  @override
-  Future<GitOperationResult> syncWithRemote() async {
-    if (_lifecycle.store?.gitMode != StoreGitMode.remote) {
-      await refresh();
-      return _gitDisabledResult('git sync', message: 'Skipped: no Git remote.');
+  void _applySummaryResponse(
+    frb.GitStatusSummaryResponse response,
+    StoreGitMode mode,
+  ) {
+    final summary = response.summary;
+    if (response.error != null || summary == null) {
+      _statusSummary = null;
+      _gitStatus = RepoGitStatus.syncFailed;
+      return;
     }
-    final pulled = await pull();
-    if (!pulled.success) return pulled;
-    final status = await refreshGitStatus();
-    if (!status.success || !status.stdout.contains('ahead')) return pulled;
-    return push();
+    _statusSummary = _summaryFromBridge(summary);
+    _gitStatus = classifyGitStatus(
+      _statusSummary!,
+      mode: mode,
+      conflict: _lastConflict,
+      syncFailed: _lastSyncFailed,
+    );
+  }
+
+  GitStatusSummary _summaryFromBridge(frb.GitStatusSummaryDto dto) {
+    final fetched = dto.lastFetchedAt;
+    return GitStatusSummary(
+      branch: dto.branch,
+      upstream: dto.upstream,
+      ahead: dto.ahead,
+      behind: dto.behind,
+      changed: dto.changed,
+      conflicted: dto.conflicted,
+      operation: switch (dto.operation) {
+        frb.GitStatusOperationDto.none => GitOperationState.none,
+        frb.GitStatusOperationDto.rebasing => GitOperationState.rebasing,
+        frb.GitStatusOperationDto.merging => GitOperationState.merging,
+        frb.GitStatusOperationDto.other => GitOperationState.other,
+      },
+      lastFetchedAt:
+          fetched == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(fetched.toInt() * 1000),
+    );
+  }
+
+  GitSyncOutcome _syncOutcomeFromBridge(frb.GitSyncResultDto dto) {
+    final conflict = dto.conflict;
+    return GitSyncOutcome(
+      committed: dto.committed,
+      pulled: dto.pulled,
+      pushed: dto.pushed,
+      blockedByChanges: dto.blockedByChanges,
+      conflict:
+          conflict == null
+              ? null
+              : GitSyncConflict(
+                backupBranch: conflict.backupBranch,
+                paths: List<String>.unmodifiable(conflict.paths),
+              ),
+      summary: _summaryFromBridge(dto.summary),
+    );
   }
 
   static String defaultConfigPath() {
@@ -1361,6 +1828,7 @@ class BridgeBackedRepository
       fingerprint: key.fingerprint,
       source: key.source,
       hasPrivateKey: key.hasPrivateKey,
+      encrypted: key.encrypted,
     );
   }
 
@@ -1857,16 +2325,6 @@ class BridgeBackedRepository
     return null;
   }
 
-  Future<String?> _sshMaterialForConfiguredRemote() async {
-    for (final remote in await listRemotes()) {
-      for (final url in <String>[remote.pushUrl, remote.fetchUrl]) {
-        if (!remoteUrlUsesSsh(url)) continue;
-        return _sshPrivateKeyForUrl(url);
-      }
-    }
-    return null;
-  }
-
   String _requiredSshDir() {
     final dir = sshDir;
     if (dir == null || dir.trim().isEmpty) {
@@ -1908,28 +2366,6 @@ class BridgeBackedRepository
       exitCode: 1,
       success: false,
     );
-  }
-
-  RepoGitStatus _gitStatusFromBridge(frb.GitCommandResponse response) {
-    if (response.error != null) {
-      return RepoGitStatus.syncFailed;
-    }
-    final output = response.output;
-    if (output == null || !output.success) {
-      return RepoGitStatus.syncFailed;
-    }
-    if (output.stdout.contains('behind')) {
-      return RepoGitStatus.needPull;
-    }
-    final lines = output.stdout
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList(growable: false);
-    if (lines.any((line) => !line.startsWith('##'))) {
-      return RepoGitStatus.uncommitted;
-    }
-    return RepoGitStatus.clean;
   }
 
   GitOperationResult _gitResultFromBridge(frb.GitCommandResponse response) {
@@ -2013,7 +2449,7 @@ class BridgeBackedRepository
   }
 
   String _sanitizedRemoteUrl(String input) {
-    var value = input.split(RegExp(r'[?#]')).first;
+    var value = _stripRemoteUrlSuffix(input);
     final scheme = value.indexOf('://');
     if (scheme >= 0) {
       final authorityStart = scheme + 3;
@@ -2041,9 +2477,54 @@ class BridgeBackedRepository
     return value;
   }
 
+  /// Query and fragment markers belong to remote URLs. The Git status header
+  /// is the token `##`, and treating that `#` as a fragment erases it.
+  String _stripRemoteUrlSuffix(String input) {
+    if (!input.contains('://') && !_scpStyleRemote(input)) return input;
+    return input.split(RegExp(r'[?#]')).first;
+  }
+
+  bool _scpStyleRemote(String value) {
+    final at = value.lastIndexOf('@');
+    if (at <= 0) return false;
+    final userinfo = value.substring(0, at);
+    final hostPath = value.substring(at + 1);
+    final colon = hostPath.indexOf(':');
+    return !userinfo.contains(RegExp(r'[/\\]')) &&
+        colon > 0 &&
+        colon < hostPath.length - 1 &&
+        !hostPath.substring(0, colon).contains(RegExp(r'[/\\]'));
+  }
+
   void _throwIfFailure(frb.BridgeFailure? failure) {
-    if (failure != null) {
-      throw BridgeRepositoryException(failure.message);
+    if (failure == null) return;
+    switch (failure.category) {
+      case frb.BridgeFailureCategory.identityRequired:
+        throw GitIdentityRequiredException(failure.message);
+      case frb.BridgeFailureCategory.authenticationRequired:
+        throw GitAuthenticationRequiredException(failure.message);
+      case frb.BridgeFailureCategory.sshPassphraseRequired:
+        throw GitSshPassphraseRequiredException(failure.message);
+      default:
+        throw BridgeRepositoryException(failure.message);
     }
   }
+}
+
+class _GitTransport {
+  const _GitTransport({
+    required this.request,
+    required this.remoteUrl,
+    required this.httpsFromStore,
+    required this.httpsFromPending,
+    required this.sshKeyName,
+    required this.passphraseFromPending,
+  });
+
+  final frb.GitRequest request;
+  final String? remoteUrl;
+  final bool httpsFromStore;
+  final bool httpsFromPending;
+  final String? sshKeyName;
+  final bool passphraseFromPending;
 }

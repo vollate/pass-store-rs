@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../../models/git_sync.dart';
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../services/autofill_repository.dart';
@@ -23,6 +24,7 @@ import '../../widgets/app_notification.dart';
 import '../../widgets/failure_notice.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/gesture_setup_panel.dart';
+import '../../widgets/git_flows.dart';
 import '../../widgets/pars_action_group.dart';
 import '../../widgets/pars_dialog.dart';
 import '../../widgets/path_picker_row.dart';
@@ -279,26 +281,5 @@ class SettingsScreen extends StatelessWidget {
       AutofillStatusKind.disabled => localizations.autofillDisabled,
       AutofillStatusKind.unavailable => localizations.autofillUnavailableState,
     };
-  }
-
-  List<String> _parseGitArgs(String value) {
-    return value
-        .split(RegExp(r'\s+'))
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty)
-        .toList(growable: false);
-  }
-
-  GitOperationResult _combineGitOutput(
-    GitOperationResult first,
-    GitOperationResult second,
-  ) {
-    return GitOperationResult(
-      command: '${first.command}\n${second.command}',
-      stdout: '${first.stdout}${second.stdout}',
-      stderr: '${first.stderr}${second.stderr}',
-      exitCode: second.exitCode,
-      success: first.success && second.success,
-    );
   }
 }

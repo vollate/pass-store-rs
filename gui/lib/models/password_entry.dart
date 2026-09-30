@@ -7,6 +7,9 @@ enum RepoGitStatus {
   uncommitted,
   invalid,
   syncFailed,
+  needPush,
+  diverged,
+  conflicted,
 }
 
 class PasswordEntry {

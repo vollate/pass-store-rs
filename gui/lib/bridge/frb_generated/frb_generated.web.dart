@@ -172,13 +172,60 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GitCommitRequest dco_decode_box_autoadd_git_commit_request(dynamic raw);
 
   @protected
+  GitIdentityDto dco_decode_box_autoadd_git_identity_dto(dynamic raw);
+
+  @protected
+  GitIdentityRequest dco_decode_box_autoadd_git_identity_request(dynamic raw);
+
+  @protected
+  GitLogRequest dco_decode_box_autoadd_git_log_request(dynamic raw);
+
+  @protected
+  GitPushBranchRequest dco_decode_box_autoadd_git_push_branch_request(
+    dynamic raw,
+  );
+
+  @protected
   GitRemoteRequest dco_decode_box_autoadd_git_remote_request(dynamic raw);
 
   @protected
   GitRequest dco_decode_box_autoadd_git_request(dynamic raw);
 
   @protected
+  GitResetRequest dco_decode_box_autoadd_git_reset_request(dynamic raw);
+
+  @protected
+  GitResetResultDto dco_decode_box_autoadd_git_reset_result_dto(dynamic raw);
+
+  @protected
+  GitSetIdentityRequest dco_decode_box_autoadd_git_set_identity_request(
+    dynamic raw,
+  );
+
+  @protected
+  GitStatusSummaryDto dco_decode_box_autoadd_git_status_summary_dto(
+    dynamic raw,
+  );
+
+  @protected
+  GitSwitchBranchRequest dco_decode_box_autoadd_git_switch_branch_request(
+    dynamic raw,
+  );
+
+  @protected
+  GitSyncConflictDto dco_decode_box_autoadd_git_sync_conflict_dto(dynamic raw);
+
+  @protected
+  GitSyncRequest dco_decode_box_autoadd_git_sync_request(dynamic raw);
+
+  @protected
+  GitSyncResultDto dco_decode_box_autoadd_git_sync_result_dto(dynamic raw);
+
+  @protected
   int dco_decode_box_autoadd_i_32(dynamic raw);
+
+  @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
   ImportKeyFileRequest dco_decode_box_autoadd_import_key_file_request(
@@ -416,13 +463,83 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GitCommitRequest dco_decode_git_commit_request(dynamic raw);
 
   @protected
+  GitIdentityDto dco_decode_git_identity_dto(dynamic raw);
+
+  @protected
+  GitIdentityRequest dco_decode_git_identity_request(dynamic raw);
+
+  @protected
+  GitIdentityResponse dco_decode_git_identity_response(dynamic raw);
+
+  @protected
+  GitIntegrationStrategyDto dco_decode_git_integration_strategy_dto(
+    dynamic raw,
+  );
+
+  @protected
+  GitLogEntryDto dco_decode_git_log_entry_dto(dynamic raw);
+
+  @protected
+  GitLogRequest dco_decode_git_log_request(dynamic raw);
+
+  @protected
+  GitLogResponse dco_decode_git_log_response(dynamic raw);
+
+  @protected
+  GitPushBranchRequest dco_decode_git_push_branch_request(dynamic raw);
+
+  @protected
+  GitRemoteBranchesResponse dco_decode_git_remote_branches_response(
+    dynamic raw,
+  );
+
+  @protected
   GitRemoteRequest dco_decode_git_remote_request(dynamic raw);
 
   @protected
   GitRequest dco_decode_git_request(dynamic raw);
 
   @protected
+  GitResetRequest dco_decode_git_reset_request(dynamic raw);
+
+  @protected
+  GitResetResponse dco_decode_git_reset_response(dynamic raw);
+
+  @protected
+  GitResetResultDto dco_decode_git_reset_result_dto(dynamic raw);
+
+  @protected
+  GitSetIdentityRequest dco_decode_git_set_identity_request(dynamic raw);
+
+  @protected
+  GitStatusOperationDto dco_decode_git_status_operation_dto(dynamic raw);
+
+  @protected
+  GitStatusSummaryDto dco_decode_git_status_summary_dto(dynamic raw);
+
+  @protected
+  GitStatusSummaryResponse dco_decode_git_status_summary_response(dynamic raw);
+
+  @protected
+  GitSwitchBranchRequest dco_decode_git_switch_branch_request(dynamic raw);
+
+  @protected
+  GitSyncConflictDto dco_decode_git_sync_conflict_dto(dynamic raw);
+
+  @protected
+  GitSyncRequest dco_decode_git_sync_request(dynamic raw);
+
+  @protected
+  GitSyncResponse dco_decode_git_sync_response(dynamic raw);
+
+  @protected
+  GitSyncResultDto dco_decode_git_sync_result_dto(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
   ImportKeyFileRequest dco_decode_import_key_file_request(dynamic raw);
@@ -505,6 +622,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<EntrySummaryDto> dco_decode_list_entry_summary_dto(dynamic raw);
 
   @protected
+  List<GitLogEntryDto> dco_decode_list_git_log_entry_dto(dynamic raw);
+
+  @protected
   List<KeyRecordDto> dco_decode_list_key_record_dto(dynamic raw);
 
   @protected
@@ -581,7 +701,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  GitIdentityDto? dco_decode_opt_box_autoadd_git_identity_dto(dynamic raw);
+
+  @protected
+  GitResetResultDto? dco_decode_opt_box_autoadd_git_reset_result_dto(
+    dynamic raw,
+  );
+
+  @protected
+  GitStatusSummaryDto? dco_decode_opt_box_autoadd_git_status_summary_dto(
+    dynamic raw,
+  );
+
+  @protected
+  GitSyncConflictDto? dco_decode_opt_box_autoadd_git_sync_conflict_dto(
+    dynamic raw,
+  );
+
+  @protected
+  GitSyncResultDto? dco_decode_opt_box_autoadd_git_sync_result_dto(dynamic raw);
+
+  @protected
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
+
+  @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
   @protected
   InsertEntryResultDto? dco_decode_opt_box_autoadd_insert_entry_result_dto(
@@ -866,6 +1010,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  GitIdentityDto sse_decode_box_autoadd_git_identity_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitIdentityRequest sse_decode_box_autoadd_git_identity_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitLogRequest sse_decode_box_autoadd_git_log_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitPushBranchRequest sse_decode_box_autoadd_git_push_branch_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   GitRemoteRequest sse_decode_box_autoadd_git_remote_request(
     SseDeserializer deserializer,
   );
@@ -874,7 +1038,50 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GitRequest sse_decode_box_autoadd_git_request(SseDeserializer deserializer);
 
   @protected
+  GitResetRequest sse_decode_box_autoadd_git_reset_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitResetResultDto sse_decode_box_autoadd_git_reset_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSetIdentityRequest sse_decode_box_autoadd_git_set_identity_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitStatusSummaryDto sse_decode_box_autoadd_git_status_summary_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSwitchBranchRequest sse_decode_box_autoadd_git_switch_branch_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSyncConflictDto sse_decode_box_autoadd_git_sync_conflict_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSyncRequest sse_decode_box_autoadd_git_sync_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSyncResultDto sse_decode_box_autoadd_git_sync_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
   ImportKeyFileRequest sse_decode_box_autoadd_import_key_file_request(
@@ -1192,13 +1399,103 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GitCommitRequest sse_decode_git_commit_request(SseDeserializer deserializer);
 
   @protected
+  GitIdentityDto sse_decode_git_identity_dto(SseDeserializer deserializer);
+
+  @protected
+  GitIdentityRequest sse_decode_git_identity_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitIdentityResponse sse_decode_git_identity_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitIntegrationStrategyDto sse_decode_git_integration_strategy_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitLogEntryDto sse_decode_git_log_entry_dto(SseDeserializer deserializer);
+
+  @protected
+  GitLogRequest sse_decode_git_log_request(SseDeserializer deserializer);
+
+  @protected
+  GitLogResponse sse_decode_git_log_response(SseDeserializer deserializer);
+
+  @protected
+  GitPushBranchRequest sse_decode_git_push_branch_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitRemoteBranchesResponse sse_decode_git_remote_branches_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   GitRemoteRequest sse_decode_git_remote_request(SseDeserializer deserializer);
 
   @protected
   GitRequest sse_decode_git_request(SseDeserializer deserializer);
 
   @protected
+  GitResetRequest sse_decode_git_reset_request(SseDeserializer deserializer);
+
+  @protected
+  GitResetResponse sse_decode_git_reset_response(SseDeserializer deserializer);
+
+  @protected
+  GitResetResultDto sse_decode_git_reset_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSetIdentityRequest sse_decode_git_set_identity_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitStatusOperationDto sse_decode_git_status_operation_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitStatusSummaryDto sse_decode_git_status_summary_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitStatusSummaryResponse sse_decode_git_status_summary_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSwitchBranchRequest sse_decode_git_switch_branch_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSyncConflictDto sse_decode_git_sync_conflict_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSyncRequest sse_decode_git_sync_request(SseDeserializer deserializer);
+
+  @protected
+  GitSyncResponse sse_decode_git_sync_response(SseDeserializer deserializer);
+
+  @protected
+  GitSyncResultDto sse_decode_git_sync_result_dto(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
   ImportKeyFileRequest sse_decode_import_key_file_request(
@@ -1319,6 +1616,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<GitLogEntryDto> sse_decode_list_git_log_entry_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<KeyRecordDto> sse_decode_list_key_record_dto(
     SseDeserializer deserializer,
   );
@@ -1413,7 +1715,35 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  GitIdentityDto? sse_decode_opt_box_autoadd_git_identity_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitResetResultDto? sse_decode_opt_box_autoadd_git_reset_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitStatusSummaryDto? sse_decode_opt_box_autoadd_git_status_summary_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSyncConflictDto? sse_decode_opt_box_autoadd_git_sync_conflict_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GitSyncResultDto? sse_decode_opt_box_autoadd_git_sync_result_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
   InsertEntryResultDto? sse_decode_opt_box_autoadd_insert_entry_result_dto(
@@ -1754,6 +2084,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_git_identity_dto(
+    GitIdentityDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_identity_request(
+    GitIdentityRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_log_request(
+    GitLogRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_push_branch_request(
+    GitPushBranchRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_git_remote_request(
     GitRemoteRequest self,
     SseSerializer serializer,
@@ -1766,7 +2120,61 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_git_reset_request(
+    GitResetRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_reset_result_dto(
+    GitResetResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_set_identity_request(
+    GitSetIdentityRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_status_summary_dto(
+    GitStatusSummaryDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_switch_branch_request(
+    GitSwitchBranchRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_sync_conflict_dto(
+    GitSyncConflictDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_sync_request(
+    GitSyncRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_git_sync_result_dto(
+    GitSyncResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_import_key_file_request(
@@ -2147,6 +2555,57 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_git_identity_dto(
+    GitIdentityDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_identity_request(
+    GitIdentityRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_identity_response(
+    GitIdentityResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_integration_strategy_dto(
+    GitIntegrationStrategyDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_log_entry_dto(
+    GitLogEntryDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_log_request(GitLogRequest self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_git_log_response(
+    GitLogResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_push_branch_request(
+    GitPushBranchRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_remote_branches_response(
+    GitRemoteBranchesResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_git_remote_request(
     GitRemoteRequest self,
     SseSerializer serializer,
@@ -2156,7 +2615,82 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_git_request(GitRequest self, SseSerializer serializer);
 
   @protected
+  void sse_encode_git_reset_request(
+    GitResetRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_reset_response(
+    GitResetResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_reset_result_dto(
+    GitResetResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_set_identity_request(
+    GitSetIdentityRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_status_operation_dto(
+    GitStatusOperationDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_status_summary_dto(
+    GitStatusSummaryDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_status_summary_response(
+    GitStatusSummaryResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_switch_branch_request(
+    GitSwitchBranchRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_sync_conflict_dto(
+    GitSyncConflictDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_sync_request(
+    GitSyncRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_sync_response(
+    GitSyncResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_git_sync_result_dto(
+    GitSyncResultDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
   void sse_encode_import_key_file_request(
@@ -2300,6 +2834,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_git_log_entry_dto(
+    List<GitLogEntryDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_key_record_dto(
     List<KeyRecordDto> self,
     SseSerializer serializer,
@@ -2423,7 +2963,43 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_git_identity_dto(
+    GitIdentityDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_git_reset_result_dto(
+    GitResetResultDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_git_status_summary_dto(
+    GitStatusSummaryDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_git_sync_conflict_dto(
+    GitSyncConflictDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_git_sync_result_dto(
+    GitSyncResultDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_insert_entry_result_dto(

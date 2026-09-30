@@ -1,27 +1,5 @@
 part of '../vault_operations.dart';
 
-class _CommitCheckbox extends StatelessWidget {
-  const _CommitCheckbox({
-    required this.enabled,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final bool enabled;
-  final bool value;
-  final ValueChanged<bool?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return CheckboxListTile(
-      contentPadding: EdgeInsets.zero,
-      value: enabled && value,
-      onChanged: enabled ? onChanged : null,
-      title: Text(context.l10n.commitAfterOperation),
-    );
-  }
-}
-
 class _SubmitButton extends StatelessWidget {
   const _SubmitButton({
     required this.saving,

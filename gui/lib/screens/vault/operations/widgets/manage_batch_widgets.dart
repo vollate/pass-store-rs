@@ -1,14 +1,9 @@
 part of '../vault_operations.dart';
 
 class _BatchMoveSheet extends StatefulWidget {
-  const _BatchMoveSheet({
-    required this.entries,
-    required this.canCommit,
-    required this.onSubmit,
-  });
+  const _BatchMoveSheet({required this.entries, required this.onSubmit});
 
   final List<PasswordEntry> entries;
-  final bool canCommit;
   final _BatchMoveSubmit onSubmit;
 
   @override
@@ -18,7 +13,6 @@ class _BatchMoveSheet extends StatefulWidget {
 class _BatchMoveSheetState extends State<_BatchMoveSheet> {
   var _destination = '';
   var _overwrite = false;
-  var _commit = false;
   var _saving = false;
   String? _errorText;
 
@@ -28,7 +22,7 @@ class _BatchMoveSheetState extends State<_BatchMoveSheet> {
       _errorText = null;
     });
     try {
-      final result = await widget.onSubmit(_destination, _overwrite, _commit);
+      final result = await widget.onSubmit(_destination, _overwrite);
       if (mounted) {
         Navigator.of(context).pop(result);
       }
@@ -66,11 +60,6 @@ class _BatchMoveSheetState extends State<_BatchMoveSheet> {
                   : (value) => setState(() => _overwrite = value ?? false),
           title: Text(context.l10n.overwriteTarget),
         ),
-        _CommitCheckbox(
-          enabled: widget.canCommit && !_saving,
-          value: _commit,
-          onChanged: (value) => setState(() => _commit = value ?? false),
-        ),
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
@@ -83,14 +72,9 @@ class _BatchMoveSheetState extends State<_BatchMoveSheet> {
 }
 
 class _BatchRenameSheet extends StatefulWidget {
-  const _BatchRenameSheet({
-    required this.entries,
-    required this.canCommit,
-    required this.onSubmit,
-  });
+  const _BatchRenameSheet({required this.entries, required this.onSubmit});
 
   final List<PasswordEntry> entries;
-  final bool canCommit;
   final _BatchRenameSubmit onSubmit;
 
   @override
@@ -101,7 +85,6 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
   var _prefix = '';
   var _suffix = '';
   var _overwrite = false;
-  var _commit = false;
   var _saving = false;
   String? _errorText;
 
@@ -111,12 +94,7 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
       _errorText = null;
     });
     try {
-      final result = await widget.onSubmit(
-        _prefix,
-        _suffix,
-        _overwrite,
-        _commit,
-      );
+      final result = await widget.onSubmit(_prefix, _suffix, _overwrite);
       if (mounted) {
         Navigator.of(context).pop(result);
       }
@@ -156,11 +134,6 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
                   : (value) => setState(() => _overwrite = value ?? false),
           title: Text(context.l10n.overwriteTarget),
         ),
-        _CommitCheckbox(
-          enabled: widget.canCommit && !_saving,
-          value: _commit,
-          onChanged: (value) => setState(() => _commit = value ?? false),
-        ),
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
@@ -173,14 +146,9 @@ class _BatchRenameSheetState extends State<_BatchRenameSheet> {
 }
 
 class _BatchDeleteSheet extends StatefulWidget {
-  const _BatchDeleteSheet({
-    required this.entries,
-    required this.canCommit,
-    required this.onSubmit,
-  });
+  const _BatchDeleteSheet({required this.entries, required this.onSubmit});
 
   final List<PasswordEntry> entries;
-  final bool canCommit;
   final _BatchDeleteSubmit onSubmit;
 
   @override
@@ -189,7 +157,6 @@ class _BatchDeleteSheet extends StatefulWidget {
 
 class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
   var _confirmation = '';
-  var _commit = false;
   var _saving = false;
   String? _errorText;
 
@@ -203,7 +170,7 @@ class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
       _errorText = null;
     });
     try {
-      final result = await widget.onSubmit(_commit);
+      final result = await widget.onSubmit();
       if (mounted) {
         Navigator.of(context).pop(result);
       }
@@ -229,11 +196,6 @@ class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
           decoration: InputDecoration(labelText: context.l10n.confirmation),
           onChanged: (value) => _confirmation = value,
         ),
-        _CommitCheckbox(
-          enabled: widget.canCommit && !_saving,
-          value: _commit,
-          onChanged: (value) => setState(() => _commit = value ?? false),
-        ),
         _ErrorText(_errorText),
         _SubmitButton(
           saving: _saving,
@@ -249,14 +211,12 @@ class _BatchDeleteSheetState extends State<_BatchDeleteSheet> {
 class _BatchRegenerateSheet extends StatefulWidget {
   const _BatchRegenerateSheet({
     required this.entries,
-    required this.canCommit,
     required this.onSubmit,
     this.title,
     this.submitLabel,
   });
 
   final List<PasswordEntry> entries;
-  final bool canCommit;
   final _BatchRegenerateSubmit onSubmit;
   final String? title;
   final String? submitLabel;
@@ -267,7 +227,6 @@ class _BatchRegenerateSheet extends StatefulWidget {
 
 class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
   var _noSymbols = false;
-  var _commit = false;
   var _saving = false;
   String? _errorText;
 
@@ -277,7 +236,7 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
       _errorText = null;
     });
     try {
-      final result = await widget.onSubmit(_noSymbols, _commit);
+      final result = await widget.onSubmit(_noSymbols);
       if (mounted) {
         Navigator.of(context).pop(result);
       }
@@ -306,11 +265,6 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
                   ? null
                   : (value) => setState(() => _noSymbols = value ?? false),
           title: Text(context.l10n.noSymbols),
-        ),
-        _CommitCheckbox(
-          enabled: widget.canCommit && !_saving,
-          value: _commit,
-          onChanged: (value) => setState(() => _commit = value ?? false),
         ),
         _ErrorText(_errorText),
         _SubmitButton(

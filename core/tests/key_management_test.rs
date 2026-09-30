@@ -219,17 +219,42 @@ fn imports_openssh_rsa_ecdsa_and_pkcs1_private_keys() {
 }
 
 #[test]
-fn rejecting_an_encrypted_ssh_key_writes_nothing() {
+fn an_encrypted_openssh_key_is_imported_without_its_passphrase() {
     let dest = tempfile::tempdir().unwrap();
     let key = PrivateKey::random(&mut OsRng, Algorithm::Ed25519).unwrap();
     let encrypted = key.encrypt(&mut OsRng, "hunter2").unwrap();
     let text = encrypted.to_openssh(LineEnding::LF).unwrap();
 
-    let err = import_ssh_private_key_text(dest.path(), "locked", &text).unwrap_err();
+    let imported = import_ssh_private_key_text(dest.path(), "locked", &text).unwrap();
 
-    assert!(err.to_string().contains("encrypted"), "{}", err);
+    assert!(imported.encrypted);
+    assert!(imported.has_private_key);
+    let stored = fs::read_to_string(dest.path().join("locked")).unwrap();
+    assert_eq!(stored.trim(), text.trim());
+    let public = fs::read_to_string(dest.path().join("locked.pub")).unwrap();
+    assert!(public.starts_with("ssh-ed25519 "));
+    assert!(public.trim_end().ends_with(" locked"));
+    let listed = list_ssh_keys(dest.path()).unwrap();
+    assert!(listed.iter().any(|key| key.name == "locked" && key.encrypted));
+}
+
+#[test]
+fn rejecting_an_encrypted_pem_key_writes_nothing() {
+    let dest = tempfile::tempdir().unwrap();
+    let text = "-----BEGIN ENCRYPTED PRIVATE KEY-----\nAAAA\n-----END ENCRYPTED PRIVATE KEY-----\n";
+
+    let err = import_ssh_private_key_text(dest.path(), "locked", text).unwrap_err();
+
+    assert!(err.to_string().contains("Encrypted PEM"), "{}", err);
     assert!(!dest.path().join("locked").exists());
     assert!(!dest.path().join("locked.pub").exists());
+}
+
+#[test]
+fn unencrypted_keys_are_not_flagged_encrypted() {
+    let dest = tempfile::tempdir().unwrap();
+    let key = generate_ssh_ed25519_key(dest.path(), "plain").unwrap();
+    assert!(!key.encrypted);
 }
 
 #[test]

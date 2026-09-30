@@ -1,3 +1,4 @@
+import '../models/git_sync.dart';
 import '../models/key_record.dart';
 import '../models/password_entry.dart';
 import '../models/pgp_key_import.dart';
@@ -120,11 +121,11 @@ class FakeParsRepository
   }
 
   @override
-  Future<GitOperationResult> runArgs(List<String> args) async {
+  Future<GitOperationResult> runCommandLine(String commandLine) async {
     return GitOperationResult(
-      command: 'git ${args.join(' ')}',
+      command: 'git ${commandLine.trim()}',
       stdout:
-          args.join(' ') == 'remote -v'
+          commandLine.trim() == 'remote -v'
               ? 'origin\tgit@example.com:org/pass.git (fetch)\norigin\tgit@example.com:org/pass.git (push)\n'
               : 'ok',
       stderr: '',
@@ -132,6 +133,131 @@ class FakeParsRepository
       success: true,
     );
   }
+
+  static const GitStatusSummary _cleanSummary = GitStatusSummary(
+    branch: 'main',
+    upstream: 'origin/main',
+    ahead: 0,
+    behind: 0,
+    changed: 0,
+    conflicted: 0,
+    operation: GitOperationState.none,
+    lastFetchedAt: null,
+  );
+
+  @override
+  GitStatusSummary? get statusSummary => _cleanSummary;
+
+  @override
+  GitSyncConflict? get lastConflict => null;
+
+  @override
+  bool get lastRemoteCheckFailed => false;
+
+  @override
+  GitPreferences get preferences => const GitPreferences();
+
+  @override
+  Future<void> updatePreferences(GitPreferences preferences) async {}
+
+  @override
+  Future<void> checkRemoteOnLaunch() async {}
+
+  @override
+  Future<GitSyncOutcome> sync({
+    required bool commitPending,
+    String message = 'Sync password store',
+  }) async {
+    return const GitSyncOutcome(
+      committed: false,
+      pulled: 0,
+      pushed: false,
+      blockedByChanges: false,
+      conflict: null,
+      summary: _cleanSummary,
+    );
+  }
+
+  @override
+  Future<GitResetOutcome> resetToUpstream() async {
+    return const GitResetOutcome(
+      committed: false,
+      backupBranch: null,
+      summary: _cleanSummary,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> pushBackupBranch(String branch) async {
+    return GitOperationResult(
+      command: 'git push origin $branch',
+      stdout: 'Pushed $branch.',
+      stderr: '',
+      exitCode: 0,
+      success: true,
+    );
+  }
+
+  @override
+  Future<List<GitLogEntry>> history({int limit = 50}) async {
+    return <GitLogEntry>[
+      GitLogEntry(
+        id: 'b3da0f4',
+        summary: 'Edit password work/dev/github',
+        author: 'Vollate',
+        time: DateTime.utc(2026, 9, 28, 9, 30),
+      ),
+      GitLogEntry(
+        id: '8c21e07',
+        summary: 'Generate password personal/email',
+        author: 'Vollate',
+        time: DateTime.utc(2026, 9, 27, 18, 5),
+      ),
+    ];
+  }
+
+  @override
+  Future<GitRemoteBranches> remoteBranches() async {
+    return const GitRemoteBranches(
+      remote: 'origin',
+      current: 'main',
+      branches: <String>['archive', 'main'],
+    );
+  }
+
+  @override
+  Future<void> switchBranch(String branch) async {}
+
+  @override
+  Future<GitIdentity?> identity() async {
+    return const GitIdentity(name: 'Vollate', email: 'me@example.com');
+  }
+
+  @override
+  GitIdentity? suggestedIdentity() {
+    return const GitIdentity(name: 'Vollate', email: 'me@example.com');
+  }
+
+  @override
+  Future<void> setIdentity({
+    required String name,
+    required String email,
+  }) async {}
+
+  @override
+  Future<bool> hasHttpsCredentials() async => false;
+
+  @override
+  Future<void> rememberHttpsCredentials(HttpsCredentials credentials) async {}
+
+  @override
+  Future<void> forgetHttpsCredentials() async {}
+
+  @override
+  Future<void> rememberSshPassphrase(
+    String passphrase, {
+    required bool persist,
+  }) async {}
 
   @override
   Future<List<GitRemote>> listRemotes() async {
@@ -182,15 +308,6 @@ class FakeParsRepository
       success: true,
     );
   }
-
-  @override
-  Future<GitOperationResult> autoPullOnOpen() => pull();
-
-  @override
-  Future<GitOperationResult> recoverByPull() => pull();
-
-  @override
-  Future<GitOperationResult> syncWithRemote() => pull();
 
   @override
   List<PasswordEntry> get entries => const <PasswordEntry>[
@@ -400,6 +517,9 @@ class FakeParsRepository
       affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
     );
   }
+
+  @override
+  bool get commitsEveryChange => true;
 
   @override
   Future<GitOperationResult> commitChanges(String message) async {

@@ -103,10 +103,12 @@ pub fn list_ssh_keys(ssh_dir: &Path) -> GuiResult<Vec<SshKeySummary>> {
             continue;
         };
         let fingerprint = ssh_public_key_fingerprint(&path)?;
+        let private_path = ssh_dir.join(stem);
         keys.push(SshKeySummary {
             name: stem.to_string(),
             fingerprint,
-            has_private_key: ssh_dir.join(stem).is_file(),
+            has_private_key: private_path.is_file(),
+            encrypted: ssh_private_key_file_is_encrypted(&private_path),
         });
     }
 
@@ -142,7 +144,13 @@ pub fn import_ssh_private_key_text(
         }
     })?;
     let parsed = parse_ssh_private_key(private_key)?;
-    let (private_key, public_key_text) = openssh_key_pair(parsed, name)?;
+    let (private_key, public_key_text) = if parsed.is_encrypted() {
+        // The comment lives in the encrypted section, so the original text is stored unchanged
+        // and only the public half is rewritten.
+        (format!("{}\n", private_key.trim()), openssh_public_key(&parsed, name)?)
+    } else {
+        openssh_key_pair(parsed, name)?
+    };
 
     fs::create_dir_all(ssh_dir)?;
     let private_path = ssh_dir.join(name);
@@ -258,11 +266,26 @@ fn ssh_public_key_path(ssh_dir: &Path, name: &str) -> PathBuf {
 
 fn ssh_key_summary(ssh_dir: &Path, name: &str) -> GuiResult<SshKeySummary> {
     let public_path = ssh_public_key_path(ssh_dir, name);
+    let private_path = ssh_dir.join(name);
     Ok(SshKeySummary {
         name: name.to_string(),
         fingerprint: ssh_public_key_fingerprint(&public_path)?,
-        has_private_key: ssh_dir.join(name).is_file(),
+        has_private_key: private_path.is_file(),
+        encrypted: ssh_private_key_file_is_encrypted(&private_path),
     })
+}
+
+/// Whether private key text needs a passphrase before it can authenticate.
+pub fn ssh_private_key_text_is_encrypted(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.contains("-----BEGIN OPENSSH PRIVATE KEY-----") {
+        return PrivateKey::from_openssh(trimmed).is_ok_and(|key| key.is_encrypted());
+    }
+    trimmed.contains("-----BEGIN ENCRYPTED PRIVATE KEY-----") || trimmed.contains("ENCRYPTED")
+}
+
+fn ssh_private_key_file_is_encrypted(private_path: &Path) -> bool {
+    fs::read_to_string(private_path).is_ok_and(|text| ssh_private_key_text_is_encrypted(&text))
 }
 
 fn ssh_public_key_fingerprint(public_path: &Path) -> GuiResult<String> {
@@ -287,8 +310,8 @@ fn parse_ssh_private_key(text: &str) -> GuiResult<PrivateKey> {
         let key = PrivateKey::from_openssh(trimmed).map_err(ssh_key_error)?;
         return usable_private_key(key);
     }
-    if trimmed.contains("-----BEGIN ENCRYPTED PRIVATE KEY-----") {
-        return Err(encrypted_ssh_key_error());
+    if trimmed.contains("-----BEGIN ENCRYPTED PRIVATE KEY-----") || trimmed.contains("ENCRYPTED") {
+        return Err(encrypted_pem_key_error());
     }
     if trimmed.contains("-----BEGIN RSA PRIVATE KEY-----") {
         let rsa_key = RsaPemPrivateKey::from_pkcs1_pem(trimmed).map_err(ssh_key_error)?;
@@ -305,9 +328,6 @@ fn parse_ssh_private_key(text: &str) -> GuiResult<PrivateKey> {
 }
 
 fn usable_private_key(key: PrivateKey) -> GuiResult<PrivateKey> {
-    if key.is_encrypted() {
-        return Err(encrypted_ssh_key_error());
-    }
     match key.algorithm() {
         Algorithm::Ed25519 | Algorithm::Rsa { .. } | Algorithm::Ecdsa { .. } => Ok(key),
         other => Err(CoreError::ValidationError(format!(
@@ -317,9 +337,11 @@ fn usable_private_key(key: PrivateKey) -> GuiResult<PrivateKey> {
     }
 }
 
-fn encrypted_ssh_key_error() -> CoreError {
+fn encrypted_pem_key_error() -> CoreError {
     CoreError::ValidationError(
-        "SSH private key is encrypted. Remove the passphrase before importing.".to_string(),
+        "Encrypted PEM SSH keys are not supported. Convert the key to the OpenSSH format with \
+         ssh-keygen -p before importing."
+            .to_string(),
     )
 }
 
@@ -387,6 +409,16 @@ fn openssh_key_pair(mut key: PrivateKey, comment: &str) -> GuiResult<(String, St
         public_key.push('\n');
     }
     Ok((private_key.to_string(), public_key))
+}
+
+fn openssh_public_key(key: &PrivateKey, comment: &str) -> GuiResult<String> {
+    let mut public = key.public_key().clone();
+    public.set_comment(comment);
+    let mut public_key = public.to_openssh().map_err(ssh_key_error)?;
+    if !public_key.ends_with('\n') {
+        public_key.push('\n');
+    }
+    Ok(public_key)
 }
 
 fn ssh_key_error(error: impl Display) -> CoreError {

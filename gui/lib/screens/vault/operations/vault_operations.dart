@@ -4,8 +4,10 @@ import '../../../app/pars_design_tokens.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/operation_localizations.dart';
 import '../../../models/password_entry.dart';
+import '../../../services/git_repository.dart';
 import '../../../services/ui_problem.dart';
 import '../../../services/vault_repository.dart';
+import '../../../widgets/git_flows.dart';
 import '../../../widgets/pars_adaptive_surface.dart';
 
 part 'widgets/manage_operation_typedefs.dart';
@@ -25,37 +27,38 @@ Future<EntryOperationResult?> showFocusedEditEntrySheet({
         (context) => _EditEntrySheet(
           entry: entry,
           title: context.l10n.editEntries,
-          canCommit: true,
           onReadEntry: repository.readEntry,
-          onSaveRawNotes: (entry, password, fields, notes, commit) async {
+          onSaveRawNotes: (entry, password, fields, notes) async {
             final localizations = context.l10n;
             final result = await repository.editEntry(
               path: entry.path,
               content: _entryContent(password, fields, notes),
             );
+            if (!context.mounted) return result;
             return _commitEntryOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedEntryOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Edit password ${entry.path}',
             );
           },
-          onReplacePassword: (entry, password, commit) async {
+          onReplacePassword: (entry, password) async {
             final localizations = context.l10n;
             final result = await repository.replaceEntryPassword(
               entry: entry,
               password: password,
             );
+            if (!context.mounted) return result;
             return _commitEntryOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedEntryOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Replace password ${entry.path}',
             );
           },
@@ -75,21 +78,21 @@ Future<BatchOperationResult?> showFocusedRegenerateEntrySheet({
           entries: <PasswordEntry>[entry],
           title: context.l10n.regenerate,
           submitLabel: context.l10n.regenerate,
-          canCommit: true,
-          onSubmit: (noSymbols, commit) async {
+          onSubmit: (noSymbols) async {
             final localizations = context.l10n;
             final result = await repository.batchRegenerateEntries(
               entries: <PasswordEntry>[entry],
               length: 24,
               noSymbols: noSymbols,
             );
+            if (!context.mounted) return result;
             return _commitBatchOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedBatchOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Regenerate password ${entry.path}',
             );
           },
@@ -107,20 +110,20 @@ Future<EntryOperationResult?> showFocusedDeleteEntrySheet({
     builder:
         (context) => _DeleteEntrySheet(
           entry: entry,
-          canCommit: true,
-          onSubmit: (entry, commit) async {
+          onSubmit: (entry) async {
             final localizations = context.l10n;
             final result = await repository.deleteEntry(
               path: entry.path,
               recursive: entry.isDirectory,
             );
+            if (!context.mounted) return result;
             return _commitEntryOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedEntryOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Delete password ${entry.path}',
             );
           },
@@ -136,8 +139,7 @@ Future<EntryOperationResult?> showCreateGeneratedEntrySurface({
     context: context,
     builder:
         (context) => _GenerateEntrySheet(
-          canCommit: true,
-          onSubmit: (path, noSymbols, overwrite, commit) async {
+          onSubmit: (path, noSymbols, overwrite) async {
             final trimmedPath = path.trim();
             final localizations = context.l10n;
             final result = await repository.generateEntry(
@@ -146,13 +148,14 @@ Future<EntryOperationResult?> showCreateGeneratedEntrySurface({
               noSymbols: noSymbols,
               overwrite: overwrite,
             );
+            if (!context.mounted) return result;
             return _commitEntryOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedEntryOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Generate password $trimmedPath',
             );
           },
@@ -168,8 +171,7 @@ Future<EntryOperationResult?> showSaveExistingEntrySurface({
     context: context,
     builder:
         (context) => _SaveExistingEntrySheet(
-          canCommit: true,
-          onSubmit: (path, password, notes, overwrite, commit) async {
+          onSubmit: (path, password, notes, overwrite) async {
             final trimmedPath = path.trim();
             final localizations = context.l10n;
             final result = await repository.saveEntry(
@@ -177,13 +179,14 @@ Future<EntryOperationResult?> showSaveExistingEntrySurface({
               content: _manualEntryContent(password, notes),
               overwrite: overwrite,
             );
+            if (!context.mounted) return result;
             return _commitEntryOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedEntryOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Save password $trimmedPath',
             );
           },
@@ -203,8 +206,7 @@ Future<EntryOperationResult?> showFocusedMoveOrRenameEntrySurface({
         (context) => _MoveOrRenameEntrySheet(
           entry: entry,
           rename: rename,
-          canCommit: true,
-          onSubmit: (selected, target, overwrite, commit) async {
+          onSubmit: (selected, target, overwrite) async {
             final toPath =
                 rename
                     ? target.trim()
@@ -218,13 +220,14 @@ Future<EntryOperationResult?> showFocusedMoveOrRenameEntrySurface({
             final mutationResult = result.copyWith(
               action: rename ? 'Renamed' : 'Moved',
             );
+            if (!context.mounted) return mutationResult;
             return _commitEntryOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedEntryOperationSummary(localizations, mutationResult),
               ),
               repository: repository,
               result: mutationResult,
-              commit: commit,
               message:
                   '${rename ? 'Rename' : 'Move'} password ${selected.path}',
             );
@@ -243,21 +246,21 @@ Future<BatchOperationResult?> showBatchMoveEntriesSurface({
     builder:
         (context) => _BatchMoveSheet(
           entries: entries,
-          canCommit: true,
-          onSubmit: (destination, overwrite, commit) async {
+          onSubmit: (destination, overwrite) async {
             final localizations = context.l10n;
             final result = await repository.batchMoveEntries(
               entries: entries,
               destinationDirectory: destination,
               overwrite: overwrite,
             );
+            if (!context.mounted) return result;
             return _commitBatchOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedBatchOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Move ${entries.length} passwords',
             );
           },
@@ -275,8 +278,7 @@ Future<BatchOperationResult?> showBatchRenameEntriesSurface({
     builder:
         (context) => _BatchRenameSheet(
           entries: entries,
-          canCommit: true,
-          onSubmit: (prefix, suffix, overwrite, commit) async {
+          onSubmit: (prefix, suffix, overwrite) async {
             final localizations = context.l10n;
             final result = await repository.batchRenameEntries(
               entries: entries,
@@ -284,13 +286,14 @@ Future<BatchOperationResult?> showBatchRenameEntriesSurface({
               suffix: suffix,
               overwrite: overwrite,
             );
+            if (!context.mounted) return result;
             return _commitBatchOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedBatchOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Rename ${entries.length} passwords',
             );
           },
@@ -308,19 +311,19 @@ Future<BatchOperationResult?> showBatchDeleteEntriesSurface({
     builder:
         (context) => _BatchDeleteSheet(
           entries: entries,
-          canCommit: true,
-          onSubmit: (commit) async {
+          onSubmit: () async {
             final localizations = context.l10n;
             final result = await repository.batchDeleteEntries(
               entries: entries,
             );
+            if (!context.mounted) return result;
             return _commitBatchOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedBatchOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Delete ${entries.length} passwords',
             );
           },
@@ -338,21 +341,21 @@ Future<BatchOperationResult?> showBatchRegenerateEntriesSurface({
     builder:
         (context) => _BatchRegenerateSheet(
           entries: entries,
-          canCommit: true,
-          onSubmit: (noSymbols, commit) async {
+          onSubmit: (noSymbols) async {
             final localizations = context.l10n;
             final result = await repository.batchRegenerateEntries(
               entries: entries,
               length: 24,
               noSymbols: noSymbols,
             );
+            if (!context.mounted) return result;
             return _commitBatchOperation(
+              context: context,
               failureMessage: localizations.postMutationCommitFailed(
                 localizedBatchOperationSummary(localizations, result),
               ),
               repository: repository,
               result: result,
-              commit: commit,
               message: 'Regenerate ${entries.length} passwords',
             );
           },
@@ -361,40 +364,58 @@ Future<BatchOperationResult?> showBatchRegenerateEntriesSurface({
 }
 
 Future<EntryOperationResult> _commitEntryOperation({
+  required BuildContext context,
   required String failureMessage,
   required ManageRepository repository,
   required EntryOperationResult result,
-  required bool commit,
   required String message,
 }) async {
-  if (!commit) {
-    return result;
-  }
-  try {
-    final commitResult = await repository.commitChanges(message);
-    if (!commitResult.success) {
-      throw _PostMutationCommitException(failureMessage);
-    }
-  } on _PostMutationCommitException {
-    rethrow;
-  } catch (_) {
-    throw _PostMutationCommitException(failureMessage);
-  }
-  return result.copyWith(committed: true);
+  final committed = await _commitAfterMutation(
+    context: context,
+    failureMessage: failureMessage,
+    repository: repository,
+    message: message,
+  );
+  return committed ? result.copyWith(committed: true) : result;
 }
 
 Future<BatchOperationResult> _commitBatchOperation({
+  required BuildContext context,
   required String failureMessage,
   required ManageRepository repository,
   required BatchOperationResult result,
-  required bool commit,
   required String message,
 }) async {
-  if (!commit) {
-    return result;
-  }
+  final committed = await _commitAfterMutation(
+    context: context,
+    failureMessage: failureMessage,
+    repository: repository,
+    message: message,
+  );
+  return committed ? result.copyWith(committed: true) : result;
+}
+
+/// Commits when the "Commit every change" setting is on. Returns `false` when
+/// nothing was committed, including when the user dismissed the identity
+/// prompt; the mutation itself is never rolled back.
+Future<bool> _commitAfterMutation({
+  required BuildContext context,
+  required String failureMessage,
+  required ManageRepository repository,
+  required String message,
+}) async {
+  if (!repository.commitsEveryChange) return false;
+  final git =
+      repository is GitOperationsRepository
+          ? repository as GitOperationsRepository
+          : null;
   try {
-    final commitResult = await repository.commitChanges(message);
+    final commitResult = await runGitWithPrompts(
+      context,
+      git,
+      () => repository.commitChanges(message),
+    );
+    if (commitResult == null) return false;
     if (!commitResult.success) {
       throw _PostMutationCommitException(failureMessage);
     }
@@ -403,7 +424,7 @@ Future<BatchOperationResult> _commitBatchOperation({
   } catch (_) {
     throw _PostMutationCommitException(failureMessage);
   }
-  return result.copyWith(committed: true);
+  return true;
 }
 
 class _PostMutationCommitException implements Exception {

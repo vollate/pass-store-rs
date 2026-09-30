@@ -200,6 +200,56 @@ class _MockParsBridgeApi implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.GitStatusSummaryResponse> gitStatusSummary({
+    required frb.GitRequest request,
+  }) async => const frb.GitStatusSummaryResponse();
+
+  @override
+  Future<frb.GitStatusSummaryResponse> gitFetch({
+    required frb.GitRequest request,
+  }) async => const frb.GitStatusSummaryResponse();
+
+  @override
+  Future<frb.GitSyncResponse> gitSync({
+    required frb.GitSyncRequest request,
+  }) async => const frb.GitSyncResponse();
+
+  @override
+  Future<frb.GitResetResponse> gitResetToUpstream({
+    required frb.GitResetRequest request,
+  }) async => const frb.GitResetResponse();
+
+  @override
+  Future<frb.GitCommandResponse> gitPushBranch({
+    required frb.GitPushBranchRequest request,
+  }) async => const frb.GitCommandResponse();
+
+  @override
+  Future<frb.GitLogResponse> gitLog({
+    required frb.GitLogRequest request,
+  }) async => const frb.GitLogResponse(entries: <frb.GitLogEntryDto>[]);
+
+  @override
+  Future<frb.GitRemoteBranchesResponse> gitListRemoteBranches({
+    required frb.GitRequest request,
+  }) async => const frb.GitRemoteBranchesResponse(branches: <String>[]);
+
+  @override
+  Future<frb.GitStatusSummaryResponse> gitSwitchBranch({
+    required frb.GitSwitchBranchRequest request,
+  }) async => const frb.GitStatusSummaryResponse();
+
+  @override
+  Future<frb.GitIdentityResponse> gitIdentity({
+    required frb.GitIdentityRequest request,
+  }) async => const frb.GitIdentityResponse();
+
+  @override
+  Future<frb.UnitResponse> gitSetIdentity({
+    required frb.GitSetIdentityRequest request,
+  }) async => const frb.UnitResponse();
+
+  @override
   Future<frb.InspectStoreGitResponse> inspectStoreGit({
     required frb.InspectStoreGitRequest request,
   }) async =>

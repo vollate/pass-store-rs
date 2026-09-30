@@ -8,10 +8,7 @@ use std::process::Command;
 use git2::build::CheckoutBuilder;
 #[cfg(any(target_os = "android", target_os = "ios"))]
 use git2::build::RepoBuilder;
-use git2::{
-    BranchType, CertificateCheckStatus, Cred, CredentialType, FetchOptions, IndexAddOption,
-    PushOptions, RemoteCallbacks, Repository, Signature, Status, StatusOptions,
-};
+use git2::{BranchType, Cred, FetchOptions, Repository, Status, StatusOptions};
 use pars_core::autofill::{
     self, AutofillCredential, AutofillCredentialRequest as CoreAutofillCredentialRequest,
     AutofillQueryRequest as CoreAutofillQueryRequest,
@@ -41,6 +38,8 @@ use pars_core::pgp::import::{
 use pars_core::pgp::rpgp_backend::RpgpBackend;
 use secrecy::SecretString;
 
+use crate::git_ops::GitTransport;
+
 pub const SUPPORTED_METHODS: &[&str] = &[
     "load_config",
     "save_config",
@@ -54,9 +53,19 @@ pub const SUPPORTED_METHODS: &[&str] = &[
     "move_entry",
     "delete_entry",
     "git_status",
+    "git_status_summary",
+    "git_fetch",
     "git_pull",
     "git_push",
     "git_commit",
+    "git_sync",
+    "git_reset_to_upstream",
+    "git_push_branch",
+    "git_log",
+    "git_list_remote_branches",
+    "git_switch_branch",
+    "git_identity",
+    "git_set_identity",
     "git_list_remotes",
     "git_add_remote",
     "git_set_remote_url",
@@ -108,6 +117,9 @@ pub enum BridgeFailureCategory {
     ValidationError,
     Conflict,
     UnsupportedPlatform,
+    IdentityRequired,
+    AuthenticationRequired,
+    SshPassphraseRequired,
 }
 
 #[derive(Debug, Clone)]
@@ -405,6 +417,12 @@ pub struct GitRequest {
     pub ssh_private_key_path: Option<String>,
     pub ssh_dir: Option<String>,
     pub known_hosts: Option<String>,
+    /// Mobile only. Desktop keeps the system Git credential helpers.
+    pub https_username: Option<String>,
+    /// Mobile only. Never logged, returned, or persisted by the bridge.
+    pub https_token: Option<String>,
+    /// Mobile only. Never logged, returned, or persisted by the bridge.
+    pub ssh_passphrase: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -423,7 +441,158 @@ pub struct GitRemoteRequest {
 #[derive(Debug, Clone)]
 pub struct GitArgsRequest {
     pub root: String,
-    pub args: Vec<String>,
+    /// Tokenized in Rust; Flutter sends the text exactly as typed.
+    pub command_line: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitStatusOperationDto {
+    None,
+    Rebasing,
+    Merging,
+    Other,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitStatusSummaryDto {
+    pub branch: Option<String>,
+    pub upstream: Option<String>,
+    pub ahead: u32,
+    pub behind: u32,
+    pub changed: u32,
+    pub conflicted: u32,
+    pub operation: GitStatusOperationDto,
+    /// Unix seconds of the last fetch, from `FETCH_HEAD`.
+    pub last_fetched_at: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitStatusSummaryResponse {
+    pub summary: Option<GitStatusSummaryDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitIntegrationStrategyDto {
+    Rebase,
+    Merge,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitSyncRequest {
+    pub git: GitRequest,
+    pub message: String,
+    pub commit_pending: bool,
+    pub strategy: GitIntegrationStrategyDto,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitSyncConflictDto {
+    /// Absent when the repository was already mid-rebase or mid-merge before sync started.
+    pub backup_branch: Option<String>,
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitSyncResultDto {
+    pub committed: bool,
+    pub pulled: u32,
+    pub pushed: bool,
+    pub blocked_by_changes: bool,
+    pub conflict: Option<GitSyncConflictDto>,
+    pub summary: GitStatusSummaryDto,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitSyncResponse {
+    pub result: Option<GitSyncResultDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitResetRequest {
+    pub git: GitRequest,
+    pub message: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitResetResultDto {
+    pub committed: bool,
+    pub backup_branch: Option<String>,
+    pub summary: GitStatusSummaryDto,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitResetResponse {
+    pub result: Option<GitResetResultDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitPushBranchRequest {
+    pub git: GitRequest,
+    pub branch: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitLogRequest {
+    pub root: String,
+    pub limit: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitLogEntryDto {
+    pub id: String,
+    pub summary: String,
+    pub author: String,
+    /// Unix seconds.
+    pub time: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitLogResponse {
+    pub entries: Vec<GitLogEntryDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitRemoteBranchesResponse {
+    pub remote: Option<String>,
+    pub current: Option<String>,
+    pub branches: Vec<String>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitSwitchBranchRequest {
+    pub root: String,
+    pub branch: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitIdentityRequest {
+    pub root: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitIdentityDto {
+    pub name: String,
+    pub email: String,
+    /// True when both values come from the repository's own config.
+    pub local: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitIdentityResponse {
+    pub identity: Option<GitIdentityDto>,
+    pub error: Option<BridgeFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitSetIdentityRequest {
+    pub root: String,
+    pub name: String,
+    pub email: String,
 }
 
 #[derive(Debug, Clone)]
@@ -472,6 +641,9 @@ pub struct CloneStoreRequest {
     pub ssh_dir: Option<String>,
     pub known_hosts: Option<String>,
     pub overwrite: bool,
+    pub https_username: Option<String>,
+    pub https_token: Option<String>,
+    pub ssh_passphrase: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -851,6 +1023,8 @@ pub struct KeyRecordDto {
     pub fingerprint: String,
     pub source: String,
     pub has_private_key: bool,
+    /// Only SSH keys can be encrypted; they need a passphrase before use.
+    pub encrypted: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -1185,12 +1359,7 @@ pub async fn git_pull(request: GitRequest) -> GitCommandResponse {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         return structured_git_response("git pull", || {
-            structured_git_pull(
-                Path::new(&request.root),
-                request.ssh_private_key_path.as_deref().map(Path::new),
-                request.ssh_dir.as_deref().map(Path::new),
-                request.known_hosts.as_deref(),
-            )
+            structured_git_pull(Path::new(&request.root), &GitTransport::from_request(&request))
         });
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1204,12 +1373,7 @@ pub async fn git_push(request: GitRequest) -> GitCommandResponse {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         return structured_git_response("git push", || {
-            structured_git_push(
-                Path::new(&request.root),
-                request.ssh_private_key_path.as_deref().map(Path::new),
-                request.ssh_dir.as_deref().map(Path::new),
-                request.known_hosts.as_deref(),
-            )
+            structured_git_push(Path::new(&request.root), &GitTransport::from_request(&request))
         });
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1227,7 +1391,168 @@ pub async fn git_commit(request: GitCommitRequest) -> GitCommandResponse {
         });
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    run_git_command_response(request.root, vec!["commit", "-m", &request.message])
+    {
+        let response =
+            run_git_command_response(request.root, vec!["commit", "-m", &request.message]);
+        match &response.output {
+            Some(output)
+                if !output.success
+                    && (output.stderr.contains("Please tell me who you are")
+                        || output.stderr.contains("empty ident name")
+                        || output.stderr.contains("unable to auto-detect email address")) =>
+            {
+                GitCommandResponse {
+                    output: None,
+                    error: Some(crate::git_ops::identity_required()),
+                }
+            }
+            _ => response,
+        }
+    }
+}
+
+pub async fn git_status_summary(request: GitRequest) -> GitStatusSummaryResponse {
+    let root = PathBuf::from(&request.root);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result = crate::git_status::summarize_repository(&root);
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result = crate::git_ops::sys::summary(&root);
+    match result {
+        Ok(summary) => GitStatusSummaryResponse { summary: Some(summary), error: None },
+        Err(error) => GitStatusSummaryResponse { summary: None, error: Some(error) },
+    }
+}
+
+pub async fn git_fetch(request: GitRequest) -> GitStatusSummaryResponse {
+    let root = PathBuf::from(&request.root);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result = crate::git_ops::lg_fetch_summary(&root, &GitTransport::from_request(&request));
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result = crate::git_ops::sys::fetch(&root, request.known_hosts.as_deref());
+    match result {
+        Ok(summary) => GitStatusSummaryResponse { summary: Some(summary), error: None },
+        Err(error) => GitStatusSummaryResponse { summary: None, error: Some(error) },
+    }
+}
+
+pub async fn git_sync(request: GitSyncRequest) -> GitSyncResponse {
+    let root = PathBuf::from(&request.git.root);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result = crate::git_ops::lg_sync(
+        &root,
+        &GitTransport::from_request(&request.git),
+        &request.message,
+        request.commit_pending,
+        request.strategy,
+    );
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result = crate::git_ops::sys::sync(
+        &root,
+        request.git.known_hosts.as_deref(),
+        &request.message,
+        request.commit_pending,
+        request.strategy,
+    );
+    match result {
+        Ok(result) => GitSyncResponse { result: Some(result), error: None },
+        Err(error) => GitSyncResponse { result: None, error: Some(error) },
+    }
+}
+
+pub async fn git_reset_to_upstream(request: GitResetRequest) -> GitResetResponse {
+    let root = PathBuf::from(&request.git.root);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result =
+        crate::git_ops::lg_reset(&root, &GitTransport::from_request(&request.git), &request.message);
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result =
+        crate::git_ops::sys::reset(&root, request.git.known_hosts.as_deref(), &request.message);
+    match result {
+        Ok(result) => GitResetResponse { result: Some(result), error: None },
+        Err(error) => GitResetResponse { result: None, error: Some(error) },
+    }
+}
+
+pub async fn git_push_branch(request: GitPushBranchRequest) -> GitCommandResponse {
+    let root = PathBuf::from(&request.git.root);
+    let command = format!("git push {}", request.branch);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    return structured_git_response(&command, || {
+        crate::git_ops::lg_push_branch(
+            &root,
+            &GitTransport::from_request(&request.git),
+            &request.branch,
+        )
+    });
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    structured_git_response(&command, || {
+        crate::git_ops::sys::push_branch(&root, request.git.known_hosts.as_deref(), &request.branch)
+    })
+}
+
+pub async fn git_log(request: GitLogRequest) -> GitLogResponse {
+    let root = PathBuf::from(&request.root);
+    let limit = request.limit.clamp(1, 50);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result = crate::git_ops::lg_log(&root, limit);
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result = crate::git_ops::sys::log(&root, limit);
+    match result {
+        Ok(entries) => GitLogResponse { entries, error: None },
+        Err(error) => GitLogResponse { entries: Vec::new(), error: Some(error) },
+    }
+}
+
+pub async fn git_list_remote_branches(request: GitRequest) -> GitRemoteBranchesResponse {
+    let root = PathBuf::from(&request.root);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result = crate::git_ops::lg_remote_branches(&root);
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result = crate::git_ops::sys::remote_branches(&root);
+    match result {
+        Ok((remote, current, branches)) => {
+            GitRemoteBranchesResponse { remote, current, branches, error: None }
+        }
+        Err(error) => GitRemoteBranchesResponse {
+            remote: None,
+            current: None,
+            branches: Vec::new(),
+            error: Some(error),
+        },
+    }
+}
+
+pub async fn git_switch_branch(request: GitSwitchBranchRequest) -> GitStatusSummaryResponse {
+    let root = PathBuf::from(&request.root);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result = crate::git_ops::lg_switch_branch(&root, &request.branch);
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result = crate::git_ops::sys::switch_branch(&root, &request.branch);
+    match result {
+        Ok(summary) => GitStatusSummaryResponse { summary: Some(summary), error: None },
+        Err(error) => GitStatusSummaryResponse { summary: None, error: Some(error) },
+    }
+}
+
+pub async fn git_identity(request: GitIdentityRequest) -> GitIdentityResponse {
+    let root = PathBuf::from(&request.root);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result = crate::git_ops::lg_identity(&root);
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result = crate::git_ops::sys::identity(&root);
+    match result {
+        Ok(identity) => GitIdentityResponse { identity, error: None },
+        Err(error) => GitIdentityResponse { identity: None, error: Some(error) },
+    }
+}
+
+pub async fn git_set_identity(request: GitSetIdentityRequest) -> UnitResponse {
+    let root = PathBuf::from(&request.root);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let result = crate::git_ops::lg_set_identity(&root, &request.name, &request.email);
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let result = crate::git_ops::sys::set_identity(&root, &request.name, &request.email);
+    UnitResponse { error: result.err() }
 }
 
 pub async fn git_list_remotes(request: GitRequest) -> GitCommandResponse {
@@ -1284,7 +1609,8 @@ pub async fn run_git_args(request: GitArgsRequest) -> GitCommandResponse {
         };
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    match GitOperationRequest::new(PathBuf::from(request.root), request.args)
+    match gui::parse_git_command_line(&request.command_line)
+        .and_then(|args| GitOperationRequest::new(PathBuf::from(request.root), args))
         .and_then(gui::run_git_args)
     {
         Ok(output) => GitCommandResponse { output: Some(output.into()), error: None },
@@ -1367,6 +1693,7 @@ pub async fn generate_pgp_key(request: GeneratePgpKeyRequest) -> KeyMutationResp
                 fingerprint: result.fingerprint,
                 source: "Generated on device".to_string(),
                 has_private_key: result.imported_private_key,
+                encrypted: false,
             }),
             error: None,
         },
@@ -1764,6 +2091,7 @@ fn pgp_key_record(outcome: &PgpImportOutcome, name: Option<String>, source: &str
         fingerprint: outcome.fingerprint.clone(),
         source: source.to_string(),
         has_private_key: outcome.imported_private_key,
+        encrypted: false,
     }
 }
 
@@ -2203,8 +2531,8 @@ fn discard_incomplete_clone(root: &Path) {
         return;
     }
     match remove_clone_target(root) {
-        Ok(()) => git_log("removed incomplete clone"),
-        Err(error) => git_log(&format!("incomplete clone cleanup failed: {error}")),
+        Ok(()) => trace_git("removed incomplete clone"),
+        Err(error) => trace_git(&format!("incomplete clone cleanup failed: {error}")),
     }
 }
 
@@ -2215,15 +2543,15 @@ fn clone_store_inner(request: CloneStoreRequest) -> Result<(), BridgeFailure> {
     require_empty_canonical_store(&config)?;
     if clone_target_present(&root_path) {
         if !request.overwrite {
-            git_log("clone target already exists");
+            trace_git("clone target already exists");
             return Err(BridgeFailure::from(CoreError::Conflict(gui::EntryConflict {
                 kind: gui::EntryConflictKind::EntryAlreadyExists,
                 path: root,
             })));
         }
-        git_log("replacing existing clone target");
+        trace_git("replacing existing clone target");
         remove_clone_target(&root_path).map_err(|error| {
-            git_log(&format!("clone target replacement failed: {error}"));
+            trace_git(&format!("clone target replacement failed: {error}"));
             BridgeFailure::from(CoreError::StoreError(bounded_git_detail(&sanitize_git_text(
                 &error,
             ))))
@@ -2235,9 +2563,14 @@ fn clone_store_inner(request: CloneStoreRequest) -> Result<(), BridgeFailure> {
     if let Err(error) = clone_git_repository(
         &request.remote_url,
         &root_path,
-        request.ssh_private_key_path.as_deref(),
-        request.ssh_dir.as_deref(),
-        request.known_hosts.as_deref(),
+        &GitTransport {
+            ssh_private_key_path: request.ssh_private_key_path.as_deref().map(Path::new),
+            ssh_dir: request.ssh_dir.as_deref().map(Path::new),
+            known_hosts: request.known_hosts.as_deref(),
+            https_username: request.https_username.as_deref(),
+            https_token: request.https_token.as_deref(),
+            ssh_passphrase: request.ssh_passphrase.as_deref(),
+        },
     ) {
         discard_incomplete_clone(&root_path);
         return Err(error);
@@ -2524,7 +2857,7 @@ fn pgp_key_matches(required: &str, key: &PgpKeySummary) -> bool {
         || identity.to_lowercase().contains(&format!("<{}>", required.to_lowercase()))
 }
 
-fn ensure_git_trace() {
+pub(crate) fn ensure_git_trace() {
     static STARTED: std::sync::Once = std::sync::Once::new();
     STARTED.call_once(|| {
         let _ = git2::trace_set(git2::TraceLevel::Debug, libgit2_trace);
@@ -2533,10 +2866,10 @@ fn ensure_git_trace() {
 
 fn libgit2_trace(_level: git2::TraceLevel, message: &[u8]) {
     let text = String::from_utf8_lossy(message);
-    git_log(&format!("libgit2: {text}"));
+    trace_git(&format!("libgit2: {text}"));
 }
 
-fn git_log(message: &str) {
+pub(crate) fn trace_git(message: &str) {
     let text = if message.contains("PRIVATE KEY") || message.contains("BEGIN OPENSSH") {
         "[redacted]".to_string()
     } else {
@@ -2578,7 +2911,7 @@ fn android_log_line(message: &str) {
 }
 
 #[allow(dead_code)]
-fn git_failure(error: git2::Error) -> BridgeFailure {
+pub(crate) fn git_failure(error: git2::Error) -> BridgeFailure {
     ensure_git_trace();
     let message = error.message().trim();
     let detail = if message.is_empty() {
@@ -2586,11 +2919,11 @@ fn git_failure(error: git2::Error) -> BridgeFailure {
     } else {
         format!("{message} ({:?})", error.class())
     };
-    git_log(&format!("git failure: {detail}"));
+    trace_git(&format!("git failure: {detail}"));
     BridgeFailure::from(CoreError::GitError(bounded_git_detail(&sanitize_git_text(&detail))))
 }
 
-fn git_process_failure(output: &std::process::Output) -> BridgeFailure {
+pub(crate) fn git_process_failure(output: &std::process::Output) -> BridgeFailure {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let detail = if !stderr.trim().is_empty() { stderr.trim() } else { stdout.trim() };
@@ -2599,7 +2932,7 @@ fn git_process_failure(output: &std::process::Output) -> BridgeFailure {
     } else {
         bounded_git_detail(&sanitize_git_text(detail))
     };
-    git_log(&format!("git failure: {message}"));
+    trace_git(&format!("git failure: {message}"));
     BridgeFailure::from(CoreError::GitError(message))
 }
 
@@ -2715,30 +3048,10 @@ fn status_code(status: Status) -> &'static str {
 #[allow(dead_code)]
 fn structured_git_commit(root: &Path, message: &str) -> Result<String, BridgeFailure> {
     let repo = Repository::open(root).map_err(git_failure)?;
-    let mut index = repo.index().map_err(git_failure)?;
-    index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None).map_err(git_failure)?;
-    index.update_all(["*"].iter(), None).map_err(git_failure)?;
-    index.write().map_err(git_failure)?;
-    let tree_oid = index.write_tree().map_err(git_failure)?;
-    let tree = repo.find_tree(tree_oid).map_err(git_failure)?;
-    let signature = repo
-        .signature()
-        .or_else(|_| Signature::now("Pars", "pars@localhost"))
-        .map_err(git_failure)?;
-    let parent =
-        repo.head().ok().and_then(|head| head.target()).and_then(|oid| repo.find_commit(oid).ok());
-    if parent.as_ref().is_some_and(|commit| commit.tree_id() == tree_oid) {
-        return Err(BridgeFailure::from(CoreError::GitError("nothing to commit".to_string())));
+    match crate::git_ops::lg_commit_all(&repo, message)? {
+        Some(oid) => Ok(format!("[{oid}] {message}\n")),
+        None => Err(BridgeFailure::from(CoreError::GitError("nothing to commit".to_string()))),
     }
-    let oid = match parent.as_ref() {
-        Some(parent) => repo
-            .commit(Some("HEAD"), &signature, &signature, message, &tree, &[parent])
-            .map_err(git_failure)?,
-        None => repo
-            .commit(Some("HEAD"), &signature, &signature, message, &tree, &[])
-            .map_err(git_failure)?,
-    };
-    Ok(format!("[{oid}] {message}\n"))
 }
 
 #[allow(dead_code)]
@@ -2760,7 +3073,14 @@ fn structured_git_list_remotes(root: &Path) -> Result<String, BridgeFailure> {
 }
 
 fn sanitized_remote_url(url: &str) -> String {
-    let mut value = url.split(['?', '#']).next().unwrap_or(url).to_string();
+    // `?` and `#` end a query or fragment only on a remote URL. Porcelain
+    // status starts with the token `##`, and splitting that on `#` deletes
+    // the branch header so a clean clone is parsed as uncommitted.
+    let mut value = if url.contains("://") || scp_style_remote(url) {
+        url.split(['?', '#']).next().unwrap_or(url).to_string()
+    } else {
+        url.to_string()
+    };
     if let Some(scheme_end) = value.find("://") {
         let authority_start = scheme_end + 3;
         let authority_end = value[authority_start..]
@@ -2782,6 +3102,18 @@ fn sanitized_remote_url(url: &str) -> String {
         }
     }
     value
+}
+
+fn scp_style_remote(value: &str) -> bool {
+    let Some(at) = value.rfind('@') else {
+        return false;
+    };
+    let userinfo = &value[..at];
+    let host_path = &value[at + 1..];
+    !userinfo.contains(['/', '\\'])
+        && host_path.split_once(':').is_some_and(|(host, path)| {
+            !host.is_empty() && !path.is_empty() && !host.contains(['/', '\\'])
+        })
 }
 
 fn sanitize_git_text(raw: &str) -> String {
@@ -2902,88 +3234,15 @@ fn required_remote_url(request: &GitRemoteRequest) -> Result<&str, BridgeFailure
     })
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 fn git_remote_callbacks(
     ssh_private_key_path: Option<&Path>,
     ssh_dir: Option<&Path>,
     known_hosts: Option<&str>,
     remote_url: &str,
-) -> Result<RemoteCallbacks<'static>, BridgeFailure> {
-    let mut callbacks = RemoteCallbacks::new();
-    if let Some(private_key_path) = ssh_private_key_path {
-        let ssh_dir = ssh_dir.ok_or_else(|| {
-            BridgeFailure::from(CoreError::ValidationError(
-                "SSH key directory is required".to_string(),
-            ))
-        })?;
-        let root = ssh_dir.canonicalize().map_err(store_failure)?;
-        let metadata = fs::symlink_metadata(private_key_path).map_err(store_failure)?;
-        if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Err(BridgeFailure::from(CoreError::ValidationError(
-                "SSH private key must be a regular managed file".to_string(),
-            )));
-        }
-        let key_path = private_key_path.canonicalize().map_err(store_failure)?;
-        if !key_path.starts_with(&root) || key_path == root {
-            return Err(BridgeFailure::from(CoreError::ValidationError(
-                "SSH private key is outside managed storage".to_string(),
-            )));
-        }
-        callbacks.credentials(move |_url, username, allowed| {
-            if !allowed.contains(CredentialType::SSH_KEY)
-                && !allowed.contains(CredentialType::SSH_MEMORY)
-            {
-                return Err(git2::Error::from_str("SSH key credentials are not accepted"));
-            }
-            ssh_identity_credential(username.unwrap_or("git"), &key_path)
-        });
-    }
-    let _ = known_hosts;
-    if let Some((host_name, port)) = crate::known_hosts::ssh_remote_endpoint(remote_url) {
-        let ssh_dir = ssh_dir.ok_or_else(|| {
-            BridgeFailure::from(CoreError::ValidationError(
-                "SSH key directory is required".to_string(),
-            ))
-        })?;
-        let ssh_dir = ssh_dir.to_path_buf();
-        let stored = fs::read_to_string(ssh_dir.join("known_hosts")).unwrap_or_default();
-        callbacks.certificate_check(move |cert, connected_host| {
-            let Some(hostkey) = cert.as_hostkey() else {
-                return Ok(CertificateCheckStatus::CertificatePassthrough);
-            };
-            let raw = hostkey
-                .hostkey()
-                .ok_or_else(|| git2::Error::from_str("remote SSH host key is missing"))?;
-            let key_type = hostkey.hostkey_type().map(|kind| kind.name()).unwrap_or("unknown");
-            let hostname =
-                if connected_host.is_empty() { host_name.as_str() } else { connected_host };
-            match crate::known_hosts::remote_host_key_trust(&stored, hostname, port, key_type, raw)
-            {
-                crate::known_hosts::RemoteHostKeyTrust::Trusted => {
-                    git_log(&format!("ssh host {hostname}:{port} trusted ({key_type})"));
-                    Ok(CertificateCheckStatus::CertificateOk)
-                }
-                crate::known_hosts::RemoteHostKeyTrust::Changed => {
-                    git_log(&format!("ssh host {hostname}:{port} changed ({key_type})"));
-                    Err(git2::Error::from_str(
-                        "remote SSH host key does not match the remembered host key",
-                    ))
-                }
-                crate::known_hosts::RemoteHostKeyTrust::Unknown => {
-                    git_log(&format!(
-                        "ssh host {hostname}:{port} unknown; remembering ({key_type})"
-                    ));
-                    let line =
-                        crate::known_hosts::format_known_host_line(hostname, port, key_type, raw);
-                    remember_remote_host_key(&ssh_dir, &line).map_err(|_| {
-                        git2::Error::from_str("could not remember the remote SSH host key")
-                    })?;
-                    Ok(CertificateCheckStatus::CertificateOk)
-                }
-            }
-        });
-    }
-    Ok(callbacks)
+) -> Result<git2::RemoteCallbacks<'static>, BridgeFailure> {
+    let transport = GitTransport { ssh_private_key_path, ssh_dir, known_hosts, ..Default::default() };
+    crate::git_ops::transport_callbacks(&transport, remote_url).map(|(callbacks, _)| callbacks)
 }
 
 fn sibling_public_key_path(private_key: &Path) -> PathBuf {
@@ -2992,7 +3251,11 @@ fn sibling_public_key_path(private_key: &Path) -> PathBuf {
     private_key.with_file_name(name)
 }
 
-fn ssh_identity_credential(username: &str, private_key_path: &Path) -> Result<Cred, git2::Error> {
+pub(crate) fn ssh_identity_credential(
+    username: &str,
+    private_key_path: &Path,
+    passphrase: Option<&str>,
+) -> Result<Cred, git2::Error> {
     const MAX_SSH_KEY_BYTES: u64 = 1024 * 1024;
     let metadata = fs::metadata(private_key_path)
         .map_err(|_| git2::Error::from_str("unable to read SSH private key"))?;
@@ -3004,11 +3267,11 @@ fn ssh_identity_credential(username: &str, private_key_path: &Path) -> Result<Cr
     let public_key = fs::read_to_string(sibling_public_key_path(private_key_path))
         .ok()
         .filter(|text| text.len() <= 16 * 1024 && !text.contains("PRIVATE KEY"));
-    git_log("ssh identity loaded into memory");
-    Cred::ssh_key_from_memory(username, public_key.as_deref(), &private_key, None)
+    trace_git("ssh identity loaded into memory");
+    Cred::ssh_key_from_memory(username, public_key.as_deref(), &private_key, passphrase)
 }
 
-fn remember_remote_host_key(ssh_dir: &Path, line: &str) -> Result<(), BridgeFailure> {
+pub(crate) fn remember_remote_host_key(ssh_dir: &Path, line: &str) -> Result<(), BridgeFailure> {
     fs::create_dir_all(ssh_dir).map_err(store_failure)?;
     let path = ssh_dir.join("known_hosts");
     let mut options = OpenOptions::new();
@@ -3070,28 +3333,19 @@ fn configured_upstream(repo: &Repository) -> Result<ConfiguredUpstream, BridgeFa
 }
 
 #[allow(dead_code)]
-fn structured_git_pull(
-    root: &Path,
-    ssh_private_key_path: Option<&Path>,
-    ssh_dir: Option<&Path>,
-    known_hosts: Option<&str>,
-) -> Result<String, BridgeFailure> {
+fn structured_git_pull(root: &Path, transport: &GitTransport<'_>) -> Result<String, BridgeFailure> {
     ensure_git_trace();
-    git_log("pull");
+    trace_git("pull");
     let repo = Repository::open(root).map_err(git_failure)?;
     let upstream = configured_upstream(&repo)?;
     let mut remote = repo.find_remote(&upstream.remote_name).map_err(git_failure)?;
     let remote_url = remote.url().unwrap_or("").to_string();
+    let (callbacks, probe) = crate::git_ops::transport_callbacks(transport, &remote_url)?;
     let mut fetch_options = FetchOptions::new();
-    fetch_options.remote_callbacks(git_remote_callbacks(
-        ssh_private_key_path,
-        ssh_dir,
-        known_hosts,
-        &remote_url,
-    )?);
+    fetch_options.remote_callbacks(callbacks);
     remote
         .fetch(&[upstream.merge_ref.as_str()], Some(&mut fetch_options), None)
-        .map_err(git_failure)?;
+        .map_err(|error| probe.failure(error))?;
     drop(remote);
     let branch = repo.find_branch(&upstream.branch_name, BranchType::Local).map_err(git_failure)?;
     let upstream_branch = branch.upstream().map_err(|_| {
@@ -3109,7 +3363,7 @@ fn structured_git_pull(
     }
     if !analysis.is_fast_forward() {
         return Err(BridgeFailure::from(CoreError::GitError(
-            "mobile pull requires a fast-forward; resolve divergence with desktop Git".to_string(),
+            "local and remote history have diverged; use Sync to combine them".to_string(),
         )));
     }
     let target_object = repo.find_object(target, None).map_err(git_failure)?;
@@ -3121,27 +3375,16 @@ fn structured_git_pull(
 }
 
 #[allow(dead_code)]
-fn structured_git_push(
-    root: &Path,
-    ssh_private_key_path: Option<&Path>,
-    ssh_dir: Option<&Path>,
-    known_hosts: Option<&str>,
-) -> Result<String, BridgeFailure> {
-    ensure_git_trace();
-    git_log("push");
+fn structured_git_push(root: &Path, transport: &GitTransport<'_>) -> Result<String, BridgeFailure> {
     let repo = Repository::open(root).map_err(git_failure)?;
     let upstream = configured_upstream(&repo)?;
-    let refspec = format!("{}:{}", upstream.local_ref, upstream.merge_ref);
-    let mut remote = repo.find_remote(&upstream.remote_name).map_err(git_failure)?;
-    let remote_url = remote.url().unwrap_or("").to_string();
-    let mut push_options = PushOptions::new();
-    push_options.remote_callbacks(git_remote_callbacks(
-        ssh_private_key_path,
-        ssh_dir,
-        known_hosts,
-        &remote_url,
-    )?);
-    remote.push(&[&refspec], Some(&mut push_options)).map_err(git_failure)?;
+    crate::git_ops::lg_push(
+        &repo,
+        &upstream.remote_name,
+        &upstream.local_ref,
+        &upstream.merge_ref,
+        transport,
+    )?;
     Ok(format!("Pushed {} to {}.\n", upstream.local_ref, upstream.remote_name))
 }
 
@@ -3159,29 +3402,22 @@ fn init_git_repository(root: &Path) -> Result<(), BridgeFailure> {
 fn clone_git_repository(
     remote_url: &str,
     root: &Path,
-    ssh_private_key_path: Option<&str>,
-    ssh_dir: Option<&str>,
-    known_hosts: Option<&str>,
+    transport: &GitTransport<'_>,
 ) -> Result<(), BridgeFailure> {
     ensure_git_trace();
-    git_log(&format!("clone {remote_url}"));
+    trace_git(&format!("clone {remote_url}"));
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         let mut builder = RepoBuilder::new();
         let mut fetch = FetchOptions::new();
-        fetch.remote_callbacks(git_remote_callbacks(
-            ssh_private_key_path.map(Path::new),
-            ssh_dir.map(Path::new),
-            known_hosts,
-            remote_url,
-        )?);
+        let (callbacks, probe) = crate::git_ops::transport_callbacks(transport, remote_url)?;
+        fetch.remote_callbacks(callbacks);
         builder.fetch_options(fetch);
-        builder.clone(remote_url, root).map(|_| ()).map_err(git_failure)
+        builder.clone(remote_url, root).map(|_| ()).map_err(|error| probe.failure(error))
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        let _ = (ssh_private_key_path, ssh_dir);
-        with_selected_known_hosts(known_hosts, |known_hosts_file| {
+        with_selected_known_hosts(transport.known_hosts, |known_hosts_file| {
             let mut command = Command::new("git");
             command.args(["clone", remote_url, &root.display().to_string()]);
             if let Some(file) = known_hosts_file {
@@ -3252,7 +3488,7 @@ fn run_system_git_args_with_known_hosts(
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-fn with_selected_known_hosts<T>(
+pub(crate) fn with_selected_known_hosts<T>(
     known_hosts: Option<&str>,
     use_file: impl FnOnce(Option<&Path>) -> T,
 ) -> Result<T, BridgeFailure> {
@@ -3285,7 +3521,7 @@ fn write_private_text(path: &Path, text: &str) -> Result<(), BridgeFailure> {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-fn git_ssh_command(known_hosts_file: &Path) -> String {
+pub(crate) fn git_ssh_command(known_hosts_file: &Path) -> String {
     format!(
         "ssh -o UserKnownHostsFile={}",
         shell_single_quote(&known_hosts_file.display().to_string())
@@ -3311,7 +3547,7 @@ fn run_system_git(root: &Path, args: &[&str]) -> Result<(), BridgeFailure> {
     }
 }
 
-fn store_failure(error: std::io::Error) -> BridgeFailure {
+pub(crate) fn store_failure(error: std::io::Error) -> BridgeFailure {
     BridgeFailure::from(CoreError::StoreError(error.to_string()))
 }
 
@@ -3423,6 +3659,7 @@ impl From<PgpKeySummary> for KeyRecordDto {
             fingerprint: value.fingerprint,
             source: "GnuPG keyring".to_string(),
             has_private_key: value.has_private_key,
+            encrypted: false,
         }
     }
 }
@@ -3435,6 +3672,7 @@ impl From<SshKeySummary> for KeyRecordDto {
             fingerprint: value.fingerprint,
             source: "SSH key directory".to_string(),
             has_private_key: value.has_private_key,
+            encrypted: value.encrypted,
         }
     }
 }
@@ -3568,6 +3806,21 @@ mod tests {
     }
 
     #[test]
+    fn git_status_sanitization_keeps_the_porcelain_branch_header() {
+        let clean = sanitize_git_text("## main...origin/main\n");
+        assert_eq!(clean, "## main...origin/main\n");
+        assert!(clean.lines().all(|line| line.starts_with("##")));
+
+        let diverged = sanitize_git_text(
+            "## main...origin/main [ahead 1, behind 2]\n M entry.gpg\n?? new.gpg\n",
+        );
+        assert!(diverged.lines().next().unwrap().starts_with("## "));
+        assert!(diverged.contains("[ahead 1, behind 2]"));
+        assert!(diverged.contains(" M entry.gpg"));
+        assert!(diverged.contains("?? new.gpg"));
+    }
+
+    #[test]
     fn git_command_output_conversion_sanitizes_system_git_fields() {
         let output = gui::GitCommandOutput {
             command: "git remote add origin https://secret@example.com/pass.git?token=x".into(),
@@ -3617,10 +3870,10 @@ mod tests {
         let repo = init_test_repository(&root);
         fs::write(root.join(".gpg-id"), "ABC\n").unwrap();
         structured_git_commit(&root, "Initial").unwrap();
-        assert!(structured_git_push(&root, None, None, None).is_err());
+        assert!(structured_git_push(&root, &GitTransport::default()).is_err());
         let oid = repo.head().unwrap().target().unwrap();
         repo.set_head_detached(oid).unwrap();
-        assert!(structured_git_push(&root, None, None, None).is_err());
+        assert!(structured_git_push(&root, &GitTransport::default()).is_err());
     }
 
     #[test]
@@ -3639,7 +3892,7 @@ mod tests {
         let mut config = source.config().unwrap();
         config.set_str(&format!("branch.{branch_name}.remote"), "backup").unwrap();
         config.set_str(&format!("branch.{branch_name}.merge"), "refs/heads/mobile-main").unwrap();
-        structured_git_push(&source_path, None, None, None).expect("initial push");
+        structured_git_push(&source_path, &GitTransport::default()).expect("initial push");
         bare.set_head("refs/heads/mobile-main").expect("remote head");
 
         let clone_path = temp.path().join("clone");
@@ -3652,10 +3905,10 @@ mod tests {
             .unwrap();
         fs::write(source_path.join("entry.gpg"), b"ciphertext").expect("new entry");
         structured_git_commit(&source_path, "Second").expect("second commit");
-        structured_git_push(&source_path, None, None, None).expect("second push");
+        structured_git_push(&source_path, &GitTransport::default()).expect("second push");
 
         let before = Repository::open(&clone_path).unwrap().head().unwrap().target().unwrap();
-        let pull = structured_git_pull(&clone_path, None, None, None).expect("fast-forward pull");
+        let pull = structured_git_pull(&clone_path, &GitTransport::default()).expect("fast-forward pull");
         assert!(pull.contains("Fast-forwarded"));
         let after = Repository::open(&clone_path).unwrap().head().unwrap().target().unwrap();
         assert_ne!(before, after);
@@ -3689,7 +3942,7 @@ mod tests {
         assert!(git_remote_callbacks(Some(&key_path), None, None, "https://example.com/repo.git")
             .is_err());
         fs::write(ssh_dir.join("mobile-key.pub"), "ssh-ed25519 AAAA comment\n").unwrap();
-        ssh_identity_credential("git", &key_path).expect("memory credential");
+        ssh_identity_credential("git", &key_path, None).expect("memory credential");
         assert_eq!(
             sibling_public_key_path(std::path::Path::new("/tmp/id_rsa")),
             std::path::Path::new("/tmp/id_rsa.pub")

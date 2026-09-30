@@ -16,6 +16,7 @@ import '../../services/vault_repository.dart';
 import '../../services/ui_problem.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/failure_notice.dart';
+import '../../widgets/git_flows.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/entry_tile.dart';
 import '../../widgets/pars_action_group.dart';
@@ -527,22 +528,23 @@ class _VaultScreenState extends State<VaultScreen> {
     _showBatchOperationResult(result);
   }
 
-  Future<void> _refreshVault() => _runVaultLoad(widget.vaultRepository.refresh);
+  Future<void> _refreshVault() async {
+    await _runVaultLoad(widget.vaultRepository.refresh);
+    final git = _gitOperations;
+    if (git == null || !mounted) return;
+    await git.checkRemoteOnLaunch();
+    if (mounted) setState(() {});
+  }
 
   /// Pull-to-refresh syncs with the remote first; the Git operations refresh
   /// the entry list themselves once the remote state has landed.
   Future<void> _syncVault() {
     final git = _gitOperations;
-    if (git == null) return _refreshVault();
+    if (git == null || git.gitMode != StoreGitMode.remote) {
+      return _runVaultLoad(widget.vaultRepository.refresh);
+    }
     return _runVaultLoad(() async {
-      final result = await git.syncWithRemote();
-      if (!result.success) {
-        final detail = [
-          result.stderr.trim(),
-          result.stdout.trim(),
-        ].where((part) => part.isNotEmpty).join('\n');
-        throw StateError(detail.isEmpty ? 'Git sync failed' : detail);
-      }
+      await runGitSyncFlow(context, git);
     });
   }
 
@@ -709,26 +711,7 @@ class _VaultScreenState extends State<VaultScreen> {
 
   String _gitStatusLabel(BuildContext context) {
     if (_isLoading) return context.l10n.storeActionInProgress;
-    final operational = switch (widget.gitRepository.gitStatus) {
-      RepoGitStatus.disabled => context.l10n.gitDisabledState,
-      RepoGitStatus.clean => context.l10n.gitClean,
-      RepoGitStatus.needPull => context.l10n.gitNeedPull,
-      RepoGitStatus.uncommitted => context.l10n.gitUncommitted,
-      RepoGitStatus.invalid => context.l10n.invalidGitMetadataTitle,
-      RepoGitStatus.syncFailed => context.l10n.gitSyncFailed,
-    };
-    return switch (_storeGitMode) {
-      StoreGitMode.disabled => context.l10n.gitDisabledState,
-      StoreGitMode.invalid => context.l10n.invalidGitMetadataTitle,
-      StoreGitMode.local =>
-        widget.gitRepository.gitStatus == RepoGitStatus.clean
-            ? context.l10n.gitLocalState
-            : '${context.l10n.gitLocalState} · $operational',
-      StoreGitMode.remote =>
-        widget.gitRepository.gitStatus == RepoGitStatus.clean
-            ? '${context.l10n.gitRemoteState} · ${context.l10n.gitClean}'
-            : operational,
-    };
+    return gitStatusLabel(context.l10n, widget.gitRepository.gitStatus);
   }
 
   ParsStatusKind get _gitStatusKind {
@@ -742,11 +725,29 @@ class _VaultScreenState extends State<VaultScreen> {
       RepoGitStatus.uncommitted => ParsStatusKind.warning,
       RepoGitStatus.invalid => ParsStatusKind.error,
       RepoGitStatus.syncFailed => ParsStatusKind.error,
+      RepoGitStatus.needPush => ParsStatusKind.warning,
+      RepoGitStatus.diverged => ParsStatusKind.warning,
+      RepoGitStatus.conflicted => ParsStatusKind.warning,
     };
   }
 
-  void _handleGitStatus() {
-    AppNotification.show(context, _gitStatusLabel(context));
+  Future<void> _handleGitStatus() async {
+    final git = _gitOperations;
+    final status = widget.gitRepository.gitStatus;
+    if (git != null &&
+        !_isLoading &&
+        (status == RepoGitStatus.conflicted ||
+            status == RepoGitStatus.diverged)) {
+      await showGitRecoveryDialog(context, git, onSync: _syncVault);
+      if (mounted) setState(() {});
+      return;
+    }
+    final label = _gitStatusLabel(context);
+    final detail =
+        git != null && git.lastRemoteCheckFailed
+            ? ' · ${context.l10n.gitRemoteCheckFailed}'
+            : '';
+    AppNotification.show(context, '$label$detail');
   }
 
   void _openDirectory(PasswordEntry entry) {

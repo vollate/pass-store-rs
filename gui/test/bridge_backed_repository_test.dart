@@ -4,11 +4,14 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/bridge/frb_generated/api.dart' as frb;
 import 'package:pars_gui/bridge/pars_bridge_api.dart';
+import 'package:pars_gui/models/git_sync.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/models/pgp_key_import.dart';
 import 'package:pars_gui/services/autofill_repository.dart';
 import 'package:pars_gui/services/bridge_backed_repository.dart';
+import 'package:pars_gui/services/git_credential_store.dart';
+import 'package:pars_gui/services/git_repository.dart';
 import 'package:pars_gui/services/mobile_pgp_backend.dart';
 import 'package:pars_gui/services/security_repository.dart';
 import 'package:pars_gui/services/store_lifecycle.dart';
@@ -65,7 +68,7 @@ void main() {
           'inspect_app_state',
           'list_keys',
           'list_entries',
-          'git_status',
+          'git_status_summary',
           'read_entry',
           'copy_entry_password',
         ]),
@@ -73,6 +76,79 @@ void main() {
       expect(repository.keys.single.name, 'github-mobile');
     },
   );
+
+  test('clean tracking status stays clean', () async {
+    final bridge = _LifecycleBridge()..gitSummary = gitSummaryDto();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+
+    await repository.refresh();
+
+    expect(repository.gitStatus, RepoGitStatus.clean);
+    expect(bridge.calledMethods, isNot(contains('git_status')));
+  });
+
+  test('behind tracking status is pull needed, not uncommitted', () async {
+    final bridge = _LifecycleBridge()..gitSummary = gitSummaryDto(behind: 1);
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+    );
+
+    await repository.refresh();
+
+    expect(repository.gitStatus, RepoGitStatus.needPull);
+  });
+
+  test('status classification follows the documented order', () {
+    GitStatusSummary summary({
+      int ahead = 0,
+      int behind = 0,
+      int changed = 0,
+      int conflicted = 0,
+      String? upstream = 'origin/main',
+      GitOperationState operation = GitOperationState.none,
+    }) => GitStatusSummary(
+      branch: 'main',
+      upstream: upstream,
+      ahead: ahead,
+      behind: behind,
+      changed: changed,
+      conflicted: conflicted,
+      operation: operation,
+      lastFetchedAt: null,
+    );
+    RepoGitStatus classify(
+      GitStatusSummary value, {
+      GitSyncConflict? conflict,
+    }) =>
+        classifyGitStatus(value, mode: StoreGitMode.remote, conflict: conflict);
+
+    expect(classify(summary()), RepoGitStatus.clean);
+    expect(classify(summary(ahead: 1)), RepoGitStatus.needPush);
+    expect(classify(summary(ahead: 1, behind: 2)), RepoGitStatus.diverged);
+    expect(classify(summary(behind: 2)), RepoGitStatus.needPull);
+    expect(classify(summary(changed: 1, ahead: 1)), RepoGitStatus.uncommitted);
+    expect(
+      classify(summary(operation: GitOperationState.rebasing)),
+      RepoGitStatus.conflicted,
+    );
+    expect(classify(summary(conflicted: 1)), RepoGitStatus.conflicted);
+    expect(
+      classify(
+        summary(),
+        conflict: const GitSyncConflict(backupBranch: 'b', paths: <String>[]),
+      ),
+      RepoGitStatus.conflicted,
+    );
+    expect(classify(summary(upstream: null)), RepoGitStatus.needPush);
+    expect(
+      classifyGitStatus(summary(upstream: null), mode: StoreGitMode.local),
+      RepoGitStatus.clean,
+    );
+  });
 
   test(
     'refresh persists a snapshot that hydrate replays without the bridge',
@@ -129,26 +205,7 @@ void main() {
     expect(restored.entries, isEmpty);
   });
 
-  test('pull-to-refresh sync pulls and pushes local commits ahead', () async {
-    final bridge = _LifecycleBridge()..gitStatusStdout = '## main [ahead 1]\n';
-    final repository = BridgeBackedRepository(
-      bridge: bridge,
-      configPath: '/tmp/pars_config.toml',
-      snapshotCache: InMemoryVaultSnapshotCache(),
-      metadataStore: InMemoryVaultMetadataStore(),
-    );
-    await repository.refresh();
-    bridge.calledMethods.clear();
-
-    await repository.syncWithRemote();
-
-    expect(
-      bridge.calledMethods,
-      containsAllInOrder(<String>['git_pull', 'git_push']),
-    );
-  });
-
-  test('pull-to-refresh sync skips push when nothing is ahead', () async {
+  test('sync sends the commit choice and the rebase default', () async {
     final bridge = _LifecycleBridge();
     final repository = BridgeBackedRepository(
       bridge: bridge,
@@ -159,11 +216,173 @@ void main() {
     await repository.refresh();
     bridge.calledMethods.clear();
 
-    await repository.syncWithRemote();
+    final outcome = await repository.sync(commitPending: true);
 
-    expect(bridge.calledMethods, contains('git_pull'));
-    expect(bridge.calledMethods, isNot(contains('git_push')));
+    expect(bridge.calledMethods, contains('git_sync'));
+    expect(bridge.lastSyncRequest?.commitPending, isTrue);
+    expect(
+      bridge.lastSyncRequest?.strategy,
+      frb.GitIntegrationStrategyDto.rebase,
+    );
+    expect(outcome.pushed, isTrue);
+    expect(bridge.calledMethods, isNot(contains('git_pull')));
   });
+
+  test('a sync conflict keeps the badge on conflict until reset', () async {
+    final bridge =
+        _LifecycleBridge()
+          ..syncResult = frb.GitSyncResultDto(
+            committed: false,
+            pulled: 0,
+            pushed: false,
+            blockedByChanges: false,
+            conflict: const frb.GitSyncConflictDto(
+              backupBranch: 'pars/backup-20260930-100000',
+              paths: <String>['work/github.gpg'],
+            ),
+            summary: gitSummaryDto(),
+          );
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      snapshotCache: InMemoryVaultSnapshotCache(),
+      metadataStore: InMemoryVaultMetadataStore(),
+    );
+    await repository.refresh();
+
+    final outcome = await repository.sync(commitPending: false);
+
+    expect(outcome.conflict?.backupBranch, 'pars/backup-20260930-100000');
+    expect(repository.gitStatus, RepoGitStatus.conflicted);
+
+    final reset = await repository.resetToUpstream();
+    expect(reset.backupBranch, 'pars/backup-20260930-100000');
+    expect(repository.lastConflict, isNull);
+    expect(repository.gitStatus, isNot(RepoGitStatus.conflicted));
+  });
+
+  test('typed bridge failures become typed exceptions', () async {
+    final bridge =
+        _LifecycleBridge()
+          ..syncFailure = const frb.BridgeFailure(
+            category: frb.BridgeFailureCategory.identityRequired,
+            message: 'Set a Git name and email before committing.',
+          );
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      snapshotCache: InMemoryVaultSnapshotCache(),
+      metadataStore: InMemoryVaultMetadataStore(),
+    );
+    await repository.refresh();
+
+    await expectLater(
+      repository.sync(commitPending: true),
+      throwsA(isA<GitIdentityRequiredException>()),
+    );
+    expect(repository.gitStatus, isNot(RepoGitStatus.syncFailed));
+
+    bridge.syncFailure = const frb.BridgeFailure(
+      category: frb.BridgeFailureCategory.authenticationRequired,
+      message: 'The remote needs a username and token.',
+    );
+    await expectLater(
+      repository.sync(commitPending: true),
+      throwsA(isA<GitAuthenticationRequiredException>()),
+    );
+
+    bridge.syncFailure = const frb.BridgeFailure(
+      category: frb.BridgeFailureCategory.gitError,
+      message: 'network down',
+    );
+    await expectLater(
+      repository.sync(commitPending: true),
+      throwsA(isA<BridgeRepositoryException>()),
+    );
+    expect(repository.gitStatus, RepoGitStatus.syncFailed);
+  });
+
+  test('identity, history, and branches go through the bridge', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      snapshotCache: InMemoryVaultSnapshotCache(),
+      metadataStore: InMemoryVaultMetadataStore(),
+    );
+    await repository.refresh();
+
+    expect(await repository.identity(), isNull);
+    await repository.setIdentity(
+      name: 'Ada Lovelace',
+      email: 'ada@example.invalid',
+    );
+    expect(bridge.lastSetIdentityRequest?.name, 'Ada Lovelace');
+    expect((await repository.identity())?.email, 'ada@example.invalid');
+
+    final history = await repository.history();
+    expect(history.single.summary, 'Edit password work/github');
+    expect(history.single.time.toUtc(), DateTime.utc(2026, 9, 30, 10));
+
+    final branches = await repository.remoteBranches();
+    expect(branches.branches, <String>['archive', 'main']);
+    expect(
+      bridge.calledMethods,
+      containsAllInOrder(<String>['git_fetch', 'git_list_remote_branches']),
+    );
+
+    await repository.pushBackupBranch('pars/backup-20260930-100000');
+    expect(bridge.lastPushBranchRequest?.branch, 'pars/backup-20260930-100000');
+  });
+
+  test('launch remote check runs once and never throws', () async {
+    final bridge = _LifecycleBridge();
+    final repository = BridgeBackedRepository(
+      bridge: bridge,
+      configPath: '/tmp/pars_config.toml',
+      snapshotCache: InMemoryVaultSnapshotCache(),
+      metadataStore: InMemoryVaultMetadataStore(),
+    );
+    await repository.refresh();
+    bridge.calledMethods.clear();
+
+    await repository.checkRemoteOnLaunch();
+    await repository.checkRemoteOnLaunch();
+
+    expect(bridge.calledMethods.where((m) => m == 'git_fetch'), hasLength(1));
+    expect(repository.lastRemoteCheckFailed, isFalse);
+  });
+
+  test(
+    'credential store keys ignore userinfo and keep secrets apart',
+    () async {
+      final storage = _MemorySecureStorage();
+      final store = GitCredentialStore(storage);
+
+      expect(
+        GitCredentialStore.normalizedRemoteKey(
+          'https://ada:old@Example.com/pass.git/?x=1#frag',
+        ),
+        'https://example.com/pass.git',
+      );
+      await store.writeHttps(
+        'https://ada@example.com/pass.git',
+        const HttpsCredentials(username: 'ada', token: 'token-value'),
+      );
+      final read = await store.readHttps('https://example.com/pass.git');
+      expect(read?.token, 'token-value');
+      await store.deleteHttps('https://example.com/pass.git');
+      expect(await store.readHttps('https://example.com/pass.git'), isNull);
+
+      await store.writePassphrase('work', 'secret', remember: false);
+      expect(await store.readPassphrase('work'), 'secret');
+      expect(storage.values, isEmpty);
+      await store.writePassphrase('work', 'secret', remember: true);
+      expect(storage.values.values, contains('secret'));
+      await store.deletePassphrase('work');
+      expect(await store.readPassphrase('work'), isNull);
+    },
+  );
 
   test(
     'bridge-backed repository exposes password-store PGP references',
@@ -213,6 +432,7 @@ void main() {
           fingerprint: '3A8E 9C12 77FA 22D1 90BD 48AA A991 D3B4 A702 91EF',
           source: 'GnuPG keyring',
           hasPrivateKey: true,
+          encrypted: false,
         ),
       ],
     );
@@ -953,7 +1173,7 @@ void main() {
 
       await repository.refresh();
       expect(repository.lifecycle.store?.gitMode, StoreGitMode.local);
-      expect(bridge.calledMethods, contains('git_status'));
+      expect(bridge.calledMethods, contains('git_status_summary'));
       bridge.calledMethods.clear();
 
       final pull = await repository.pull();
@@ -1175,6 +1395,7 @@ void main() {
           fingerprint: 'PROTECTED PGP',
           source: 'Imported private key',
           hasPrivateKey: true,
+          encrypted: false,
         ),
       );
       final repository = BridgeBackedRepository(
@@ -1367,6 +1588,7 @@ class _LifecycleBridge implements ParsBridgeApi {
         fingerprint: 'SHA256:test',
         source: 'SSH key directory',
         hasPrivateKey: true,
+        encrypted: false,
       ),
     ],
   });
@@ -1375,6 +1597,14 @@ class _LifecycleBridge implements ParsBridgeApi {
   bool storePresent = true;
   bool failDisconnect = false;
   String gitStatusStdout = '## main\n M example.gpg\n';
+  frb.GitStatusSummaryDto gitSummary = gitSummaryDto(changed: 1);
+  frb.GitSyncResultDto? syncResult;
+  frb.BridgeFailure? syncFailure;
+  frb.GitSyncRequest? lastSyncRequest;
+  frb.GitResetRequest? lastResetRequest;
+  frb.GitPushBranchRequest? lastPushBranchRequest;
+  frb.GitSetIdentityRequest? lastSetIdentityRequest;
+  frb.GitIdentityDto? identityDto;
   frb.StoreGitModeDto gitMode;
   final bool failGitInitialization;
   final List<frb.KeyRecordDto> listedKeys;
@@ -1424,6 +1654,7 @@ class _LifecycleBridge implements ParsBridgeApi {
       fingerprint: 'IMPORTED PGP',
       source: 'Imported public key',
       hasPrivateKey: false,
+      encrypted: false,
     ),
   );
 
@@ -1639,6 +1870,7 @@ class _LifecycleBridge implements ParsBridgeApi {
         fingerprint: 'SHA256:test',
         source: 'SSH key directory',
         hasPrivateKey: true,
+        encrypted: false,
       ),
     );
   }
@@ -1923,12 +2155,140 @@ class _LifecycleBridge implements ParsBridgeApi {
   }
 
   @override
+  Future<frb.GitStatusSummaryResponse> gitStatusSummary({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_status_summary');
+    return frb.GitStatusSummaryResponse(summary: gitSummary);
+  }
+
+  @override
+  Future<frb.GitStatusSummaryResponse> gitFetch({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_fetch');
+    return frb.GitStatusSummaryResponse(summary: gitSummary);
+  }
+
+  @override
+  Future<frb.GitSyncResponse> gitSync({
+    required frb.GitSyncRequest request,
+  }) async {
+    calledMethods.add('git_sync');
+    lastSyncRequest = request;
+    final failure = syncFailure;
+    if (failure != null) return frb.GitSyncResponse(error: failure);
+    return frb.GitSyncResponse(
+      result:
+          syncResult ??
+          frb.GitSyncResultDto(
+            committed: request.commitPending,
+            pulled: 0,
+            pushed: true,
+            blockedByChanges: false,
+            summary: gitSummaryDto(),
+          ),
+    );
+  }
+
+  @override
+  Future<frb.GitResetResponse> gitResetToUpstream({
+    required frb.GitResetRequest request,
+  }) async {
+    calledMethods.add('git_reset_to_upstream');
+    lastResetRequest = request;
+    return frb.GitResetResponse(
+      result: frb.GitResetResultDto(
+        committed: false,
+        backupBranch: 'pars/backup-20260930-100000',
+        summary: gitSummaryDto(),
+      ),
+    );
+  }
+
+  @override
+  Future<frb.GitCommandResponse> gitPushBranch({
+    required frb.GitPushBranchRequest request,
+  }) async {
+    calledMethods.add('git_push_branch');
+    lastPushBranchRequest = request;
+    return frb.GitCommandResponse(
+      output: frb.GitCommandOutputDto(
+        command: 'git push ${request.branch}',
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        success: true,
+      ),
+    );
+  }
+
+  @override
+  Future<frb.GitLogResponse> gitLog({
+    required frb.GitLogRequest request,
+  }) async {
+    calledMethods.add('git_log');
+    return frb.GitLogResponse(
+      entries: <frb.GitLogEntryDto>[
+        frb.GitLogEntryDto(
+          id: 'b3da0f4',
+          summary: 'Edit password work/github',
+          author: 'Pars Test',
+          time: 1790762400,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<frb.GitRemoteBranchesResponse> gitListRemoteBranches({
+    required frb.GitRequest request,
+  }) async {
+    calledMethods.add('git_list_remote_branches');
+    return const frb.GitRemoteBranchesResponse(
+      remote: 'origin',
+      current: 'main',
+      branches: <String>['archive', 'main'],
+    );
+  }
+
+  @override
+  Future<frb.GitStatusSummaryResponse> gitSwitchBranch({
+    required frb.GitSwitchBranchRequest request,
+  }) async {
+    calledMethods.add('git_switch_branch');
+    return frb.GitStatusSummaryResponse(summary: gitSummary);
+  }
+
+  @override
+  Future<frb.GitIdentityResponse> gitIdentity({
+    required frb.GitIdentityRequest request,
+  }) async {
+    calledMethods.add('git_identity');
+    return frb.GitIdentityResponse(identity: identityDto);
+  }
+
+  @override
+  Future<frb.UnitResponse> gitSetIdentity({
+    required frb.GitSetIdentityRequest request,
+  }) async {
+    calledMethods.add('git_set_identity');
+    lastSetIdentityRequest = request;
+    identityDto = frb.GitIdentityDto(
+      name: request.name,
+      email: request.email,
+      local: true,
+    );
+    return const frb.UnitResponse();
+  }
+
+  @override
   Future<frb.GitCommandResponse> runGitArgs({
     required frb.GitArgsRequest request,
   }) async {
     calledMethods.add('run_git_args');
     lastGitArgsRequest = request;
-    final args = request.args.join(' ');
+    final args = request.commandLine.trim();
     final stdout =
         args == 'remote -v'
             ? 'origin\tgit@example.com:org/pass.git (fetch)\norigin\tgit@example.com:org/pass.git (push)\n'
@@ -1963,6 +2323,7 @@ class _LifecycleBridge implements ParsBridgeApi {
         fingerprint: 'GENERATED PGP',
         source: 'Generated key',
         hasPrivateKey: true,
+        encrypted: false,
       ),
     );
   }
@@ -1986,5 +2347,41 @@ class _LifecycleBridge implements ParsBridgeApi {
     required frb.ExportSshKeyRequest request,
   }) {
     throw UnimplementedError();
+  }
+}
+
+frb.GitStatusSummaryDto gitSummaryDto({
+  int ahead = 0,
+  int behind = 0,
+  int changed = 0,
+  int conflicted = 0,
+  String? upstream = 'origin/main',
+  frb.GitStatusOperationDto operation = frb.GitStatusOperationDto.none,
+}) {
+  return frb.GitStatusSummaryDto(
+    branch: 'main',
+    upstream: upstream,
+    ahead: ahead,
+    behind: behind,
+    changed: changed,
+    conflicted: conflicted,
+    operation: operation,
+  );
+}
+
+class _MemorySecureStorage implements SecureStorageAdapter {
+  final Map<String, String> values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    values.remove(key);
   }
 }

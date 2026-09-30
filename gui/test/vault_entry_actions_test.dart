@@ -225,13 +225,16 @@ void main() {
   });
 
   testWidgets(
-    'failed optional commit states that mutation was not rolled back',
+    'failed automatic commit states that mutation was not rolled back',
     (tester) async {
-      final repository = _RecordingManageRepository()..failCommits = true;
+      final repository =
+          _RecordingManageRepository()
+            ..failCommits = true
+            ..autoCommit = true;
       await _pumpVault(tester, repository);
       await _openFocusedAction(tester, 'Edit');
 
-      await tester.tap(find.text('Commit after operation'));
+      expect(find.byType(CheckboxListTile), findsNothing);
       await tester.tap(find.widgetWithText(FilledButton, 'Save edited entry'));
       await tester.pumpAndSettle();
 
@@ -315,6 +318,10 @@ class _RecordingManageRepository extends FakeParsRepository {
   bool? lastDeleteRecursive;
   bool failEdits = false;
   bool failCommits = false;
+  bool autoCommit = false;
+
+  @override
+  bool get commitsEveryChange => autoCommit;
 
   @override
   String get currentRepoName => 'Test store';

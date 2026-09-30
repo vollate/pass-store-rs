@@ -31,7 +31,6 @@ void main() {
       'lib/screens/settings/widgets/settings_git_widgets.dart': <String>[
         'git',
         r'git ${_argsText.trim()}',
-        r'${remote.fetchUrl}\n${remote.pushUrl}',
       ],
     };
     final found = <String, List<String>>{};

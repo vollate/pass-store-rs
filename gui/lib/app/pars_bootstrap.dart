@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io' show File, Platform;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     show ExternalLibrary;
@@ -12,6 +11,7 @@ import '../bridge/pars_bridge_api.dart';
 import '../l10n/app_localizations.dart';
 import '../services/autofill_repository.dart';
 import '../services/bridge_backed_repository.dart';
+import '../services/git_credential_store.dart';
 import '../services/key_repository.dart';
 import '../services/mobile_pgp_backend.dart';
 import '../services/security_repository.dart';
@@ -205,6 +205,7 @@ Future<Widget> createParsGuiApp() async {
     managedStoreBaseDir: pgpRuntime.storeBaseDir,
     securityRepository: securityRepository,
     autofillRepository: autofillRepository,
+    gitCredentials: GitCredentialStore(const FlutterSecureStorageAdapter()),
   );
   // A cached snapshot is enough to route and paint the first frame; the vault
   // rescans on mount. Only a cache miss has to block startup on a full scan.

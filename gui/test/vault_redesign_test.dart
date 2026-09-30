@@ -142,9 +142,7 @@ void main() {
     expect(cleared, 1);
   });
 
-  testWidgets('Chinese Vault localizes disabled and local Git modes', (
-    tester,
-  ) async {
+  testWidgets('Chinese Vault shows a short Git status', (tester) async {
     await configureGuiTestViewport(tester);
     for (final mode in <StoreGitMode>[
       StoreGitMode.disabled,
@@ -169,9 +167,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(
-        find.text(
-          mode == StoreGitMode.disabled ? '未启用 Git · 仅本地密码库' : '本地 Git · 无远端',
-        ),
+        find.text(mode == StoreGitMode.disabled ? '关闭' : '已同步'),
         findsOneWidget,
       );
     }

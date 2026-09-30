@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/app/pars_gui_app.dart';
 import 'package:pars_gui/app/pars_theme.dart';
 import 'package:pars_gui/l10n/app_localizations.dart';
+import 'package:pars_gui/models/git_sync.dart';
 import 'package:pars_gui/models/key_record.dart';
 import 'package:pars_gui/models/password_entry.dart';
 import 'package:pars_gui/models/pgp_key_import.dart';
@@ -1143,10 +1144,13 @@ void main() {
     ]);
   });
 
-  testWidgets('manage shows conflict errors and optional commits', (
+  testWidgets('manage shows conflict errors and commits every change', (
     tester,
   ) async {
-    final repository = _ManageVaultRepository()..failNextWith = 'target exists';
+    final repository =
+        _ManageVaultRepository()
+          ..failNextWith = 'target exists'
+          ..commitsEveryChange = true;
 
     await _openManageSurface(
       tester,
@@ -1164,8 +1168,6 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Commit after operation'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Save generated password'));
     await tester.pumpAndSettle();
 
@@ -1368,22 +1370,35 @@ void main() {
     await _openSettingsTile(tester, 'Git sync and remotes');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Pull'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Pull'));
     await tester.pumpAndSettle();
     expect(repository.gitCalls, contains('pull'));
-    expect(find.text('git pull'), findsOneWidget);
-    expect(find.text('Already up to date.'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField).first, 'Sync now');
-    await tester.tap(find.text('Push after commit'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Sync'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Commit'));
+    expect(repository.gitCalls, contains('sync commit=true'));
+    expect(find.text('Pushed local commits'), findsOneWidget);
+    AppNotification.dismiss();
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Commit now'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Commit now'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Sync now');
+    await tester.tap(find.widgetWithText(FilledButton, 'Commit'));
+    await tester.pumpAndSettle();
     expect(repository.gitCalls, contains('commit Sync now'));
-    expect(repository.gitCalls, contains('push'));
-    expect(find.textContaining('git commit -m "Sync now"'), findsOneWidget);
-    expect(find.textContaining('git push'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Commit every change'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Commit every change'));
+    await tester.pumpAndSettle();
+    expect(repository.gitPreferences.commitEveryChange, isFalse);
+    expect(find.text('Sync asks before committing'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('origin'),
@@ -1393,24 +1408,24 @@ void main() {
     expect(find.text('origin'), findsOneWidget);
     expect(find.textContaining('git@example.com:org/pass.git'), findsWidgets);
 
-    await tester.enterText(find.byType(TextField).at(1), 'backup');
-    await tester.enterText(
-      find.byType(TextField).at(2),
-      'git@example.com:backup/pass.git',
-    );
     await tester.scrollUntilVisible(
-      find.text('Add remote'),
+      find.widgetWithText(OutlinedButton, 'Add remote'),
       200,
       scrollable: find.byType(Scrollable).last,
     );
-    await tester.tap(find.text('Add remote'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Add remote'));
     await tester.pumpAndSettle();
-
-    expect(repository.gitCalls, contains('remote add backup'));
-    expect(
-      find.text('git remote add backup git@example.com:backup/pass.git'),
-      findsOneWidget,
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Remote name'),
+      'backup',
     );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Remote URL'),
+      'git@example.com:backup/pass.git',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Add remote'));
+    await tester.pumpAndSettle();
+    expect(repository.gitCalls, contains('remote add backup'));
 
     expect(find.text('Delete local repo'), findsNothing);
   });
@@ -1447,13 +1462,12 @@ void main() {
         find.widgetWithText(FilledButton, 'Initialize Git'),
         findsOneWidget,
       );
-      expect(find.text('List remotes'), findsNothing);
+      expect(find.text('Remotes and authentication'), findsNothing);
       expect(find.text('Add remote'), findsNothing);
       expect(find.text('SSH keys'), findsNothing);
       await tester.tap(find.text('Initialize Git'));
       await tester.pumpAndSettle();
       expect(repository.gitCalls, contains('init'));
-      expect(find.text('git init'), findsOneWidget);
     },
   );
 
@@ -1479,24 +1493,19 @@ void main() {
     await _openSettingsTile(tester, 'Git sync and remotes');
     await tester.pumpAndSettle();
 
-    expect(
-      tester
-          .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Pull'))
-          .onPressed,
-      isNull,
+    expect(find.widgetWithText(OutlinedButton, 'Pull'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Push'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Sync'), findsNothing);
+    expect(find.text('Check remote on launch'), findsNothing);
+    expect(find.text('Commit now'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('History'),
+      200,
+      scrollable: find.byType(Scrollable).last,
     );
-    expect(
-      tester
-          .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Push'))
-          .onPressed,
-      isNull,
-    );
-    expect(
-      tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Commit'))
-          .onPressed,
-      isNotNull,
-    );
+    expect(find.text('History'), findsOneWidget);
+    expect(find.text('Reset to remote'), findsNothing);
+    expect(find.text('Switch branch'), findsNothing);
   });
 
   testWidgets('invalid Git hides remote mutation controls', (tester) async {
@@ -1524,7 +1533,7 @@ void main() {
     await _openSettingsTile(tester, 'Git sync and remotes');
     await tester.pumpAndSettle();
     expect(find.text('Git metadata is invalid'), findsWidgets);
-    expect(find.text('List remotes'), findsNothing);
+    expect(find.text('Remotes and authentication'), findsNothing);
     expect(find.text('Add remote'), findsNothing);
     expect(find.text('SSH keys'), findsNothing);
   });
@@ -1568,9 +1577,7 @@ void main() {
   testWidgets('Git and SSH sheet remains usable at 200 percent text scale', (
     tester,
   ) async {
-    final repository = _GitSettingsRepository(
-      remoteUrl: 'https://example.com/pass.git',
-    );
+    final repository = _GitSettingsRepository();
     await tester.pumpWidget(
       MaterialApp(
         builder:
@@ -1597,21 +1604,30 @@ void main() {
     );
     await _openSettingsTile(tester, 'Git sync and remotes');
     await tester.pumpAndSettle();
-    expect(find.text('SSH keys'), findsNothing);
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Remote URL'),
-      'git@example.com:org/pass.git',
+    expect(tester.takeException(), isNull);
+    for (final label in <String>[
+      'Commit identity',
+      'Commit every change',
+      'SSH keys',
+      'History',
+      'Reset to remote',
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        160,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text(label), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+    await tester.scrollUntilVisible(
+      find.text('SSH keys'),
+      -160,
+      scrollable: find.byType(Scrollable).last,
     );
-    await tester.pumpAndSettle();
-    expect(find.text('SSH keys'), findsOneWidget);
     expect(
       tester.getSemantics(find.text('SSH keys')).label,
       contains('SSH keys'),
-    );
-    await tester.scrollUntilVisible(
-      find.text('SSH keys'),
-      160,
-      scrollable: find.byType(Scrollable).last,
     );
     await tester.tap(find.text('SSH keys'));
     await tester.pumpAndSettle();
@@ -3255,8 +3271,8 @@ class _GitSettingsRepository extends _InjectedRepository
   }
 
   @override
-  Future<GitOperationResult> runArgs(List<String> args) async {
-    final joined = args.join(' ');
+  Future<GitOperationResult> runCommandLine(String commandLine) async {
+    final joined = commandLine.trim();
     gitCalls.add(joined);
     if (failAdvancedArgs) {
       return GitOperationResult(
@@ -3329,14 +3345,123 @@ class _GitSettingsRepository extends _InjectedRepository
     );
   }
 
-  @override
-  Future<GitOperationResult> autoPullOnOpen() => pull();
+  GitPreferences gitPreferences = const GitPreferences();
+
+  static const GitStatusSummary _summary = GitStatusSummary(
+    branch: 'main',
+    upstream: 'origin/main',
+    ahead: 0,
+    behind: 0,
+    changed: 1,
+    conflicted: 0,
+    operation: GitOperationState.none,
+    lastFetchedAt: null,
+  );
 
   @override
-  Future<GitOperationResult> recoverByPull() => pull();
+  GitStatusSummary? get statusSummary => _summary;
 
   @override
-  Future<GitOperationResult> syncWithRemote() => pull();
+  GitSyncConflict? get lastConflict => null;
+
+  @override
+  bool get lastRemoteCheckFailed => false;
+
+  @override
+  GitPreferences get preferences => gitPreferences;
+
+  @override
+  Future<void> updatePreferences(GitPreferences preferences) async {
+    gitCalls.add('preferences');
+    gitPreferences = preferences;
+  }
+
+  @override
+  Future<void> checkRemoteOnLaunch() async {}
+
+  @override
+  Future<GitSyncOutcome> sync({
+    required bool commitPending,
+    String message = 'Sync password store',
+  }) async {
+    gitCalls.add('sync commit=$commitPending');
+    return const GitSyncOutcome(
+      committed: false,
+      pulled: 0,
+      pushed: true,
+      blockedByChanges: false,
+      conflict: null,
+      summary: _summary,
+    );
+  }
+
+  @override
+  Future<GitResetOutcome> resetToUpstream() async {
+    gitCalls.add('reset');
+    return const GitResetOutcome(
+      committed: false,
+      backupBranch: null,
+      summary: _summary,
+    );
+  }
+
+  @override
+  Future<GitOperationResult> pushBackupBranch(String branch) async {
+    gitCalls.add('push $branch');
+    return push();
+  }
+
+  @override
+  Future<List<GitLogEntry>> history({int limit = 50}) async {
+    gitCalls.add('log');
+    return const <GitLogEntry>[];
+  }
+
+  @override
+  Future<GitRemoteBranches> remoteBranches() async {
+    gitCalls.add('branches');
+    return const GitRemoteBranches(
+      remote: 'origin',
+      current: 'main',
+      branches: <String>['main'],
+    );
+  }
+
+  @override
+  Future<void> switchBranch(String branch) async {
+    gitCalls.add('switch $branch');
+  }
+
+  @override
+  Future<GitIdentity?> identity() async {
+    return const GitIdentity(name: 'Pars Test', email: 'pars@example.invalid');
+  }
+
+  @override
+  GitIdentity? suggestedIdentity() => null;
+
+  @override
+  Future<void> setIdentity({
+    required String name,
+    required String email,
+  }) async {
+    gitCalls.add('identity $name');
+  }
+
+  @override
+  Future<bool> hasHttpsCredentials() async => false;
+
+  @override
+  Future<void> rememberHttpsCredentials(HttpsCredentials credentials) async {}
+
+  @override
+  Future<void> forgetHttpsCredentials() async {}
+
+  @override
+  Future<void> rememberSshPassphrase(
+    String passphrase, {
+    required bool persist,
+  }) async {}
 }
 
 class _EmptyVaultRepository implements VaultRepository, GitRepository {
@@ -3666,6 +3791,9 @@ class _ManageVaultRepository implements ManageRepository {
   final List<List<String>> batchDeletedPaths = <List<String>>[];
   final List<List<String>> batchRegeneratedPaths = <List<String>>[];
   final List<String> commitMessages = <String>[];
+
+  @override
+  bool commitsEveryChange = false;
   String? failNextWith;
 
   @override
