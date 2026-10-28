@@ -36,29 +36,6 @@ void main() {
     );
   });
 
-  testWidgets('Vault selection compact English visual baseline', (
-    tester,
-  ) async {
-    await configureGuiTestViewport(tester);
-    final state = VaultDestinationState()..enterSelection('work/dev/github');
-    addTearDown(state.dispose);
-    await tester.pumpWidget(
-      buildLocalizedTestApp(
-        child: VaultScreen(
-          vaultRepository: repository,
-          gitRepository: repository,
-          viewState: state,
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/vault_selection_compact_en_light.png'),
-    );
-  });
-
   testWidgets('Vault search compact Chinese dark visual baseline', (
     tester,
   ) async {

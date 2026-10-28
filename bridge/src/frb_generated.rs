@@ -2659,6 +2659,7 @@ impl SseDecode for crate::api::CloneStoreRequest {
         let mut var_httpsUsername = <Option<String>>::sse_decode(deserializer);
         let mut var_httpsToken = <Option<String>>::sse_decode(deserializer);
         let mut var_sshPassphrase = <Option<String>>::sse_decode(deserializer);
+        let mut var_networkTimeoutMs = <u32>::sse_decode(deserializer);
         return crate::api::CloneStoreRequest {
             config_path: var_configPath,
             remote_url: var_remoteUrl,
@@ -2670,6 +2671,7 @@ impl SseDecode for crate::api::CloneStoreRequest {
             https_username: var_httpsUsername,
             https_token: var_httpsToken,
             ssh_passphrase: var_sshPassphrase,
+            network_timeout_ms: var_networkTimeoutMs,
         };
     }
 }
@@ -3139,6 +3141,7 @@ impl SseDecode for crate::api::GitRequest {
         let mut var_httpsUsername = <Option<String>>::sse_decode(deserializer);
         let mut var_httpsToken = <Option<String>>::sse_decode(deserializer);
         let mut var_sshPassphrase = <Option<String>>::sse_decode(deserializer);
+        let mut var_networkTimeoutMs = <u32>::sse_decode(deserializer);
         return crate::api::GitRequest {
             root: var_root,
             ssh_private_key_path: var_sshPrivateKeyPath,
@@ -3147,6 +3150,7 @@ impl SseDecode for crate::api::GitRequest {
             https_username: var_httpsUsername,
             https_token: var_httpsToken,
             ssh_passphrase: var_sshPassphrase,
+            network_timeout_ms: var_networkTimeoutMs,
         };
     }
 }
@@ -4649,6 +4653,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::CloneStoreRequest {
             self.https_username.into_into_dart().into_dart(),
             self.https_token.into_into_dart().into_dart(),
             self.ssh_passphrase.into_into_dart().into_dart(),
+            self.network_timeout_ms.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -5378,6 +5383,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::GitRequest {
             self.https_username.into_into_dart().into_dart(),
             self.https_token.into_into_dart().into_dart(),
             self.ssh_passphrase.into_into_dart().into_dart(),
+            self.network_timeout_ms.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -6702,6 +6708,7 @@ impl SseEncode for crate::api::CloneStoreRequest {
         <Option<String>>::sse_encode(self.https_username, serializer);
         <Option<String>>::sse_encode(self.https_token, serializer);
         <Option<String>>::sse_encode(self.ssh_passphrase, serializer);
+        <u32>::sse_encode(self.network_timeout_ms, serializer);
     }
 }
 
@@ -7054,6 +7061,7 @@ impl SseEncode for crate::api::GitRequest {
         <Option<String>>::sse_encode(self.https_username, serializer);
         <Option<String>>::sse_encode(self.https_token, serializer);
         <Option<String>>::sse_encode(self.ssh_passphrase, serializer);
+        <u32>::sse_encode(self.network_timeout_ms, serializer);
     }
 }
 

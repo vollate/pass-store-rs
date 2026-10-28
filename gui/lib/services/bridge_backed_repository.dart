@@ -25,6 +25,10 @@ import 'vault_metadata_store.dart';
 import 'vault_repository.dart';
 import 'vault_snapshot_cache.dart';
 
+/// Remote Git calls fail when the server does not answer a connection or one
+/// read within this long. The bridge does not choose the limit itself.
+const Duration _gitNetworkTimeout = Duration(seconds: 5);
+
 class BridgeRepositoryException implements Exception {
   const BridgeRepositoryException(this.message);
 
@@ -327,7 +331,7 @@ class BridgeBackedRepository
       case StoreGitMode.local:
       case StoreGitMode.remote:
         final summaryResponse = await bridge.gitStatusSummary(
-          request: frb.GitRequest(root: currentStore.root, sshDir: sshDir),
+          request: _gitRequest(currentStore.root),
         );
         if (refreshEpoch != _refreshEpoch) return;
         _applySummaryResponse(summaryResponse, currentStore.gitMode);
@@ -685,6 +689,7 @@ class BridgeBackedRepository
           httpsUsername: transport.request.httpsUsername,
           httpsToken: transport.request.httpsToken,
           sshPassphrase: transport.request.sshPassphrase,
+          networkTimeoutMs: _gitNetworkTimeout.inMilliseconds,
         ),
       );
       final failure = response.error;
@@ -1068,11 +1073,11 @@ class BridgeBackedRepository
     }
     final root = _requiredStoreRoot();
     final summaryResponse = await bridge.gitStatusSummary(
-      request: frb.GitRequest(root: root, sshDir: sshDir),
+      request: _gitRequest(root),
     );
     _applySummaryResponse(summaryResponse, mode);
     final response = await bridge.gitStatus(
-      request: frb.GitRequest(root: root, sshDir: sshDir),
+      request: _gitRequest(root),
     );
     return _gitResultFromBridge(response);
   }
@@ -1289,7 +1294,7 @@ class BridgeBackedRepository
     _throwIfFailure(fetched.error);
     _applySummaryResponse(fetched, StoreGitMode.remote);
     final response = await bridge.gitListRemoteBranches(
-      request: frb.GitRequest(root: root, sshDir: sshDir),
+      request: _gitRequest(root),
     );
     _throwIfFailure(response.error);
     return GitRemoteBranches(
@@ -1424,7 +1429,7 @@ class BridgeBackedRepository
       return const <GitRemote>[];
     }
     final response = await bridge.gitListRemotes(
-      request: frb.GitRequest(root: _requiredStoreRoot(), sshDir: sshDir),
+      request: _gitRequest(_requiredStoreRoot()),
     );
     return _parseRemotes(_gitResultFromBridge(response).stdout);
   }
@@ -1538,6 +1543,14 @@ class BridgeBackedRepository
     return lower.startsWith('https://') || lower.startsWith('http://');
   }
 
+  frb.GitRequest _gitRequest(String root) {
+    return frb.GitRequest(
+      root: root,
+      sshDir: sshDir,
+      networkTimeoutMs: _gitNetworkTimeout.inMilliseconds,
+    );
+  }
+
   /// Resolves the SSH key and any credentials for one network operation.
   /// Values the user just typed are only persisted once the remote accepts
   /// them; stored values the remote rejects are forgotten.
@@ -1593,6 +1606,7 @@ class BridgeBackedRepository
         httpsUsername: https?.username,
         httpsToken: https?.token,
         sshPassphrase: passphrase,
+        networkTimeoutMs: _gitNetworkTimeout.inMilliseconds,
       ),
       remoteUrl: url,
       httpsFromStore: httpsFromStore,

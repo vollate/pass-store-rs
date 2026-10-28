@@ -27,6 +27,7 @@ import '../../widgets/gesture_setup_panel.dart';
 import '../../widgets/git_flows.dart';
 import '../../widgets/pars_action_group.dart';
 import '../../widgets/pars_dialog.dart';
+import '../../widgets/password_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
 import '../../widgets/ssh_key_dialogs.dart';
 import '../../widgets/pars_adaptive_surface.dart';
@@ -104,12 +105,17 @@ class SettingsScreen extends StatelessWidget {
           title: localizations.securityPrivacySection,
           children: <Widget>[
             _SettingsTile(
-              title: localizations.gestureBiometricsTitle,
+              title:
+                  _usesPasswordLock
+                      ? localizations.passwordBiometricsTitle
+                      : localizations.gestureBiometricsTitle,
               subtitle:
                   securityRepository.lockOnResume
                       ? localizations.lockOnResumeState
+                      : _usesPasswordLock
+                      ? localizations.passwordConfiguredState
                       : localizations.gestureConfiguredState,
-              icon: Icons.pattern,
+              icon: _usesPasswordLock ? Icons.password : Icons.pattern,
               onTap: () => _showSecuritySheet(context),
             ),
             _SettingsTile(
@@ -237,6 +243,9 @@ class SettingsScreen extends StatelessWidget {
       AppLocalePreference.chinese => localizations.languageChinese,
     };
   }
+
+  bool get _usesPasswordLock =>
+      securityRepository.unlockMethod == LocalUnlockMethod.password;
 
   GitOperationsRepository? get _gitOperations =>
       gitRepository is GitOperationsRepository

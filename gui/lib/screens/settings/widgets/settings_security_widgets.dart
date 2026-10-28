@@ -231,21 +231,35 @@ class _SecuritySettingsSheetBodyState
     Duration(hours: 1),
   ];
 
-  var _isChangingGesture = false;
+  LocalUnlockMethod? _editingMethod;
+
+  LocalUnlockMethod get _currentMethod =>
+      widget.securityRepository.unlockMethod ?? platformDefaultUnlockMethod();
+
+  void _finishEditing(String message) {
+    widget.onSecuritySettingsChanged?.call();
+    setState(() => _editingMethod = null);
+    widget.onNotify(message);
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (_isChangingGesture) {
-      return _GestureChangeSheetBody(
-        securityRepository: widget.securityRepository,
-        onSaved: () {
-          widget.onSecuritySettingsChanged?.call();
-          setState(() => _isChangingGesture = false);
-          widget.onNotify(context.l10n.gestureConfirmed);
-        },
-      );
+    switch (_editingMethod) {
+      case LocalUnlockMethod.gesture:
+        return _GestureChangeSheetBody(
+          securityRepository: widget.securityRepository,
+          onSaved: () => _finishEditing(context.l10n.gestureConfirmed),
+        );
+      case LocalUnlockMethod.password:
+        return _PasswordChangeSheetBody(
+          securityRepository: widget.securityRepository,
+          onSaved: () => _finishEditing(context.l10n.passwordSaved),
+        );
+      case null:
+        break;
     }
 
+    final usesPassword = _currentMethod == LocalUnlockMethod.password;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(ParsSpacing.lg),
@@ -254,22 +268,51 @@ class _SecuritySettingsSheetBodyState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              context.l10n.gestureBiometricsTitle,
+              usesPassword
+                  ? context.l10n.passwordBiometricsTitle
+                  : context.l10n.gestureBiometricsTitle,
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: ParsSpacing.sm),
-            OutlinedButton.icon(
-              onPressed: () => setState(() => _isChangingGesture = true),
-              icon: const Icon(Icons.pattern),
-              label: Text(context.l10n.changeGesture),
+            ParsActionGroup(
+              actions: <ParsActionItem>[
+                ParsActionItem(
+                  label:
+                      usesPassword
+                          ? context.l10n.changePassword
+                          : context.l10n.changeGesture,
+                  icon: usesPassword ? Icons.password : Icons.pattern,
+                  onPressed:
+                      () => setState(() => _editingMethod = _currentMethod),
+                ),
+                ParsActionItem(
+                  label:
+                      usesPassword
+                          ? context.l10n.useGestureLock
+                          : context.l10n.usePasswordLock,
+                  icon: usesPassword ? Icons.pattern : Icons.password,
+                  onPressed:
+                      () => setState(
+                        () =>
+                            _editingMethod =
+                                usesPassword
+                                    ? LocalUnlockMethod.gesture
+                                    : LocalUnlockMethod.password,
+                      ),
+                ),
+              ],
             ),
             const SizedBox(height: ParsSpacing.xs),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(context.l10n.requireUnlockOnResume),
-              subtitle: Text(context.l10n.gestureFallbackDescription),
+              subtitle: Text(
+                usesPassword
+                    ? context.l10n.passwordFallbackDescription
+                    : context.l10n.gestureFallbackDescription,
+              ),
               value: widget.securityRepository.lockOnResume,
               onChanged: (value) async {
                 await widget.securityRepository.setLockOnResume(value);
@@ -416,6 +459,51 @@ class _GestureChangeSheetBody extends StatelessWidget {
                   securityRepository: securityRepository,
                   onSaved: onSaved,
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PasswordChangeSheetBody extends StatelessWidget {
+  const _PasswordChangeSheetBody({
+    required this.securityRepository,
+    required this.onSaved,
+  });
+
+  final SecurityRepository securityRepository;
+  final VoidCallback onSaved;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: ParsSpacing.lg,
+          right: ParsSpacing.lg,
+          top: ParsSpacing.lg,
+          bottom: MediaQuery.of(context).viewInsets.bottom + ParsSpacing.lg,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                context.l10n.setAppPassword,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: ParsSpacing.xs),
+              Text(context.l10n.enterConfirmPassword),
+              const SizedBox(height: ParsSpacing.md),
+              PasswordSetupPanel(
+                securityRepository: securityRepository,
+                onSaved: onSaved,
               ),
             ],
           ),

@@ -19,7 +19,6 @@ import '../../widgets/failure_notice.dart';
 import '../../widgets/git_flows.dart';
 import '../../widgets/app_section.dart';
 import '../../widgets/entry_tile.dart';
-import '../../widgets/pars_action_group.dart';
 import '../../widgets/pars_adaptive_surface.dart';
 import '../../widgets/pars_status_badge.dart';
 import '../shell/shell_view_state.dart';
@@ -104,12 +103,6 @@ class _VaultScreenState extends State<VaultScreen> {
       widget.gitRepository is GitOperationsRepository
           ? widget.gitRepository as GitOperationsRepository
           : null;
-  List<PasswordEntry> get _selectedEntries => widget.vaultRepository.entries
-      .where(
-        (entry) =>
-            !entry.isDirectory && _viewState.selectedPaths.contains(entry.path),
-      )
-      .toList(growable: false);
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +123,7 @@ class _VaultScreenState extends State<VaultScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton:
-          _manageRepository == null || _viewState.selectionMode
+          _manageRepository == null
               ? null
               : FloatingActionButton(
                 onPressed: _showCreateMenu,
@@ -171,12 +164,6 @@ class _VaultScreenState extends State<VaultScreen> {
                 ],
               ),
               actions: <Widget>[
-                if (_manageRepository != null && !_viewState.selectionMode)
-                  IconButton(
-                    tooltip: localizations.select,
-                    onPressed: () => setState(_viewState.enterSelection),
-                    icon: const Icon(Icons.checklist),
-                  ),
                 if (widget.onLock != null)
                   IconButton(
                     tooltip: localizations.lockNow,
@@ -226,18 +213,6 @@ class _VaultScreenState extends State<VaultScreen> {
                 ),
               ),
             ),
-            if (_viewState.selectionMode)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    ParsSpacing.md,
-                    ParsSpacing.sm,
-                    ParsSpacing.md,
-                    0,
-                  ),
-                  child: _buildVaultActions(context),
-                ),
-              ),
             if (_isLoading)
               const SliverToBoxAdapter(child: LinearProgressIndicator()),
             if (_loadError != null)
@@ -348,92 +323,18 @@ class _VaultScreenState extends State<VaultScreen> {
 
   // Reads as another row in the same grouped list rather than a separate card.
   Widget _buildUpOneLevelRow(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     return ParsSectionRow(
       leading: const ParsSectionRowIcon(icon: Icons.arrow_upward),
       title: context.l10n.upOneLevel,
-      subtitle: _directoryPath!,
-      subtitleStyle: ParsTheme.mono(
-        theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ) ??
-            const TextStyle(),
-      ),
       onTap: _openParentDirectory,
     );
   }
 
-  Widget _buildVaultActions(BuildContext context) {
-    final localizations = context.l10n;
-    final selectedCount = _selectedEntries.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                localizations.selectedCount(selectedCount),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-            ),
-            TextButton(
-              onPressed: () => setState(_viewState.clearSelection),
-              child: Text(localizations.cancel),
-            ),
-          ],
-        ),
-        if (selectedCount > 0)
-          ParsActionGroup(
-            actions: <ParsActionItem>[
-              ParsActionItem(
-                label: localizations.move,
-                icon: Icons.drive_file_move_outlined,
-                onPressed: _showBatchMove,
-              ),
-              ParsActionItem(
-                label: localizations.rename,
-                icon: Icons.drive_file_rename_outline,
-                onPressed: _showBatchRename,
-              ),
-              ParsActionItem(
-                label: localizations.regenerate,
-                icon: Icons.refresh,
-                onPressed: _showBatchRegenerate,
-              ),
-              ParsActionItem(
-                label: localizations.delete,
-                icon: Icons.delete_outline,
-                kind: ParsActionKind.destructive,
-                onPressed: _showBatchDelete,
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-
   Widget _buildEntryTile(PasswordEntry entry, {required VoidCallback onTap}) {
-    final selected = _viewState.selectedPaths.contains(entry.path);
     return EntryTile(
       entry: entry,
       onTap: onTap,
       onCopy: entry.isDirectory ? null : () => _copyPassword(entry),
-      onLongPress:
-          entry.isDirectory
-              ? null
-              : () => setState(() => _viewState.enterSelection(entry.path)),
-      selectionMode: _viewState.selectionMode,
-      selected: selected,
-      onSelectedChanged:
-          entry.isDirectory
-              ? null
-              : (value) => setState(
-                () => _viewState.setSelected(entry.path, selected: value),
-              ),
     );
   }
 
@@ -484,48 +385,6 @@ class _VaultScreenState extends State<VaultScreen> {
             );
     final result = await operation;
     _showEntryOperationResult(result);
-  }
-
-  Future<void> _showBatchMove() async {
-    final result = await showBatchMoveEntriesSurface(
-      context: context,
-      entries: _selectedEntries,
-      repository: _manageRepository!,
-    );
-    _finishBatchAction(result);
-  }
-
-  Future<void> _showBatchRename() async {
-    final result = await showBatchRenameEntriesSurface(
-      context: context,
-      entries: _selectedEntries,
-      repository: _manageRepository!,
-    );
-    _finishBatchAction(result);
-  }
-
-  Future<void> _showBatchRegenerate() async {
-    final result = await showBatchRegenerateEntriesSurface(
-      context: context,
-      entries: _selectedEntries,
-      repository: _manageRepository!,
-    );
-    _finishBatchAction(result);
-  }
-
-  Future<void> _showBatchDelete() async {
-    final result = await showBatchDeleteEntriesSurface(
-      context: context,
-      entries: _selectedEntries,
-      repository: _manageRepository!,
-    );
-    _finishBatchAction(result);
-  }
-
-  void _finishBatchAction(BatchOperationResult? result) {
-    if (result == null || !mounted) return;
-    setState(_viewState.clearSelection);
-    _showBatchOperationResult(result);
   }
 
   Future<void> _refreshVault() async {
@@ -755,14 +614,7 @@ class _VaultScreenState extends State<VaultScreen> {
   }
 
   void _openParentDirectory() {
-    final path = _directoryPath;
-    if (path == null) {
-      return;
-    }
-    final index = path.lastIndexOf('/');
-    setState(() {
-      _viewState.setDirectory(index == -1 ? null : path.substring(0, index));
-    });
+    if (_viewState.popDirectory()) setState(() {});
   }
 
   Future<void> _copyPassword(PasswordEntry entry) async {

@@ -4,6 +4,7 @@ use std::io::{Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 use git2::build::CheckoutBuilder;
 #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -423,6 +424,8 @@ pub struct GitRequest {
     pub https_token: Option<String>,
     /// Mobile only. Never logged, returned, or persisted by the bridge.
     pub ssh_passphrase: Option<String>,
+    /// How long a remote connect or a stalled read may take before that Git call fails.
+    pub network_timeout_ms: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -644,6 +647,8 @@ pub struct CloneStoreRequest {
     pub https_username: Option<String>,
     pub https_token: Option<String>,
     pub ssh_passphrase: Option<String>,
+    /// How long a remote connect or a stalled read may take before the clone fails.
+    pub network_timeout_ms: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -1359,13 +1364,22 @@ pub async fn git_pull(request: GitRequest) -> GitCommandResponse {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         return structured_git_response("git pull", || {
-            structured_git_pull(Path::new(&request.root), &GitTransport::from_request(&request))
+            structured_git_pull(
+                Path::new(&request.root),
+                &GitTransport::from_request(&request),
+                git_network_timeout(request.network_timeout_ms),
+            )
         });
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         let _ = (request.ssh_private_key_path, request.ssh_dir);
-        run_git_command_with_known_hosts(request.root, vec!["pull"], request.known_hosts.as_deref())
+        run_git_command_with_known_hosts(
+            request.root,
+            vec!["pull"],
+            request.known_hosts.as_deref(),
+            git_network_timeout(request.network_timeout_ms),
+        )
     }
 }
 
@@ -1373,13 +1387,22 @@ pub async fn git_push(request: GitRequest) -> GitCommandResponse {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         return structured_git_response("git push", || {
-            structured_git_push(Path::new(&request.root), &GitTransport::from_request(&request))
+            structured_git_push(
+                Path::new(&request.root),
+                &GitTransport::from_request(&request),
+                git_network_timeout(request.network_timeout_ms),
+            )
         });
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         let _ = (request.ssh_private_key_path, request.ssh_dir);
-        run_git_command_with_known_hosts(request.root, vec!["push"], request.known_hosts.as_deref())
+        run_git_command_with_known_hosts(
+            request.root,
+            vec!["push"],
+            request.known_hosts.as_deref(),
+            git_network_timeout(request.network_timeout_ms),
+        )
     }
 }
 
@@ -1423,12 +1446,17 @@ pub async fn git_status_summary(request: GitRequest) -> GitStatusSummaryResponse
     }
 }
 
+fn git_network_timeout(millis: u32) -> Duration {
+    Duration::from_millis(u64::from(millis))
+}
+
 pub async fn git_fetch(request: GitRequest) -> GitStatusSummaryResponse {
     let root = PathBuf::from(&request.root);
+    let timeout = git_network_timeout(request.network_timeout_ms);
     #[cfg(any(target_os = "android", target_os = "ios"))]
-    let result = crate::git_ops::lg_fetch_summary(&root, &GitTransport::from_request(&request));
+    let result = crate::git_ops::lg_fetch_summary(&root, &GitTransport::from_request(&request), timeout);
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    let result = crate::git_ops::sys::fetch(&root, request.known_hosts.as_deref());
+    let result = crate::git_ops::sys::fetch(&root, request.known_hosts.as_deref(), timeout);
     match result {
         Ok(summary) => GitStatusSummaryResponse { summary: Some(summary), error: None },
         Err(error) => GitStatusSummaryResponse { summary: None, error: Some(error) },
@@ -1437,6 +1465,7 @@ pub async fn git_fetch(request: GitRequest) -> GitStatusSummaryResponse {
 
 pub async fn git_sync(request: GitSyncRequest) -> GitSyncResponse {
     let root = PathBuf::from(&request.git.root);
+    let timeout = git_network_timeout(request.git.network_timeout_ms);
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let result = crate::git_ops::lg_sync(
         &root,
@@ -1444,6 +1473,7 @@ pub async fn git_sync(request: GitSyncRequest) -> GitSyncResponse {
         &request.message,
         request.commit_pending,
         request.strategy,
+        timeout,
     );
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let result = crate::git_ops::sys::sync(
@@ -1452,6 +1482,7 @@ pub async fn git_sync(request: GitSyncRequest) -> GitSyncResponse {
         &request.message,
         request.commit_pending,
         request.strategy,
+        timeout,
     );
     match result {
         Ok(result) => GitSyncResponse { result: Some(result), error: None },
@@ -1461,12 +1492,21 @@ pub async fn git_sync(request: GitSyncRequest) -> GitSyncResponse {
 
 pub async fn git_reset_to_upstream(request: GitResetRequest) -> GitResetResponse {
     let root = PathBuf::from(&request.git.root);
+    let timeout = git_network_timeout(request.git.network_timeout_ms);
     #[cfg(any(target_os = "android", target_os = "ios"))]
-    let result =
-        crate::git_ops::lg_reset(&root, &GitTransport::from_request(&request.git), &request.message);
+    let result = crate::git_ops::lg_reset(
+        &root,
+        &GitTransport::from_request(&request.git),
+        &request.message,
+        timeout,
+    );
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    let result =
-        crate::git_ops::sys::reset(&root, request.git.known_hosts.as_deref(), &request.message);
+    let result = crate::git_ops::sys::reset(
+        &root,
+        request.git.known_hosts.as_deref(),
+        &request.message,
+        timeout,
+    );
     match result {
         Ok(result) => GitResetResponse { result: Some(result), error: None },
         Err(error) => GitResetResponse { result: None, error: Some(error) },
@@ -1482,11 +1522,17 @@ pub async fn git_push_branch(request: GitPushBranchRequest) -> GitCommandRespons
             &root,
             &GitTransport::from_request(&request.git),
             &request.branch,
+            git_network_timeout(request.git.network_timeout_ms),
         )
     });
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     structured_git_response(&command, || {
-        crate::git_ops::sys::push_branch(&root, request.git.known_hosts.as_deref(), &request.branch)
+        crate::git_ops::sys::push_branch(
+            &root,
+            request.git.known_hosts.as_deref(),
+            &request.branch,
+            git_network_timeout(request.git.network_timeout_ms),
+        )
     })
 }
 
@@ -2571,6 +2617,7 @@ fn clone_store_inner(request: CloneStoreRequest) -> Result<(), BridgeFailure> {
             https_token: request.https_token.as_deref(),
             ssh_passphrase: request.ssh_passphrase.as_deref(),
         },
+        git_network_timeout(request.network_timeout_ms),
     ) {
         discard_incomplete_clone(&root_path);
         return Err(error);
@@ -3333,7 +3380,11 @@ fn configured_upstream(repo: &Repository) -> Result<ConfiguredUpstream, BridgeFa
 }
 
 #[allow(dead_code)]
-fn structured_git_pull(root: &Path, transport: &GitTransport<'_>) -> Result<String, BridgeFailure> {
+fn structured_git_pull(
+    root: &Path,
+    transport: &GitTransport<'_>,
+    timeout: Duration,
+) -> Result<String, BridgeFailure> {
     ensure_git_trace();
     trace_git("pull");
     let repo = Repository::open(root).map_err(git_failure)?;
@@ -3343,9 +3394,11 @@ fn structured_git_pull(root: &Path, transport: &GitTransport<'_>) -> Result<Stri
     let (callbacks, probe) = crate::git_ops::transport_callbacks(transport, &remote_url)?;
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks);
-    remote
-        .fetch(&[upstream.merge_ref.as_str()], Some(&mut fetch_options), None)
-        .map_err(|error| probe.failure(error))?;
+    crate::git_ops::with_network_timeout(timeout, || {
+        remote
+            .fetch(&[upstream.merge_ref.as_str()], Some(&mut fetch_options), None)
+            .map_err(|error| probe.failure(error))
+    })?;
     drop(remote);
     let branch = repo.find_branch(&upstream.branch_name, BranchType::Local).map_err(git_failure)?;
     let upstream_branch = branch.upstream().map_err(|_| {
@@ -3375,7 +3428,11 @@ fn structured_git_pull(root: &Path, transport: &GitTransport<'_>) -> Result<Stri
 }
 
 #[allow(dead_code)]
-fn structured_git_push(root: &Path, transport: &GitTransport<'_>) -> Result<String, BridgeFailure> {
+fn structured_git_push(
+    root: &Path,
+    transport: &GitTransport<'_>,
+    timeout: Duration,
+) -> Result<String, BridgeFailure> {
     let repo = Repository::open(root).map_err(git_failure)?;
     let upstream = configured_upstream(&repo)?;
     crate::git_ops::lg_push(
@@ -3384,6 +3441,7 @@ fn structured_git_push(root: &Path, transport: &GitTransport<'_>) -> Result<Stri
         &upstream.local_ref,
         &upstream.merge_ref,
         transport,
+        timeout,
     )?;
     Ok(format!("Pushed {} to {}.\n", upstream.local_ref, upstream.remote_name))
 }
@@ -3403,6 +3461,7 @@ fn clone_git_repository(
     remote_url: &str,
     root: &Path,
     transport: &GitTransport<'_>,
+    timeout: Duration,
 ) -> Result<(), BridgeFailure> {
     ensure_git_trace();
     trace_git(&format!("clone {remote_url}"));
@@ -3413,7 +3472,9 @@ fn clone_git_repository(
         let (callbacks, probe) = crate::git_ops::transport_callbacks(transport, remote_url)?;
         fetch.remote_callbacks(callbacks);
         builder.fetch_options(fetch);
-        builder.clone(remote_url, root).map(|_| ()).map_err(|error| probe.failure(error))
+        crate::git_ops::with_network_timeout(timeout, || {
+            builder.clone(remote_url, root).map(|_| ()).map_err(|error| probe.failure(error))
+        })
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
@@ -3423,9 +3484,7 @@ fn clone_git_repository(
             if let Some(file) = known_hosts_file {
                 command.env("GIT_SSH_COMMAND", git_ssh_command(file));
             }
-            let output = command
-                .output()
-                .map_err(|error| BridgeFailure::from(CoreError::GitError(error.to_string())))?;
+            let output = crate::git_ops::sys::output_with_timeout(command, timeout)?;
             if output.status.success() {
                 Ok(())
             } else {
@@ -3440,10 +3499,11 @@ fn run_git_command_with_known_hosts(
     root: String,
     args: Vec<&str>,
     known_hosts: Option<&str>,
+    timeout: Duration,
 ) -> GitCommandResponse {
     match with_selected_known_hosts(known_hosts, |known_hosts_file| {
         let owned = args.iter().map(|arg| (*arg).to_string()).collect::<Vec<_>>();
-        match run_system_git_args_with_known_hosts(&root, owned, known_hosts_file) {
+        match run_system_git_args_with_known_hosts(&root, owned, known_hosts_file, timeout) {
             Ok(output) => GitCommandResponse { output: Some(output.into()), error: None },
             Err(error) => GitCommandResponse { output: None, error: Some(error) },
         }
@@ -3458,12 +3518,10 @@ fn run_system_git_args_with_known_hosts(
     root: &str,
     args: Vec<String>,
     known_hosts_file: Option<&Path>,
+    timeout: Duration,
 ) -> Result<gui::GitCommandOutput, BridgeFailure> {
     let request =
         gui::GitOperationRequest::new(PathBuf::from(root), args).map_err(BridgeFailure::from)?;
-    if known_hosts_file.is_none() {
-        return gui::run_git_args(request).map_err(BridgeFailure::from);
-    }
     if !request.root.is_dir() {
         return Err(BridgeFailure::from(CoreError::StoreError(format!(
             "git working directory does not exist: {}",
@@ -3475,9 +3533,7 @@ fn run_system_git_args_with_known_hosts(
     if let Some(file) = known_hosts_file {
         command.env("GIT_SSH_COMMAND", git_ssh_command(file));
     }
-    let output = command
-        .output()
-        .map_err(|error| BridgeFailure::from(CoreError::GitError(error.to_string())))?;
+    let output = crate::git_ops::sys::output_with_timeout(command, timeout)?;
     Ok(gui::GitCommandOutput {
         command: format!("git {}", request.args.join(" ")),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
@@ -3706,6 +3762,8 @@ impl From<AutofillCredential> for AutofillCredentialDto {
 mod tests {
     use super::*;
 
+    const REMOTE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
     fn key(fingerprint: &str, identity: &str, has_private_key: bool) -> PgpKeySummary {
         PgpKeySummary {
             identity: identity.to_string(),
@@ -3870,10 +3928,10 @@ mod tests {
         let repo = init_test_repository(&root);
         fs::write(root.join(".gpg-id"), "ABC\n").unwrap();
         structured_git_commit(&root, "Initial").unwrap();
-        assert!(structured_git_push(&root, &GitTransport::default()).is_err());
+        assert!(structured_git_push(&root, &GitTransport::default(), REMOTE_TIMEOUT).is_err());
         let oid = repo.head().unwrap().target().unwrap();
         repo.set_head_detached(oid).unwrap();
-        assert!(structured_git_push(&root, &GitTransport::default()).is_err());
+        assert!(structured_git_push(&root, &GitTransport::default(), REMOTE_TIMEOUT).is_err());
     }
 
     #[test]
@@ -3892,7 +3950,7 @@ mod tests {
         let mut config = source.config().unwrap();
         config.set_str(&format!("branch.{branch_name}.remote"), "backup").unwrap();
         config.set_str(&format!("branch.{branch_name}.merge"), "refs/heads/mobile-main").unwrap();
-        structured_git_push(&source_path, &GitTransport::default()).expect("initial push");
+        structured_git_push(&source_path, &GitTransport::default(), REMOTE_TIMEOUT).expect("initial push");
         bare.set_head("refs/heads/mobile-main").expect("remote head");
 
         let clone_path = temp.path().join("clone");
@@ -3905,10 +3963,11 @@ mod tests {
             .unwrap();
         fs::write(source_path.join("entry.gpg"), b"ciphertext").expect("new entry");
         structured_git_commit(&source_path, "Second").expect("second commit");
-        structured_git_push(&source_path, &GitTransport::default()).expect("second push");
+        structured_git_push(&source_path, &GitTransport::default(), REMOTE_TIMEOUT).expect("second push");
 
         let before = Repository::open(&clone_path).unwrap().head().unwrap().target().unwrap();
-        let pull = structured_git_pull(&clone_path, &GitTransport::default()).expect("fast-forward pull");
+        let pull = structured_git_pull(&clone_path, &GitTransport::default(), REMOTE_TIMEOUT)
+            .expect("fast-forward pull");
         assert!(pull.contains("Fast-forwarded"));
         let after = Repository::open(&clone_path).unwrap().head().unwrap().target().unwrap();
         assert_ne!(before, after);

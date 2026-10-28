@@ -20,6 +20,7 @@ import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/failure_notice.dart';
 import '../../widgets/pars_action_group.dart';
 import '../../widgets/pars_dialog.dart';
+import '../../widgets/password_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
 import '../../widgets/pgp_key_import_body.dart';
 import '../../widgets/ssh_key_dialogs.dart';
@@ -49,7 +50,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 enum _OnboardingStep {
-  gesture,
+  unlock,
   biometrics,
   pgp,
   ssh,
@@ -117,9 +118,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   bool get _isReadyToFinish =>
-      widget.securityRepository.hasGestureVerifier &&
+      widget.securityRepository.hasUnlockVerifier &&
       !_needsStoreSetup &&
       !_needsStoreRepair;
+
+  // The unlock step always offers the platform's method, so a desktop that
+  // walks back to it sets a password even if a gesture was saved earlier.
+  LocalUnlockMethod get _setupUnlockMethod => platformDefaultUnlockMethod();
+
+  LocalUnlockMethod get _fallbackUnlockMethod =>
+      widget.securityRepository.unlockMethod ?? _setupUnlockMethod;
 
   @override
   Widget build(BuildContext context) {
@@ -247,8 +255,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   _OnboardingStep _initialStep() {
-    if (!widget.securityRepository.hasGestureVerifier) {
-      return _OnboardingStep.gesture;
+    if (!widget.securityRepository.hasUnlockVerifier) {
+      return _OnboardingStep.unlock;
     }
     if (!widget.securityRepository.onboardingComplete &&
         !widget.securityRepository.biometricUnlockEnabled) {
@@ -267,7 +275,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   List<_OnboardingStep> get _progressSteps {
     return <_OnboardingStep>[
-      _OnboardingStep.gesture,
+      _OnboardingStep.unlock,
       _OnboardingStep.biometrics,
       if (_includesKeySteps) ...<_OnboardingStep>[
         _OnboardingStep.pgp,
@@ -283,11 +291,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildStep(BuildContext context) {
     switch (_step) {
-      case _OnboardingStep.gesture:
-        return GestureSetupPanel(
-          securityRepository: widget.securityRepository,
-          onSaved: () => _setStep(_OnboardingStep.biometrics),
-        );
+      case _OnboardingStep.unlock:
+        return switch (_setupUnlockMethod) {
+          LocalUnlockMethod.gesture => GestureSetupPanel(
+            securityRepository: widget.securityRepository,
+            onSaved: () => _setStep(_OnboardingStep.biometrics),
+          ),
+          LocalUnlockMethod.password => LayoutBuilder(
+            builder:
+                (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: ParsContentWidth.narrow,
+                        ),
+                        child: PasswordSetupPanel(
+                          securityRepository: widget.securityRepository,
+                          onSaved: () => _setStep(_OnboardingStep.biometrics),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+          ),
+        };
       case _OnboardingStep.biometrics:
         return _BiometricSetupStep(
           securityRepository: widget.securityRepository,
@@ -626,8 +657,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _needsStoreSetup ? _OnboardingStep.ssh : null,
       _OnboardingStep.ssh => _OnboardingStep.pgp,
       _OnboardingStep.pgp => _OnboardingStep.biometrics,
-      _OnboardingStep.biometrics => _OnboardingStep.gesture,
-      _OnboardingStep.gesture || _OnboardingStep.repair => null,
+      _OnboardingStep.biometrics => _OnboardingStep.unlock,
+      _OnboardingStep.unlock || _OnboardingStep.repair => null,
     };
   }
 
@@ -947,7 +978,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   String _stepTitle(AppLocalizations l10n, _OnboardingStep step) =>
       switch (step) {
-        _OnboardingStep.gesture => l10n.setGestureLock,
+        _OnboardingStep.unlock => switch (_setupUnlockMethod) {
+          LocalUnlockMethod.gesture => l10n.setGestureLock,
+          LocalUnlockMethod.password => l10n.setAppPassword,
+        },
         _OnboardingStep.biometrics => l10n.enableBiometricUnlock,
         _OnboardingStep.pgp => l10n.setupPgpKey,
         _OnboardingStep.ssh => l10n.setupSshGithub,
@@ -958,8 +992,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   String _stepSubtitle(AppLocalizations l10n, _OnboardingStep step) =>
       switch (step) {
-        _OnboardingStep.gesture => l10n.gestureStepSubtitle,
-        _OnboardingStep.biometrics => l10n.biometricsStepSubtitle,
+        _OnboardingStep.unlock => switch (_setupUnlockMethod) {
+          LocalUnlockMethod.gesture => l10n.gestureStepSubtitle,
+          LocalUnlockMethod.password => l10n.passwordStepSubtitle,
+        },
+        _OnboardingStep.biometrics => switch (_fallbackUnlockMethod) {
+          LocalUnlockMethod.gesture => l10n.biometricsStepSubtitle,
+          LocalUnlockMethod.password => l10n.biometricsPasswordStepSubtitle,
+        },
         _OnboardingStep.pgp => l10n.pgpStepSubtitle,
         _OnboardingStep.ssh => l10n.sshStepSubtitle,
         _OnboardingStep.store => l10n.storeFirstSetupSubtitle,

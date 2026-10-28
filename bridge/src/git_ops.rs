@@ -9,7 +9,8 @@ use std::cell::{Cell, RefCell};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Mutex;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use git2::build::CheckoutBuilder;
 use git2::{
@@ -32,6 +33,19 @@ use crate::git_status::summarize_repository;
 pub(crate) type RemoteBranches = (Option<String>, Option<String>, Vec<String>);
 
 pub(crate) const BACKUP_BRANCH_PREFIX: &str = "pars/backup-";
+
+/// libgit2 keeps the connect and read limits in a process global. Network calls take the
+/// lock so two syncs cannot change the caller's timeout underneath each other.
+pub(crate) fn with_network_timeout<T>(timeout: Duration, body: impl FnOnce() -> T) -> T {
+    static LOCK: Mutex<()> = Mutex::new(());
+    let _guard = LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let millis = i32::try_from(timeout.as_millis()).unwrap_or(i32::MAX);
+    unsafe {
+        let _ = git2::opts::set_server_connect_timeout_in_milliseconds(millis);
+        let _ = git2::opts::set_server_timeout_in_milliseconds(millis);
+    }
+    body()
+}
 
 /// Transport inputs for one Git network operation. Secrets are borrowed from the request and
 /// never logged or stored.
@@ -397,7 +411,12 @@ fn lg_remote_name(repo: &Repository) -> Result<String, BridgeFailure> {
     }
 }
 
-fn lg_fetch(repo: &Repository, remote_name: &str, transport: &GitTransport<'_>) -> Result<(), BridgeFailure> {
+fn lg_fetch(
+    repo: &Repository,
+    remote_name: &str,
+    transport: &GitTransport<'_>,
+    timeout: Duration,
+) -> Result<(), BridgeFailure> {
     crate::api::ensure_git_trace();
     trace_git(&format!("fetch {remote_name}"));
     let mut remote = repo.find_remote(remote_name).map_err(git_failure)?;
@@ -405,7 +424,9 @@ fn lg_fetch(repo: &Repository, remote_name: &str, transport: &GitTransport<'_>) 
     let (callbacks, probe) = transport_callbacks(transport, &remote_url)?;
     let mut options = FetchOptions::new();
     options.remote_callbacks(callbacks);
-    remote.fetch(&[] as &[&str], Some(&mut options), None).map_err(|error| probe.failure(error))
+    with_network_timeout(timeout, || {
+        remote.fetch(&[] as &[&str], Some(&mut options), None).map_err(|error| probe.failure(error))
+    })
 }
 
 pub(crate) fn lg_push(
@@ -414,6 +435,7 @@ pub(crate) fn lg_push(
     source_ref: &str,
     destination_ref: &str,
     transport: &GitTransport<'_>,
+    timeout: Duration,
 ) -> Result<(), BridgeFailure> {
     crate::api::ensure_git_trace();
     trace_git(&format!("push {source_ref} to {remote_name}"));
@@ -431,7 +453,9 @@ pub(crate) fn lg_push(
     let mut options = PushOptions::new();
     options.remote_callbacks(callbacks);
     let refspec = format!("{source_ref}:{destination_ref}");
-    remote.push(&[&refspec], Some(&mut options)).map_err(|error| probe.failure(error))?;
+    with_network_timeout(timeout, || {
+        remote.push(&[&refspec], Some(&mut options)).map_err(|error| probe.failure(error))
+    })?;
     if let Some(reason) = rejection.borrow().as_deref() {
         return Err(git_error(&format!("the remote rejected the push ({reason})")));
     }
@@ -570,6 +594,7 @@ pub(crate) fn lg_sync(
     message: &str,
     commit_pending: bool,
     strategy: GitIntegrationStrategyDto,
+    timeout: Duration,
 ) -> Result<GitSyncResultDto, BridgeFailure> {
     let repo = Repository::open(root).map_err(git_failure)?;
     let before = summarize_repository(root)?;
@@ -591,7 +616,7 @@ pub(crate) fn lg_sync(
     }
 
     let target = lg_target(&repo)?;
-    lg_fetch(&repo, &target.remote, transport)?;
+    lg_fetch(&repo, &target.remote, transport, timeout)?;
     let Some(local) = repo.head().ok().and_then(|head| head.target()) else {
         result.summary = summarize_repository(root)?;
         return Ok(result);
@@ -644,11 +669,11 @@ pub(crate) fn lg_sync(
         }
         let (ahead_after, _) = repo.graph_ahead_behind(current, upstream).map_err(git_failure)?;
         if ahead_after > 0 {
-            lg_push(&repo, &target.remote, &target.local_ref, &target.destination_ref(), transport)?;
+            lg_push(&repo, &target.remote, &target.local_ref, &target.destination_ref(), transport, timeout)?;
             result.pushed = true;
         }
     } else {
-        lg_push(&repo, &target.remote, &target.local_ref, &target.destination_ref(), transport)?;
+        lg_push(&repo, &target.remote, &target.local_ref, &target.destination_ref(), transport, timeout)?;
         result.pushed = true;
     }
     if target.merge_ref.is_none() && result.pushed {
@@ -681,11 +706,12 @@ pub(crate) fn lg_reset(
     root: &Path,
     transport: &GitTransport<'_>,
     message: &str,
+    timeout: Duration,
 ) -> Result<GitResetResultDto, BridgeFailure> {
     let repo = Repository::open(root).map_err(git_failure)?;
     lg_abort_operation(&repo)?;
     let target = lg_target(&repo)?;
-    lg_fetch(&repo, &target.remote, transport)?;
+    lg_fetch(&repo, &target.remote, transport, timeout)?;
     let upstream = repo
         .refname_to_id(&target.tracking_ref())
         .map_err(|_| git_error("the remote branch does not exist yet"))?;
@@ -710,13 +736,14 @@ pub(crate) fn lg_push_branch(
     root: &Path,
     transport: &GitTransport<'_>,
     branch: &str,
+    timeout: Duration,
 ) -> Result<String, BridgeFailure> {
     backup_branch_only(branch)?;
     let repo = Repository::open(root).map_err(git_failure)?;
     repo.find_branch(branch, BranchType::Local).map_err(|_| validation("backup branch not found"))?;
     let remote = lg_remote_name(&repo)?;
     let reference = format!("refs/heads/{branch}");
-    lg_push(&repo, &remote, &reference, &reference, transport)?;
+    lg_push(&repo, &remote, &reference, &reference, transport, timeout)?;
     Ok(format!("Pushed {branch} to {remote}.\n"))
 }
 
@@ -842,10 +869,11 @@ pub(crate) fn lg_set_identity(root: &Path, name: &str, email: &str) -> Result<()
 pub(crate) fn lg_fetch_summary(
     root: &Path,
     transport: &GitTransport<'_>,
+    timeout: Duration,
 ) -> Result<GitStatusSummaryDto, BridgeFailure> {
     let repo = Repository::open(root).map_err(git_failure)?;
     let remote = lg_remote_name(&repo)?;
-    lg_fetch(&repo, &remote, transport)?;
+    lg_fetch(&repo, &remote, transport, timeout)?;
     summarize_repository(root)
 }
 
@@ -856,13 +884,35 @@ pub(crate) fn lg_fetch_summary(
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub(crate) mod sys {
     use std::path::Path;
-    use std::process::{Command, Output};
+    use std::process::{Child, Command, Output, Stdio};
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     use super::*;
     use crate::api::{git_process_failure, git_ssh_command, with_selected_known_hosts};
     use crate::git_status::parse_porcelain_v2;
 
     fn run(root: &Path, args: &[&str], known_hosts_file: Option<&Path>) -> Result<Output, BridgeFailure> {
+        run_deadline(root, args, known_hosts_file, None)
+    }
+
+    /// Fetch and push talk to the remote. They fail when the process is still running after
+    /// the network limit, instead of leaving the refresh spinner up.
+    fn run_network(
+        root: &Path,
+        args: &[&str],
+        known_hosts_file: Option<&Path>,
+        timeout: Duration,
+    ) -> Result<Output, BridgeFailure> {
+        run_deadline(root, args, known_hosts_file, Some(timeout))
+    }
+
+    fn run_deadline(
+        root: &Path,
+        args: &[&str],
+        known_hosts_file: Option<&Path>,
+        timeout: Option<Duration>,
+    ) -> Result<Output, BridgeFailure> {
         let mut command = Command::new("git");
         command
             .args(args)
@@ -873,7 +923,53 @@ pub(crate) mod sys {
         if let Some(file) = known_hosts_file {
             command.env("GIT_SSH_COMMAND", git_ssh_command(file));
         }
-        command.output().map_err(|error| git_error(&error.to_string()))
+        let Some(limit) = timeout else {
+            return command.output().map_err(|error| git_error(&error.to_string()));
+        };
+        output_with_timeout(command, limit)
+    }
+
+    pub(crate) fn output_with_timeout(
+        mut command: Command,
+        timeout: Duration,
+    ) -> Result<Output, BridgeFailure> {
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+        let mut child = command.spawn().map_err(|error| git_error(&error.to_string()))?;
+        let started = Instant::now();
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => {
+                    return child.wait_with_output().map_err(|error| git_error(&error.to_string()));
+                }
+                Ok(None) if started.elapsed() >= timeout => {
+                    stop_child(&mut child);
+                    let seconds = timeout.as_secs().max(1);
+                    return Err(git_error(&format!("timed out after {seconds}s")));
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(20)),
+                Err(error) => return Err(git_error(&error.to_string())),
+            }
+        }
+    }
+
+    fn stop_child(child: &mut Child) {
+        #[cfg(unix)]
+        unsafe {
+            libc::kill(child.id() as libc::pid_t, libc::SIGTERM);
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = child.kill();
+        }
+        let started = Instant::now();
+        while started.elapsed() < Duration::from_millis(500) {
+            if child.try_wait().ok().flatten().is_some() {
+                return;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        let _ = child.kill();
+        let _ = child.wait();
     }
 
     fn failure(output: &Output) -> BridgeFailure {
@@ -888,7 +984,19 @@ pub(crate) mod sys {
     }
 
     fn ok(root: &Path, args: &[&str], known_hosts_file: Option<&Path>) -> Result<String, BridgeFailure> {
-        let output = run(root, args, known_hosts_file)?;
+        command_output(run(root, args, known_hosts_file)?)
+    }
+
+    fn ok_network(
+        root: &Path,
+        args: &[&str],
+        known_hosts_file: Option<&Path>,
+        timeout: Duration,
+    ) -> Result<String, BridgeFailure> {
+        command_output(run_network(root, args, known_hosts_file, timeout)?)
+    }
+
+    fn command_output(output: Output) -> Result<String, BridgeFailure> {
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {
@@ -1030,9 +1138,13 @@ pub(crate) mod sys {
         Ok(true)
     }
 
-    pub(crate) fn fetch(root: &Path, known_hosts: Option<&str>) -> Result<GitStatusSummaryDto, BridgeFailure> {
+    pub(crate) fn fetch(
+        root: &Path,
+        known_hosts: Option<&str>,
+        timeout: Duration,
+    ) -> Result<GitStatusSummaryDto, BridgeFailure> {
         let remote = remote_name(root)?;
-        with_known_hosts(known_hosts, |file| ok(root, &["fetch", &remote], file).map(|_| ()))?;
+        with_known_hosts(known_hosts, |file| ok_network(root, &["fetch", &remote], file, timeout).map(|_| ()))?;
         summary(root)
     }
 
@@ -1042,6 +1154,7 @@ pub(crate) mod sys {
         message: &str,
         commit_pending: bool,
         strategy: GitIntegrationStrategyDto,
+        timeout: Duration,
     ) -> Result<GitSyncResultDto, BridgeFailure> {
         let before = summary(root)?;
         let mut result = GitSyncResultDto {
@@ -1061,14 +1174,14 @@ pub(crate) mod sys {
         }
         let target = target(root)?;
         with_known_hosts(known_hosts, |file| {
-            ok(root, &["fetch", &target.remote], file)?;
+            ok_network(root, &["fetch", &target.remote], file, timeout)?;
             let Some(local) = rev(root, "HEAD") else {
                 return Ok(());
             };
             let tracking_ref = target.tracking_ref();
             let destination = format!("HEAD:{}", target.destination_ref());
             if rev(root, &tracking_ref).is_none() {
-                ok(root, &["push", "--set-upstream", &target.remote, &destination], file)?;
+                ok_network(root, &["push", "--set-upstream", &target.remote, &destination], file, timeout)?;
                 result.pushed = true;
                 return Ok(());
             }
@@ -1123,7 +1236,7 @@ pub(crate) mod sys {
                 }
                 args.push(&target.remote);
                 args.push(&destination);
-                ok(root, &args, file)?;
+                ok_network(root, &args, file, timeout)?;
                 result.pushed = true;
             }
             Ok(())
@@ -1153,10 +1266,13 @@ pub(crate) mod sys {
         root: &Path,
         known_hosts: Option<&str>,
         message: &str,
+        timeout: Duration,
     ) -> Result<GitResetResultDto, BridgeFailure> {
         abort_operation(root);
         let target = target(root)?;
-        with_known_hosts(known_hosts, |file| ok(root, &["fetch", &target.remote], file).map(|_| ()))?;
+        with_known_hosts(known_hosts, |file| {
+            ok_network(root, &["fetch", &target.remote], file, timeout).map(|_| ())
+        })?;
         let tracking_ref = target.tracking_ref();
         if rev(root, &tracking_ref).is_none() {
             return Err(git_error("the remote branch does not exist yet"));
@@ -1170,7 +1286,12 @@ pub(crate) mod sys {
         Ok(GitResetResultDto { committed, backup_branch, summary: summary(root)? })
     }
 
-    pub(crate) fn push_branch(root: &Path, known_hosts: Option<&str>, branch: &str) -> Result<String, BridgeFailure> {
+    pub(crate) fn push_branch(
+        root: &Path,
+        known_hosts: Option<&str>,
+        branch: &str,
+        timeout: Duration,
+    ) -> Result<String, BridgeFailure> {
         backup_branch_only(branch)?;
         let reference = format!("refs/heads/{branch}");
         if rev(root, &reference).is_none() {
@@ -1178,7 +1299,7 @@ pub(crate) mod sys {
         }
         let remote = remote_name(root)?;
         let refspec = format!("{reference}:{reference}");
-        with_known_hosts(known_hosts, |file| ok(root, &["push", &remote, &refspec], file))
+        with_known_hosts(known_hosts, |file| ok_network(root, &["push", &remote, &refspec], file, timeout))
     }
 
     pub(crate) fn log(root: &Path, limit: u32) -> Result<Vec<GitLogEntryDto>, BridgeFailure> {
@@ -1249,6 +1370,8 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
+    const REMOTE_TIMEOUT: Duration = Duration::from_secs(15);
+
     fn init_repo(root: &Path) -> Repository {
         fs::create_dir_all(root).unwrap();
         let repo = Repository::init(root).expect("init");
@@ -1289,7 +1412,7 @@ mod tests {
         Repository::init_bare(&bare).unwrap();
         seed_repo.remote("origin", bare.to_str().unwrap()).unwrap();
         let reference = format!("refs/heads/{branch}");
-        lg_push(&seed_repo, "origin", &reference, &reference, &GitTransport::default()).unwrap();
+        lg_push(&seed_repo, "origin", &reference, &reference, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
         Repository::open_bare(&bare).unwrap().set_head(&reference).unwrap();
         let source = temp.path().join("source");
         let clone = temp.path().join("clone");
@@ -1305,7 +1428,7 @@ mod tests {
     }
 
     fn sync(root: &Path, commit_pending: bool, strategy: GitIntegrationStrategyDto) -> GitSyncResultDto {
-        lg_sync(root, &GitTransport::default(), "Sync", commit_pending, strategy).unwrap()
+        lg_sync(root, &GitTransport::default(), "Sync", commit_pending, strategy, REMOTE_TIMEOUT).unwrap()
     }
 
     fn head(root: &Path) -> Oid {
@@ -1316,6 +1439,40 @@ mod tests {
         let bare = Repository::open_bare(&fixture.bare).unwrap();
         let oid = bare.head().unwrap().target().unwrap();
         oid
+    }
+
+    #[test]
+    fn stalled_http_fetch_fails_at_the_network_timeout() {
+        use std::io::Read;
+        use std::net::TcpListener;
+        use std::time::Instant;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let accepted = std::thread::spawn(move || {
+            // Accept the request, then hold the socket open so the read stalls.
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut buffer = [0_u8; 1024];
+            let _ = stream.read(&mut buffer);
+            let _ = stream.read(&mut buffer);
+        });
+
+        let temp = tempfile::tempdir().unwrap();
+        let repo = init_repo(temp.path());
+        repo.remote("origin", &format!("http://127.0.0.1:{port}/store.git")).unwrap();
+
+        let started = Instant::now();
+        let error = lg_fetch(&repo, "origin", &GitTransport::default(), Duration::from_millis(400)).unwrap_err();
+        let elapsed = started.elapsed();
+        assert!(elapsed < Duration::from_secs(3), "fetch ran for {elapsed:?}: {}", error.message);
+        assert!(
+            error.message.to_lowercase().contains("timed out"),
+            "{}",
+            error.message
+        );
+        let _ = accepted.join();
     }
 
     #[test]
@@ -1331,7 +1488,7 @@ mod tests {
         commit_file(&fixture.source, "remote.gpg", "remote", "Remote");
         sync(&fixture.source, false, GitIntegrationStrategyDto::Rebase);
         let before = head(&fixture.clone);
-        let summary = lg_fetch_summary(&fixture.clone, &GitTransport::default()).unwrap();
+        let summary = lg_fetch_summary(&fixture.clone, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
         assert_eq!(summary.behind, 1);
         assert_eq!(summary.ahead, 0);
         assert!(summary.last_fetched_at.is_some());
@@ -1452,7 +1609,7 @@ mod tests {
             assert_eq!(fs::read_to_string(fixture.clone.join(".gpg-id")).unwrap(), "LOCAL\n");
             assert!(!result.pushed);
 
-            lg_push_branch(&fixture.clone, &GitTransport::default(), &backup).unwrap();
+            lg_push_branch(&fixture.clone, &GitTransport::default(), &backup, REMOTE_TIMEOUT).unwrap();
             let bare = Repository::open_bare(&fixture.bare).unwrap();
             assert_eq!(bare.refname_to_id(&format!("refs/heads/{backup}")).unwrap(), before);
         }
@@ -1499,7 +1656,7 @@ mod tests {
         let fixture = fixture();
         commit_file(&fixture.clone, "local.gpg", "local", "Local");
         write(&fixture.clone, "pending.gpg", "pending");
-        let result = lg_reset(&fixture.clone, &GitTransport::default(), "Before reset").unwrap();
+        let result = lg_reset(&fixture.clone, &GitTransport::default(), "Before reset", REMOTE_TIMEOUT).unwrap();
         assert!(result.committed);
         let backup = result.backup_branch.expect("backup");
         assert_eq!(head(&fixture.clone), remote_head(&fixture));
@@ -1514,7 +1671,7 @@ mod tests {
     #[test]
     fn reset_of_a_clean_up_to_date_branch_makes_no_backup() {
         let fixture = fixture();
-        let result = lg_reset(&fixture.clone, &GitTransport::default(), "Before reset").unwrap();
+        let result = lg_reset(&fixture.clone, &GitTransport::default(), "Before reset", REMOTE_TIMEOUT).unwrap();
         assert!(!result.committed);
         assert!(result.backup_branch.is_none());
     }
@@ -1545,9 +1702,9 @@ mod tests {
             let commit = source.head().unwrap().peel_to_commit().unwrap();
             source.branch("archive", &commit, false).unwrap();
             let reference = "refs/heads/archive";
-            lg_push(&source, "origin", reference, reference, &GitTransport::default()).unwrap();
+            lg_push(&source, "origin", reference, reference, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
         }
-        lg_fetch_summary(&fixture.clone, &GitTransport::default()).unwrap();
+        lg_fetch_summary(&fixture.clone, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
         let (remote, _, branches) = lg_remote_branches(&fixture.clone).unwrap();
         assert_eq!(remote.as_deref(), Some("origin"));
         assert!(branches.contains(&"archive".to_string()));
@@ -1580,7 +1737,7 @@ mod tests {
     #[test]
     fn push_branch_only_accepts_backup_branches() {
         let fixture = fixture();
-        let error = lg_push_branch(&fixture.clone, &GitTransport::default(), "main").unwrap_err();
+        let error = lg_push_branch(&fixture.clone, &GitTransport::default(), "main", REMOTE_TIMEOUT).unwrap_err();
         assert!(error.message.contains("backup"));
     }
 
@@ -1600,6 +1757,7 @@ mod tests {
             "Sync",
             true,
             GitIntegrationStrategyDto::Rebase,
+            REMOTE_TIMEOUT,
         )
         .unwrap();
         let rendered = format!("{result:?}");
@@ -1657,7 +1815,7 @@ mod tests {
         }
 
         fn sys_sync(root: &Path, commit_pending: bool, strategy: GitIntegrationStrategyDto) -> GitSyncResultDto {
-            sys::sync(root, None, "Sync", commit_pending, strategy).unwrap()
+            sys::sync(root, None, "Sync", commit_pending, strategy, REMOTE_TIMEOUT).unwrap()
         }
 
         #[test]
@@ -1718,7 +1876,7 @@ mod tests {
         fn desktop_pending_edit_is_committed_and_pushed() {
             let fixture = sys_fixture();
             write(&fixture.clone, "entry.gpg", "A & B");
-            let result = sys::sync(&fixture.clone, None, "Edit A & B", true, GitIntegrationStrategyDto::Rebase).unwrap();
+            let result = sys::sync(&fixture.clone, None, "Edit A & B", true, GitIntegrationStrategyDto::Rebase, REMOTE_TIMEOUT).unwrap();
             assert!(result.committed);
             assert!(result.pushed);
             assert_eq!(remote_head(&fixture), head(&fixture.clone));
@@ -1737,7 +1895,7 @@ mod tests {
             let result = sys_sync(&fixture.clone, false, GitIntegrationStrategyDto::Rebase);
             assert!(result.blocked_by_changes);
 
-            let reset = sys::reset(&fixture.clone, None, "Before reset").unwrap();
+            let reset = sys::reset(&fixture.clone, None, "Before reset", REMOTE_TIMEOUT).unwrap();
             assert!(reset.committed);
             assert!(reset.backup_branch.is_some());
             assert_eq!(head(&fixture.clone), remote_head(&fixture));

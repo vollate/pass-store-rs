@@ -15,19 +15,11 @@ class EntryTile extends StatelessWidget {
     required this.entry,
     required this.onTap,
     required this.onCopy,
-    this.onLongPress,
-    this.selectionMode = false,
-    this.selected = false,
-    this.onSelectedChanged,
   });
 
   final PasswordEntry entry;
   final VoidCallback onTap;
   final VoidCallback? onCopy;
-  final VoidCallback? onLongPress;
-  final bool selectionMode;
-  final bool selected;
-  final ValueChanged<bool>? onSelectedChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -51,19 +43,9 @@ class EntryTile extends StatelessWidget {
       // the directory child count is ordinary prose and stays in the body face.
       subtitleStyle:
           entry.isDirectory ? subtitleStyle : ParsTheme.mono(subtitleStyle),
-      selected: selected,
-      onTap:
-          selectionMode && !entry.isDirectory
-              ? () => onSelectedChanged?.call(!selected)
-              : onTap,
-      onLongPress: entry.isDirectory ? null : onLongPress,
+      onTap: onTap,
       trailing:
-          selectionMode && !entry.isDirectory
-              ? Checkbox(
-                value: selected,
-                onChanged: (value) => onSelectedChanged?.call(value ?? false),
-              )
-              : entry.isDirectory
+          entry.isDirectory
               ? Padding(
                 padding: const EdgeInsets.only(right: ParsSpacing.sm),
                 child: Icon(

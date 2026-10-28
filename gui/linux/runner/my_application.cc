@@ -54,6 +54,8 @@ static void my_application_activate(GApplication* application) {
   fl_dart_project_set_dart_entrypoint_arguments(project, self->dart_entrypoint_arguments);
 
   FlView* view = fl_view_new(project);
+  // Matches the smallest layout the Flutter UI is verified against.
+  gtk_widget_set_size_request(GTK_WIDGET(view), 480, 560);
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 

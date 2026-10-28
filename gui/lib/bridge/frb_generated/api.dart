@@ -562,6 +562,9 @@ class CloneStoreRequest {
   final String? httpsToken;
   final String? sshPassphrase;
 
+  /// How long a remote connect or a stalled read may take before the clone fails.
+  final int networkTimeoutMs;
+
   const CloneStoreRequest({
     required this.configPath,
     required this.remoteUrl,
@@ -573,6 +576,7 @@ class CloneStoreRequest {
     this.httpsUsername,
     this.httpsToken,
     this.sshPassphrase,
+    required this.networkTimeoutMs,
   });
 
   @override
@@ -586,7 +590,8 @@ class CloneStoreRequest {
       overwrite.hashCode ^
       httpsUsername.hashCode ^
       httpsToken.hashCode ^
-      sshPassphrase.hashCode;
+      sshPassphrase.hashCode ^
+      networkTimeoutMs.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -602,7 +607,8 @@ class CloneStoreRequest {
           overwrite == other.overwrite &&
           httpsUsername == other.httpsUsername &&
           httpsToken == other.httpsToken &&
-          sshPassphrase == other.sshPassphrase;
+          sshPassphrase == other.sshPassphrase &&
+          networkTimeoutMs == other.networkTimeoutMs;
 }
 
 class ConfigResponse {
@@ -1481,6 +1487,9 @@ class GitRequest {
   /// Mobile only. Never logged, returned, or persisted by the bridge.
   final String? sshPassphrase;
 
+  /// How long a remote connect or a stalled read may take before this call fails.
+  final int networkTimeoutMs;
+
   const GitRequest({
     required this.root,
     this.sshPrivateKeyPath,
@@ -1489,6 +1498,7 @@ class GitRequest {
     this.httpsUsername,
     this.httpsToken,
     this.sshPassphrase,
+    required this.networkTimeoutMs,
   });
 
   @override
@@ -1499,7 +1509,8 @@ class GitRequest {
       knownHosts.hashCode ^
       httpsUsername.hashCode ^
       httpsToken.hashCode ^
-      sshPassphrase.hashCode;
+      sshPassphrase.hashCode ^
+      networkTimeoutMs.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1512,7 +1523,8 @@ class GitRequest {
           knownHosts == other.knownHosts &&
           httpsUsername == other.httpsUsername &&
           httpsToken == other.httpsToken &&
-          sshPassphrase == other.sshPassphrase;
+          sshPassphrase == other.sshPassphrase &&
+          networkTimeoutMs == other.networkTimeoutMs;
 }
 
 class GitResetRequest {

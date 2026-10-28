@@ -3089,8 +3089,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CloneStoreRequest dco_decode_clone_store_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 10)
-      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
     return CloneStoreRequest(
       configPath: dco_decode_String(arr[0]),
       remoteUrl: dco_decode_String(arr[1]),
@@ -3102,6 +3102,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       httpsUsername: dco_decode_opt_String(arr[7]),
       httpsToken: dco_decode_opt_String(arr[8]),
       sshPassphrase: dco_decode_opt_String(arr[9]),
+      networkTimeoutMs: dco_decode_u_32(arr[10]),
     );
   }
 
@@ -3589,8 +3590,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   GitRequest dco_decode_git_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return GitRequest(
       root: dco_decode_String(arr[0]),
       sshPrivateKeyPath: dco_decode_opt_String(arr[1]),
@@ -3599,6 +3600,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       httpsUsername: dco_decode_opt_String(arr[4]),
       httpsToken: dco_decode_opt_String(arr[5]),
       sshPassphrase: dco_decode_opt_String(arr[6]),
+      networkTimeoutMs: dco_decode_u_32(arr[7]),
     );
   }
 
@@ -5440,6 +5442,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_httpsUsername = sse_decode_opt_String(deserializer);
     var var_httpsToken = sse_decode_opt_String(deserializer);
     var var_sshPassphrase = sse_decode_opt_String(deserializer);
+    var var_networkTimeoutMs = sse_decode_u_32(deserializer);
     return CloneStoreRequest(
       configPath: var_configPath,
       remoteUrl: var_remoteUrl,
@@ -5451,6 +5454,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       httpsUsername: var_httpsUsername,
       httpsToken: var_httpsToken,
       sshPassphrase: var_sshPassphrase,
+      networkTimeoutMs: var_networkTimeoutMs,
     );
   }
 
@@ -5938,6 +5942,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_httpsUsername = sse_decode_opt_String(deserializer);
     var var_httpsToken = sse_decode_opt_String(deserializer);
     var var_sshPassphrase = sse_decode_opt_String(deserializer);
+    var var_networkTimeoutMs = sse_decode_u_32(deserializer);
     return GitRequest(
       root: var_root,
       sshPrivateKeyPath: var_sshPrivateKeyPath,
@@ -5946,6 +5951,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       httpsUsername: var_httpsUsername,
       httpsToken: var_httpsToken,
       sshPassphrase: var_sshPassphrase,
+      networkTimeoutMs: var_networkTimeoutMs,
     );
   }
 
@@ -7995,6 +8001,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.httpsUsername, serializer);
     sse_encode_opt_String(self.httpsToken, serializer);
     sse_encode_opt_String(self.sshPassphrase, serializer);
+    sse_encode_u_32(self.networkTimeoutMs, serializer);
   }
 
   @protected
@@ -8414,6 +8421,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.httpsUsername, serializer);
     sse_encode_opt_String(self.httpsToken, serializer);
     sse_encode_opt_String(self.sshPassphrase, serializer);
+    sse_encode_u_32(self.networkTimeoutMs, serializer);
   }
 
   @protected

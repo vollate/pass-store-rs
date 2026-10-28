@@ -1,8 +1,8 @@
 ## MODIFIED Requirements
 
-### Requirement: Vault SHALL expose contextual single-entry and batch management workflows
+### Requirement: Vault SHALL expose contextual single-entry management workflows
 
-Vault SHALL expose generated-password creation and manual credential creation through a prominent create action. It SHALL expose edit, move, rename, regenerate, and delete beside the relevant credential, and SHALL expose batch move, batch rename, batch regenerate, and batch delete only after entering explicit multi-select mode. All workflows SHALL reuse existing repository mutation semantics. Git commits after a mutation SHALL follow the "Commit every change" setting and SHALL run only when Git mode is local or remote. Mutation sheets SHALL NOT show a per-operation commit control. Git-disabled mutations SHALL remain successful without a Git warning.
+Vault SHALL expose generated-password creation and manual credential creation through a prominent create action. It SHALL expose edit, move, rename, regenerate, and delete beside the relevant credential. Vault SHALL NOT expose multi-select or batch move, rename, regenerate, or delete. All workflows SHALL reuse existing repository mutation semantics. Git commits after a mutation SHALL follow the "Commit every change" setting and SHALL run only when Git mode is local or remote. Mutation sheets SHALL NOT show a per-operation commit control. Git-disabled mutations SHALL remain successful without a Git warning.
 
 #### Scenario: Create action offers existing creation workflows
 
@@ -10,13 +10,10 @@ Vault SHALL expose generated-password creation and manual credential creation th
 - **THEN** generated-password and manual-existing-password workflows are available
 - **AND** they call the same repository operations and overwrite handling as before
 
-#### Scenario: Explicit selection mode exposes batch actions
+#### Scenario: Vault does not offer multi-select
 
-- **GIVEN** Vault is not in selection mode
-- **WHEN** the user invokes Select or long-presses a selectable credential
-- **THEN** Vault enters selection mode and shows selected count
-- **AND** no batch operation is shown until at least one credential is selected
-- **AND** selecting the first credential reveals only supported batch actions
+- **WHEN** Vault renders the credential list
+- **THEN** it does not show a selection control, selection mode, or batch actions
 
 #### Scenario: Focused single-entry workflow does not ask for an entry again
 
@@ -25,22 +22,9 @@ Vault SHALL expose generated-password creation and manual credential creation th
 - **THEN** it is bound to the displayed credential
 - **AND** it does not show a secondary entry picker
 
-#### Scenario: Leaving selection mode clears selection
-
-- **GIVEN** one or more credentials are selected
-- **WHEN** the user cancels selection mode or changes destination
-- **THEN** public selection state is cleared or safely preserved according to shell state policy
-- **AND** no repository mutation occurs
-
-#### Scenario: Batch operation preserves per-entry outcomes
-
-- **WHEN** a contextual batch operation runs
-- **THEN** successful paths and per-entry failures are collected through existing batch semantics
-- **AND** the result surface distinguishes complete success, partial success, and failure
-
 #### Scenario: Mutation sheets have no commit checkbox
 
-- **WHEN** any single-entry or batch mutation sheet opens
+- **WHEN** any single-entry mutation sheet opens
 - **THEN** it does not show a "commit after operation" control
 
 #### Scenario: Automatic Git commit failure is durable

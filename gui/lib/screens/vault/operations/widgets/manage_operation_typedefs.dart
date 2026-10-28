@@ -38,17 +38,5 @@ typedef _SaveEditedEntrySubmit =
 typedef _ReplaceEntryPasswordSubmit =
     Future<EntryOperationResult> Function(PasswordEntry entry, String password);
 
-typedef _BatchMoveSubmit =
-    Future<BatchOperationResult> Function(String destination, bool overwrite);
-
-typedef _BatchRenameSubmit =
-    Future<BatchOperationResult> Function(
-      String prefix,
-      String suffix,
-      bool overwrite,
-    );
-
-typedef _BatchDeleteSubmit = Future<BatchOperationResult> Function();
-
 typedef _BatchRegenerateSubmit =
     Future<BatchOperationResult> Function(bool noSymbols);

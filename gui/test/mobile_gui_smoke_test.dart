@@ -872,6 +872,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Browse: work'), findsOneWidget);
+    expect(
+      tester
+          .widget<ParsSectionRow>(
+            find.ancestor(
+              of: find.text('Up'),
+              matching: find.byType(ParsSectionRow),
+            ),
+          )
+          .subtitle,
+      isNull,
+    );
     expect(find.text('Work GitHub'), findsOneWidget);
 
     await tester.tap(find.text('Work GitHub'));
@@ -905,17 +916,13 @@ void main() {
     expect(find.text('No entries in this store.'), findsOneWidget);
   });
 
-  testWidgets('Vault exposes contextual create and selection workflows', (
-    tester,
-  ) async {
+  testWidgets('Vault exposes the contextual create workflow', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
     await _completeReadyOnboarding(tester);
 
     expect(find.text('Manage'), findsNothing);
-    // Create and selection are both icon-only, so each is named by tooltip
-    // rather than a visible label.
     expect(find.byTooltip('Create password'), findsOneWidget);
-    expect(find.byTooltip('Select'), findsOneWidget);
+    expect(find.byTooltip('Select'), findsNothing);
 
     await tester.tap(find.byTooltip('Create password'));
     await tester.pumpAndSettle();
@@ -1068,80 +1075,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.deletedPaths, <String>['work/first']);
-  });
-
-  testWidgets('manage batch operations use selected entries', (tester) async {
-    final repository = _ManageVaultRepository();
-
-    final selected = repository.entries
-        .where((entry) => !entry.isDirectory)
-        .toList(growable: false);
-    await _openManageSurface(
-      tester,
-      (context) => showBatchMoveEntriesSurface(
-        context: context,
-        entries: selected,
-        repository: repository,
-      ),
-    );
-    await tester.enterText(find.byType(TextField).first, 'archive');
-    await tester.tap(find.widgetWithText(FilledButton, 'Move selected'));
-    await tester.pumpAndSettle();
-
-    expect(repository.batchMoveDestinations, <String>['archive']);
-    expect(repository.batchMovePaths.single, <String>[
-      'work/first',
-      'work/second',
-    ]);
-
-    await _openManageSurface(
-      tester,
-      (context) => showBatchRenameEntriesSurface(
-        context: context,
-        entries: selected,
-        repository: repository,
-      ),
-    );
-    await tester.enterText(find.byType(TextField).first, 'old-');
-    await tester.enterText(find.byType(TextField).at(1), '-2026');
-    await tester.tap(find.widgetWithText(FilledButton, 'Rename selected'));
-    await tester.pumpAndSettle();
-
-    expect(repository.batchRenamePrefixes, <String>['old-']);
-    expect(repository.batchRenameSuffixes, <String>['-2026']);
-
-    await _openManageSurface(
-      tester,
-      (context) => showBatchRegenerateEntriesSurface(
-        context: context,
-        entries: selected,
-        repository: repository,
-      ),
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Regenerate batch'));
-    await tester.pumpAndSettle();
-
-    expect(repository.batchRegeneratedPaths.single, <String>[
-      'work/first',
-      'work/second',
-    ]);
-
-    await _openManageSurface(
-      tester,
-      (context) => showBatchDeleteEntriesSurface(
-        context: context,
-        entries: selected,
-        repository: repository,
-      ),
-    );
-    await tester.enterText(find.byType(TextField).first, 'DELETE');
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete selected'));
-    await tester.pumpAndSettle();
-
-    expect(repository.batchDeletedPaths.single, <String>[
-      'work/first',
-      'work/second',
-    ]);
   });
 
   testWidgets('manage shows conflict errors and commits every change', (
@@ -3818,12 +3751,6 @@ class _ManageVaultRepository implements ManageRepository {
   final List<String> movedFrom = <String>[];
   final List<String> movedTo = <String>[];
   final List<String> deletedPaths = <String>[];
-  final List<List<String>> batchMovePaths = <List<String>>[];
-  final List<String> batchMoveDestinations = <String>[];
-  final List<String> batchRenamePrefixes = <String>[];
-  final List<String> batchRenameSuffixes = <String>[];
-  final List<List<String>> batchDeletedPaths = <List<String>>[];
-  final List<List<String>> batchRegeneratedPaths = <List<String>>[];
   final List<String> commitMessages = <String>[];
 
   @override
@@ -3959,10 +3886,10 @@ class _ManageVaultRepository implements ManageRepository {
     required bool overwrite,
   }) async {
     _maybeFail();
-    final paths = entries.map((entry) => entry.path).toList(growable: false);
-    batchMovePaths.add(paths);
-    batchMoveDestinations.add(destinationDirectory);
-    return BatchOperationResult(action: 'Moved', affectedPaths: paths);
+    return BatchOperationResult(
+      action: 'Moved',
+      affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
+    );
   }
 
   @override
@@ -3973,10 +3900,10 @@ class _ManageVaultRepository implements ManageRepository {
     required bool overwrite,
   }) async {
     _maybeFail();
-    final paths = entries.map((entry) => entry.path).toList(growable: false);
-    batchRenamePrefixes.add(prefix);
-    batchRenameSuffixes.add(suffix);
-    return BatchOperationResult(action: 'Renamed', affectedPaths: paths);
+    return BatchOperationResult(
+      action: 'Renamed',
+      affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
+    );
   }
 
   @override
@@ -3984,9 +3911,10 @@ class _ManageVaultRepository implements ManageRepository {
     required List<PasswordEntry> entries,
   }) async {
     _maybeFail();
-    final paths = entries.map((entry) => entry.path).toList(growable: false);
-    batchDeletedPaths.add(paths);
-    return BatchOperationResult(action: 'Deleted', affectedPaths: paths);
+    return BatchOperationResult(
+      action: 'Deleted',
+      affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
+    );
   }
 
   @override
@@ -3996,9 +3924,10 @@ class _ManageVaultRepository implements ManageRepository {
     required bool noSymbols,
   }) async {
     _maybeFail();
-    final paths = entries.map((entry) => entry.path).toList(growable: false);
-    batchRegeneratedPaths.add(paths);
-    return BatchOperationResult(action: 'Regenerated', affectedPaths: paths);
+    return BatchOperationResult(
+      action: 'Regenerated',
+      affectedPaths: entries.map((entry) => entry.path).toList(growable: false),
+    );
   }
 
   @override

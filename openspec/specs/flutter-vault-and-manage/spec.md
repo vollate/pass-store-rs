@@ -41,7 +41,7 @@ Sources: `gui/lib/main.dart`, `gui/lib/app/pars_gui_app.dart`, `gui/lib/screens/
 
 #### Scenario: Destination switch preserves safe state
 
-- **GIVEN** Vault contains a query, directory, selection, or scroll position
+- **GIVEN** Vault contains a query, directory, or scroll position
 - **WHEN** the user opens Settings and returns without changing the canonical store
 - **THEN** that non-secret Vault state is restored
 - **AND** decrypted detail content is not retained by destination restoration
@@ -51,7 +51,15 @@ Sources: `gui/lib/main.dart`, `gui/lib/app/pars_gui_app.dart`, `gui/lib/screens/
 - **GIVEN** a compact authenticated shell is showing Settings with no nested route to pop
 - **WHEN** the platform back action is invoked
 - **THEN** the shell returns to Vault
-- **AND** a later back action may leave the app according to platform convention
+- **AND** an open Vault folder is kept until a later back action
+- **AND** a later back action at the Vault root may leave the app according to platform convention
+
+#### Scenario: Back navigation leaves the current folder before exit
+
+- **GIVEN** Vault is browsing inside a directory
+- **WHEN** the platform back action is invoked
+- **THEN** Vault shows that directory's parent, or the store root when it has none
+- **AND** the shell stays open
 
 ### Requirement: Bridge-backed repository SHALL refresh app, key, entry, and Git state
 
@@ -83,7 +91,7 @@ Sources: `gui/lib/services/bridge_backed_repository.dart`, `gui/test/bridge_back
 
 ### Requirement: Vault SHALL support search, browse, and refresh
 
-Vault SHALL refresh on initial open and explicit pull-to-refresh, search by display name or path, and browse direct children of a directory. Search results SHALL replace Browse while the query is active. Public search, browse, section, selection, and scroll state SHALL survive a safe destination switch for the same store. Store-scoped query, selection, directory, and scroll state SHALL be cleared when the canonical store is removed or replaced. Vault SHALL NOT expose Favorites or Recent sections or derive Autofill ranking from viewing, decrypting, revealing, or copying an entry.
+Vault SHALL refresh on initial open and explicit pull-to-refresh, search by display name or path, and browse direct children of a directory. Search results SHALL replace Browse while the query is active. Public search, browse, and scroll state SHALL survive a safe destination switch for the same store. Store-scoped query, directory, and scroll state SHALL be cleared when the canonical store is removed or replaced. Vault SHALL NOT expose Favorites or Recent sections or derive Autofill ranking from viewing, decrypting, revealing, or copying an entry.
 
 Sources: `gui/lib/screens/vault/vault_screen.dart`, `gui/lib/services/bridge_backed_repository.dart`, `gui/lib/services/vault_metadata_store.dart`, `gui/test/bridge_backed_repository_test.dart`
 
@@ -108,7 +116,7 @@ Sources: `gui/lib/screens/vault/vault_screen.dart`, `gui/lib/services/bridge_bac
 
 #### Scenario: Store removal clears store-scoped presentation metadata
 
-- **GIVEN** the canonical store has query, selection, or navigation state
+- **GIVEN** the canonical store has query or navigation state
 - **WHEN** that store is deleted or disconnected successfully
 - **THEN** those store-scoped values are cleared before store setup is shown
 - **AND** a later replacement store cannot inherit them
@@ -261,9 +269,9 @@ Every rendered production GUI control that appears actionable SHALL either invok
 - **THEN** automated regression validation fails
 - **AND** the finding must be implemented, disabled, or explicitly classified before validation passes
 
-### Requirement: Vault SHALL expose contextual single-entry and batch management workflows
+### Requirement: Vault SHALL expose contextual single-entry management workflows
 
-Vault SHALL expose generated-password creation and manual credential creation through a prominent create action. It SHALL expose edit, move, rename, regenerate, and delete beside the relevant credential, and SHALL expose batch move, batch rename, batch regenerate, and batch delete only after entering explicit multi-select mode. All workflows SHALL reuse existing repository mutation semantics. Git commits after a mutation SHALL follow the "Commit every change" setting and SHALL run only when Git mode is local or remote. Mutation sheets SHALL NOT show a per-operation commit control. Git-disabled mutations SHALL remain successful without a Git warning.
+Vault SHALL expose generated-password creation and manual credential creation through a prominent create action. It SHALL expose edit, move, rename, regenerate, and delete beside the relevant credential. Vault SHALL NOT expose multi-select or batch move, rename, regenerate, or delete. All workflows SHALL reuse existing repository mutation semantics. Git commits after a mutation SHALL follow the "Commit every change" setting and SHALL run only when Git mode is local or remote. Mutation sheets SHALL NOT show a per-operation commit control. Git-disabled mutations SHALL remain successful without a Git warning.
 
 #### Scenario: Create action offers existing creation workflows
 
@@ -271,13 +279,10 @@ Vault SHALL expose generated-password creation and manual credential creation th
 - **THEN** generated-password and manual-existing-password workflows are available
 - **AND** they call the same repository operations and overwrite handling as before
 
-#### Scenario: Explicit selection mode exposes batch actions
+#### Scenario: Vault does not offer multi-select
 
-- **GIVEN** Vault is not in selection mode
-- **WHEN** the user invokes Select or long-presses a selectable credential
-- **THEN** Vault enters selection mode and shows selected count
-- **AND** no batch operation is shown until at least one credential is selected
-- **AND** selecting the first credential reveals only supported batch actions
+- **WHEN** Vault renders the credential list
+- **THEN** it does not show a selection control, selection mode, or batch actions
 
 #### Scenario: Focused single-entry workflow does not ask for an entry again
 
@@ -286,22 +291,9 @@ Vault SHALL expose generated-password creation and manual credential creation th
 - **THEN** it is bound to the displayed credential
 - **AND** it does not show a secondary entry picker
 
-#### Scenario: Leaving selection mode clears selection
-
-- **GIVEN** one or more credentials are selected
-- **WHEN** the user cancels selection mode or changes destination
-- **THEN** public selection state is cleared or safely preserved according to shell state policy
-- **AND** no repository mutation occurs
-
-#### Scenario: Batch operation preserves per-entry outcomes
-
-- **WHEN** a contextual batch operation runs
-- **THEN** successful paths and per-entry failures are collected through existing batch semantics
-- **AND** the result surface distinguishes complete success, partial success, and failure
-
 #### Scenario: Mutation sheets have no commit checkbox
 
-- **WHEN** any single-entry or batch mutation sheet opens
+- **WHEN** any single-entry mutation sheet opens
 - **THEN** it does not show a "commit after operation" control
 
 #### Scenario: Automatic Git commit failure is durable

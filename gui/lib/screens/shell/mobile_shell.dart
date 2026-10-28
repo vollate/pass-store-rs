@@ -66,7 +66,20 @@ class _MobileShellState extends State<MobileShell> {
   final SettingsDestinationState _settingsState = SettingsDestinationState();
 
   @override
+  void initState() {
+    super.initState();
+    // Folder changes happen inside VaultScreen. The shell has to rebuild so
+    // system back stops exiting the app while a folder is open.
+    _vaultState.addListener(_onVaultStateChanged);
+  }
+
+  void _onVaultStateChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _vaultState.removeListener(_onVaultStateChanged);
     _vaultState.dispose();
     _settingsState.dispose();
     super.dispose();
@@ -108,10 +121,16 @@ class _MobileShellState extends State<MobileShell> {
     ];
     final content = IndexedStack(index: _index, children: pages);
 
+    final atVaultRoot = _index == 0 && _vaultState.directoryPath == null;
     return PopScope<void>(
-      canPop: _index == 0,
+      canPop: atVaultRoot,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _index != 0) setState(() => _index = 0);
+        if (didPop) return;
+        if (_index != 0) {
+          setState(() => _index = 0);
+          return;
+        }
+        if (_vaultState.popDirectory()) setState(() {});
       },
       child: LayoutBuilder(
         builder: (context, constraints) {

@@ -248,22 +248,20 @@ class ParsSectionRow extends StatelessWidget {
     super.key,
     required this.leading,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.subtitleStyle,
     this.trailing,
     this.onTap,
-    this.onLongPress,
     this.selected = false,
     this.semanticLabel,
   });
 
   final Widget leading;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final TextStyle? subtitleStyle;
   final Widget? trailing;
   final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
   final bool selected;
   final String? semanticLabel;
 
@@ -272,11 +270,13 @@ class ParsSectionRow extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final style = context.parsSection;
+    final subtitle = this.subtitle;
+    final hasSubtitle = subtitle != null && subtitle.isNotEmpty;
 
     return Semantics(
       button: true,
       selected: selected,
-      label: semanticLabel ?? '$title, $subtitle',
+      label: semanticLabel ?? (hasSubtitle ? '$title, $subtitle' : title),
       child: Material(
         color:
             selected
@@ -284,7 +284,6 @@ class ParsSectionRow extends StatelessWidget {
                 : Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          onLongPress: onLongPress,
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: style.rowMinHeight),
             child: Padding(
@@ -304,17 +303,19 @@ class ParsSectionRow extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleMedium,
                         ),
-                        SizedBox(height: style.rowTitleSpacing),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              subtitleStyle ??
-                              theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                        ),
+                        if (hasSubtitle) ...<Widget>[
+                          SizedBox(height: style.rowTitleSpacing),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                subtitleStyle ??
+                                theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

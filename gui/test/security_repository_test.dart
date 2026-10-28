@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/services/security_repository.dart';
 
@@ -29,7 +30,96 @@ void main() {
     });
   });
 
+  group('PasswordVerifier', () {
+    test('derives PBKDF2-HMAC-SHA256', () {
+      // RFC 7914 / common test vector: P="password", S="salt", c=4096.
+      final verifier = PasswordVerifier.fromStoredValue(
+        r'pbkdf2-sha256$4096$c2FsdA==$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+      );
+
+      expect(verifier.matches('password'), isTrue);
+      expect(verifier.matches('Password'), isFalse);
+    });
+
+    test('salts every verifier and round-trips through storage', () {
+      final first = PasswordVerifier.fromPassword(
+        'correct horse',
+        iterations: 1000,
+      );
+      final second = PasswordVerifier.fromPassword(
+        'correct horse',
+        iterations: 1000,
+      );
+
+      expect(first.value, isNot(second.value));
+      expect(first.value, isNot(contains('correct horse')));
+      final restored = PasswordVerifier.fromStoredValue(first.value);
+      expect(restored.matches('correct horse'), isTrue);
+      expect(restored.matches('correct horsf'), isFalse);
+    });
+
+    test('rejects short passwords and malformed stored values', () {
+      expect(() => PasswordVerifier.fromPassword('short'), throwsArgumentError);
+      for (final value in <String>[
+        '',
+        'pbkdf2-sha256',
+        r'md5$1$c2FsdA==$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+        r'pbkdf2-sha256$0$c2FsdA==$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+        r'pbkdf2-sha256$4096$$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+        r'pbkdf2-sha256$4096$c2FsdA==$c2hvcnQ=',
+        r'pbkdf2-sha256$4096$not base64$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+      ]) {
+        expect(
+          () => PasswordVerifier.fromStoredValue(value),
+          throwsArgumentError,
+          reason: value,
+        );
+      }
+    });
+  });
+
+  group('platformDefaultUnlockMethod', () {
+    tearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    test('uses a password on desktops and a gesture on phones and tablets', () {
+      for (final platform in TargetPlatform.values) {
+        debugDefaultTargetPlatformOverride = platform;
+        final desktop = <TargetPlatform>{
+          TargetPlatform.macOS,
+          TargetPlatform.windows,
+          TargetPlatform.linux,
+        }.contains(platform);
+        expect(
+          platformDefaultUnlockMethod(),
+          desktop ? LocalUnlockMethod.password : LocalUnlockMethod.gesture,
+          reason: platform.name,
+        );
+      }
+    });
+  });
+
   group('InMemorySecurityRepository', () {
+    test('saving one unlock method replaces the other', () async {
+      final repository = InMemorySecurityRepository(
+        gestureVerifier: GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+        passwordIterations: 1000,
+      );
+
+      expect(repository.unlockMethod, LocalUnlockMethod.gesture);
+      await repository.savePassword('correct horse');
+      expect(repository.unlockMethod, LocalUnlockMethod.password);
+      expect(repository.hasGestureVerifier, isFalse);
+      expect(await repository.verifyGesture(const <int>[0, 1, 2, 5]), isFalse);
+      expect(repository.shouldLock(DateTime(2026)), isTrue);
+
+      await repository.saveGestureVerifier(
+        GestureVerifier.fromPattern(const <int>[2, 1, 0, 3]),
+      );
+      expect(repository.unlockMethod, LocalUnlockMethod.gesture);
+      expect(repository.hasPasswordVerifier, isFalse);
+      expect(await repository.verifyPassword('correct horse'), isFalse);
+    });
+
     test('locks when no active app session exists', () {
       final repository = InMemorySecurityRepository.withPattern(const <int>[
         0,
@@ -93,6 +183,64 @@ void main() {
       expect(reloaded.autoLockTimeout, Duration.zero);
       await reloaded.markUnlocked(DateTime(2026));
       expect(reloaded.shouldLock(DateTime(2026, 1, 2)), isFalse);
+    });
+
+    test('persists a password verifier and drops the gesture', () async {
+      final storage = _FakeSecureStorageAdapter();
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
+      );
+      await repository.saveGestureVerifier(
+        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+      );
+
+      await repository.savePassword('correct horse');
+
+      expect(
+        storage.keys,
+        isNot(contains('pars.security.gesture_verifier.v1')),
+      );
+      expect(
+        storage.values.any((value) => value.contains('correct horse')),
+        isFalse,
+      );
+      final reloaded = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
+      );
+      expect(reloaded.unlockMethod, LocalUnlockMethod.password);
+      expect(reloaded.hasGestureVerifier, isFalse);
+      expect(await reloaded.verifyPassword('correct horse'), isTrue);
+      expect(await reloaded.verifyPassword('correct horsf'), isFalse);
+      expect(reloaded.shouldLock(DateTime(2026)), isTrue);
+
+      await reloaded.saveGestureVerifier(
+        GestureVerifier.fromPattern(const <int>[2, 1, 0, 3]),
+      );
+      expect(
+        storage.keys,
+        isNot(contains('pars.security.password_verifier.v1')),
+      );
+    });
+
+    test('clears a corrupted password verifier on load', () async {
+      final storage = _FakeSecureStorageAdapter();
+      await storage.write(
+        key: 'pars.security.password_verifier.v1',
+        value: 'garbage',
+      );
+
+      final repository = await SecureStorageSecurityRepository.load(
+        storage: storage,
+        biometricAuth: _FakeBiometricAuthAdapter(),
+      );
+
+      expect(repository.unlockMethod, isNull);
+      expect(
+        storage.keys,
+        isNot(contains('pars.security.password_verifier.v1')),
+      );
     });
 
     test('persists PGP session expiration setting', () async {
@@ -499,6 +647,10 @@ void main() {
 
 class _FakeSecureStorageAdapter implements SecureStorageAdapter {
   final Map<String, String> _values = <String, String>{};
+
+  Iterable<String> get keys => _values.keys;
+
+  Iterable<String> get values => _values.values;
 
   @override
   Future<String?> read(String key) async => _values[key];

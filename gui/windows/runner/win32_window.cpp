@@ -18,6 +18,11 @@ namespace {
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
+// Smallest client area, in logical pixels, that the Flutter UI is verified
+// against.
+constexpr int kMinimumClientWidth = 480;
+constexpr int kMinimumClientHeight = 560;
+
 /// Registry key for app theme preference.
 ///
 /// A value of 0 indicates apps should use dark mode. A non-zero or missing
@@ -195,6 +200,17 @@ Win32Window::MessageHandler(HWND hwnd,
       SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
                    newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
 
+      return 0;
+    }
+    case WM_GETMINMAXINFO: {
+      auto info = reinterpret_cast<MINMAXINFO*>(lparam);
+      HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+      double scale_factor = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
+      RECT frame = {0, 0, Scale(kMinimumClientWidth, scale_factor),
+                    Scale(kMinimumClientHeight, scale_factor)};
+      AdjustWindowRectEx(&frame, WS_OVERLAPPEDWINDOW, FALSE, 0);
+      info->ptMinTrackSize.x = frame.right - frame.left;
+      info->ptMinTrackSize.y = frame.bottom - frame.top;
       return 0;
     }
     case WM_SIZE: {

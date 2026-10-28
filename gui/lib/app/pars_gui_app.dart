@@ -344,7 +344,7 @@ class _ParsGuiAppState extends State<ParsGuiApp> with WidgetsBindingObserver {
 
   bool get _isLocalSecurityConfigured =>
       widget.securityRepository.onboardingComplete &&
-      widget.securityRepository.hasGestureVerifier;
+      widget.securityRepository.hasUnlockVerifier;
 
   _RootPresentationState get _presentationState {
     if (!_isLocalSecurityConfigured) {

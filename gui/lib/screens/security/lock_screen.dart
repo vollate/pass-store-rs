@@ -22,10 +22,16 @@ class LockScreen extends StatefulWidget {
 }
 
 class _LockScreenState extends State<LockScreen> {
+  final TextEditingController _password = TextEditingController();
+  final FocusNode _passwordFocus = FocusNode();
   String? _error;
   late Future<BiometricUnlockStatus> _biometricStatus;
   bool _autoBiometricAttempted = false;
   bool _biometricUnlockInProgress = false;
+  bool _passwordCheckInProgress = false;
+
+  bool get _usesPassword =>
+      widget.securityRepository.unlockMethod == LocalUnlockMethod.password;
 
   @override
   void initState() {
@@ -34,6 +40,13 @@ class _LockScreenState extends State<LockScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryAutomaticBiometricUnlock();
     });
+  }
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _passwordFocus.dispose();
+    super.dispose();
   }
 
   @override
@@ -59,62 +72,90 @@ class _LockScreenState extends State<LockScreen> {
                           .clamp(0, double.infinity)
                           .toDouble(),
                 ),
+                // The password form is short, so it sits in the middle of the
+                // free space rather than under the title.
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment:
+                      _usesPassword
+                          ? MainAxisAlignment.spaceBetween
+                          : MainAxisAlignment.start,
                   children: <Widget>[
-                    const SizedBox(height: ParsSpacing.xl),
-                    Text(
-                      context.l10n.unlockPars,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: ParsSpacing.xs),
-                    Text(context.l10n.drawGestureToUnlock),
-                    const SizedBox(height: ParsSpacing.xxl),
-                    FutureBuilder<BiometricUnlockStatus>(
-                      future: _biometricStatus,
-                      builder: (context, snapshot) {
-                        if (snapshot.data != BiometricUnlockStatus.available) {
-                          return const SizedBox.shrink();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: ParsSpacing.lg,
-                          ),
-                          child: Center(
-                            child: FilledButton.icon(
-                              onPressed:
-                                  _biometricUnlockInProgress
-                                      ? null
-                                      : _unlockWithBiometrics,
-                              icon: const Icon(Icons.fingerprint),
-                              label: Text(context.l10n.unlockWithBiometrics),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    Center(
-                      child: GestureLockInput(
-                        size: gridSize,
-                        onCompleted: (pattern) => _unlock(context, pattern),
-                      ),
-                    ),
-                    if (_error != null) ...<Widget>[
-                      const SizedBox(height: ParsSpacing.md),
-                      Center(
-                        child: Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            _error!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const SizedBox(height: ParsSpacing.xl),
+                        Text(
+                          context.l10n.unlockPars,
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: ParsSpacing.xs),
+                        Text(
+                          _usesPassword
+                              ? context.l10n.enterPasswordToUnlock
+                              : context.l10n.drawGestureToUnlock,
+                        ),
+                        const SizedBox(height: ParsSpacing.xxl),
+                      ],
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        FutureBuilder<BiometricUnlockStatus>(
+                          future: _biometricStatus,
+                          builder: (context, snapshot) {
+                            if (snapshot.data !=
+                                BiometricUnlockStatus.available) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: ParsSpacing.lg,
+                              ),
+                              child: Center(
+                                child: FilledButton.icon(
+                                  onPressed:
+                                      _biometricUnlockInProgress
+                                          ? null
+                                          : _unlockWithBiometrics,
+                                  icon: const Icon(Icons.fingerprint),
+                                  label: Text(
+                                    context.l10n.unlockWithBiometrics,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        Center(
+                          child:
+                              _usesPassword
+                                  ? _buildPasswordInput(context)
+                                  : GestureLockInput(
+                                    size: gridSize,
+                                    onCompleted:
+                                        (pattern) => _unlock(context, pattern),
+                                  ),
+                        ),
+                        if (_error != null) ...<Widget>[
+                          const SizedBox(height: ParsSpacing.md),
+                          Center(
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: ParsSpacing.xl),
                   ],
                 ),
@@ -124,6 +165,65 @@ class _LockScreenState extends State<LockScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildPasswordInput(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: ParsContentWidth.narrow),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          TextField(
+            key: const Key('unlock-password-field'),
+            controller: _password,
+            focusNode: _passwordFocus,
+            autofocus: true,
+            enabled: !_passwordCheckInProgress,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(labelText: context.l10n.password),
+            onSubmitted: (_) => _unlockWithPassword(context),
+          ),
+          const SizedBox(height: ParsSpacing.md),
+          FilledButton(
+            onPressed:
+                _passwordCheckInProgress
+                    ? null
+                    : () => _unlockWithPassword(context),
+            child: Text(context.l10n.unlockAction, textAlign: TextAlign.center),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _unlockWithPassword(BuildContext context) async {
+    if (_passwordCheckInProgress || _password.text.isEmpty) return;
+    setState(() {
+      _error = null;
+      _passwordCheckInProgress = true;
+    });
+    final isValid = await widget.securityRepository.verifyPassword(
+      _password.text,
+    );
+    if (!context.mounted) return;
+    if (!isValid) {
+      _password.clear();
+      setState(() {
+        _error = context.l10n.incorrectPassword;
+        _passwordCheckInProgress = false;
+      });
+      _passwordFocus.requestFocus();
+      return;
+    }
+    _password.clear();
+    await widget.securityRepository.markUnlocked(DateTime.now());
+    if (context.mounted) {
+      widget.onUnlocked();
+    }
   }
 
   Future<void> _unlock(BuildContext context, List<int> pattern) async {

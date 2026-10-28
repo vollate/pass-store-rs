@@ -7,6 +7,8 @@ enum GuiTestViewport {
   compactPhone(Size(390, 844), 0),
   keyboardPhone(Size(390, 844), 320),
   compactLandscape(Size(844, 390), 0),
+  // Minimum window size set by the macOS, Windows and Linux runners.
+  desktopMinimum(Size(480, 560), 0),
   medium(Size(700, 900), 0),
   expanded(Size(1100, 900), 0);
 

@@ -36,6 +36,7 @@ pub enum RemoteHostKeyTrust {
 
 /// True when [key] for [hostname]:[port] is listed in OpenSSH `known_hosts` text
 /// and is not revoked.
+#[cfg(test)]
 pub fn remote_host_key_is_trusted(
     known_hosts: &str,
     hostname: &str,

@@ -23,14 +23,6 @@ void main() {
     expect(repository.refreshCount, 1);
 
     await tester.enterText(find.byType(TextField).first, 'github');
-    await tester.tap(find.byTooltip('Select'));
-    await tester.pumpAndSettle();
-    expect(find.text('Move'), findsNothing);
-    expect(find.text('Rename'), findsNothing);
-    await tester.tap(find.byType(Checkbox).first);
-    await tester.pumpAndSettle();
-    expect(find.text('Move'), findsOneWidget);
-    expect(find.text('Rename'), findsOneWidget);
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Vault').last);
@@ -40,7 +32,6 @@ void main() {
       tester.widget<TextField>(find.byType(TextField).first).controller?.text,
       'github',
     );
-    expect(find.text('1 selected'), findsOneWidget);
     expect(repository.refreshCount, 1);
     expectNoFlutterOverflow(tester);
   });
@@ -73,6 +64,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Search by name or path'), findsOneWidget);
+  });
+
+  testWidgets('system back leaves the open folder before exiting', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    await tester.pumpWidget(_readyApp(_CountingRepository()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('work'));
+    await tester.pumpAndSettle();
+    expect(find.text('Browse: work'), findsOneWidget);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Browse: work'), findsNothing);
+    expect(find.text('Browse'), findsOneWidget);
+    expect(find.text('Search by name or path'), findsOneWidget);
+  });
+
+  testWidgets('system back returns from Settings without leaving the folder', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    await tester.pumpWidget(_readyApp(_CountingRepository()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('work'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Appearance'), findsOneWidget);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Appearance'), findsNothing);
+    expect(find.text('Browse: work'), findsOneWidget);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Browse'), findsOneWidget);
   });
 
   testWidgets('Lock now clears session and opens the lock screen', (
@@ -112,21 +146,23 @@ void main() {
     expect(autofill.publishCount, greaterThan(0));
   });
 
-  test('destination state owns query, directory, selection, and cleanup', () {
+  test('destination state owns query, directory, and cleanup', () {
     final state = VaultDestinationState();
     addTearDown(state.dispose);
 
     state.setDirectory('work');
     state.setQuery('github');
     expect(state.directoryPath, isNull);
-    state.enterSelection('github/alice');
-    state.setSelected('github/bob', selected: true);
-    expect(state.selectionMode, isTrue);
-    expect(state.selectedPaths, <String>{'github/alice', 'github/bob'});
+    expect(state.query, 'github');
 
-    state.clearSelection();
-    expect(state.selectionMode, isFalse);
-    expect(state.selectedPaths, isEmpty);
+    state.setDirectory('work/dev');
+    expect(state.parentDirectory, 'work');
+    expect(state.popDirectory(), isTrue);
+    expect(state.directoryPath, 'work');
+    expect(state.parentDirectory, isNull);
+    expect(state.popDirectory(), isTrue);
+    expect(state.directoryPath, isNull);
+    expect(state.popDirectory(), isFalse);
   });
 }
 
