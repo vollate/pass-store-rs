@@ -1,3 +1,6 @@
+// Shared test helpers also compile directly in integration-test crates.
+extern crate self as pars_core;
+
 pub mod autofill;
 pub mod clipboard;
 pub mod config;

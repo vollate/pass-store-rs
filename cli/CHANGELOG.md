@@ -1,5 +1,37 @@
 # pars-cli Changelog
 
+## [0.3.0] - Unreleased
+
+### Changed
+
+- Integrate `pars-core ^0.3.0` (previously `^0.2`) and upgrade terminal
+  dependencies to `crossterm 0.29` and `ratatui 0.30`.
+- Inherit core configuration normalization: nonempty `default_repo` wins,
+  otherwise the first nonempty `repos` entry wins. Loading normalizes in memory;
+  saving keeps only that registration. Back up multi-store configuration and
+  explicitly select the intended default before upgrading. No store directories
+  or passwords are deleted. Config saves now atomically replace the destination;
+  review assumptions about symlinks and preservation of file metadata.
+
+### Fixed
+
+- File `mv`/`cp` create missing destination parents through core 0.3.0.
+- Package GPL license text and refresh completion documentation.
+
+### Compatibility notes
+
+- CLI operations still require GnuPG-compatible tooling, Git, and applicable
+  clipboard utilities. `pgp_config.backend = "pure_rust"` does not switch the
+  CLI backend. Core's new backend and key management APIs are library capabilities.
+- Core's public `ParsConfig.pgp_config` addition breaks exhaustive Rust struct
+  literals/patterns; old TOML remains readable. Library consumers should add
+  `pgp_config: Default::default()` or use struct-update defaults / `..` patterns.
+- Locked dependencies require at least Rust 1.88; no build-verified MSRV is claimed.
+- Fuzzy search, completion installation, vendored completion files and corrected
+  include paths already shipped in 0.2.0; they are not new 0.3.0 features.
+- Android manual Git-sync device verification remains unfinished; no such
+  verification is claimed by this core/CLI release.
+
 ## [0.2.0] - 2026-05-31
 
 ### Added

@@ -1,3 +1,7 @@
+#[allow(dead_code, unused_imports, unused_macros)]
+#[path = "../src/util/test_util.rs"]
+mod test_util;
+
 use std::path::Path;
 
 use pars_core::config::cli::PgpBackendKind;
@@ -7,9 +11,9 @@ use pars_core::pgp::import::{
     PgpImportError, PgpKeyMaterialKind,
 };
 use pars_core::pgp::rpgp_backend::RpgpBackend;
-use pars_core::util::test_util::PgpKeyMaterialFixture;
 use secrecy::SecretString;
 use tempfile::TempDir;
+use test_util::PgpKeyMaterialFixture;
 
 const PASSPHRASE: &str = "fixture passphrase";
 

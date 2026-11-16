@@ -2485,7 +2485,7 @@ dependencies = [
 
 [[package]]
 name = "pars-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2503,7 +2503,7 @@ dependencies = [
 
 [[package]]
 name = "pars-core"
-version = "0.2.5"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "bumpalo",
@@ -2520,7 +2520,6 @@ dependencies = [
  "p384",
  "p521",
  "parking_lot",
- "pars-core",
  "passwords",
  "pgp",
  "pretty_assertions",

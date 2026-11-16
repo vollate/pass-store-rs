@@ -1,3 +1,7 @@
+#[allow(dead_code, unused_imports, unused_macros)]
+#[path = "../src/util/test_util.rs"]
+mod test_util;
+
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -11,11 +15,11 @@ use pars_core::pgp::import::{
     PgpImportOutcome,
 };
 use pars_core::pgp::rpgp_backend::RpgpBackend;
-use pars_core::util::test_util::{gpg_key_gen_batch, PgpKeyMaterialFixture};
 use pgp::crypto::hash::HashAlgorithm;
 use pgp::crypto::sym::SymmetricKeyAlgorithm;
 use pgp::types::{S2kParams, SecretParams, StringToKey};
 use secrecy::{ExposeSecret, SecretString};
+use test_util::{gpg_key_gen_batch, PgpKeyMaterialFixture};
 
 #[test]
 fn pure_rust_reprotects_the_low_cost_legacy_sha1_ci_fixture() {

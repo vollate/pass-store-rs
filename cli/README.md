@@ -6,7 +6,7 @@
 
 To use `pars-cli`, ensure your system has the following dependencies installed:
 
-- `gpg2`: for encryption and decryption (any program that implements the PGP standard, such as GnuPG or OpenPGP)
+- GnuPG-compatible `gpg`/`gpg2`: for encryption and decryption (configure `executable_config.pgp_executable` for your system)
 - `git`: for version control
 - `xclip`(X11) or `wl-clipboard`(Wayland): for Linux DE clipboard support
 
@@ -146,44 +146,29 @@ git_executable = "git"
 
 ## Command Line Completion
 
-Currently, only `powershell` is supported for command line completion. We are working on adding support for `bash`, `zsh` and `fish` in the future.
+Completion scripts for bash, zsh, fish and PowerShell are bundled with the CLI:
 
-### Windows Powershell
-
-Run the following command to download the latest `ParsCompletion` module to your local machine:
-
-```powershell
-$documentsPath = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders').Personal
-$documentsPath = [Environment]::ExpandEnvironmentVariables($documentsPath)
-
-$modulePath = Join-Path $documentsPath "PowerShell\Modules\ParsCompletion"
-
-# make sure the module path exists
-if (-Not (Test-Path $modulePath)) {
-    Write-Host "Creating module directory at $modulePath"
-    New-Item -Path $modulePath -ItemType Directory -Force | Out-Null
-}
-
-$files = @(
-    @{
-        Url = "https://raw.githubusercontent.com/vollate/pass-store-rs/refs/heads/main/completion/pwsh/ParsCompletion.psm1"
-        Path = Join-Path $modulePath "ParsCompletion.psm1"
-    },
-    @{
-        Url = "https://raw.githubusercontent.com/vollate/pass-store-rs/refs/heads/main/completion/pwsh/ParsCompletion.psd1"
-        Path = Join-Path $modulePath "ParsCompletion.psd1"
-    }
-)
-
-# Download the files
-foreach ($file in $files) {
-    Write-Host "Downloading $($file.Url) ..."
-    Invoke-WebRequest -Uri $file.Url -OutFile $file.Path -UseBasicParsing
-    Write-Host "Saved to $($file.Path)"
-}
+```sh
+pars completion install --shell bash
+pars completion generate --shell zsh
+pars completion uninstall --shell bash
 ```
 
-Then, run `"Import-Module ParsCompletion" >> $PROFILE` to enable the module.
+Use `--shell fish` or `--shell powershell` for those shells. `install` and
+`uninstall` can auto-detect the shell when `--shell` is omitted. Use
+`pars completion --help` for details. Installation changes your shell setup;
+`generate` only prints the script and usage instructions.
+
+## Upgrading to 0.3.0
+
+Back up multi-store configuration and explicitly select the intended
+`path_config.default_repo` before upgrading. Loading normalizes registrations
+to one canonical store; saving removes other registrations, **not** directories
+or passwords. See [CHANGELOG.md](CHANGELOG.md) for migration details.
+
+The CLI still uses `executable_config.pgp_executable`; selecting the pure-Rust
+backend in `pgp_config` does not change CLI encryption/decryption. Locked
+build dependencies require at least Rust 1.88, but this is not a verified MSRV.
 
 ## Contributing
 

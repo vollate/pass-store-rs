@@ -308,13 +308,10 @@ mod tests {
         let mut default_config = ParsConfig::default();
         default_config.path_config.default_repo = "<Your Home>/.password-store".into();
         default_config.path_config.repos = vec!["<Your Home>/.password-store".into()];
-        let root = env!("CARGO_MANIFEST_DIR");
-        let save_path = Path::new(root).parent().unwrap().join("config").join("cli");
-        if !save_path.exists() {
-            fs::create_dir_all(&save_path).unwrap();
-        }
-        save_config(&default_config, save_path.join("pars_config.toml"))
-            .expect("Failed to save default config");
+        let (_temp_dir, root) = gen_unique_temp_dir();
+        let save_path = root.join("pars_config.toml");
+        save_config(&default_config, &save_path).expect("Failed to save default config");
+        assert_eq!(load_config(save_path).unwrap(), default_config);
     }
 
     #[test]

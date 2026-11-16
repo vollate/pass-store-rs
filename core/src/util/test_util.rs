@@ -31,9 +31,10 @@ pub fn clean_up_test_key(
     emails: &[impl AsRef<str>],
 ) -> Result<(), Box<dyn std::error::Error>> {
     for email in emails {
-        while let Ok((fingerprint, _, _)) = get_pgp_key_info(executable, email) {
+        while let Ok(client) = PGPClient::new(executable, &[email.as_ref()]) {
+            let fingerprint = client.get_keys_fpr()[0];
             let delete_status = Command::new(executable)
-                .args(["--batch", "--yes", "--delete-secret-and-public-keys", &fingerprint])
+                .args(["--batch", "--yes", "--delete-secret-and-public-keys", fingerprint])
                 .stdin(Stdio::null())
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit())
@@ -170,12 +171,11 @@ impl PgpKeyMaterialFixture {
     }
 
     pub fn generate_for(name: &str, email: &str, passphrase: Option<&str>) -> Self {
+        use pars_core::config::cli::PgpBackendKind;
+        use pars_core::pgp::backend::{KeyGenerationRequest, PgpBackend, PgpBackendConfig};
+        use pars_core::pgp::import::pgp_key_material_to_binary;
+        use pars_core::pgp::rpgp_backend::RpgpBackend;
         use secrecy::SecretString;
-
-        use crate::config::cli::PgpBackendKind;
-        use crate::pgp::backend::{KeyGenerationRequest, PgpBackend, PgpBackendConfig};
-        use crate::pgp::import::pgp_key_material_to_binary;
-        use crate::pgp::rpgp_backend::RpgpBackend;
 
         // A throwaway keyring: the fixture only needs the exported material, not a live backend.
         let keyring = tempfile::tempdir().expect("fixture keyring");
@@ -248,6 +248,5 @@ macro_rules! log_test {
 }
 #[cfg(test)]
 pub(crate) use log_test;
-
-use crate::pgp::key_management::key_gen_batch;
-use crate::pgp::utils::get_pgp_key_info;
+use pars_core::pgp::key_management::key_gen_batch;
+use pars_core::pgp::PGPClient;

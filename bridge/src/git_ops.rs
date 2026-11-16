@@ -22,7 +22,7 @@ use pars_core::gui::CoreError;
 use pars_core::key_management::ssh_private_key_text_is_encrypted;
 
 use crate::api::{
-    git_failure, trace_git, remember_remote_host_key, ssh_identity_credential, store_failure,
+    git_failure, remember_remote_host_key, ssh_identity_credential, store_failure, trace_git,
     BridgeFailure, BridgeFailureCategory, GitIdentityDto, GitIntegrationStrategyDto,
     GitLogEntryDto, GitRequest, GitResetResultDto, GitStatusOperationDto, GitStatusSummaryDto,
     GitSyncConflictDto, GitSyncResultDto,
@@ -145,7 +145,10 @@ fn git_error(message: &str) -> BridgeFailure {
     BridgeFailure::from(CoreError::GitError(message.to_string()))
 }
 
-fn managed_key_path(private_key_path: &Path, ssh_dir: Option<&Path>) -> Result<PathBuf, BridgeFailure> {
+fn managed_key_path(
+    private_key_path: &Path,
+    ssh_dir: Option<&Path>,
+) -> Result<PathBuf, BridgeFailure> {
     let ssh_dir = ssh_dir.ok_or_else(|| validation("SSH key directory is required"))?;
     let root = ssh_dir.canonicalize().map_err(store_failure)?;
     let metadata = fs::symlink_metadata(private_key_path).map_err(store_failure)?;
@@ -333,7 +336,10 @@ pub(crate) fn lg_signature(repo: &Repository) -> Result<Signature<'static>, Brid
 }
 
 /// Stages every change and commits it. Returns `None` when the tree matches HEAD.
-pub(crate) fn lg_commit_all(repo: &Repository, message: &str) -> Result<Option<Oid>, BridgeFailure> {
+pub(crate) fn lg_commit_all(
+    repo: &Repository,
+    message: &str,
+) -> Result<Option<Oid>, BridgeFailure> {
     let mut index = repo.index().map_err(git_failure)?;
     index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None).map_err(git_failure)?;
     index.update_all(["*"].iter(), None).map_err(git_failure)?;
@@ -389,12 +395,15 @@ fn lg_target(repo: &Repository) -> Result<LgTarget, BridgeFailure> {
         return Err(git_error("current Git HEAD is detached"));
     }
     let local_ref = head.name().ok_or_else(|| git_error("current branch has no name"))?.to_string();
-    let branch = head.shorthand().ok_or_else(|| git_error("current branch has no name"))?.to_string();
+    let branch =
+        head.shorthand().ok_or_else(|| git_error("current branch has no name"))?.to_string();
     let config = repo.config().map_err(git_failure)?;
     let remote = config.get_string(&format!("branch.{branch}.remote")).ok();
     let merge_ref = config.get_string(&format!("branch.{branch}.merge")).ok();
     match (remote, merge_ref) {
-        (Some(remote), Some(merge_ref)) if remote != "." && merge_ref.starts_with("refs/heads/") => {
+        (Some(remote), Some(merge_ref))
+            if remote != "." && merge_ref.starts_with("refs/heads/") =>
+        {
             Ok(LgTarget { branch, local_ref, remote, merge_ref: Some(merge_ref) })
         }
         (Some(remote), Some(_)) if remote == "." => {
@@ -464,7 +473,9 @@ pub(crate) fn lg_push(
 
 fn lg_set_upstream(repo: &Repository, target: &LgTarget) -> Result<(), BridgeFailure> {
     let mut config = repo.config().map_err(git_failure)?;
-    config.set_str(&format!("branch.{}.remote", target.branch), &target.remote).map_err(git_failure)?;
+    config
+        .set_str(&format!("branch.{}.remote", target.branch), &target.remote)
+        .map_err(git_failure)?;
     config
         .set_str(&format!("branch.{}.merge", target.branch), &target.destination_ref())
         .map_err(git_failure)?;
@@ -647,7 +658,8 @@ pub(crate) fn lg_sync(
                 let integration = match strategy {
                     GitIntegrationStrategyDto::Rebase => lg_rebase(&repo, local, upstream)?,
                     GitIntegrationStrategyDto::Merge => {
-                        let upstream_name = target.tracking_ref().trim_start_matches("refs/remotes/").to_string();
+                        let upstream_name =
+                            target.tracking_ref().trim_start_matches("refs/remotes/").to_string();
                         let merge_message = format!("Merge {upstream_name} into {}", target.branch);
                         lg_merge(&repo, local, upstream, &merge_message)?
                     }
@@ -659,7 +671,8 @@ pub(crate) fn lg_sync(
                     }
                     Integration::Conflict(paths) => {
                         let backup = lg_create_backup(&repo, local)?;
-                        result.conflict = Some(GitSyncConflictDto { backup_branch: Some(backup), paths });
+                        result.conflict =
+                            Some(GitSyncConflictDto { backup_branch: Some(backup), paths });
                         result.summary = summarize_repository(root)?;
                         return Ok(result);
                     }
@@ -669,11 +682,25 @@ pub(crate) fn lg_sync(
         }
         let (ahead_after, _) = repo.graph_ahead_behind(current, upstream).map_err(git_failure)?;
         if ahead_after > 0 {
-            lg_push(&repo, &target.remote, &target.local_ref, &target.destination_ref(), transport, timeout)?;
+            lg_push(
+                &repo,
+                &target.remote,
+                &target.local_ref,
+                &target.destination_ref(),
+                transport,
+                timeout,
+            )?;
             result.pushed = true;
         }
     } else {
-        lg_push(&repo, &target.remote, &target.local_ref, &target.destination_ref(), transport, timeout)?;
+        lg_push(
+            &repo,
+            &target.remote,
+            &target.local_ref,
+            &target.destination_ref(),
+            transport,
+            timeout,
+        )?;
         result.pushed = true;
     }
     if target.merge_ref.is_none() && result.pushed {
@@ -690,13 +717,18 @@ pub(crate) fn lg_sync(
 fn lg_abort_operation(repo: &Repository) -> Result<(), BridgeFailure> {
     match repo.state() {
         RepositoryState::Clean => Ok(()),
-        RepositoryState::Rebase | RepositoryState::RebaseInteractive | RepositoryState::RebaseMerge => {
+        RepositoryState::Rebase
+        | RepositoryState::RebaseInteractive
+        | RepositoryState::RebaseMerge => {
             let mut rebase = repo.open_rebase(None).map_err(git_failure)?;
             rebase.abort().map_err(git_failure)
         }
         _ => {
             repo.cleanup_state().map_err(git_failure)?;
-            let head = repo.head().and_then(|head| head.peel(git2::ObjectType::Commit)).map_err(git_failure)?;
+            let head = repo
+                .head()
+                .and_then(|head| head.peel(git2::ObjectType::Commit))
+                .map_err(git_failure)?;
             repo.reset(&head, ResetType::Hard, None).map_err(git_failure)
         }
     }
@@ -722,7 +754,10 @@ pub(crate) fn lg_reset(
     };
     let local = repo.head().ok().and_then(|head| head.target());
     let backup_branch = match local {
-        Some(local) if local != upstream && !repo.graph_descendant_of(upstream, local).map_err(git_failure)? => {
+        Some(local)
+            if local != upstream
+                && !repo.graph_descendant_of(upstream, local).map_err(git_failure)? =>
+        {
             Some(lg_create_backup(&repo, local)?)
         }
         _ => None,
@@ -740,7 +775,8 @@ pub(crate) fn lg_push_branch(
 ) -> Result<String, BridgeFailure> {
     backup_branch_only(branch)?;
     let repo = Repository::open(root).map_err(git_failure)?;
-    repo.find_branch(branch, BranchType::Local).map_err(|_| validation("backup branch not found"))?;
+    repo.find_branch(branch, BranchType::Local)
+        .map_err(|_| validation("backup branch not found"))?;
     let remote = lg_remote_name(&repo)?;
     let reference = format!("refs/heads/{branch}");
     lg_push(&repo, &remote, &reference, &reference, transport, timeout)?;
@@ -782,11 +818,13 @@ pub(crate) fn lg_log(root: &Path, limit: u32) -> Result<Vec<GitLogEntryDto>, Bri
     Ok(entries)
 }
 
-pub(crate) fn lg_remote_branches(
-    root: &Path,
-) -> Result<RemoteBranches, BridgeFailure> {
+pub(crate) fn lg_remote_branches(root: &Path) -> Result<RemoteBranches, BridgeFailure> {
     let repo = Repository::open(root).map_err(git_failure)?;
-    let current = repo.head().ok().filter(|head| head.is_branch()).and_then(|head| head.shorthand().map(str::to_string));
+    let current = repo
+        .head()
+        .ok()
+        .filter(|head| head.is_branch())
+        .and_then(|head| head.shorthand().map(str::to_string));
     let Ok(remote) = lg_remote_name(&repo) else {
         return Ok((None, current, Vec::new()));
     };
@@ -812,7 +850,10 @@ fn require_switchable(summary: &GitStatusSummaryDto) -> Result<(), BridgeFailure
     Ok(())
 }
 
-pub(crate) fn lg_switch_branch(root: &Path, branch: &str) -> Result<GitStatusSummaryDto, BridgeFailure> {
+pub(crate) fn lg_switch_branch(
+    root: &Path,
+    branch: &str,
+) -> Result<GitStatusSummaryDto, BridgeFailure> {
     valid_branch_name(branch)?;
     require_switchable(&summarize_repository(root)?)?;
     let repo = Repository::open(root).map_err(git_failure)?;
@@ -824,8 +865,11 @@ pub(crate) fn lg_switch_branch(root: &Path, branch: &str) -> Result<GitStatusSum
     let local_ref = format!("refs/heads/{branch}");
     match repo.find_branch(branch, BranchType::Local) {
         Ok(existing) => {
-            let local_oid = existing.get().target().ok_or_else(|| git_error("branch has no commit"))?;
-            if local_oid != remote_oid && !repo.graph_descendant_of(remote_oid, local_oid).map_err(git_failure)? {
+            let local_oid =
+                existing.get().target().ok_or_else(|| git_error("branch has no commit"))?;
+            if local_oid != remote_oid
+                && !repo.graph_descendant_of(remote_oid, local_oid).map_err(git_failure)?
+            {
                 return Err(validation("the local branch has commits that are not on the remote"));
             }
         }
@@ -833,7 +877,8 @@ pub(crate) fn lg_switch_branch(root: &Path, branch: &str) -> Result<GitStatusSum
             repo.branch(branch, &commit, false).map_err(git_failure)?;
         }
     }
-    repo.checkout_tree(commit.as_object(), Some(CheckoutBuilder::new().safe())).map_err(git_failure)?;
+    repo.checkout_tree(commit.as_object(), Some(CheckoutBuilder::new().safe()))
+        .map_err(git_failure)?;
     repo.reference(&local_ref, remote_oid, true, "Pars switch branch").map_err(git_failure)?;
     repo.set_head(&local_ref).map_err(git_failure)?;
     let mut local = repo.find_branch(branch, BranchType::Local).map_err(git_failure)?;
@@ -845,9 +890,14 @@ pub(crate) fn lg_identity(root: &Path) -> Result<Option<GitIdentityDto>, BridgeF
     let repo = Repository::open(root).map_err(git_failure)?;
     let config = repo.config().map_err(git_failure)?;
     let read = |config: &git2::Config, key: &str| {
-        config.get_string(key).ok().map(|value| value.trim().to_string()).filter(|value| !value.is_empty())
+        config
+            .get_string(key)
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
     };
-    let (Some(name), Some(email)) = (read(&config, "user.name"), read(&config, "user.email")) else {
+    let (Some(name), Some(email)) = (read(&config, "user.name"), read(&config, "user.email"))
+    else {
         return Ok(None);
     };
     let local = config
@@ -860,7 +910,10 @@ pub(crate) fn lg_identity(root: &Path) -> Result<Option<GitIdentityDto>, BridgeF
 pub(crate) fn lg_set_identity(root: &Path, name: &str, email: &str) -> Result<(), BridgeFailure> {
     let (name, email) = validated_identity(name, email)?;
     let repo = Repository::open(root).map_err(git_failure)?;
-    let mut local = repo.config().and_then(|config| config.open_level(ConfigLevel::Local)).map_err(git_failure)?;
+    let mut local = repo
+        .config()
+        .and_then(|config| config.open_level(ConfigLevel::Local))
+        .map_err(git_failure)?;
     local.set_str("user.name", &name).map_err(git_failure)?;
     local.set_str("user.email", &email).map_err(git_failure)?;
     Ok(())
@@ -892,7 +945,11 @@ pub(crate) mod sys {
     use crate::api::{git_process_failure, git_ssh_command, with_selected_known_hosts};
     use crate::git_status::parse_porcelain_v2;
 
-    fn run(root: &Path, args: &[&str], known_hosts_file: Option<&Path>) -> Result<Output, BridgeFailure> {
+    fn run(
+        root: &Path,
+        args: &[&str],
+        known_hosts_file: Option<&Path>,
+    ) -> Result<Output, BridgeFailure> {
         run_deadline(root, args, known_hosts_file, None)
     }
 
@@ -983,7 +1040,11 @@ pub(crate) mod sys {
         git_process_failure(output)
     }
 
-    fn ok(root: &Path, args: &[&str], known_hosts_file: Option<&Path>) -> Result<String, BridgeFailure> {
+    fn ok(
+        root: &Path,
+        args: &[&str],
+        known_hosts_file: Option<&Path>,
+    ) -> Result<String, BridgeFailure> {
         command_output(run(root, args, known_hosts_file)?)
     }
 
@@ -1064,13 +1125,18 @@ pub(crate) mod sys {
 
         fn tracking_ref(&self) -> String {
             let destination = self.destination_ref();
-            format!("refs/remotes/{}/{}", self.remote, destination.trim_start_matches("refs/heads/"))
+            format!(
+                "refs/remotes/{}/{}",
+                self.remote,
+                destination.trim_start_matches("refs/heads/")
+            )
         }
     }
 
     fn single_remote(root: &Path) -> Result<String, BridgeFailure> {
         let remotes = ok(root, &["remote"], None)?;
-        let names = remotes.lines().map(str::trim).filter(|line| !line.is_empty()).collect::<Vec<_>>();
+        let names =
+            remotes.lines().map(str::trim).filter(|line| !line.is_empty()).collect::<Vec<_>>();
         match names.as_slice() {
             [only] => Ok((*only).to_string()),
             [] => Err(git_error("no Git remote is configured")),
@@ -1084,7 +1150,9 @@ pub(crate) mod sys {
         let remote = value(root, &["config", &format!("branch.{branch}.remote")]);
         let merge_ref = value(root, &["config", &format!("branch.{branch}.merge")]);
         match (remote, merge_ref) {
-            (Some(remote), Some(merge_ref)) if remote != "." && merge_ref.starts_with("refs/heads/") => {
+            (Some(remote), Some(merge_ref))
+                if remote != "." && merge_ref.starts_with("refs/heads/") =>
+            {
                 Ok(SysTarget { branch, remote, merge_ref: Some(merge_ref) })
             }
             (Some(remote), Some(_)) if remote == "." => {
@@ -1144,7 +1212,9 @@ pub(crate) mod sys {
         timeout: Duration,
     ) -> Result<GitStatusSummaryDto, BridgeFailure> {
         let remote = remote_name(root)?;
-        with_known_hosts(known_hosts, |file| ok_network(root, &["fetch", &remote], file, timeout).map(|_| ()))?;
+        with_known_hosts(known_hosts, |file| {
+            ok_network(root, &["fetch", &remote], file, timeout).map(|_| ())
+        })?;
         summary(root)
     }
 
@@ -1166,7 +1236,8 @@ pub(crate) mod sys {
             summary: before.clone(),
         };
         if in_progress(&before) {
-            result.conflict = Some(GitSyncConflictDto { backup_branch: None, paths: unmerged_paths(root) });
+            result.conflict =
+                Some(GitSyncConflictDto { backup_branch: None, paths: unmerged_paths(root) });
             return Ok(result);
         }
         if commit_pending && before.changed > 0 {
@@ -1181,7 +1252,12 @@ pub(crate) mod sys {
             let tracking_ref = target.tracking_ref();
             let destination = format!("HEAD:{}", target.destination_ref());
             if rev(root, &tracking_ref).is_none() {
-                ok_network(root, &["push", "--set-upstream", &target.remote, &destination], file, timeout)?;
+                ok_network(
+                    root,
+                    &["push", "--set-upstream", &target.remote, &destination],
+                    file,
+                    timeout,
+                )?;
                 result.pushed = true;
                 return Ok(());
             }
@@ -1204,12 +1280,27 @@ pub(crate) mod sys {
                         return Ok(());
                     }
                     require_identity(root)?;
-                    let upstream_name = tracking_ref.trim_start_matches("refs/remotes/").to_string();
+                    let upstream_name =
+                        tracking_ref.trim_start_matches("refs/remotes/").to_string();
                     let output = match strategy {
-                        GitIntegrationStrategyDto::Rebase => run(root, &["rebase", &tracking_ref], None)?,
+                        GitIntegrationStrategyDto::Rebase => {
+                            run(root, &["rebase", &tracking_ref], None)?
+                        }
                         GitIntegrationStrategyDto::Merge => {
-                            let merge_message = format!("Merge {upstream_name} into {}", target.branch);
-                            run(root, &["merge", "--no-edit", "--no-ff", "-m", &merge_message, &tracking_ref], None)?
+                            let merge_message =
+                                format!("Merge {upstream_name} into {}", target.branch);
+                            run(
+                                root,
+                                &[
+                                    "merge",
+                                    "--no-edit",
+                                    "--no-ff",
+                                    "-m",
+                                    &merge_message,
+                                    &tracking_ref,
+                                ],
+                                None,
+                            )?
                         }
                     };
                     if !output.status.success() {
@@ -1223,7 +1314,8 @@ pub(crate) mod sys {
                             return Err(failure(&output));
                         }
                         let backup = create_backup(root, &local)?;
-                        result.conflict = Some(GitSyncConflictDto { backup_branch: Some(backup), paths });
+                        result.conflict =
+                            Some(GitSyncConflictDto { backup_branch: Some(backup), paths });
                         return Ok(());
                     }
                 }
@@ -1246,7 +1338,8 @@ pub(crate) mod sys {
     }
 
     fn abort_operation(root: &Path) {
-        let current = summary(root).map(|summary| summary.operation).unwrap_or(GitStatusOperationDto::None);
+        let current =
+            summary(root).map(|summary| summary.operation).unwrap_or(GitStatusOperationDto::None);
         match current {
             GitStatusOperationDto::Rebasing => {
                 let _ = run(root, &["rebase", "--abort"], None);
@@ -1279,7 +1372,9 @@ pub(crate) mod sys {
         }
         let committed = if summary(root)?.changed > 0 { commit_all(root, message)? } else { false };
         let backup_branch = match rev(root, "HEAD") {
-            Some(local) if count(root, &format!("{tracking_ref}..HEAD"))? > 0 => Some(create_backup(root, &local)?),
+            Some(local) if count(root, &format!("{tracking_ref}..HEAD"))? > 0 => {
+                Some(create_backup(root, &local)?)
+            }
             _ => None,
         };
         ok(root, &["reset", "--hard", &tracking_ref], None)?;
@@ -1299,7 +1394,9 @@ pub(crate) mod sys {
         }
         let remote = remote_name(root)?;
         let refspec = format!("{reference}:{reference}");
-        with_known_hosts(known_hosts, |file| ok_network(root, &["push", &remote, &refspec], file, timeout))
+        with_known_hosts(known_hosts, |file| {
+            ok_network(root, &["push", &remote, &refspec], file, timeout)
+        })
     }
 
     pub(crate) fn log(root: &Path, limit: u32) -> Result<Vec<GitLogEntryDto>, BridgeFailure> {
@@ -1323,9 +1420,7 @@ pub(crate) mod sys {
             .collect())
     }
 
-    pub(crate) fn remote_branches(
-        root: &Path,
-    ) -> Result<RemoteBranches, BridgeFailure> {
+    pub(crate) fn remote_branches(root: &Path) -> Result<RemoteBranches, BridgeFailure> {
         let current = value(root, &["symbolic-ref", "--short", "-q", "HEAD"]);
         let Ok(remote) = remote_name(root) else {
             return Ok((None, current, Vec::new()));
@@ -1342,7 +1437,10 @@ pub(crate) mod sys {
         Ok((Some(remote), current, branches))
     }
 
-    pub(crate) fn switch_branch(root: &Path, branch: &str) -> Result<GitStatusSummaryDto, BridgeFailure> {
+    pub(crate) fn switch_branch(
+        root: &Path,
+        branch: &str,
+    ) -> Result<GitStatusSummaryDto, BridgeFailure> {
         valid_branch_name(branch)?;
         require_switchable(&summary(root)?)?;
         let remote = remote_name(root)?;
@@ -1366,9 +1464,10 @@ pub(crate) mod sys {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs;
     use std::path::Path;
+
+    use super::*;
 
     const REMOTE_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -1412,7 +1511,15 @@ mod tests {
         Repository::init_bare(&bare).unwrap();
         seed_repo.remote("origin", bare.to_str().unwrap()).unwrap();
         let reference = format!("refs/heads/{branch}");
-        lg_push(&seed_repo, "origin", &reference, &reference, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
+        lg_push(
+            &seed_repo,
+            "origin",
+            &reference,
+            &reference,
+            &GitTransport::default(),
+            REMOTE_TIMEOUT,
+        )
+        .unwrap();
         Repository::open_bare(&bare).unwrap().set_head(&reference).unwrap();
         let source = temp.path().join("source");
         let clone = temp.path().join("clone");
@@ -1427,8 +1534,13 @@ mod tests {
         lg_commit_all(&repo, message).unwrap().expect("commit");
     }
 
-    fn sync(root: &Path, commit_pending: bool, strategy: GitIntegrationStrategyDto) -> GitSyncResultDto {
-        lg_sync(root, &GitTransport::default(), "Sync", commit_pending, strategy, REMOTE_TIMEOUT).unwrap()
+    fn sync(
+        root: &Path,
+        commit_pending: bool,
+        strategy: GitIntegrationStrategyDto,
+    ) -> GitSyncResultDto {
+        lg_sync(root, &GitTransport::default(), "Sync", commit_pending, strategy, REMOTE_TIMEOUT)
+            .unwrap()
     }
 
     fn head(root: &Path) -> Oid {
@@ -1464,14 +1576,11 @@ mod tests {
         repo.remote("origin", &format!("http://127.0.0.1:{port}/store.git")).unwrap();
 
         let started = Instant::now();
-        let error = lg_fetch(&repo, "origin", &GitTransport::default(), Duration::from_millis(400)).unwrap_err();
+        let error = lg_fetch(&repo, "origin", &GitTransport::default(), Duration::from_millis(400))
+            .unwrap_err();
         let elapsed = started.elapsed();
         assert!(elapsed < Duration::from_secs(3), "fetch ran for {elapsed:?}: {}", error.message);
-        assert!(
-            error.message.to_lowercase().contains("timed out"),
-            "{}",
-            error.message
-        );
+        assert!(error.message.to_lowercase().contains("timed out"), "{}", error.message);
         let _ = accepted.join();
     }
 
@@ -1488,7 +1597,8 @@ mod tests {
         commit_file(&fixture.source, "remote.gpg", "remote", "Remote");
         sync(&fixture.source, false, GitIntegrationStrategyDto::Rebase);
         let before = head(&fixture.clone);
-        let summary = lg_fetch_summary(&fixture.clone, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
+        let summary =
+            lg_fetch_summary(&fixture.clone, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
         assert_eq!(summary.behind, 1);
         assert_eq!(summary.ahead, 0);
         assert!(summary.last_fetched_at.is_some());
@@ -1609,7 +1719,8 @@ mod tests {
             assert_eq!(fs::read_to_string(fixture.clone.join(".gpg-id")).unwrap(), "LOCAL\n");
             assert!(!result.pushed);
 
-            lg_push_branch(&fixture.clone, &GitTransport::default(), &backup, REMOTE_TIMEOUT).unwrap();
+            lg_push_branch(&fixture.clone, &GitTransport::default(), &backup, REMOTE_TIMEOUT)
+                .unwrap();
             let bare = Repository::open_bare(&fixture.bare).unwrap();
             assert_eq!(bare.refname_to_id(&format!("refs/heads/{backup}")).unwrap(), before);
         }
@@ -1656,14 +1767,17 @@ mod tests {
         let fixture = fixture();
         commit_file(&fixture.clone, "local.gpg", "local", "Local");
         write(&fixture.clone, "pending.gpg", "pending");
-        let result = lg_reset(&fixture.clone, &GitTransport::default(), "Before reset", REMOTE_TIMEOUT).unwrap();
+        let result =
+            lg_reset(&fixture.clone, &GitTransport::default(), "Before reset", REMOTE_TIMEOUT)
+                .unwrap();
         assert!(result.committed);
         let backup = result.backup_branch.expect("backup");
         assert_eq!(head(&fixture.clone), remote_head(&fixture));
         assert!(!fixture.clone.join("local.gpg").exists());
         assert!(!fixture.clone.join("pending.gpg").exists());
         let repo = Repository::open(&fixture.clone).unwrap();
-        let backup_commit = repo.find_branch(&backup, BranchType::Local).unwrap().get().peel_to_commit().unwrap();
+        let backup_commit =
+            repo.find_branch(&backup, BranchType::Local).unwrap().get().peel_to_commit().unwrap();
         assert!(backup_commit.tree().unwrap().get_name("pending.gpg").is_some());
         assert!(backup_commit.tree().unwrap().get_name("local.gpg").is_some());
     }
@@ -1671,7 +1785,9 @@ mod tests {
     #[test]
     fn reset_of_a_clean_up_to_date_branch_makes_no_backup() {
         let fixture = fixture();
-        let result = lg_reset(&fixture.clone, &GitTransport::default(), "Before reset", REMOTE_TIMEOUT).unwrap();
+        let result =
+            lg_reset(&fixture.clone, &GitTransport::default(), "Before reset", REMOTE_TIMEOUT)
+                .unwrap();
         assert!(!result.committed);
         assert!(result.backup_branch.is_none());
     }
@@ -1702,7 +1818,15 @@ mod tests {
             let commit = source.head().unwrap().peel_to_commit().unwrap();
             source.branch("archive", &commit, false).unwrap();
             let reference = "refs/heads/archive";
-            lg_push(&source, "origin", reference, reference, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
+            lg_push(
+                &source,
+                "origin",
+                reference,
+                reference,
+                &GitTransport::default(),
+                REMOTE_TIMEOUT,
+            )
+            .unwrap();
         }
         lg_fetch_summary(&fixture.clone, &GitTransport::default(), REMOTE_TIMEOUT).unwrap();
         let (remote, _, branches) = lg_remote_branches(&fixture.clone).unwrap();
@@ -1737,7 +1861,9 @@ mod tests {
     #[test]
     fn push_branch_only_accepts_backup_branches() {
         let fixture = fixture();
-        let error = lg_push_branch(&fixture.clone, &GitTransport::default(), "main", REMOTE_TIMEOUT).unwrap_err();
+        let error =
+            lg_push_branch(&fixture.clone, &GitTransport::default(), "main", REMOTE_TIMEOUT)
+                .unwrap_err();
         assert!(error.message.contains("backup"));
     }
 
@@ -1798,12 +1924,22 @@ mod tests {
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     mod system {
-        use super::*;
         use std::process::Command;
 
+        use super::*;
+
         fn git(root: &Path, args: &[&str]) {
-            let status = Command::new("git").args(args).current_dir(root).env("LC_ALL", "C").output().unwrap();
-            assert!(status.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&status.stderr));
+            let status = Command::new("git")
+                .args(args)
+                .current_dir(root)
+                .env("LC_ALL", "C")
+                .output()
+                .unwrap();
+            assert!(
+                status.status.success(),
+                "git {args:?}: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
         }
 
         fn sys_fixture() -> Fixture {
@@ -1814,7 +1950,11 @@ mod tests {
             fixture
         }
 
-        fn sys_sync(root: &Path, commit_pending: bool, strategy: GitIntegrationStrategyDto) -> GitSyncResultDto {
+        fn sys_sync(
+            root: &Path,
+            commit_pending: bool,
+            strategy: GitIntegrationStrategyDto,
+        ) -> GitSyncResultDto {
             sys::sync(root, None, "Sync", commit_pending, strategy, REMOTE_TIMEOUT).unwrap()
         }
 
@@ -1876,7 +2016,15 @@ mod tests {
         fn desktop_pending_edit_is_committed_and_pushed() {
             let fixture = sys_fixture();
             write(&fixture.clone, "entry.gpg", "A & B");
-            let result = sys::sync(&fixture.clone, None, "Edit A & B", true, GitIntegrationStrategyDto::Rebase, REMOTE_TIMEOUT).unwrap();
+            let result = sys::sync(
+                &fixture.clone,
+                None,
+                "Edit A & B",
+                true,
+                GitIntegrationStrategyDto::Rebase,
+                REMOTE_TIMEOUT,
+            )
+            .unwrap();
             assert!(result.committed);
             assert!(result.pushed);
             assert_eq!(remote_head(&fixture), head(&fixture.clone));

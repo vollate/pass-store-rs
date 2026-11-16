@@ -1,3 +1,7 @@
+#[allow(dead_code, unused_imports, unused_macros)]
+#[path = "../src/util/test_util.rs"]
+mod test_util;
+
 use std::path::Path;
 
 use pars_core::config::cli::{ParsConfig, PgpBackendKind};
@@ -7,8 +11,8 @@ use pars_core::pgp::backend::{
     PgpKeyDeletionResult, PgpKeyDetails, SystemGpgBackend,
 };
 use pars_core::pgp::import::{import_inspected_pgp_key, inspect_pgp_key_bytes, InspectedPgpKey};
-use pars_core::util::test_util::PgpKeyMaterialFixture;
 use secrecy::SecretString;
+use test_util::PgpKeyMaterialFixture;
 
 #[test]
 fn config_defaults_to_system_gpg_backend_and_round_trips_selection() {

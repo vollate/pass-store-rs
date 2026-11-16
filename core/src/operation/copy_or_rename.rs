@@ -368,16 +368,14 @@ mod tests {
     use serial_test::serial;
 
     use super::*;
-    use crate::pgp::key_management::key_gen_batch;
     use crate::util::defer::cleanup;
     use crate::util::test_util::{
-        clean_up_test_key, create_dir_structure, gen_unique_temp_dir, get_test_email,
-        get_test_executable, gpg_key_edit_example_batch, gpg_key_gen_example_batch, write_gpg_id,
+        create_dir_structure, gen_unique_temp_dir, get_test_email, get_test_executable,
+        gpg_key_edit_example_batch, write_gpg_id, TestKeyGuard,
     };
 
     #[test]
     #[serial]
-    #[ignore = "need run interactively"]
     fn rename_test() {
         // Original structure:
         // root
@@ -492,7 +490,6 @@ mod tests {
 
     #[test]
     #[serial]
-    #[ignore = "need run interactively"]
     fn copy_test() {
         // Original structure:
         // root
@@ -610,7 +607,6 @@ mod tests {
 
     #[test]
     #[serial]
-    #[ignore = "need run interactively"]
     // Try to access parent directory, should be blocked
     fn path_attack_protection_test() {
         // Simple structure:
@@ -745,7 +741,6 @@ mod tests {
 
     #[test]
     #[serial]
-    #[ignore = "need run interactively"]
     fn re_encrypt_case_test() {
         // Set up directory structure:
         // root
@@ -759,8 +754,8 @@ mod tests {
         create_dir_structure(&root, structure);
 
         // Create first client with first key
-        key_gen_batch(&executable, &gpg_key_gen_example_batch()).unwrap();
         let email1 = get_test_email();
+        let _key1 = TestKeyGuard::generate(&executable, "Copy/move source", &email1);
         let client1 = PGPClient::new(executable.clone(), &[&email1]).unwrap();
         client1.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         let key1_fpr = client1.get_keys_fpr();
@@ -768,22 +763,7 @@ mod tests {
         // Create a second key for the subdirectory
         // We create a new email by appending a suffix to make it unique
         let email2 = format!("sub-{email1}");
-        let second_key_batch = format!(
-            r#"%echo Generating a second key
-Key-Type: RSA
-Key-Length: 2048
-Subkey-Type: RSA
-Subkey-Length: 2048
-Name-Real: Test User Sub
-Name-Email: {email2}
-Expire-Date: 0
-Passphrase: password
-%commit
-%echo Key generation complete
-"#
-        );
-
-        key_gen_batch(&executable, &second_key_batch).unwrap();
+        let _key2 = TestKeyGuard::generate(&executable, "Copy/move destination", &email2);
         let client2 = PGPClient::new(executable.clone(), &[&email2]).unwrap();
         client2.key_edit_batch(&gpg_key_edit_example_batch()).unwrap();
         let key2_fpr = client2.get_keys_fpr();
@@ -816,17 +796,18 @@ Passphrase: password
                     },
                     &root,
                     "file1",
-                    "subdir/file1",
+                    "subdir/new/nested/file1",
                     io_streams,
                 )
                 .unwrap();
 
                 // Verify both files exist (since it's a copy)
                 assert!(root.join("file1.gpg").exists());
-                assert!(root.join("subdir").join("file1.gpg").exists());
+                assert!(root.join("subdir/new/nested/file1.gpg").exists());
 
                 // Verify the file in the subdirectory can be decrypted with client2
-                let decrypted = client2.decrypt_stdin(&root, "subdir/file1.gpg").unwrap();
+                let decrypted =
+                    client2.decrypt_stdin(&root, "subdir/new/nested/file1.gpg").unwrap();
                 assert_eq!(decrypted.expose_secret(), test_content);
 
                 // Now test moving a file (which should also trigger re-encryption)
@@ -846,23 +827,22 @@ Passphrase: password
                     },
                     &root,
                     "file2",
-                    "subdir/file2",
+                    "subdir/moved/nested/file2",
                     io_streams,
                 )
                 .unwrap();
 
                 // Verify the original file is gone (since it's a move)
                 assert!(!root.join("file2.gpg").exists());
-                assert!(root.join("subdir").join("file2.gpg").exists());
+                assert!(root.join("subdir/moved/nested/file2.gpg").exists());
 
                 // Verify the moved file can be decrypted with client2
-                let decrypted = client2.decrypt_stdin(&root, "subdir/file2.gpg").unwrap();
+                let decrypted =
+                    client2.decrypt_stdin(&root, "subdir/moved/nested/file2.gpg").unwrap();
                 assert_eq!(decrypted.expose_secret(), test_content2);
             },
             {
-                // Clean up both keys
-                let emails = vec![email1.as_str(), email2.as_str()];
-                clean_up_test_key(&executable, &emails).unwrap();
+                // TestKeyGuard cleans up both disposable keys, even on assertion failure.
             }
         );
     }

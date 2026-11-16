@@ -1,3 +1,7 @@
+#[allow(dead_code, unused_imports, unused_macros)]
+#[path = "../src/util/test_util.rs"]
+mod test_util;
+
 use std::fs;
 use std::path::PathBuf;
 use std::process::{self, Command};
@@ -5,15 +9,14 @@ use std::process::{self, Command};
 use pars_core::gui::{
     delete_entry, edit_entry, generate_entry, insert_entry, list_entries, move_entry,
     parse_entry_secret, parse_git_command_line, read_entry, run_git_args, validate_git_args,
-    CoreError, DeleteEntryRequest,
-    EditEntryRequest, EntryConflictKind, EntryRef, EntryType, GenerateEntryRequest,
-    GitOperationRequest, InsertEntryRequest, ListEntriesRequest, MoveEntryRequest,
-    ReadEntryRequest,
+    CoreError, DeleteEntryRequest, EditEntryRequest, EntryConflictKind, EntryRef, EntryType,
+    GenerateEntryRequest, GitOperationRequest, InsertEntryRequest, ListEntriesRequest,
+    MoveEntryRequest, ReadEntryRequest,
 };
 use pars_core::pgp::PGPClient;
-use pars_core::util::test_util::{get_test_executable, TestKeyGuard};
 use secrecy::ExposeSecret;
 use serial_test::serial;
+use test_util::{get_test_executable, TestKeyGuard};
 
 fn create_file(path: PathBuf) {
     if let Some(parent) = path.parent() {
@@ -105,7 +108,14 @@ fn git_operation_request_accepts_plain_git_args() {
 
 #[test]
 fn command_line_rejects_unquoted_shell_syntax() {
-    for line in ["status ; rm", "status | cat", "status && push", "status > out.txt", "status $(whoami)", "log `id`"] {
+    for line in [
+        "status ; rm",
+        "status | cat",
+        "status && push",
+        "status > out.txt",
+        "status $(whoami)",
+        "log `id`",
+    ] {
         let err = parse_git_command_line(line).unwrap_err();
         assert!(err.to_string().contains("shell syntax is not allowed"), "{line}: {err}");
     }
@@ -132,7 +142,8 @@ fn command_line_keeps_quoted_values_together() {
 
 #[test]
 fn command_line_rejects_bad_input() {
-    for line in ["commit -m \"unfinished", "commit -m 'open", "status\nrm", "", "   ", "git status"] {
+    for line in ["commit -m \"unfinished", "commit -m 'open", "status\nrm", "", "   ", "git status"]
+    {
         assert!(parse_git_command_line(line).is_err(), "{line:?}");
     }
 }

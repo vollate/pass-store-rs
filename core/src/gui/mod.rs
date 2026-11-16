@@ -325,9 +325,7 @@ pub fn validate_git_args(args: &[String]) -> GuiResult<()> {
 /// and a user typing `status | less` would otherwise get a confusing Git error.
 pub fn parse_git_command_line(line: &str) -> GuiResult<Vec<String>> {
     if line.contains(['\n', '\r', '\0']) {
-        return Err(CoreError::ValidationError(
-            "git args cannot contain line breaks".to_string(),
-        ));
+        return Err(CoreError::ValidationError("git args cannot contain line breaks".to_string()));
     }
 
     let mut args = Vec::new();

@@ -78,7 +78,10 @@ pub fn summarize_repository(root: &Path) -> Result<GitStatusSummaryDto, BridgeFa
     })
 }
 
-pub fn parse_porcelain_v2(stdout: &[u8], git_dir: &Path) -> Result<GitStatusSummaryDto, BridgeFailure> {
+pub fn parse_porcelain_v2(
+    stdout: &[u8],
+    git_dir: &Path,
+) -> Result<GitStatusSummaryDto, BridgeFailure> {
     let mut branch = None;
     let mut upstream = None;
     let mut ahead = 0_u32;
@@ -190,10 +193,12 @@ fn last_fetched_at_from_git_dir(git_dir: &Path) -> Option<i64> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use git2::{IndexAddOption, Signature};
     use std::fs;
+
+    use git2::{IndexAddOption, Signature};
     use tempfile::tempdir;
+
+    use super::*;
 
     fn init_repo(root: &Path) -> Repository {
         let repo = Repository::init(root).expect("init");
@@ -221,8 +226,7 @@ mod tests {
                     .unwrap();
             }
             None => {
-                repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])
-                    .unwrap();
+                repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[]).unwrap();
             }
         }
     }
@@ -292,9 +296,7 @@ mod tests {
         source_repo.remote("origin", bare_path.to_str().unwrap()).unwrap();
         {
             let mut remote = source_repo.find_remote("origin").unwrap();
-            remote
-                .push(&[format!("{head_ref}:{head_ref}")], None)
-                .unwrap();
+            remote.push(&[format!("{head_ref}:{head_ref}")], None).unwrap();
         }
         let mut config = source_repo.config().unwrap();
         config.set_str(&format!("branch.{branch_name}.remote"), "origin").unwrap();
@@ -305,17 +307,13 @@ mod tests {
         let clone_branch = clone.head().unwrap().shorthand().unwrap().to_string();
         let mut clone_config = clone.config().unwrap();
         clone_config.set_str(&format!("branch.{clone_branch}.remote"), "origin").unwrap();
-        clone_config
-            .set_str(&format!("branch.{clone_branch}.merge"), &head_ref)
-            .unwrap();
+        clone_config.set_str(&format!("branch.{clone_branch}.merge"), &head_ref).unwrap();
 
         fs::write(source.join("a.gpg"), b"a").unwrap();
         commit_all(&source_repo, "Ahead");
         {
             let mut remote = source_repo.find_remote("origin").unwrap();
-            remote
-                .push(&[format!("{head_ref}:{head_ref}")], None)
-                .unwrap();
+            remote.push(&[format!("{head_ref}:{head_ref}")], None).unwrap();
         }
 
         fs::write(clone_path.join("b.gpg"), b"b").unwrap();

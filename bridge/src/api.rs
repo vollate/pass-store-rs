@@ -1454,7 +1454,8 @@ pub async fn git_fetch(request: GitRequest) -> GitStatusSummaryResponse {
     let root = PathBuf::from(&request.root);
     let timeout = git_network_timeout(request.network_timeout_ms);
     #[cfg(any(target_os = "android", target_os = "ios"))]
-    let result = crate::git_ops::lg_fetch_summary(&root, &GitTransport::from_request(&request), timeout);
+    let result =
+        crate::git_ops::lg_fetch_summary(&root, &GitTransport::from_request(&request), timeout);
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let result = crate::git_ops::sys::fetch(&root, request.known_hosts.as_deref(), timeout);
     match result {
@@ -3288,7 +3289,8 @@ fn git_remote_callbacks(
     known_hosts: Option<&str>,
     remote_url: &str,
 ) -> Result<git2::RemoteCallbacks<'static>, BridgeFailure> {
-    let transport = GitTransport { ssh_private_key_path, ssh_dir, known_hosts, ..Default::default() };
+    let transport =
+        GitTransport { ssh_private_key_path, ssh_dir, known_hosts, ..Default::default() };
     crate::git_ops::transport_callbacks(&transport, remote_url).map(|(callbacks, _)| callbacks)
 }
 
@@ -3950,7 +3952,8 @@ mod tests {
         let mut config = source.config().unwrap();
         config.set_str(&format!("branch.{branch_name}.remote"), "backup").unwrap();
         config.set_str(&format!("branch.{branch_name}.merge"), "refs/heads/mobile-main").unwrap();
-        structured_git_push(&source_path, &GitTransport::default(), REMOTE_TIMEOUT).expect("initial push");
+        structured_git_push(&source_path, &GitTransport::default(), REMOTE_TIMEOUT)
+            .expect("initial push");
         bare.set_head("refs/heads/mobile-main").expect("remote head");
 
         let clone_path = temp.path().join("clone");
@@ -3963,7 +3966,8 @@ mod tests {
             .unwrap();
         fs::write(source_path.join("entry.gpg"), b"ciphertext").expect("new entry");
         structured_git_commit(&source_path, "Second").expect("second commit");
-        structured_git_push(&source_path, &GitTransport::default(), REMOTE_TIMEOUT).expect("second push");
+        structured_git_push(&source_path, &GitTransport::default(), REMOTE_TIMEOUT)
+            .expect("second push");
 
         let before = Repository::open(&clone_path).unwrap().head().unwrap().target().unwrap();
         let pull = structured_git_pull(&clone_path, &GitTransport::default(), REMOTE_TIMEOUT)

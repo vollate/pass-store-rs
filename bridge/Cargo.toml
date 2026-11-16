@@ -18,7 +18,7 @@ flutter_rust_bridge = "=2.12.0"
 git2 = { version = "0.20.2", features = ["vendored-libgit2", "vendored-openssl"] }
 hmac = "0.12.1"
 libc = "0.2"
-pars-core = { path = "../core" }
+pars-core = { path = "../core", version = "^0.3.0" }
 secrecy = "0.10.3"
 serde = { version = "1.0.219", features = ["derive"] }
 sha1 = "0.10.6"
@@ -31,4 +31,4 @@ jni = "0.21.1"
 
 [dev-dependencies]
 # `test-util` exposes the shared PGP key-material fixtures used by the smoke tests.
-pars-core = { path = "../core", features = ["test-util"] }
+pars-core = { path = "../core", version = "^0.3.0", features = ["test-util"] }

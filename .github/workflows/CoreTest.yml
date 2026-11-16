@@ -1,4 +1,4 @@
-name: Core checks
+name: Core and CLI checks
 
 on:
   push:
@@ -57,10 +57,11 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
-      - name: Build core
-        run: cargo build --verbose
-        working-directory: ./core
+      - name: Build core and CLI
+        run: cargo build --locked --verbose -p pars-core -p pars-cli
 
-      - name: Run core tests
-        run: cargo test --verbose
-        working-directory: ./core
+      - name: Run core and CLI tests
+        run: cargo test --locked --verbose -p pars-core -p pars-cli
+
+      - name: Check shared test helpers
+        run: cargo check --locked -p pars-core --features test-util

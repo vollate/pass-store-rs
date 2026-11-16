@@ -4,8 +4,8 @@ pub mod fs_util;
 pub mod log;
 pub mod rand;
 pub mod str;
-// `test` covers the unit tests inside this crate; the `test-util` feature lets the integration
-// tests under `tests/` reach the same helpers (enabled via the self dev-dependency in Cargo.toml).
+// Unit tests use these helpers directly; `test-util` exposes them to workspace consumers
+// such as the bridge. Integration tests include the helper source without a self-dependency.
 #[cfg(any(test, feature = "test-util"))]
 pub mod test_util;
 pub mod tree;
