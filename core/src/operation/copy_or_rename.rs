@@ -298,6 +298,12 @@ where
         return Err(IOErr::new(IOErrType::PathNotExist, &to_path).into());
     }
 
+    if !to_path.exists() {
+        if let Some(parent) = to_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+
     // Check if we're dealing with GPG-encrypted files and need to re-encrypt
     let needs_reencryption = if from_path.is_file()
         && from_path.extension().is_some_and(|ext| ext.to_string_lossy() == config.file_extension)
@@ -667,7 +673,7 @@ mod tests {
     #[test]
     #[serial]
     fn rename_to_non_existent_parent_dir_test() {
-        // Test that renaming to a non-existent parent directory returns an error
+        // Test that renaming to a non-existent parent directory creates it, like `pass mv`
         // Original structure:
         // root
         // └── a.gpg
@@ -691,13 +697,11 @@ mod tests {
                     file_extension: "gpg".to_string(),
                 };
 
-                // Try to rename a.gpg to non_existent_dir/b.gpg, should fail
-                let result =
-                    copy_rename_io(rename_config, &root, "a", "non_existent_dir/b", io_streams);
-                assert!(result.is_err(), "Should fail when parent directory doesn't exist");
+                copy_rename_io(rename_config, &root, "a", "non_existent_dir/b", io_streams)
+                    .unwrap();
 
-                // Verify original file still exists
-                assert!(root.join("a.gpg").exists());
+                assert!(!root.join("a.gpg").exists());
+                assert!(root.join("non_existent_dir/b.gpg").is_file());
             },
             {}
         );
@@ -706,7 +710,7 @@ mod tests {
     #[test]
     #[serial]
     fn copy_to_non_existent_parent_dir_test() {
-        // Test that copying to a non-existent parent directory returns an error
+        // Test that copying to a non-existent parent directory creates it, like `pass cp`
         // Original structure:
         // root
         // └── a.gpg
@@ -730,15 +734,10 @@ mod tests {
                     file_extension: "gpg".to_string(),
                 };
 
-                // Try to copy a.gpg to non_existent_dir/b.gpg, should fail
-                let result =
-                    copy_rename_io(copy_config, &root, "a", "non_existent_dir/b", io_streams);
-                assert!(result.is_err(), "Should fail when parent directory doesn't exist");
+                copy_rename_io(copy_config, &root, "a", "non_existent_dir/b", io_streams).unwrap();
 
-                // Verify original file still exists
                 assert!(root.join("a.gpg").exists());
-                // Verify target was not created
-                assert!(!root.join("non_existent_dir").exists());
+                assert!(root.join("non_existent_dir/b.gpg").is_file());
             },
             {}
         );
