@@ -5,7 +5,9 @@ use log::debug;
 use pars_core::config::cli::ParsConfig;
 use pars_core::git::add_and_commit;
 use pars_core::git::commit::{CommitType, GitCommit};
-use pars_core::operation::copy_or_rename::{copy_rename_io, CopyRenameConfig};
+use pars_core::operation::copy_or_rename::{
+    copy_rename_io_with_outcome, CopyRenameConfig, CopyRenameOutcome,
+};
 use pars_core::operation::generate::IOStreams;
 
 use crate::constants::{ParsExitCode, SECRET_EXTENSION};
@@ -28,8 +30,11 @@ pub fn cmd_cp(
     let mut stderr = std::io::stderr();
     let io_streams = IOStreams { in_s: &mut stdin, out_s: &mut stdout, err_s: &mut stderr };
 
-    copy_rename_io(copy_config, &root, old_path, new_path, io_streams)
+    let outcome = copy_rename_io_with_outcome(copy_config, &root, old_path, new_path, io_streams)
         .map_err(|e| (ParsExitCode::Error.into(), e))?;
+    if outcome == CopyRenameOutcome::Canceled {
+        return Ok(());
+    }
 
     let commit =
         GitCommit::new(&root, CommitType::Copy((old_path.to_string(), new_path.to_string())));

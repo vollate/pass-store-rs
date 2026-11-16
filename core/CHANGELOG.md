@@ -9,6 +9,8 @@ Changes since the published `pars-core 0.2.5`.
 - Pure-Rust OpenPGP backend, key import/inspection/export and private-key
   protection APIs, alongside the existing system-GnuPG backend.
 - SSH key management, GUI-oriented entry and Git APIs, and autofill index APIs.
+- `copy_rename_io_with_outcome` distinguishes completed operations from canceled
+  overwrites. The existing `copy_rename_io` API remains compatible.
 
 ### Breaking changes and migration
 

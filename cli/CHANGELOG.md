@@ -16,6 +16,8 @@
 ### Fixed
 
 - File `mv`/`cp` create missing destination parents through core 0.3.0.
+- Declining a `mv`/`cp` overwrite exits successfully without staging changes or
+  attempting a Git commit, including when destination recipients differ.
 - Package GPL license text and refresh completion documentation.
 
 ### Compatibility notes

@@ -18,6 +18,14 @@ pub struct CopyRenameConfig {
     pub file_extension: String,
 }
 
+/// Whether a copy or move completed or the user declined an overwrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[must_use]
+pub enum CopyRenameOutcome {
+    Completed,
+    Canceled,
+}
+
 use crate::operation::generate::IOStreams;
 
 // Cross repo rename/copy is not supported
@@ -67,7 +75,7 @@ fn copy_rename_file<I, O, E>(
     extension: &str,
     force: bool,
     io_streams: &mut IOStreams<I, O, E>,
-) -> Result<()>
+) -> Result<CopyRenameOutcome>
 where
     I: Read + BufRead,
     O: Write,
@@ -81,14 +89,14 @@ where
         return if to.is_dir() {
             let sub_file = to.join(file_name);
             if sub_file.exists() && !handle_overwrite_delete(&sub_file, force, io_streams)? {
-                return Ok(());
+                return Ok(CopyRenameOutcome::Canceled);
             }
             if copy {
                 fs::copy(from, sub_file)?;
             } else {
                 better_rename(from.with_extension(extension), sub_file)?;
             }
-            Ok(())
+            Ok(CopyRenameOutcome::Completed)
         } else {
             Err(IOErr::new(IOErrType::PathNotExist, to).into())
         };
@@ -99,7 +107,7 @@ where
     if to.exists() {
         if to.is_file() {
             if !handle_overwrite_delete(&to, force, io_streams)? {
-                return Ok(());
+                return Ok(CopyRenameOutcome::Canceled);
             }
         } else {
             return Err(IOErr::new(IOErrType::PathNotExist, &to).into());
@@ -110,7 +118,7 @@ where
     } else {
         better_rename(from.with_extension(extension), to)?;
     }
-    Ok(())
+    Ok(CopyRenameOutcome::Completed)
 }
 
 /// Copy or rename a directory
@@ -126,7 +134,7 @@ fn copy_rename_dir<I, O, E>(
     to: &Path,
     force: bool,
     io_streams: &mut IOStreams<I, O, E>,
-) -> Result<()>
+) -> Result<CopyRenameOutcome>
 where
     I: Read + BufRead,
     O: Write,
@@ -139,7 +147,7 @@ where
         if to.is_dir() {
             let sub_dir = to.join(file_name);
             if sub_dir.exists() && !handle_overwrite_delete(&sub_dir, force, io_streams)? {
-                return Ok(());
+                return Ok(CopyRenameOutcome::Canceled);
             }
             if copy {
                 copy_dir_recursive(from, sub_dir)?;
@@ -148,7 +156,7 @@ where
             }
         } else if to.is_file() {
             if !handle_overwrite_delete(to, force, io_streams)? {
-                return Ok(());
+                return Ok(CopyRenameOutcome::Canceled);
             }
             if copy {
                 copy_dir_recursive(from, to)?;
@@ -163,7 +171,7 @@ where
     } else {
         better_rename(from, to)?;
     }
-    Ok(())
+    Ok(CopyRenameOutcome::Completed)
 }
 
 /// Re-encrypts a file with different GPG keys
@@ -175,7 +183,7 @@ fn reencrypt_file<I, O, E>(
     root: &Path,
     config: &CopyRenameConfig,
     io_streams: &mut IOStreams<I, O, E>,
-) -> Result<()>
+) -> Result<CopyRenameOutcome>
 where
     I: Read + BufRead,
     O: Write,
@@ -203,7 +211,7 @@ where
 
     // Check for overwrite
     if target_file.exists() && !handle_overwrite_delete(&target_file, config.force, io_streams)? {
-        return Ok(());
+        return Ok(CopyRenameOutcome::Canceled);
     }
 
     // Set up clients for decryption and re-encryption
@@ -250,7 +258,7 @@ where
                     )?;
                 }
             }
-            Ok(())
+            Ok(CopyRenameOutcome::Completed)
         }
         Err(e) => {
             writeln!(io_streams.err_s, "Error re-encrypting file: {e}")?;
@@ -259,13 +267,31 @@ where
     }
 }
 
+/// Compatibility wrapper: cancellation is successful, but has no outcome value.
+/// Use [`copy_rename_io_with_outcome`] when follow-up work requires a completed operation.
 pub fn copy_rename_io<I, O, E>(
     config: CopyRenameConfig,
     root: &Path,
     from: &str,
     to: &str,
-    mut io_streams: IOStreams<I, O, E>,
+    io_streams: IOStreams<I, O, E>,
 ) -> Result<()>
+where
+    I: Read + BufRead,
+    O: Write,
+    E: Write,
+{
+    copy_rename_io_with_outcome(config, root, from, to, io_streams).map(|_| ())
+}
+
+/// Copy or move an entry, distinguishing a declined overwrite from completion.
+pub fn copy_rename_io_with_outcome<I, O, E>(
+    config: CopyRenameConfig,
+    root: &Path,
+    from: &str,
+    to: &str,
+    mut io_streams: IOStreams<I, O, E>,
+) -> Result<CopyRenameOutcome>
 where
     I: Read + BufRead,
     O: Write,
