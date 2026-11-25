@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/pars_design_tokens.dart';
+import '../app/pars_theme.dart';
 import '../l10n/app_localizations.dart';
 import '../l10n/l10n.dart';
 import '../models/pgp_key_import.dart';
@@ -9,6 +10,8 @@ import '../services/path_picker_service.dart';
 import '../services/pgp_import_service.dart';
 import '../services/security_repository.dart';
 import '../services/ui_problem.dart';
+import 'app_section.dart';
+import 'pars_action_group.dart';
 import 'path_picker_row.dart';
 
 /// Reusable PGP import body shared by Settings and Onboarding.
@@ -144,15 +147,27 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
             ),
             onChanged: (_) => setState(() {}),
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _remember,
-            onChanged:
-                _isSubmitting
-                    ? null
-                    : (value) => setState(() => _remember = value),
-            title: Text(localizations.rememberInKeychain),
-            subtitle: Text(localizations.rememberPassphraseDescription),
+          const SizedBox(height: ParsSpacing.sm),
+          AppSectionBox(
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              ParsSectionRow(
+                leading: const ParsSectionRowIcon(icon: Icons.key_outlined),
+                title: localizations.rememberInKeychain,
+                subtitle: localizations.rememberPassphraseDescription,
+                onTap:
+                    _isSubmitting
+                        ? null
+                        : () => setState(() => _remember = !_remember),
+                trailing: Switch(
+                  value: _remember,
+                  onChanged:
+                      _isSubmitting
+                          ? null
+                          : (value) => setState(() => _remember = value),
+                ),
+              ),
+            ],
           ),
         ],
         if (_isInspecting) ...<Widget>[
@@ -174,15 +189,13 @@ class _PgpKeyImportBodyState extends State<PgpKeyImportBody> {
           Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
         ],
         const SizedBox(height: ParsSpacing.md),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        ParsButtonGrid(
           children: <Widget>[
             if (widget.onCancel != null)
-              TextButton(
+              OutlinedButton(
                 onPressed: _isSubmitting ? null : _cancel,
                 child: Text(localizations.cancel),
               ),
-            const SizedBox(width: ParsSpacing.xs),
             FilledButton(
               onPressed: _canSubmit ? _submit : null,
               child: Text(
@@ -389,19 +402,26 @@ class _InspectionSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        leading: Icon(
-          inspection.isPrivate ? Icons.key : Icons.vpn_key_outlined,
+    final colorScheme = Theme.of(context).colorScheme;
+    return AppSectionBox(
+      padding: EdgeInsets.zero,
+      children: <Widget>[
+        ParsSectionRow(
+          leading: ParsSectionRowIcon(
+            icon: inspection.isPrivate ? Icons.key : Icons.vpn_key_outlined,
+          ),
+          title: inspection.identity,
+          subtitle:
+              '${_kindLabel(context.l10n, inspection.kind)} · '
+              '${inspection.fingerprint}',
+          subtitleStyle: ParsTheme.mono(
+            Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ) ??
+                const TextStyle(),
+          ),
         ),
-        title: Text(inspection.identity),
-        subtitle: Text(
-          '${_kindLabel(context.l10n, inspection.kind)}\n'
-          '${inspection.fingerprint}',
-        ),
-        isThreeLine: true,
-      ),
+      ],
     );
   }
 

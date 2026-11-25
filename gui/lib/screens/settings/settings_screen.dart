@@ -20,15 +20,17 @@ import '../../services/ui_preferences_store.dart';
 import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
 import '../../app/pars_design_tokens.dart';
+import '../../app/pars_theme.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/failure_notice.dart';
 import '../../widgets/app_section.dart';
-import '../../widgets/gesture_setup_panel.dart';
+import '../../widgets/biometric_icon.dart';
 import '../../widgets/git_flows.dart';
 import '../../widgets/pars_action_group.dart';
 import '../../widgets/pars_dialog.dart';
 import '../../widgets/password_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
+import '../../widgets/pin_setup_panel.dart';
 import '../../widgets/ssh_key_dialogs.dart';
 import '../../widgets/pars_adaptive_surface.dart';
 
@@ -84,6 +86,7 @@ class SettingsScreen extends StatelessWidget {
       slivers: <Widget>[
         SliverAppBar(
           pinned: true,
+          toolbarHeight: ParsSizes.tallToolbar,
           title: Text(
             localizations.settingsTitle,
             style: Theme.of(
@@ -109,14 +112,14 @@ class SettingsScreen extends StatelessWidget {
               title:
                   _usesPasswordLock
                       ? localizations.passwordBiometricsTitle
-                      : localizations.gestureBiometricsTitle,
+                      : localizations.pinBiometricsTitle,
               subtitle:
                   securityRepository.lockOnResume
                       ? localizations.lockOnResumeState
                       : _usesPasswordLock
                       ? localizations.passwordConfiguredState
-                      : localizations.gestureConfiguredState,
-              icon: _usesPasswordLock ? Icons.password : Icons.pattern,
+                      : localizations.pinConfiguredState,
+              icon: _usesPasswordLock ? Icons.password : Icons.dialpad,
               onTap: () => _showSecuritySheet(context),
             ),
             _SettingsTile(

@@ -310,13 +310,20 @@ class _StoreRepairStep extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: <Widget>[
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(icon, color: Theme.of(context).colorScheme.error),
-          title: Text(title),
-          subtitle: Text(message),
+        AppSectionBox(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            ParsSectionRow(
+              leading: ParsSectionRowIcon(
+                icon: icon,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: title,
+              subtitle: message,
+            ),
+          ],
         ),
-        const SizedBox(height: ParsSpacing.sm),
+        const SizedBox(height: ParsSpacing.md),
         FilledButton.tonal(
           onPressed: onAction,
           child: SizedBox(
@@ -350,12 +357,14 @@ class _CreatePgpKeyFields extends StatelessWidget {
           decoration: InputDecoration(labelText: context.l10n.nameField),
           textInputAction: TextInputAction.next,
         ),
+        const SizedBox(height: ParsSpacing.sm),
         TextField(
           controller: email,
           decoration: InputDecoration(labelText: context.l10n.emailField),
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
         ),
+        const SizedBox(height: ParsSpacing.sm),
         TextField(
           controller: passphrase,
           obscureText: true,
@@ -398,6 +407,7 @@ class _ImportSshKeyFields extends StatelessWidget {
           decoration: InputDecoration(labelText: context.l10n.nameField),
           textInputAction: TextInputAction.next,
         ),
+        const SizedBox(height: ParsSpacing.sm),
         TextField(
           controller: privateKey,
           minLines: 4,

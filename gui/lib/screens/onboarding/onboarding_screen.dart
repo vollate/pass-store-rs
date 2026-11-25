@@ -13,8 +13,9 @@ import '../../services/security_repository.dart';
 import '../../services/settings_repository.dart';
 import '../../services/store_lifecycle.dart';
 import '../../services/ui_problem.dart';
+import '../../widgets/app_notification.dart';
 import '../../widgets/app_section.dart';
-import '../../widgets/gesture_setup_panel.dart';
+import '../../widgets/biometric_icon.dart';
 import '../../widgets/git_flows.dart';
 import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/failure_notice.dart';
@@ -24,6 +25,7 @@ import '../../widgets/pars_dialog.dart';
 import '../../widgets/password_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
 import '../../widgets/pgp_key_import_body.dart';
+import '../../widgets/pin_setup_panel.dart';
 import '../../widgets/ssh_key_dialogs.dart';
 
 part 'widgets/onboarding_key_setup_widgets.dart';
@@ -124,7 +126,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       !_needsStoreRepair;
 
   // The unlock step always offers the platform's method, so a desktop that
-  // walks back to it sets a password even if a gesture was saved earlier.
+  // walks back to it sets a password even if a PIN was saved earlier.
   LocalUnlockMethod get _setupUnlockMethod => platformDefaultUnlockMethod();
 
   LocalUnlockMethod get _fallbackUnlockMethod =>
@@ -294,7 +296,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     switch (_step) {
       case _OnboardingStep.unlock:
         return switch (_setupUnlockMethod) {
-          LocalUnlockMethod.gesture => GestureSetupPanel(
+          LocalUnlockMethod.pin => PinSetupPanel(
             securityRepository: widget.securityRepository,
             onSaved: () => _setStep(_OnboardingStep.biometrics),
           ),
@@ -949,7 +951,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _stepTitle(AppLocalizations l10n, _OnboardingStep step) =>
       switch (step) {
         _OnboardingStep.unlock => switch (_setupUnlockMethod) {
-          LocalUnlockMethod.gesture => l10n.setGestureLock,
+          LocalUnlockMethod.pin => l10n.setPinLock,
           LocalUnlockMethod.password => l10n.setAppPassword,
         },
         _OnboardingStep.biometrics => l10n.enableBiometricUnlock,
@@ -963,11 +965,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _stepSubtitle(AppLocalizations l10n, _OnboardingStep step) =>
       switch (step) {
         _OnboardingStep.unlock => switch (_setupUnlockMethod) {
-          LocalUnlockMethod.gesture => l10n.gestureStepSubtitle,
+          LocalUnlockMethod.pin => l10n.pinStepSubtitle,
           LocalUnlockMethod.password => l10n.passwordStepSubtitle,
         },
         _OnboardingStep.biometrics => switch (_fallbackUnlockMethod) {
-          LocalUnlockMethod.gesture => l10n.biometricsStepSubtitle,
+          LocalUnlockMethod.pin => l10n.biometricsStepSubtitle,
           LocalUnlockMethod.password => l10n.biometricsPasswordStepSubtitle,
         },
         _OnboardingStep.pgp => l10n.pgpStepSubtitle,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../app/pars_theme.dart';
 import '../l10n/l10n.dart';
 import '../services/sensitive_clipboard_service.dart';
 import 'app_notification.dart';
@@ -78,7 +79,9 @@ class _SshPublicKeyDialog extends StatelessWidget {
       content: SelectableText(
         publicKey,
         key: const Key('ssh-public-key-text'),
-        style: const TextStyle(fontFamily: 'monospace'),
+        style: ParsTheme.mono(
+          Theme.of(context).textTheme.bodyMedium ?? const TextStyle(),
+        ),
       ),
       secondary: ParsDialogAction(
         label: localizations.githubSettings,

@@ -33,7 +33,7 @@ class PathPickerRow extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(ParsRadii.small),
+          borderRadius: BorderRadius.circular(ParsRadii.control),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(

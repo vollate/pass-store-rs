@@ -36,8 +36,8 @@ void main() {
   testWidgets('biometrics is visibly optional and deferrable', (tester) async {
     await configureGuiTestViewport(tester);
     const repository = FakeParsRepository();
-    final security = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final security = InMemorySecurityRepository.withPin(
+      '123456',
       onboardingComplete: false,
       lastUnlockedAt: DateTime.now(),
     );
@@ -68,8 +68,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             lastUnlockedAt: DateTime.now(),
           ),
@@ -113,8 +113,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             onboardingComplete: false,
             lastUnlockedAt: DateTime.now(),
@@ -160,8 +160,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             onboardingComplete: false,
             lastUnlockedAt: DateTime.now(),
@@ -216,8 +216,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             onboardingComplete: false,
             lastUnlockedAt: DateTime.now(),
@@ -257,8 +257,8 @@ void main() {
     final repository = _OnboardingRepository(
       keysOverride: const <KeyRecord>[_pgpKey],
     );
-    final security = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final security = InMemorySecurityRepository.withPin(
+      '123456',
       biometricUnlockEnabled: true,
       lastUnlockedAt: DateTime.now(),
     );
@@ -294,14 +294,14 @@ void main() {
 
     expect(await tester.binding.handlePopRoute(), isTrue);
     await tester.pumpAndSettle();
-    expect(find.text('Set gesture lock'), findsWidgets);
+    expect(find.text('Set PIN lock'), findsWidgets);
     expect(find.text('Step 1 of 5'), findsOneWidget);
     expect(find.byTooltip('Back'), findsNothing);
-    expect(find.text('Reset gesture'), findsOneWidget);
-    expect(find.text('Keep current gesture'), findsNothing);
+    expect(find.text('Reset PIN'), findsOneWidget);
+    expect(find.text('Keep current PIN'), findsNothing);
   });
 
-  testWidgets('first-run biometrics goes back to gesture setup', (
+  testWidgets('first-run biometrics goes back to PIN setup', (
     tester,
   ) async {
     await configureGuiTestViewport(tester);
@@ -314,8 +314,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             onboardingComplete: false,
             lastUnlockedAt: DateTime.now(),
           ),
@@ -327,7 +327,7 @@ void main() {
 
     expect(await tester.binding.handlePopRoute(), isTrue);
     await tester.pumpAndSettle();
-    expect(find.text('Set gesture lock'), findsWidgets);
+    expect(find.text('Set PIN lock'), findsWidgets);
   });
 
   testWidgets('SSH step keeps its actions pinned when many keys exist', (
@@ -346,8 +346,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             onboardingComplete: false,
             lastUnlockedAt: DateTime.now(),
@@ -404,8 +404,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             onboardingComplete: false,
             lastUnlockedAt: DateTime.now(),
@@ -449,8 +449,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             lastUnlockedAt: DateTime.now(),
           ),
@@ -494,8 +494,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             lastUnlockedAt: DateTime.now(),
           ),
@@ -530,8 +530,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             lastUnlockedAt: DateTime.now(),
           ),
@@ -588,8 +588,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             lastUnlockedAt: DateTime.now(),
           ),
@@ -604,7 +604,7 @@ void main() {
     await tester.pump();
 
     expect(
-      find.widgetWithText(RadioListTile<String>, 'v_github'),
+      find.widgetWithText(ParsSectionRow, 'v_github'),
       findsOneWidget,
     );
     expect(find.text('Known hosts file'), findsNothing);
@@ -620,8 +620,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             lastUnlockedAt: DateTime.now(),
           ),
@@ -690,8 +690,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
             onboardingComplete: true,
             lastUnlockedAt: DateTime.now(),
@@ -731,8 +731,8 @@ void main() {
           onComplete: () => completed = true,
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             onboardingComplete: true,
             biometricUnlockEnabled: true,
             lastUnlockedAt: DateTime.now(),
@@ -775,8 +775,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             onboardingComplete: true,
             biometricUnlockEnabled: true,
             lastUnlockedAt: DateTime.now(),
@@ -814,8 +814,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             onboardingComplete: true,
             biometricUnlockEnabled: true,
           ),
@@ -875,8 +875,8 @@ void main() {
           onComplete: () => completed = true,
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             onboardingComplete: false,
             biometricUnlockEnabled: true,
           ),
@@ -912,8 +912,8 @@ void main() {
           armored: true,
         ),
       );
-      final security = InMemorySecurityRepository.withPattern(
-        const <int>[0, 1, 2, 5],
+      final security = InMemorySecurityRepository.withPin(
+        '123456',
         onboardingComplete: true,
         biometricUnlockEnabled: true,
         pgpPassphraseStorageEnabled: true,
@@ -987,8 +987,8 @@ void main() {
           onComplete: () {},
           settingsRepository: repository,
           keyRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             onboardingComplete: true,
             biometricUnlockEnabled: true,
           ),
@@ -1023,8 +1023,8 @@ void main() {
             settingsRepository: repository,
             keyRepository: repository,
             pathPickerService: picker,
-            securityRepository: InMemorySecurityRepository.withPattern(
-              const <int>[0, 1, 2, 5],
+            securityRepository: InMemorySecurityRepository.withPin(
+              '123456',
               biometricUnlockEnabled: true,
               lastUnlockedAt: DateTime.now(),
             ),
@@ -1084,8 +1084,8 @@ void main() {
             onComplete: () {},
             settingsRepository: repository,
             keyRepository: repository,
-            securityRepository: InMemorySecurityRepository.withPattern(
-              const <int>[0, 1, 2, 5],
+            securityRepository: InMemorySecurityRepository.withPin(
+              '123456',
               biometricUnlockEnabled: true,
             ),
           ),
@@ -1142,8 +1142,8 @@ void main() {
           settingsRepository: repository,
           keyRepository: repository,
           pathPickerService: _MissingGitPicker(),
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             biometricUnlockEnabled: true,
           ),
         ),
@@ -1189,8 +1189,8 @@ void main() {
         settingsRepository: repository,
         keyRepository: repository,
         gitRepository: repository,
-        securityRepository: InMemorySecurityRepository.withPattern(
-          const <int>[0, 1, 2, 5],
+        securityRepository: InMemorySecurityRepository.withPin(
+          '123456',
           lockOnResume: true,
           biometricUnlockEnabled: true,
           onboardingComplete: false,
@@ -1258,8 +1258,8 @@ void main() {
             settingsRepository: repository,
             keyRepository: repository,
             pathPickerService: picker,
-            securityRepository: InMemorySecurityRepository.withPattern(
-              const <int>[0, 1, 2, 5],
+            securityRepository: InMemorySecurityRepository.withPin(
+              '123456',
               biometricUnlockEnabled: true,
               onboardingComplete: false,
             ),
@@ -1304,7 +1304,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Set gesture lock'), findsOneWidget);
+    expect(find.text('Set PIN lock'), findsOneWidget);
     expectNoFlutterOverflow(tester);
   });
 }

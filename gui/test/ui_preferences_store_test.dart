@@ -54,8 +54,8 @@ void main() {
   ) async {
     const repository = FakeParsRepository();
     final store = InMemoryUiPreferencesStore();
-    final security = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final security = InMemorySecurityRepository.withPin(
+      '123456',
       onboardingComplete: true,
       lastUnlockedAt: DateTime.now(),
     );

@@ -366,7 +366,7 @@ void main() {
     final expectedWidth = GuiTestViewport.compactPhone.size.width;
     for (final label in <String>[
       'Language',
-      'Gesture lock and biometrics',
+      'PIN lock and biometrics',
       'PGP session timeout',
       'KMS / Keychain passphrase',
       'Password store',

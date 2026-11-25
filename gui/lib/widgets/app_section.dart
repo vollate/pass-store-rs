@@ -338,14 +338,27 @@ class ParsSectionRow extends StatelessWidget {
 // Neutral leading slot for rows that identify themselves with an icon rather
 // than with an accent-coloured monogram.
 class ParsSectionRowIcon extends StatelessWidget {
-  const ParsSectionRowIcon({super.key, required this.icon, this.color});
+  const ParsSectionRowIcon({
+    super.key,
+    required IconData this.icon,
+    this.color,
+  }) : child = null;
 
-  final IconData icon;
+  const ParsSectionRowIcon.custom({
+    super.key,
+    required Widget this.child,
+    this.color,
+  }) : icon = null;
+
+  final IconData? icon;
+  final Widget? child;
   final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final foreground = color ?? colorScheme.onSurfaceVariant;
+    final customChild = child;
     return Container(
       width: ParsSizes.compactAvatar,
       height: ParsSizes.compactAvatar,
@@ -354,11 +367,20 @@ class ParsSectionRowIcon extends StatelessWidget {
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(ParsRadii.control),
       ),
-      child: Icon(
-        icon,
-        size: ParsSizes.iconSmall,
-        color: color ?? colorScheme.onSurfaceVariant,
-      ),
+      child:
+          customChild != null
+              ? IconTheme.merge(
+                data: IconThemeData(
+                  size: ParsSizes.iconSmall,
+                  color: foreground,
+                ),
+                child: customChild,
+              )
+              : Icon(
+                icon,
+                size: ParsSizes.iconSmall,
+                color: foreground,
+              ),
     );
   }
 }

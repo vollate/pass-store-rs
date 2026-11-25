@@ -56,35 +56,65 @@ class _AutofillSettingsSheetBodyState
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(switch (kind) {
-            AutofillStatusKind.ready => Icons.check_circle_outline,
-            AutofillStatusKind.syncFailed => Icons.sync_problem_outlined,
-            AutofillStatusKind.busy => Icons.sync,
-            AutofillStatusKind.disabled => Icons.block_outlined,
-            AutofillStatusKind.unavailable => Icons.info_outline,
-          }),
-          title: Text(summary),
-          subtitle:
-              available
-                  ? Text(localizations.autofillIndexedEntries(indexedEntries))
-                  : null,
+        AppSectionBox(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            ParsSectionRow(
+              leading: ParsSectionRowIcon(
+                icon: switch (kind) {
+                  AutofillStatusKind.ready => Icons.check_circle_outline,
+                  AutofillStatusKind.syncFailed => Icons.sync_problem_outlined,
+                  AutofillStatusKind.busy => Icons.sync,
+                  AutofillStatusKind.disabled => Icons.block_outlined,
+                  AutofillStatusKind.unavailable => Icons.info_outline,
+                },
+                color: switch (kind) {
+                  AutofillStatusKind.ready => context.parsColors.success,
+                  AutofillStatusKind.syncFailed =>
+                    Theme.of(context).colorScheme.error,
+                  AutofillStatusKind.busy => context.parsColors.busy,
+                  AutofillStatusKind.disabled =>
+                    context.parsColors.unavailable,
+                  AutofillStatusKind.unavailable => context.parsColors.info,
+                },
+              ),
+              title: summary,
+              subtitle:
+                  available
+                      ? localizations.autofillIndexedEntries(indexedEntries)
+                      : null,
+            ),
+          ],
         ),
         if (status?.message case final diagnostics?)
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
+            shape: const Border(),
+            collapsedShape: const Border(),
             title: Text(localizations.diagnosticDetails),
             children: <Widget>[
-              SelectableText(diagnostics),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SelectableText(
+                  diagnostics,
+                  style: ParsTheme.mono(
+                    Theme.of(context).textTheme.bodySmall ?? const TextStyle(),
+                  ),
+                ),
+              ),
               const SizedBox(height: ParsSpacing.sm),
             ],
           ),
-        const SizedBox(height: ParsSpacing.sm),
+        const SizedBox(height: ParsSpacing.md),
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Text(localizations.useLoginAndUrlFieldsHint),
+            Text(
+              localizations.useLoginAndUrlFieldsHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: ParsSpacing.xs),
             FilledButton.icon(
               onPressed:
@@ -95,7 +125,12 @@ class _AutofillSettingsSheetBodyState
               label: Text(localizations.useLoginAndUrlFields),
             ),
             const SizedBox(height: ParsSpacing.md),
-            Text(localizations.forgetLoginAndUrlFieldsHint),
+            Text(
+              localizations.forgetLoginAndUrlFieldsHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: ParsSpacing.xs),
             OutlinedButton.icon(
               onPressed:

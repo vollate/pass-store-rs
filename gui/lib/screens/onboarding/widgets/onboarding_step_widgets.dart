@@ -48,7 +48,7 @@ class _OnboardingProgress extends StatelessWidget {
   }
 }
 
-class _BiometricSetupStep extends StatelessWidget {
+class _BiometricSetupStep extends StatefulWidget {
   const _BiometricSetupStep({
     required this.securityRepository,
     required this.onEnable,
@@ -62,28 +62,61 @@ class _BiometricSetupStep extends StatelessWidget {
   final void Function(Object error) onError;
 
   @override
+  State<_BiometricSetupStep> createState() => _BiometricSetupStepState();
+}
+
+class _BiometricSetupStepState extends State<_BiometricSetupStep> {
+  late Future<({BiometricUnlockStatus status, BiometricKind kind})>
+  _biometricsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _biometricsFuture = _loadBiometrics();
+  }
+
+  @override
+  void didUpdateWidget(covariant _BiometricSetupStep oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.securityRepository != widget.securityRepository) {
+      _biometricsFuture = _loadBiometrics();
+    }
+  }
+
+  Future<({BiometricUnlockStatus status, BiometricKind kind})>
+  _loadBiometrics() async {
+    final status = await widget.securityRepository.biometricUnlockStatus();
+    final kind = await widget.securityRepository.biometricKind();
+    return (status: status, kind: kind);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<BiometricUnlockStatus>(
-      future: securityRepository.biometricUnlockStatus(),
+    return FutureBuilder<({BiometricUnlockStatus status, BiometricKind kind})>(
+      future: _biometricsFuture,
       builder: (context, snapshot) {
-        final status = snapshot.data ?? BiometricUnlockStatus.unavailable;
+        final status =
+            snapshot.data?.status ?? BiometricUnlockStatus.unavailable;
+        final kind = snapshot.data?.kind ?? BiometricKind.fingerprint;
         return ListView(
           children: <Widget>[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                status == BiometricUnlockStatus.unavailable
-                    ? Icons.fingerprint_outlined
-                    : Icons.fingerprint,
-              ),
-              title: Text(context.l10n.biometricUnlock),
-              subtitle: Text(_biometricSubtitle(context.l10n, status)),
+            AppSectionBox(
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+                ParsSectionRow(
+                  leading: ParsSectionRowIcon.custom(
+                    child: BiometricIcon(kind: kind),
+                  ),
+                  title: context.l10n.biometricUnlock,
+                  subtitle: _biometricSubtitle(context.l10n, status),
+                ),
+              ],
             ),
-            const SizedBox(height: ParsSpacing.sm),
+            const SizedBox(height: ParsSpacing.md),
             ParsButtonGrid(
               children: <Widget>[
                 OutlinedButton(
-                  onPressed: onSkip,
+                  onPressed: widget.onSkip,
                   child: Text(
                     context.l10n.skipBiometrics,
                     textAlign: TextAlign.center,
@@ -95,14 +128,14 @@ class _BiometricSetupStep extends StatelessWidget {
                           ? null
                           : () async {
                             try {
-                              await securityRepository
+                              await widget.securityRepository
                                   .setBiometricUnlockEnabled(true);
-                              onEnable();
+                              widget.onEnable();
                             } catch (error) {
-                              onError(error);
+                              widget.onError(error);
                             }
                           },
-                  icon: const Icon(Icons.fingerprint),
+                  icon: BiometricIcon(kind: kind),
                   label: Text(
                     context.l10n.enableBiometricUnlock,
                     textAlign: TextAlign.center,
@@ -143,12 +176,16 @@ class _EmptyOnboardingStep extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: <Widget>[
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(icon),
-          title: Text(title),
+        AppSectionBox(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            ParsSectionRow(
+              leading: ParsSectionRowIcon(icon: icon),
+              title: title,
+            ),
+          ],
         ),
-        const SizedBox(height: ParsSpacing.sm),
+        const SizedBox(height: ParsSpacing.md),
         FilledButton(
           onPressed: onPressed,
           child: SizedBox(

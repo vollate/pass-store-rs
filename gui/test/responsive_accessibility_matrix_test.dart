@@ -92,9 +92,7 @@ void main() {
       buildLocalizedTestApp(
         textScale: 2,
         child: LockScreen(
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
-          ),
+          securityRepository: InMemorySecurityRepository.withPin('123456'),
           unlockWithBiometrics: () async => false,
           onUnlocked: () {},
         ),
@@ -190,8 +188,8 @@ void main() {
 }
 
 InMemorySecurityRepository _readySecurity() {
-  return InMemorySecurityRepository.withPattern(
-    const <int>[0, 1, 2, 5],
+  return InMemorySecurityRepository.withPin(
+    '123456',
     onboardingComplete: true,
     lastUnlockedAt: DateTime.now(),
   );

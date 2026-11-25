@@ -6,10 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 
-enum LocalUnlockMethod { gesture, password }
+enum LocalUnlockMethod { pin, password }
 
-// A drawn pattern suits touch screens; with a mouse or trackpad it is slow
-// and imprecise, so desktops start with a typed password instead.
+// A 6-digit PIN suits touch screens; desktops start with a typed password.
 LocalUnlockMethod platformDefaultUnlockMethod() {
   return switch (defaultTargetPlatform) {
     TargetPlatform.macOS ||
@@ -17,41 +16,50 @@ LocalUnlockMethod platformDefaultUnlockMethod() {
     TargetPlatform.linux => LocalUnlockMethod.password,
     TargetPlatform.android ||
     TargetPlatform.iOS ||
-    TargetPlatform.fuchsia => LocalUnlockMethod.gesture,
+    TargetPlatform.fuchsia => LocalUnlockMethod.pin,
   };
 }
 
-class PasswordVerifier {
-  const PasswordVerifier._({
+class _Pbkdf2Verifier {
+  const _Pbkdf2Verifier({
     required this.iterations,
-    required Uint8List salt,
-    required Uint8List hash,
-  }) : _salt = salt,
-       _hash = hash;
+    required this.salt,
+    required this.hash,
+  });
 
-  factory PasswordVerifier.fromPassword(
-    String password, {
+  static const int defaultIterations = 210000;
+  static const int maximumIterations = 10000000;
+  static const int saltLength = 16;
+  static const int hashLength = 32;
+  static const String scheme = 'pbkdf2-sha256';
+
+  final int iterations;
+  final Uint8List salt;
+  final Uint8List hash;
+
+  String get value =>
+      '$scheme\$$iterations\$${base64Encode(salt)}\$${base64Encode(hash)}';
+
+  static _Pbkdf2Verifier deriveNew(
+    String secret, {
     int iterations = defaultIterations,
     Random? random,
   }) {
-    if (password.runes.length < minimumLength) {
-      throw ArgumentError('Use at least $minimumLength characters.');
-    }
     _checkIterations(iterations);
     final source = random ?? Random.secure();
     final salt = Uint8List.fromList(
-      List<int>.generate(_saltLength, (_) => source.nextInt(256)),
+      List<int>.generate(saltLength, (_) => source.nextInt(256)),
     );
-    return PasswordVerifier._(
+    return _Pbkdf2Verifier(
       iterations: iterations,
       salt: salt,
-      hash: _derive(password, salt, iterations),
+      hash: _derive(secret, salt, iterations),
     );
   }
 
-  factory PasswordVerifier.fromStoredValue(String value) {
+  static _Pbkdf2Verifier parse(String value) {
     final parts = value.split(r'$');
-    if (parts.length != 4 || parts[0] != _scheme) {
+    if (parts.length != 4 || parts[0] != scheme) {
       throw ArgumentError('Invalid verifier value.');
     }
     final iterations = int.tryParse(parts[1]);
@@ -67,45 +75,31 @@ class PasswordVerifier {
     } on FormatException {
       throw ArgumentError('Invalid verifier value.');
     }
-    if (salt.isEmpty || hash.length != _hashLength) {
+    if (salt.isEmpty || hash.length != hashLength) {
       throw ArgumentError('Invalid verifier value.');
     }
-    return PasswordVerifier._(iterations: iterations, salt: salt, hash: hash);
+    return _Pbkdf2Verifier(iterations: iterations, salt: salt, hash: hash);
   }
 
-  static const int minimumLength = 6;
-  static const int defaultIterations = 210000;
-  static const int _maximumIterations = 10000000;
-  static const int _saltLength = 16;
-  static const int _hashLength = 32;
-  static const String _scheme = 'pbkdf2-sha256';
-
-  final int iterations;
-  final Uint8List _salt;
-  final Uint8List _hash;
-
-  String get value =>
-      '$_scheme\$$iterations\$${base64Encode(_salt)}\$${base64Encode(_hash)}';
-
-  bool matches(String password) {
-    final candidate = _derive(password, _salt, iterations);
+  bool matches(String secret) {
+    final candidate = _derive(secret, salt, iterations);
     var difference = 0;
-    for (var index = 0; index < _hashLength; index += 1) {
-      difference |= candidate[index] ^ _hash[index];
+    for (var index = 0; index < hashLength; index += 1) {
+      difference |= candidate[index] ^ hash[index];
     }
     return difference == 0;
   }
 
   static void _checkIterations(int iterations) {
-    if (iterations < 1 || iterations > _maximumIterations) {
-      throw RangeError.range(iterations, 1, _maximumIterations, 'iterations');
+    if (iterations < 1 || iterations > maximumIterations) {
+      throw RangeError.range(iterations, 1, maximumIterations, 'iterations');
     }
   }
 
   // PBKDF2-HMAC-SHA256 with a single output block, which is all a 32-byte
   // key needs.
-  static Uint8List _derive(String password, List<int> salt, int iterations) {
-    final hmac = Hmac(sha256, utf8.encode(password));
+  static Uint8List _derive(String secret, List<int> salt, int iterations) {
+    final hmac = Hmac(sha256, utf8.encode(secret));
     var block = hmac.convert(<int>[...salt, 0, 0, 0, 1]).bytes;
     final result = Uint8List.fromList(block);
     for (var round = 1; round < iterations; round += 1) {
@@ -118,65 +112,89 @@ class PasswordVerifier {
   }
 }
 
+class PasswordVerifier {
+  const PasswordVerifier._(this._verifier);
+
+  factory PasswordVerifier.fromPassword(
+    String password, {
+    int iterations = defaultIterations,
+    Random? random,
+  }) {
+    if (password.runes.length < minimumLength) {
+      throw ArgumentError('Use at least $minimumLength characters.');
+    }
+    return PasswordVerifier._(
+      _Pbkdf2Verifier.deriveNew(
+        password,
+        iterations: iterations,
+        random: random,
+      ),
+    );
+  }
+
+  factory PasswordVerifier.fromStoredValue(String value) =>
+      PasswordVerifier._(_Pbkdf2Verifier.parse(value));
+
+  static const int minimumLength = 6;
+  static const int defaultIterations = _Pbkdf2Verifier.defaultIterations;
+
+  final _Pbkdf2Verifier _verifier;
+
+  int get iterations => _verifier.iterations;
+
+  String get value => _verifier.value;
+
+  bool matches(String password) => _verifier.matches(password);
+}
+
+class PinVerifier {
+  const PinVerifier._(this._verifier);
+
+  factory PinVerifier.fromPin(
+    String pin, {
+    int iterations = defaultIterations,
+    Random? random,
+  }) {
+    if (!isValidPin(pin)) {
+      throw ArgumentError.value(pin, 'pin', 'Use exactly $pinLength digits.');
+    }
+    return PinVerifier._(
+      _Pbkdf2Verifier.deriveNew(
+        pin,
+        iterations: iterations,
+        random: random,
+      ),
+    );
+  }
+
+  factory PinVerifier.fromStoredValue(String value) =>
+      PinVerifier._(_Pbkdf2Verifier.parse(value));
+
+  static const int pinLength = 6;
+  static const int defaultIterations = _Pbkdf2Verifier.defaultIterations;
+  static final RegExp _pinPattern = RegExp(r'^\d{6}$');
+
+  static bool isValidPin(String pin) => _pinPattern.hasMatch(pin);
+
+  final _Pbkdf2Verifier _verifier;
+
+  int get iterations => _verifier.iterations;
+
+  String get value => _verifier.value;
+
+  bool matches(String pin) => isValidPin(pin) && _verifier.matches(pin);
+}
+
 PasswordVerifier _createPasswordVerifier(String password) =>
     PasswordVerifier.fromPassword(password);
 
 bool _passwordMatches((PasswordVerifier, String) request) =>
     request.$1.matches(request.$2);
 
-class GestureVerifier {
-  const GestureVerifier._(this.value);
+PinVerifier _createPinVerifier(String pin) => PinVerifier.fromPin(pin);
 
-  factory GestureVerifier.fromPattern(List<int> pattern) {
-    if (pattern.length < 4) {
-      throw ArgumentError.value(pattern, 'pattern', 'Use at least 4 dots.');
-    }
-    if (_hasConsecutiveRepeatedDots(pattern)) {
-      throw ArgumentError.value(
-        pattern,
-        'pattern',
-        'Do not repeat the same dot without moving away.',
-      );
-    }
-    for (final dot in pattern) {
-      if (dot < 0 || dot > 8) {
-        throw ArgumentError.value(pattern, 'pattern', 'Dot is out of range.');
-      }
-    }
-    return GestureVerifier._(_fingerprint(pattern));
-  }
-
-  factory GestureVerifier.fromStoredValue(String value) {
-    if (!RegExp(r'^[0-9a-f]{8}$').hasMatch(value)) {
-      throw ArgumentError.value(value, 'value', 'Invalid verifier value.');
-    }
-    return GestureVerifier._(value);
-  }
-
-  final String value;
-
-  bool matches(List<int> pattern) =>
-      pattern.length >= 4 && value == _fingerprint(pattern);
-
-  static String _fingerprint(List<int> pattern) {
-    var hash = 0x811c9dc5;
-    for (final dot in pattern) {
-      hash ^= dot + 1;
-      hash = (hash * 0x01000193) & 0xffffffff;
-    }
-    hash ^= pattern.length;
-    return hash.toRadixString(16).padLeft(8, '0');
-  }
-}
-
-bool _hasConsecutiveRepeatedDots(List<int> pattern) {
-  for (var index = 1; index < pattern.length; index += 1) {
-    if (pattern[index - 1] == pattern[index]) {
-      return true;
-    }
-  }
-  return false;
-}
+bool _pinMatches((PinVerifier, String) request) =>
+    request.$1.matches(request.$2);
 
 abstract interface class SecureStorageAdapter {
   Future<String?> read(String key);
@@ -211,6 +229,8 @@ class FlutterSecureStorageAdapter implements SecureStorageAdapter {
 }
 
 enum BiometricUnlockStatus { unavailable, disabled, available }
+
+enum BiometricKind { face, fingerprint, other }
 
 enum PgpSessionExpiration {
   immediately,
@@ -275,6 +295,8 @@ extension PgpSessionExpirationLabel on PgpSessionExpiration {
 abstract interface class BiometricAuthAdapter {
   Future<bool> isAvailable();
 
+  Future<BiometricKind> biometricKind();
+
   Future<bool> authenticate();
 }
 
@@ -294,6 +316,22 @@ class LocalAuthBiometricAdapter implements BiometricAuthAdapter {
   }
 
   @override
+  Future<BiometricKind> biometricKind() async {
+    try {
+      final types = await _auth.getAvailableBiometrics();
+      if (types.contains(BiometricType.face)) {
+        return BiometricKind.face;
+      }
+      if (types.contains(BiometricType.fingerprint)) {
+        return BiometricKind.fingerprint;
+      }
+      return BiometricKind.other;
+    } catch (_) {
+      return BiometricKind.other;
+    }
+  }
+
+  @override
   Future<bool> authenticate() async {
     try {
       return await _auth.authenticate(
@@ -308,7 +346,7 @@ class LocalAuthBiometricAdapter implements BiometricAuthAdapter {
 }
 
 abstract interface class SecurityRepository {
-  bool get hasGestureVerifier;
+  bool get hasPinVerifier;
 
   bool get hasPasswordVerifier;
 
@@ -333,9 +371,9 @@ abstract interface class SecurityRepository {
 
   DateTime? get lastUnlockedAt;
 
-  Future<void> saveGestureVerifier(GestureVerifier verifier);
+  Future<void> savePin(String pin);
 
-  Future<bool> verifyGesture(List<int> pattern);
+  Future<bool> verifyPin(String pin);
 
   Future<void> savePassword(String password);
 
@@ -352,6 +390,8 @@ abstract interface class SecurityRepository {
   Future<void> setBiometricUnlockEnabled(bool enabled);
 
   Future<BiometricUnlockStatus> biometricUnlockStatus();
+
+  Future<BiometricKind> biometricKind();
 
   Future<bool> unlockWithBiometrics();
 
@@ -392,20 +432,23 @@ extension SecurityRepositoryUnlock on SecurityRepository {
 
 LocalUnlockMethod? _activeUnlockMethod(
   PasswordVerifier? password,
-  GestureVerifier? gesture,
+  PinVerifier? pin,
 ) {
   if (password != null) return LocalUnlockMethod.password;
-  if (gesture != null) return LocalUnlockMethod.gesture;
+  if (pin != null) return LocalUnlockMethod.pin;
   return null;
 }
 
 class InMemorySecurityRepository implements SecurityRepository {
   InMemorySecurityRepository({
-    GestureVerifier? gestureVerifier,
+    PinVerifier? pinVerifier,
     PasswordVerifier? passwordVerifier,
+    this.pinIterations = 1000,
     this.passwordIterations = PasswordVerifier.defaultIterations,
     bool lockOnResume = false,
     bool biometricUnlockEnabled = false,
+    bool? biometricAvailable,
+    BiometricKind biometricKind = BiometricKind.fingerprint,
     bool pgpPassphraseStorageEnabled = false,
     PgpPassphraseCache? pgpPassphrase,
     PgpPassphraseCache? activePgpPassphrase,
@@ -414,10 +457,12 @@ class InMemorySecurityRepository implements SecurityRepository {
         PgpSessionExpiration.fifteenMinutes,
     Duration autoLockTimeout = const Duration(minutes: 15),
     DateTime? lastUnlockedAt,
-  }) : _gestureVerifier = passwordVerifier == null ? gestureVerifier : null,
+  }) : _pinVerifier = passwordVerifier == null ? pinVerifier : null,
        _passwordVerifier = passwordVerifier,
        _lockOnResume = lockOnResume,
        _biometricUnlockEnabled = biometricUnlockEnabled,
+       _biometricAvailable = biometricAvailable,
+       _biometricKind = biometricKind,
        _pgpPassphraseStorageEnabled = pgpPassphraseStorageEnabled,
        _pgpPassphrase = pgpPassphrase,
        _activePgpPassphrase = activePgpPassphrase,
@@ -426,10 +471,13 @@ class InMemorySecurityRepository implements SecurityRepository {
        _autoLockTimeout = autoLockTimeout,
        _lastUnlockedAt = lastUnlockedAt;
 
-  factory InMemorySecurityRepository.withPattern(
-    List<int> pattern, {
+  factory InMemorySecurityRepository.withPin(
+    String pin, {
+    int pinIterations = 1000,
     bool lockOnResume = false,
     bool biometricUnlockEnabled = false,
+    bool? biometricAvailable,
+    BiometricKind biometricKind = BiometricKind.fingerprint,
     bool pgpPassphraseStorageEnabled = false,
     PgpPassphraseCache? pgpPassphrase,
     PgpPassphraseCache? activePgpPassphrase,
@@ -440,9 +488,12 @@ class InMemorySecurityRepository implements SecurityRepository {
     DateTime? lastUnlockedAt,
   }) {
     return InMemorySecurityRepository(
-      gestureVerifier: GestureVerifier.fromPattern(pattern),
+      pinVerifier: PinVerifier.fromPin(pin, iterations: pinIterations),
+      pinIterations: pinIterations,
       lockOnResume: lockOnResume,
       biometricUnlockEnabled: biometricUnlockEnabled,
+      biometricAvailable: biometricAvailable,
+      biometricKind: biometricKind,
       pgpPassphraseStorageEnabled: pgpPassphraseStorageEnabled,
       pgpPassphrase: pgpPassphrase,
       activePgpPassphrase: activePgpPassphrase,
@@ -454,11 +505,14 @@ class InMemorySecurityRepository implements SecurityRepository {
   }
 
   // Hashing runs inline here, so tests can lower the cost.
+  final int pinIterations;
   final int passwordIterations;
-  GestureVerifier? _gestureVerifier;
+  PinVerifier? _pinVerifier;
   PasswordVerifier? _passwordVerifier;
   bool _lockOnResume;
   bool _biometricUnlockEnabled;
+  final bool? _biometricAvailable;
+  final BiometricKind _biometricKind;
   bool _pgpPassphraseStorageEnabled;
   bool _onboardingComplete;
   PgpPassphraseCache? _pgpPassphrase;
@@ -469,14 +523,14 @@ class InMemorySecurityRepository implements SecurityRepository {
   DateTime? _lastUnlockedAt;
 
   @override
-  bool get hasGestureVerifier => _gestureVerifier != null;
+  bool get hasPinVerifier => _pinVerifier != null;
 
   @override
   bool get hasPasswordVerifier => _passwordVerifier != null;
 
   @override
   LocalUnlockMethod? get unlockMethod =>
-      _activeUnlockMethod(_passwordVerifier, _gestureVerifier);
+      _activeUnlockMethod(_passwordVerifier, _pinVerifier);
 
   @override
   bool get lockOnResume => _lockOnResume;
@@ -512,14 +566,14 @@ class InMemorySecurityRepository implements SecurityRepository {
   DateTime? get lastUnlockedAt => _lastUnlockedAt;
 
   @override
-  Future<void> saveGestureVerifier(GestureVerifier verifier) async {
-    _gestureVerifier = verifier;
+  Future<void> savePin(String pin) async {
+    _pinVerifier = PinVerifier.fromPin(pin, iterations: pinIterations);
     _passwordVerifier = null;
   }
 
   @override
-  Future<bool> verifyGesture(List<int> pattern) async =>
-      _gestureVerifier?.matches(pattern) ?? false;
+  Future<bool> verifyPin(String pin) async =>
+      _pinVerifier?.matches(pin) ?? false;
 
   @override
   Future<void> savePassword(String password) async {
@@ -527,7 +581,7 @@ class InMemorySecurityRepository implements SecurityRepository {
       password,
       iterations: passwordIterations,
     );
-    _gestureVerifier = null;
+    _pinVerifier = null;
   }
 
   @override
@@ -562,11 +616,21 @@ class InMemorySecurityRepository implements SecurityRepository {
 
   @override
   Future<BiometricUnlockStatus> biometricUnlockStatus() async {
+    final available = _biometricAvailable;
+    if (available != null) {
+      if (!available) return BiometricUnlockStatus.unavailable;
+      return _biometricUnlockEnabled
+          ? BiometricUnlockStatus.available
+          : BiometricUnlockStatus.disabled;
+    }
     if (!_biometricUnlockEnabled) {
       return BiometricUnlockStatus.disabled;
     }
     return BiometricUnlockStatus.unavailable;
   }
+
+  @override
+  Future<BiometricKind> biometricKind() async => _biometricKind;
 
   @override
   Future<bool> unlockWithBiometrics() async => false;
@@ -718,8 +782,9 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   SecureStorageSecurityRepository._({
     required SecureStorageAdapter storage,
     required BiometricAuthAdapter biometricAuth,
-    required GestureVerifier? gestureVerifier,
+    required PinVerifier? pinVerifier,
     required PasswordVerifier? passwordVerifier,
+    required int pinIterations,
     required bool lockOnResume,
     required bool biometricUnlockEnabled,
     required bool pgpPassphraseStorageEnabled,
@@ -729,8 +794,9 @@ class SecureStorageSecurityRepository implements SecurityRepository {
     required Duration autoLockTimeout,
   }) : _storage = storage,
        _biometricAuth = biometricAuth,
-       _gestureVerifier = gestureVerifier,
+       _pinVerifier = pinVerifier,
        _passwordVerifier = passwordVerifier,
+       _pinIterations = pinIterations,
        _lockOnResume = lockOnResume,
        _biometricUnlockEnabled = biometricUnlockEnabled,
        _pgpPassphraseStorageEnabled = pgpPassphraseStorageEnabled,
@@ -739,7 +805,8 @@ class SecureStorageSecurityRepository implements SecurityRepository {
        _pgpSessionExpiration = pgpSessionExpiration,
        _autoLockTimeout = autoLockTimeout;
 
-  static const _gestureVerifierKey = 'pars.security.gesture_verifier.v1';
+  static const _legacyGestureVerifierKey = 'pars.security.gesture_verifier.v1';
+  static const _pinVerifierKey = 'pars.security.pin_verifier.v1';
   static const _passwordVerifierKey = 'pars.security.password_verifier.v1';
   static const _lockOnResumeKey = 'pars.security.lock_on_resume.v1';
   static const _biometricUnlockEnabledKey =
@@ -760,8 +827,9 @@ class SecureStorageSecurityRepository implements SecurityRepository {
 
   final SecureStorageAdapter _storage;
   final BiometricAuthAdapter _biometricAuth;
+  final int _pinIterations;
 
-  GestureVerifier? _gestureVerifier;
+  PinVerifier? _pinVerifier;
   PasswordVerifier? _passwordVerifier;
   bool _lockOnResume;
   bool _biometricUnlockEnabled;
@@ -777,14 +845,21 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   static Future<SecureStorageSecurityRepository> load({
     SecureStorageAdapter storage = const FlutterSecureStorageAdapter(),
     BiometricAuthAdapter? biometricAuth,
+    @visibleForTesting int pinIterations = PinVerifier.defaultIterations,
   }) async {
-    final verifierValue = await storage.read(_gestureVerifierKey);
-    GestureVerifier? verifier;
-    if (verifierValue != null) {
+    // Drop any leftover gesture verifier from earlier installs so the app
+    // prompts cleanly for a 6-digit PIN instead of reading a removed format.
+    if (await storage.read(_legacyGestureVerifierKey) != null) {
+      await storage.delete(_legacyGestureVerifierKey);
+    }
+
+    final pinValue = await storage.read(_pinVerifierKey);
+    PinVerifier? pinVerifier;
+    if (pinValue != null) {
       try {
-        verifier = GestureVerifier.fromStoredValue(verifierValue);
+        pinVerifier = PinVerifier.fromStoredValue(pinValue);
       } on ArgumentError {
-        await storage.delete(_gestureVerifierKey);
+        await storage.delete(_pinVerifierKey);
       }
     }
 
@@ -817,8 +892,9 @@ class SecureStorageSecurityRepository implements SecurityRepository {
     return SecureStorageSecurityRepository._(
       storage: storage,
       biometricAuth: biometricAuth ?? LocalAuthBiometricAdapter(),
-      gestureVerifier: passwordVerifier == null ? verifier : null,
+      pinVerifier: passwordVerifier == null ? pinVerifier : null,
       passwordVerifier: passwordVerifier,
+      pinIterations: pinIterations,
       lockOnResume: await _readBool(storage, _lockOnResumeKey),
       biometricUnlockEnabled: await _readBool(
         storage,
@@ -837,14 +913,14 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   }
 
   @override
-  bool get hasGestureVerifier => _gestureVerifier != null;
+  bool get hasPinVerifier => _pinVerifier != null;
 
   @override
   bool get hasPasswordVerifier => _passwordVerifier != null;
 
   @override
   LocalUnlockMethod? get unlockMethod =>
-      _activeUnlockMethod(_passwordVerifier, _gestureVerifier);
+      _activeUnlockMethod(_passwordVerifier, _pinVerifier);
 
   @override
   bool get lockOnResume => _lockOnResume;
@@ -880,24 +956,36 @@ class SecureStorageSecurityRepository implements SecurityRepository {
   DateTime? get lastUnlockedAt => _lastUnlockedAt;
 
   @override
-  Future<void> saveGestureVerifier(GestureVerifier verifier) async {
-    await _storage.write(key: _gestureVerifierKey, value: verifier.value);
+  Future<void> savePin(String pin) async {
+    final verifier =
+        _pinIterations == PinVerifier.defaultIterations
+            ? await compute(_createPinVerifier, pin)
+            : PinVerifier.fromPin(pin, iterations: _pinIterations);
+    await _storage.write(key: _pinVerifierKey, value: verifier.value);
     await _storage.delete(_passwordVerifierKey);
-    _gestureVerifier = verifier;
+    await _storage.delete(_legacyGestureVerifierKey);
+    _pinVerifier = verifier;
     _passwordVerifier = null;
   }
 
   @override
-  Future<bool> verifyGesture(List<int> pattern) async =>
-      _gestureVerifier?.matches(pattern) ?? false;
+  Future<bool> verifyPin(String pin) async {
+    final verifier = _pinVerifier;
+    if (verifier == null || !PinVerifier.isValidPin(pin)) return false;
+    if (verifier.iterations < PinVerifier.defaultIterations) {
+      return verifier.matches(pin);
+    }
+    return compute(_pinMatches, (verifier, pin));
+  }
 
   @override
   Future<void> savePassword(String password) async {
     final verifier = await compute(_createPasswordVerifier, password);
     await _storage.write(key: _passwordVerifierKey, value: verifier.value);
-    await _storage.delete(_gestureVerifierKey);
+    await _storage.delete(_pinVerifierKey);
+    await _storage.delete(_legacyGestureVerifierKey);
     _passwordVerifier = verifier;
-    _gestureVerifier = null;
+    _pinVerifier = null;
   }
 
   @override
@@ -960,6 +1048,9 @@ class SecureStorageSecurityRepository implements SecurityRepository {
     }
     return BiometricUnlockStatus.available;
   }
+
+  @override
+  Future<BiometricKind> biometricKind() => _biometricAuth.biometricKind();
 
   @override
   Future<bool> unlockWithBiometrics() async {

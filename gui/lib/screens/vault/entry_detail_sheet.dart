@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/pars_design_tokens.dart';
+import '../../app/pars_theme.dart';
 import '../../models/key_record.dart';
 import '../../models/password_entry.dart';
 import '../../models/pgp_key_import.dart';
@@ -14,6 +15,8 @@ import '../../services/sensitive_clipboard_service.dart';
 import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
+import '../../widgets/app_section.dart';
+import '../../widgets/entry_tile.dart';
 import '../../widgets/pars_action_group.dart';
 import '../../widgets/pars_adaptive_surface.dart';
 
@@ -156,8 +159,6 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Center(child: _SheetHandle()),
-              const SizedBox(height: ParsSpacing.lg),
               Text(
                 localizations.pgpPassphraseRequiredTitle,
                 style: Theme.of(
@@ -204,18 +205,10 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     }
 
     if (_isLoading) {
-      return SafeArea(
+      return const SafeArea(
         child: Padding(
           padding: ParsInsets.sheetBlockTall,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: const <Widget>[
-              _SheetHandle(),
-              SizedBox(height: ParsSpacing.xl),
-              CircularProgressIndicator(),
-              SizedBox(height: ParsSpacing.lg),
-            ],
-          ),
+          child: Center(child: CircularProgressIndicator()),
         ),
       );
     }
@@ -228,8 +221,6 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Center(child: _SheetHandle()),
-              const SizedBox(height: ParsSpacing.lg),
               Text(
                 localizations.decryptEntryFailedTitle,
                 style: Theme.of(
@@ -244,9 +235,7 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                 ),
               ),
               const SizedBox(height: ParsSpacing.md),
-              Wrap(
-                spacing: ParsSpacing.xs,
-                runSpacing: ParsSpacing.xs,
+              ParsButtonGrid(
                 children: <Widget>[
                   FilledButton.icon(
                     onPressed: _loadSecret,
@@ -279,15 +268,9 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Center(child: _SheetHandle()),
-              const SizedBox(height: ParsSpacing.lg),
               Row(
                 children: <Widget>[
-                  CircleAvatar(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                    child: Text(widget.entry.initials),
-                  ),
+                  ParsEntryAvatar(entry: widget.entry),
                   const SizedBox(width: ParsSpacing.sm),
                   Expanded(
                     child: Column(
@@ -300,7 +283,12 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
                         ),
                         Text(
                           widget.entry.path,
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style: ParsTheme.mono(
+                            Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ) ??
+                                const TextStyle(),
+                          ),
                         ),
                       ],
                     ),
@@ -369,24 +357,24 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
               ),
               if (content.fields.isNotEmpty) ...<Widget>[
                 const SizedBox(height: ParsSpacing.md),
-                Text(
-                  localizations.fields,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                AppSectionBox(
+                  title: localizations.fields,
+                  padding: EdgeInsets.zero,
+                  children: <Widget>[
+                    for (final field in content.fields)
+                      ParsSectionRow(
+                        leading: const ParsSectionRowIcon(
+                          icon: Icons.label_outline,
+                        ),
+                        title: field.label,
+                        subtitle: field.value,
+                        trailing: TextButton(
+                          onPressed: () => _copyField(field),
+                          child: Text(localizations.copy),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: ParsSpacing.xs),
-                for (final field in content.fields)
-                  ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(field.label),
-                    subtitle: Text(field.value),
-                    trailing: TextButton(
-                      onPressed: () => _copyField(field),
-                      child: Text(localizations.copy),
-                    ),
-                  ),
               ],
               if (content.rawNotes.isNotEmpty) ...<Widget>[
                 const SizedBox(height: ParsSpacing.md),
@@ -697,21 +685,5 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
     _isRevealed = false;
     _content = null;
     if (hadSecret) widget.onSecretCleared?.call();
-  }
-}
-
-class _SheetHandle extends StatelessWidget {
-  const _SheetHandle();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: ParsSizes.sheetHandleWidth,
-      height: ParsSizes.sheetHandleHeight,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.outlineVariant,
-        borderRadius: BorderRadius.circular(ParsRadii.pill),
-      ),
-    );
   }
 }

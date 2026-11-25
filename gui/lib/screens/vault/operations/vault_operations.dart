@@ -8,6 +8,7 @@ import '../../../services/git_repository.dart';
 import '../../../services/ui_problem.dart';
 import '../../../services/vault_repository.dart';
 import '../../../widgets/git_flows.dart';
+import '../../../widgets/pars_action_group.dart';
 import '../../../widgets/pars_adaptive_surface.dart';
 
 part 'widgets/manage_operation_typedefs.dart';

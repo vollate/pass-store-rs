@@ -98,7 +98,14 @@ Future<T?> showParsAdaptivePage<T>({
           final actions = actionsBuilder?.call(pageContext) ?? const <Widget>[];
           return Scaffold(
             appBar: AppBar(
-              title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              title: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  pageContext,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
               actions: <Widget>[
                 ...actions,
                 if (actions.isNotEmpty) const SizedBox(width: ParsSpacing.xs),

@@ -1,17 +1,29 @@
 part of '../settings_screen.dart';
 
 class _DiagnosticRow extends StatelessWidget {
-  const _DiagnosticRow({required this.label, required this.value});
+  const _DiagnosticRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
+  final IconData icon;
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(label),
-      subtitle: SelectableText(value),
+    final colorScheme = Theme.of(context).colorScheme;
+    return ParsSectionRow(
+      leading: ParsSectionRowIcon(icon: icon),
+      title: label,
+      subtitle: value,
+      subtitleStyle: ParsTheme.mono(
+        Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ) ??
+            const TextStyle(),
+      ),
     );
   }
 }

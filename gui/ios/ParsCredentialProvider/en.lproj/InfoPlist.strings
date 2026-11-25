@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "Pars Autofill";
 "CFBundleName" = "Pars Autofill";
+"NSFaceIDUsageDescription" = "Pars uses Face ID to unlock the stored PGP passphrase for AutoFill.";

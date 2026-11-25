@@ -119,22 +119,17 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
             onChanged: (value) => _notes = value,
           ),
           _ErrorText(_error),
-          Row(
+          ParsButtonGrid(
             children: <Widget>[
-              Expanded(
-                child: _SubmitButton(
-                  saving: _saving,
-                  label: context.l10n.saveEditedEntry,
-                  onPressed: _saveRawNotes,
-                ),
+              _SubmitButton(
+                saving: _saving,
+                label: context.l10n.saveEditedEntry,
+                onPressed: _saveRawNotes,
               ),
-              const SizedBox(width: ParsSpacing.sm),
-              Expanded(
-                child: _SubmitButton(
-                  saving: _saving,
-                  label: context.l10n.replaceFirstLine,
-                  onPressed: _replacePasswordLine,
-                ),
+              _SubmitButton(
+                saving: _saving,
+                label: context.l10n.replaceFirstLine,
+                onPressed: _replacePasswordLine,
               ),
             ],
           ),

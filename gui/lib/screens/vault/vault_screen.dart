@@ -148,7 +148,9 @@ class _VaultScreenState extends State<VaultScreen> {
                     localizations.vaultTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleLarge,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   if (showRepoName)
                     Text(
@@ -444,7 +446,6 @@ class _VaultScreenState extends State<VaultScreen> {
     final manageRepository = _manageRepository;
     final action = await showParsAdaptiveDetail<_EntryDetailAction>(
       context: context,
-      showDragHandle: false,
       builder:
           (sheetContext) => EntryDetailSheet(
             entry: entry,

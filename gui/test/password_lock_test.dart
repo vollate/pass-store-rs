@@ -5,7 +5,7 @@ import 'package:pars_gui/screens/onboarding/onboarding_screen.dart';
 import 'package:pars_gui/screens/security/lock_screen.dart';
 import 'package:pars_gui/services/fake_pars_repository.dart';
 import 'package:pars_gui/services/security_repository.dart';
-import 'package:pars_gui/widgets/gesture_lock_input.dart';
+import 'package:pars_gui/widgets/pin_lock_input.dart';
 
 import 'support/gui_test_harness.dart';
 
@@ -15,7 +15,7 @@ const _password = 'correct horse';
 final _desktop = TargetPlatformVariant.desktop();
 
 void main() {
-  testWidgets('desktop onboarding sets a password instead of a gesture', (
+  testWidgets('desktop onboarding sets a password instead of a PIN', (
     tester,
   ) async {
     await configureGuiTestViewport(tester, viewport: GuiTestViewport.expanded);
@@ -26,7 +26,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Set app password'), findsOneWidget);
-    expect(find.byType(GestureLockInput), findsNothing);
+    expect(find.byType(PinLockInput), findsNothing);
 
     await _enterNewPassword(tester, 'short', 'short');
     expect(find.text('At least 6 characters'), findsOneWidget);
@@ -50,13 +50,13 @@ void main() {
     expect(find.text('Set app password'), findsOneWidget);
   }, variant: _desktop);
 
-  testWidgets('phone onboarding keeps the gesture lock', (tester) async {
+  testWidgets('phone onboarding uses the 6-digit PIN lock', (tester) async {
     await configureGuiTestViewport(tester);
     await tester.pumpWidget(_app(InMemorySecurityRepository()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Set gesture lock'), findsOneWidget);
-    expect(find.byType(GestureLockInput), findsOneWidget);
+    expect(find.text('Set PIN lock'), findsOneWidget);
+    expect(find.byType(PinLockInput), findsOneWidget);
     expect(find.text('Set app password'), findsNothing);
   }, variant: TargetPlatformVariant.mobile());
 
@@ -77,7 +77,7 @@ void main() {
       find.text('Enter your password to open the local app session.'),
       findsOneWidget,
     );
-    expect(find.byType(GestureLockInput), findsNothing);
+    expect(find.byType(PinLockInput), findsNothing);
 
     await tester.enterText(
       find.byKey(const Key('unlock-password-field')),
@@ -98,10 +98,10 @@ void main() {
     expect(security.shouldLock(DateTime.now()), isFalse);
   }, variant: _desktop);
 
-  testWidgets('settings switches a gesture lock to a password', (tester) async {
+  testWidgets('settings switches a PIN lock to a password', (tester) async {
     await configureGuiTestViewport(tester);
     final security = InMemorySecurityRepository(
-      gestureVerifier: GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
+      pinVerifier: PinVerifier.fromPin('123456', iterations: _testIterations),
       passwordIterations: _testIterations,
       onboardingComplete: true,
       lastUnlockedAt: DateTime.now(),
@@ -111,17 +111,17 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.tap(find.text('PIN lock and biometrics'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Use password'));
     await tester.pumpAndSettle();
     await _enterNewPassword(tester, _password, _password);
 
     expect(security.unlockMethod, LocalUnlockMethod.password);
-    expect(security.hasGestureVerifier, isFalse);
+    expect(security.hasPinVerifier, isFalse);
     expect(find.text('Password lock and biometrics'), findsWidgets);
     expect(find.text('Change password'), findsOneWidget);
-    expect(find.text('Use gesture'), findsOneWidget);
+    expect(find.text('Use PIN'), findsOneWidget);
   });
 
   for (final textScale in <double>[1, 2]) {

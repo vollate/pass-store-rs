@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../../app/pars_design_tokens.dart';
 import '../../l10n/l10n.dart';
 import '../../services/security_repository.dart';
-import '../../widgets/gesture_lock_input.dart';
+import '../../widgets/biometric_icon.dart';
+import '../../widgets/pin_lock_input.dart';
+
+typedef _BiometricInfo = ({BiometricUnlockStatus status, BiometricKind kind});
 
 class LockScreen extends StatefulWidget {
   const LockScreen({
@@ -25,10 +28,12 @@ class _LockScreenState extends State<LockScreen> {
   final TextEditingController _password = TextEditingController();
   final FocusNode _passwordFocus = FocusNode();
   String? _error;
-  late Future<BiometricUnlockStatus> _biometricStatus;
+  late Future<_BiometricInfo> _biometricInfo;
   bool _autoBiometricAttempted = false;
   bool _biometricUnlockInProgress = false;
+  bool _pinCheckInProgress = false;
   bool _passwordCheckInProgress = false;
+  int _pinResetSignal = 0;
 
   bool get _usesPassword =>
       widget.securityRepository.unlockMethod == LocalUnlockMethod.password;
@@ -36,7 +41,7 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void initState() {
     super.initState();
-    _biometricStatus = widget.securityRepository.biometricUnlockStatus();
+    _biometricInfo = _loadBiometricInfo();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryAutomaticBiometricUnlock();
     });
@@ -49,119 +54,206 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
+  Future<_BiometricInfo> _loadBiometricInfo() async {
+    final status = await widget.securityRepository.biometricUnlockStatus();
+    final kind = await widget.securityRepository.biometricKind();
+    return (status: status, kind: kind);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final widthBound = (constraints.maxWidth - ParsSpacing.lg * 2)
-                .clamp(0.0, ParsSizes.gestureGrid);
-            final heightBound = (constraints.maxHeight *
-                    ParsSizes.gestureGridViewportFactor)
-                .clamp(ParsSizes.gestureGridMin, ParsSizes.gestureGrid);
-            final gridSize =
-                (widthBound < heightBound ? widthBound : heightBound)
-                    .toDouble();
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(ParsSpacing.lg),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight:
-                      (constraints.maxHeight - ParsSpacing.lg * 2)
-                          .clamp(0, double.infinity)
-                          .toDouble(),
-                ),
-                // The password form is short, so it sits in the middle of the
-                // free space rather than under the title.
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment:
-                      _usesPassword
-                          ? MainAxisAlignment.spaceBetween
-                          : MainAxisAlignment.start,
-                  children: <Widget>[
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const SizedBox(height: ParsSpacing.xl),
-                        Text(
-                          context.l10n.unlockPars,
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: ParsSpacing.xs),
-                        Text(
-                          _usesPassword
-                              ? context.l10n.enterPasswordToUnlock
-                              : context.l10n.drawGestureToUnlock,
-                        ),
-                        const SizedBox(height: ParsSpacing.xxl),
-                      ],
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        FutureBuilder<BiometricUnlockStatus>(
-                          future: _biometricStatus,
-                          builder: (context, snapshot) {
-                            if (snapshot.data !=
-                                BiometricUnlockStatus.available) {
-                              return const SizedBox.shrink();
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: ParsSpacing.lg,
-                              ),
-                              child: Center(
-                                child: FilledButton.icon(
-                                  onPressed:
-                                      _biometricUnlockInProgress
-                                          ? null
-                                          : _unlockWithBiometrics,
-                                  icon: const Icon(Icons.fingerprint),
-                                  label: Text(
-                                    context.l10n.unlockWithBiometrics,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        Center(
-                          child:
-                              _usesPassword
-                                  ? _buildPasswordInput(context)
-                                  : GestureLockInput(
-                                    size: gridSize,
-                                    onCompleted:
-                                        (pattern) => _unlock(context, pattern),
-                                  ),
-                        ),
-                        if (_error != null) ...<Widget>[
-                          const SizedBox(height: ParsSpacing.md),
-                          Center(
-                            child: Semantics(
-                              liveRegion: true,
-                              child: Text(
-                                _error!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+        child: FutureBuilder<_BiometricInfo>(
+          future: _biometricInfo,
+          builder: (context, snapshot) {
+            final biometric = snapshot.data;
+            final biometricAvailable =
+                biometric?.status == BiometricUnlockStatus.available;
+            final biometricKind = biometric?.kind ?? BiometricKind.fingerprint;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final minHeight =
+                    (constraints.maxHeight - ParsSpacing.lg * 2)
+                        .clamp(0, double.infinity)
+                        .toDouble();
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(ParsSpacing.lg),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: minHeight),
+                    child:
+                        _usesPassword
+                            ? _buildPasswordLayout(
+                              context,
+                              biometricAvailable: biometricAvailable,
+                              biometricKind: biometricKind,
+                            )
+                            : _buildPinLayout(
+                              context,
+                              biometricAvailable: biometricAvailable,
+                              biometricKind: biometricKind,
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: ParsSpacing.xl),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPinLayout(
+    BuildContext context, {
+    required bool biometricAvailable,
+    required BiometricKind biometricKind,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(top: ParsSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                width: ParsSizes.lockBadge,
+                height: ParsSizes.lockBadge,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(ParsRadii.card),
+                ),
+                child: Icon(
+                  Icons.lock_outline,
+                  size: ParsSizes.icon,
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(height: ParsSpacing.md),
+              Text(
+                context.l10n.unlockPars,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: ParsSpacing.xs),
+              Text(
+                context.l10n.enterPinToUnlock,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: ParsSpacing.xl),
+          child: Center(
+            child: PinLockInput(
+              enabled: !_pinCheckInProgress,
+              hasError: _error != null,
+              resetSignal: _pinResetSignal,
+              biometricKind: biometricAvailable ? biometricKind : null,
+              onBiometricPressed:
+                  biometricAvailable ? _unlockWithBiometrics : null,
+              biometricEnabled:
+                  !_biometricUnlockInProgress && !_pinCheckInProgress,
+              biometricTooltip: context.l10n.unlockWithBiometrics,
+              statusWidget: _buildErrorNotice(context),
+              onChanged: (value) {
+                if (_error != null && value.isNotEmpty) {
+                  setState(() => _error = null);
+                }
+              },
+              onCompleted: (pin) => _unlockWithPin(context, pin),
+            ),
+          ),
+        ),
+        const SizedBox(height: ParsSpacing.sm),
+      ],
+    );
+  }
+
+  Widget _buildPasswordLayout(
+    BuildContext context, {
+    required bool biometricAvailable,
+    required BiometricKind biometricKind,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: <Widget>[
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const SizedBox(height: ParsSpacing.xl),
+            Text(
+              context.l10n.unlockPars,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: ParsSpacing.xs),
+            Text(context.l10n.enterPasswordToUnlock),
+            const SizedBox(height: ParsSpacing.xxl),
+          ],
+        ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Center(child: _buildPasswordInput(context)),
+            if (_error != null) ...<Widget>[
+              const SizedBox(height: ParsSpacing.md),
+              Center(child: _buildErrorNotice(context)!),
+            ],
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(
+            top: ParsSpacing.xl,
+            bottom: ParsSpacing.md,
+          ),
+          child:
+              biometricAvailable
+                  ? Center(
+                    child: FilledButton.tonalIcon(
+                      key: const Key('password-biometric-button'),
+                      onPressed:
+                          _biometricUnlockInProgress
+                              ? null
+                              : _unlockWithBiometrics,
+                      icon: BiometricIcon(kind: biometricKind),
+                      label: Text(
+                        context.l10n.unlockWithBiometrics,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+                  : const SizedBox(height: ParsSpacing.xl),
+        ),
+      ],
+    );
+  }
+
+  Widget? _buildErrorNotice(BuildContext context) {
+    final error = _error;
+    if (error == null) return null;
+    return Semantics(
+      liveRegion: true,
+      child: Text(
+        error,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.error,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -226,13 +318,22 @@ class _LockScreenState extends State<LockScreen> {
     }
   }
 
-  Future<void> _unlock(BuildContext context, List<int> pattern) async {
-    final isValid = await widget.securityRepository.verifyGesture(pattern);
+  Future<void> _unlockWithPin(BuildContext context, String pin) async {
+    if (_pinCheckInProgress) return;
+    setState(() {
+      _error = null;
+      _pinCheckInProgress = true;
+    });
+    final isValid = await widget.securityRepository.verifyPin(pin);
     if (!context.mounted) {
       return;
     }
     if (!isValid) {
-      setState(() => _error = context.l10n.gestureDidNotMatch);
+      setState(() {
+        _error = context.l10n.incorrectPin;
+        _pinCheckInProgress = false;
+        _pinResetSignal += 1;
+      });
       return;
     }
     await widget.securityRepository.markUnlocked(DateTime.now());
@@ -246,8 +347,8 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
     _autoBiometricAttempted = true;
-    final status = await _biometricStatus;
-    if (!mounted || status != BiometricUnlockStatus.available) {
+    final info = await _biometricInfo;
+    if (!mounted || info.status != BiometricUnlockStatus.available) {
       return;
     }
     await _unlockWithBiometrics();

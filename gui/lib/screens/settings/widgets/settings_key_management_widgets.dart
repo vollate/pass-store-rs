@@ -319,7 +319,9 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
             title: title,
             content: SelectableText(
               value,
-              style: const TextStyle(fontFamily: 'monospace'),
+              style: ParsTheme.mono(
+                Theme.of(context).textTheme.bodyMedium ?? const TextStyle(),
+              ),
             ),
             primary: ParsDialogAction(
               label: context.l10n.close,

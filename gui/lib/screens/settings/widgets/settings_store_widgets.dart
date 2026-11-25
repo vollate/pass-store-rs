@@ -140,64 +140,106 @@ class _PasswordStoreSheetBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final current = store;
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         if (current == null)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.folder_off_outlined),
-            title: Text(context.l10n.noPasswordStoreConfigured),
-            subtitle: Text(context.l10n.storeFirstSetupSubtitle),
+          AppSectionBox(
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              ParsSectionRow(
+                leading: const ParsSectionRowIcon(
+                  icon: Icons.folder_off_outlined,
+                ),
+                title: context.l10n.noPasswordStoreConfigured,
+                subtitle: context.l10n.storeFirstSetupSubtitle,
+              ),
+            ],
           )
         else ...<Widget>[
-          Card(
-            child: ListTile(
-              leading: Icon(
-                current.exists
-                    ? Icons.folder_outlined
-                    : Icons.folder_off_outlined,
+          AppSectionBox(
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              ParsSectionRow(
+                leading: ParsSectionRowIcon(
+                  icon:
+                      current.exists
+                          ? Icons.folder_outlined
+                          : Icons.folder_off_outlined,
+                  color: colorScheme.primary,
+                ),
+                title: current.name,
+                subtitle: _storeState(context, current),
+                trailing: Padding(
+                  padding: const EdgeInsets.only(right: ParsSpacing.sm),
+                  child: Icon(
+                    current.exists && !current.issues.contains('git_invalid')
+                        ? Icons.check_circle_outline
+                        : Icons.warning_amber_rounded,
+                    color:
+                        current.exists &&
+                                !current.issues.contains('git_invalid')
+                            ? context.parsColors.success
+                            : context.parsColors.warning,
+                  ),
+                ),
               ),
-              title: Text(current.name),
-              subtitle: Text(_storeState(context, current)),
-              trailing: Icon(
-                current.exists && !current.issues.contains('git_invalid')
-                    ? Icons.check_circle_outline
-                    : Icons.warning_amber_rounded,
-              ),
-            ),
+            ],
           ),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
+            shape: const Border(),
+            collapsedShape: const Border(),
             title: Text(context.l10n.details),
             children: <Widget>[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(context.l10n.storeFolder),
-                subtitle: SelectableText(current.root),
+              AppSectionBox(
+                padding: EdgeInsets.zero,
+                children: <Widget>[
+                  ParsSectionRow(
+                    leading: const ParsSectionRowIcon(
+                      icon: Icons.folder_open_outlined,
+                    ),
+                    title: context.l10n.storeFolder,
+                    subtitle: current.root,
+                    subtitleStyle: ParsTheme.mono(
+                      Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ) ??
+                          const TextStyle(),
+                    ),
+                  ),
+                  if (current.issues.isNotEmpty)
+                    ParsSectionRow(
+                      leading: ParsSectionRowIcon(
+                        icon: Icons.warning_amber_rounded,
+                        color: context.parsColors.warning,
+                      ),
+                      title: context.l10n.storeIssues,
+                      subtitle: _repairSummary(context, current),
+                    ),
+                ],
               ),
-              if (current.issues.isNotEmpty)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(context.l10n.storeIssues),
-                  subtitle: Text(_repairSummary(context, current)),
-                ),
             ],
           ),
           const SizedBox(height: ParsSpacing.md),
-          FilledButton.tonalIcon(
-            onPressed: () => onRemove(current),
-            icon: Icon(
-              isAppManaged(current.root)
-                  ? Icons.delete_outline
-                  : Icons.link_off,
-            ),
-            label: Text(
-              isAppManaged(current.root)
-                  ? context.l10n.deleteAppCopy
-                  : context.l10n.disconnectStore,
-            ),
+          ParsButtonGrid(
+            children: <Widget>[
+              FilledButton.tonalIcon(
+                onPressed: () => onRemove(current),
+                icon: Icon(
+                  isAppManaged(current.root)
+                      ? Icons.delete_outline
+                      : Icons.link_off,
+                ),
+                label: Text(
+                  isAppManaged(current.root)
+                      ? context.l10n.deleteAppCopy
+                      : context.l10n.disconnectStore,
+                ),
+              ),
+            ],
           ),
         ],
       ],

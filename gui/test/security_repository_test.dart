@@ -3,30 +3,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pars_gui/services/security_repository.dart';
 
 void main() {
-  group('GestureVerifier', () {
-    test('matches only the captured gesture order', () {
-      final verifier = GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]);
+  group('PinVerifier', () {
+    test('salts every verifier and round-trips through storage', () {
+      final first = PinVerifier.fromPin('123456', iterations: 1000);
+      final second = PinVerifier.fromPin('123456', iterations: 1000);
 
-      expect(verifier.matches(const <int>[0, 1, 2, 5]), isTrue);
-      expect(verifier.matches(const <int>[0, 1, 5, 2]), isFalse);
+      expect(first.value, isNot(second.value));
+      expect(first.value, isNot(contains('123456')));
+      final restored = PinVerifier.fromStoredValue(first.value);
+      expect(restored.matches('123456'), isTrue);
+      expect(restored.matches('123457'), isFalse);
+      expect(restored.matches('12345'), isFalse);
+      expect(restored.matches('abcdef'), isFalse);
     });
 
-    test('rejects short or immediately repeated gestures', () {
-      expect(
-        () => GestureVerifier.fromPattern(const <int>[0, 1, 2]),
-        throwsArgumentError,
-      );
-      expect(
-        () => GestureVerifier.fromPattern(const <int>[0, 1, 1, 2]),
-        throwsArgumentError,
-      );
-    });
-
-    test('allows deliberate node jumps in gesture passwords', () {
-      final verifier = GestureVerifier.fromPattern(const <int>[1, 0, 1, 2]);
-
-      expect(verifier.matches(const <int>[1, 0, 1, 2]), isTrue);
-      expect(verifier.matches(const <int>[1, 1, 1, 2]), isFalse);
+    test('rejects invalid PIN lengths, non-digits, and malformed values', () {
+      for (final invalid in <String>['', '12345', '1234567', '12345a', ' 12345']) {
+        expect(
+          () => PinVerifier.fromPin(invalid, iterations: 1000),
+          throwsArgumentError,
+          reason: invalid,
+        );
+      }
+      for (final value in <String>[
+        '',
+        'pbkdf2-sha256',
+        r'md5$1$c2FsdA==$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+        r'pbkdf2-sha256$0$c2FsdA==$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+        r'pbkdf2-sha256$4096$$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+        r'pbkdf2-sha256$4096$c2FsdA==$c2hvcnQ=',
+        r'pbkdf2-sha256$4096$not base64$xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=',
+      ]) {
+        expect(
+          () => PinVerifier.fromStoredValue(value),
+          throwsArgumentError,
+          reason: value,
+        );
+      }
     });
   });
 
@@ -81,7 +94,7 @@ void main() {
   group('platformDefaultUnlockMethod', () {
     tearDown(() => debugDefaultTargetPlatformOverride = null);
 
-    test('uses a password on desktops and a gesture on phones and tablets', () {
+    test('uses a password on desktops and a PIN on phones and tablets', () {
       for (final platform in TargetPlatform.values) {
         debugDefaultTargetPlatformOverride = platform;
         final desktop = <TargetPlatform>{
@@ -91,7 +104,7 @@ void main() {
         }.contains(platform);
         expect(
           platformDefaultUnlockMethod(),
-          desktop ? LocalUnlockMethod.password : LocalUnlockMethod.gesture,
+          desktop ? LocalUnlockMethod.password : LocalUnlockMethod.pin,
           reason: platform.name,
         );
       }
@@ -100,44 +113,36 @@ void main() {
 
   group('InMemorySecurityRepository', () {
     test('saving one unlock method replaces the other', () async {
-      final repository = InMemorySecurityRepository(
-        gestureVerifier: GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-        passwordIterations: 1000,
+      final repository = InMemorySecurityRepository.withPin(
+        '123456',
+        onboardingComplete: false,
       );
 
-      expect(repository.unlockMethod, LocalUnlockMethod.gesture);
+      expect(repository.unlockMethod, LocalUnlockMethod.pin);
       await repository.savePassword('correct horse');
       expect(repository.unlockMethod, LocalUnlockMethod.password);
-      expect(repository.hasGestureVerifier, isFalse);
-      expect(await repository.verifyGesture(const <int>[0, 1, 2, 5]), isFalse);
+      expect(repository.hasPinVerifier, isFalse);
+      expect(await repository.verifyPin('123456'), isFalse);
       expect(repository.shouldLock(DateTime(2026)), isTrue);
 
-      await repository.saveGestureVerifier(
-        GestureVerifier.fromPattern(const <int>[2, 1, 0, 3]),
-      );
-      expect(repository.unlockMethod, LocalUnlockMethod.gesture);
+      await repository.savePin('654321');
+      expect(repository.unlockMethod, LocalUnlockMethod.pin);
       expect(repository.hasPasswordVerifier, isFalse);
       expect(await repository.verifyPassword('correct horse'), isFalse);
+      expect(await repository.verifyPin('654321'), isTrue);
     });
 
     test('locks when no active app session exists', () {
-      final repository = InMemorySecurityRepository.withPattern(const <int>[
-        0,
-        1,
-        2,
-        5,
-      ]);
+      final repository = InMemorySecurityRepository.withPin('123456');
 
       expect(repository.shouldLock(DateTime(2026)), isTrue);
     });
 
     test('locks after auto-lock timeout', () async {
-      final repository = InMemorySecurityRepository.withPattern(const <int>[
-        0,
-        1,
-        2,
-        5,
-      ], autoLockTimeout: const Duration(minutes: 5));
+      final repository = InMemorySecurityRepository.withPin(
+        '123456',
+        autoLockTimeout: const Duration(minutes: 5),
+      );
       await repository.markUnlocked(DateTime(2026));
 
       expect(repository.shouldLock(DateTime(2026, 1, 1, 0, 4)), isFalse);
@@ -145,12 +150,10 @@ void main() {
     });
 
     test('never auto-locks when timeout is disabled', () async {
-      final repository = InMemorySecurityRepository.withPattern(const <int>[
-        0,
-        1,
-        2,
-        5,
-      ], autoLockTimeout: Duration.zero);
+      final repository = InMemorySecurityRepository.withPin(
+        '123456',
+        autoLockTimeout: Duration.zero,
+      );
       await repository.markUnlocked(DateTime(2026));
 
       expect(repository.shouldLock(DateTime(2026, 1, 2)), isFalse);
@@ -158,49 +161,44 @@ void main() {
   });
 
   group('SecureStorageSecurityRepository', () {
-    test('persists gesture verifier and settings in secure storage', () async {
+    test('persists PIN verifier and settings in secure storage', () async {
       final storage = _FakeSecureStorageAdapter();
       final repository = await SecureStorageSecurityRepository.load(
         storage: storage,
         biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
-      await repository.saveGestureVerifier(
-        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-      );
+      await repository.savePin('123456');
       await repository.setLockOnResume(true);
       await repository.setAutoLockTimeout(Duration.zero);
 
+      expect(storage.values.any((value) => value.contains('123456')), isFalse);
       final reloaded = await SecureStorageSecurityRepository.load(
         storage: storage,
         biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
-      expect(reloaded.hasGestureVerifier, isTrue);
-      expect(await reloaded.verifyGesture(const <int>[0, 1, 2, 5]), isTrue);
-      expect(await reloaded.verifyGesture(const <int>[0, 1, 5, 2]), isFalse);
+      expect(reloaded.hasPinVerifier, isTrue);
+      expect(reloaded.unlockMethod, LocalUnlockMethod.pin);
+      expect(await reloaded.verifyPin('123456'), isTrue);
+      expect(await reloaded.verifyPin('123457'), isFalse);
       expect(reloaded.lockOnResume, isTrue);
       expect(reloaded.autoLockTimeout, Duration.zero);
       await reloaded.markUnlocked(DateTime(2026));
       expect(reloaded.shouldLock(DateTime(2026, 1, 2)), isFalse);
     });
 
-    test('persists a password verifier and drops the gesture', () async {
+    test('persists a password verifier and drops the PIN', () async {
       final storage = _FakeSecureStorageAdapter();
       final repository = await SecureStorageSecurityRepository.load(
         storage: storage,
         biometricAuth: _FakeBiometricAuthAdapter(),
       );
-      await repository.saveGestureVerifier(
-        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-      );
+      await repository.savePin('123456');
 
       await repository.savePassword('correct horse');
 
-      expect(
-        storage.keys,
-        isNot(contains('pars.security.gesture_verifier.v1')),
-      );
+      expect(storage.keys, isNot(contains('pars.security.pin_verifier.v1')));
       expect(
         storage.values.any((value) => value.contains('correct horse')),
         isFalse,
@@ -210,22 +208,28 @@ void main() {
         biometricAuth: _FakeBiometricAuthAdapter(),
       );
       expect(reloaded.unlockMethod, LocalUnlockMethod.password);
-      expect(reloaded.hasGestureVerifier, isFalse);
+      expect(reloaded.hasPinVerifier, isFalse);
       expect(await reloaded.verifyPassword('correct horse'), isTrue);
       expect(await reloaded.verifyPassword('correct horsf'), isFalse);
       expect(reloaded.shouldLock(DateTime(2026)), isTrue);
 
-      await reloaded.saveGestureVerifier(
-        GestureVerifier.fromPattern(const <int>[2, 1, 0, 3]),
-      );
+      await reloaded.savePin('654321');
       expect(
         storage.keys,
         isNot(contains('pars.security.password_verifier.v1')),
       );
     });
 
-    test('clears a corrupted password verifier on load', () async {
+    test('clears legacy gesture verifier and corrupted verifiers on load', () async {
       final storage = _FakeSecureStorageAdapter();
+      await storage.write(
+        key: 'pars.security.gesture_verifier.v1',
+        value: 'deadbeef',
+      );
+      await storage.write(
+        key: 'pars.security.pin_verifier.v1',
+        value: 'garbage',
+      );
       await storage.write(
         key: 'pars.security.password_verifier.v1',
         value: 'garbage',
@@ -239,8 +243,33 @@ void main() {
       expect(repository.unlockMethod, isNull);
       expect(
         storage.keys,
+        isNot(contains('pars.security.gesture_verifier.v1')),
+      );
+      expect(storage.keys, isNot(contains('pars.security.pin_verifier.v1')));
+      expect(
+        storage.keys,
         isNot(contains('pars.security.password_verifier.v1')),
       );
+    });
+
+    test('reports active biometric kind from the biometric adapter', () async {
+      final faceRepo = await SecureStorageSecurityRepository.load(
+        storage: _FakeSecureStorageAdapter(),
+        biometricAuth: _FakeBiometricAuthAdapter(
+          available: true,
+          kind: BiometricKind.face,
+        ),
+      );
+      final fingerRepo = await SecureStorageSecurityRepository.load(
+        storage: _FakeSecureStorageAdapter(),
+        biometricAuth: _FakeBiometricAuthAdapter(
+          available: true,
+          kind: BiometricKind.fingerprint,
+        ),
+      );
+
+      expect(await faceRepo.biometricKind(), BiometricKind.face);
+      expect(await fingerRepo.biometricKind(), BiometricKind.fingerprint);
     });
 
     test('persists PGP session expiration setting', () async {
@@ -295,9 +324,7 @@ void main() {
         biometricAuth: _FakeBiometricAuthAdapter(),
       );
 
-      await repository.saveGestureVerifier(
-        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-      );
+      await repository.savePin('123456');
       await repository.markUnlocked(DateTime(2026));
 
       final reloaded = await SecureStorageSecurityRepository.load(
@@ -366,9 +393,7 @@ void main() {
         biometricAuth: biometrics,
       );
 
-      await repository.saveGestureVerifier(
-        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-      );
+      await repository.savePin('123456');
       await repository.setBiometricUnlockEnabled(true);
 
       expect(
@@ -389,9 +414,7 @@ void main() {
           biometricAuth: biometrics,
         );
 
-        await repository.saveGestureVerifier(
-          GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-        );
+        await repository.savePin('123456');
         await repository.setBiometricUnlockEnabled(true);
         await repository.savePgpPassphrase(
           fingerprint: 'ABC123',
@@ -501,9 +524,7 @@ void main() {
         biometricAuth: biometrics,
       );
 
-      await repository.saveGestureVerifier(
-        GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-      );
+      await repository.savePin('123456');
       await repository.setBiometricUnlockEnabled(true);
 
       expect(await repository.unlockWithBiometrics(), isFalse);
@@ -669,17 +690,22 @@ class _FakeSecureStorageAdapter implements SecureStorageAdapter {
 class _FakeBiometricAuthAdapter implements BiometricAuthAdapter {
   _FakeBiometricAuthAdapter({
     this.available = false,
+    this.kind = BiometricKind.fingerprint,
     this.authenticateResult = true,
     List<bool>? authenticateResults,
   }) : _authenticateResults = authenticateResults ?? const <bool>[];
 
   final bool available;
+  final BiometricKind kind;
   final bool authenticateResult;
   final List<bool> _authenticateResults;
   int authenticateCount = 0;
 
   @override
   Future<bool> isAvailable() async => available;
+
+  @override
+  Future<BiometricKind> biometricKind() async => kind;
 
   @override
   Future<bool> authenticate() async {

@@ -123,32 +123,36 @@ class _RuntimeDiagnosticsSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return AppSectionBox(
+      padding: EdgeInsets.zero,
       children: <Widget>[
         _DiagnosticRow(
+          icon: Icons.hub_outlined,
           label: context.l10n.bridgeLoadedLabel,
-          value:
-              diagnostics.bridgeLoaded ? context.l10n.yes : context.l10n.no,
+          value: diagnostics.bridgeLoaded ? context.l10n.yes : context.l10n.no,
         ),
         _DiagnosticRow(
+          icon: Icons.info_outline,
           label: context.l10n.coreVersionLabel,
           value: diagnostics.coreVersion,
         ),
         _DiagnosticRow(
+          icon: Icons.memory_outlined,
           label: context.l10n.nativeLibraryLabel,
           value: diagnostics.nativeLibrary,
         ),
         _DiagnosticRow(
+          icon: Icons.enhanced_encryption_outlined,
           label: context.l10n.pgpBackendLabel,
           value: diagnostics.pgpBackend,
         ),
         _DiagnosticRow(
+          icon: Icons.account_tree_outlined,
           label: context.l10n.gitBackendLabel,
           value: diagnostics.gitBackend,
         ),
         _DiagnosticRow(
+          icon: Icons.key_outlined,
           label: context.l10n.keyStorageBackendLabel,
           value: diagnostics.keyStorageBackend,
         ),
@@ -188,17 +192,34 @@ class _SecuritySettingsSheetBodyState
     Duration(hours: 1),
   ];
 
+  late Future<({BiometricUnlockStatus status, BiometricKind kind})>
+  _biometricsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _biometricsFuture = _loadBiometrics();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SecuritySettingsSheetBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.securityRepository != widget.securityRepository) {
+      _biometricsFuture = _loadBiometrics();
+    }
+  }
+
   LocalUnlockMethod get _currentMethod =>
       widget.securityRepository.unlockMethod ?? platformDefaultUnlockMethod();
 
   Future<void> _openMethodEditor(LocalUnlockMethod method) async {
     final l10n = context.l10n;
     final saved = await switch (method) {
-      LocalUnlockMethod.gesture => showParsAdaptivePage<bool>(
+      LocalUnlockMethod.pin => showParsAdaptivePage<bool>(
         context: context,
-        title: l10n.changeGesture,
+        title: l10n.changePin,
         builder:
-            (editorContext) => _GestureChangeSheetBody(
+            (editorContext) => _PinChangeSheetBody(
               securityRepository: widget.securityRepository,
               onSaved: () {
                 if (editorContext.mounted) {
@@ -225,10 +246,15 @@ class _SecuritySettingsSheetBodyState
     widget.onSecuritySettingsChanged?.call();
     setState(() {});
     widget.onNotify(
-      method == LocalUnlockMethod.gesture
-          ? l10n.gestureConfirmed
-          : l10n.passwordSaved,
+      method == LocalUnlockMethod.pin ? l10n.pinConfirmed : l10n.passwordSaved,
     );
+  }
+
+  Future<({BiometricUnlockStatus status, BiometricKind kind})>
+  _loadBiometrics() async {
+    final status = await widget.securityRepository.biometricUnlockStatus();
+    final kind = await widget.securityRepository.biometricKind();
+    return (status: status, kind: kind);
   }
 
   @override
@@ -238,7 +264,7 @@ class _SecuritySettingsSheetBodyState
       title:
           usesPassword
               ? context.l10n.passwordBiometricsTitle
-              : context.l10n.gestureBiometricsTitle,
+              : context.l10n.pinBiometricsTitle,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,117 +275,146 @@ class _SecuritySettingsSheetBodyState
                 label:
                     usesPassword
                         ? context.l10n.changePassword
-                        : context.l10n.changeGesture,
-                icon: usesPassword ? Icons.password : Icons.pattern,
+                        : context.l10n.changePin,
+                icon: usesPassword ? Icons.password : Icons.dialpad,
                 onPressed: () => _openMethodEditor(_currentMethod),
               ),
               ParsActionItem(
                 label:
                     usesPassword
-                        ? context.l10n.useGestureLock
+                        ? context.l10n.usePinLock
                         : context.l10n.usePasswordLock,
-                icon: usesPassword ? Icons.pattern : Icons.password,
+                icon: usesPassword ? Icons.dialpad : Icons.password,
                 onPressed:
                     () => _openMethodEditor(
                       usesPassword
-                          ? LocalUnlockMethod.gesture
+                          ? LocalUnlockMethod.pin
                           : LocalUnlockMethod.password,
                     ),
               ),
             ],
           ),
-            const SizedBox(height: ParsSpacing.xs),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.requireUnlockOnResume),
-              subtitle: Text(
-                usesPassword
-                    ? context.l10n.passwordFallbackDescription
-                    : context.l10n.gestureFallbackDescription,
-              ),
-              value: widget.securityRepository.lockOnResume,
-              onChanged: (value) async {
+          const SizedBox(height: ParsSpacing.md),
+          FutureBuilder<({BiometricUnlockStatus status, BiometricKind kind})>(
+            future: _biometricsFuture,
+            builder: (context, snapshot) {
+              final status =
+                  snapshot.data?.status ?? BiometricUnlockStatus.unavailable;
+              final biometricKind =
+                  snapshot.data?.kind ?? BiometricKind.fingerprint;
+              final biometricAvailable =
+                  status != BiometricUnlockStatus.unavailable;
+              final biometricValue =
+                  status == BiometricUnlockStatus.available &&
+                  widget.securityRepository.biometricUnlockEnabled;
+
+              Future<void> toggleLockOnResume(bool value) async {
                 await widget.securityRepository.setLockOnResume(value);
                 widget.onSecuritySettingsChanged?.call();
                 setState(() {});
-              },
-            ),
-            FutureBuilder<BiometricUnlockStatus>(
-              future: widget.securityRepository.biometricUnlockStatus(),
-              builder: (context, snapshot) {
-                final status =
-                    snapshot.data ?? BiometricUnlockStatus.unavailable;
-                return SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(context.l10n.biometricUnlock),
-                  subtitle: Text(_biometricSubtitle(context.l10n, status)),
-                  value:
-                      status == BiometricUnlockStatus.available &&
-                      widget.securityRepository.biometricUnlockEnabled,
-                  onChanged:
-                      status == BiometricUnlockStatus.unavailable
-                          ? null
-                          : (value) async {
-                            final localizations = context.l10n;
-                            try {
-                              await widget.runDuringSystemAuthentication(
-                                () => widget.securityRepository
-                                    .setBiometricUnlockEnabled(value),
-                              );
-                              widget.onSecuritySettingsChanged?.call();
-                            } catch (error) {
-                              final message =
-                                  UiProblem.fromError(
-                                    localizations,
-                                    error,
-                                  ).summary;
-                              widget.onNotify(message);
-                            }
-                            if (mounted) {
-                              setState(() {});
-                            }
-                          },
-                );
-              },
-            ),
-            const SizedBox(height: ParsSpacing.xs),
-            Text(
-              context.l10n.autoLockTimeout,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: ParsSpacing.xs),
-            Wrap(
-              spacing: ParsSpacing.xs,
-              runSpacing: ParsSpacing.xs,
-              children: <Widget>[
-                for (final timeout in _timeoutOptions)
-                  ChoiceChip(
-                    label: Text(_timeoutLabel(context.l10n, timeout)),
-                    selected:
-                        widget.securityRepository.autoLockTimeout == timeout,
-                    onSelected: (_) async {
-                      await widget.securityRepository.setAutoLockTimeout(
-                        timeout,
-                      );
-                      widget.onSecuritySettingsChanged?.call();
-                      setState(() {});
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: ParsSpacing.sm),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await widget.securityRepository.setOnboardingComplete(false);
-              widget.onOnboardingReset?.call();
-              if (context.mounted) {
-                Navigator.of(context).pop();
               }
+
+              Future<void> toggleBiometric(bool value) async {
+                final localizations = context.l10n;
+                try {
+                  await widget.runDuringSystemAuthentication(
+                    () => widget.securityRepository.setBiometricUnlockEnabled(
+                      value,
+                    ),
+                  );
+                  widget.onSecuritySettingsChanged?.call();
+                } catch (error) {
+                  final message =
+                      UiProblem.fromError(localizations, error).summary;
+                  widget.onNotify(message);
+                }
+                if (mounted) {
+                  setState(() {
+                    _biometricsFuture = _loadBiometrics();
+                  });
+                }
+              }
+
+              return AppSectionBox(
+                padding: EdgeInsets.zero,
+                children: <Widget>[
+                  ParsSectionRow(
+                    leading: const ParsSectionRowIcon(
+                      icon: Icons.lock_clock_outlined,
+                    ),
+                    title: context.l10n.requireUnlockOnResume,
+                    subtitle:
+                        usesPassword
+                            ? context.l10n.passwordFallbackDescription
+                            : context.l10n.pinFallbackDescription,
+                    onTap:
+                        () => toggleLockOnResume(
+                          !widget.securityRepository.lockOnResume,
+                        ),
+                    trailing: Switch(
+                      value: widget.securityRepository.lockOnResume,
+                      onChanged: toggleLockOnResume,
+                    ),
+                  ),
+                  ParsSectionRow(
+                    leading: ParsSectionRowIcon.custom(
+                      child: BiometricIcon(kind: biometricKind),
+                    ),
+                    title: context.l10n.biometricUnlock,
+                    subtitle: _biometricSubtitle(context.l10n, status),
+                    onTap:
+                        biometricAvailable
+                            ? () => toggleBiometric(!biometricValue)
+                            : null,
+                    trailing: Switch(
+                      value: biometricValue,
+                      onChanged: biometricAvailable ? toggleBiometric : null,
+                    ),
+                  ),
+                ],
+              );
             },
-            icon: const Icon(Icons.restart_alt),
-            label: Text(context.l10n.resetOnboarding),
+          ),
+          const SizedBox(height: ParsSpacing.md),
+          Text(
+            context.l10n.autoLockTimeout,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: ParsSpacing.xs),
+          Wrap(
+            spacing: ParsSpacing.xs,
+            runSpacing: ParsSpacing.xs,
+            children: <Widget>[
+              for (final timeout in _timeoutOptions)
+                ChoiceChip(
+                  label: Text(_timeoutLabel(context.l10n, timeout)),
+                  selected:
+                      widget.securityRepository.autoLockTimeout == timeout,
+                  onSelected: (_) async {
+                    await widget.securityRepository.setAutoLockTimeout(timeout);
+                    widget.onSecuritySettingsChanged?.call();
+                    setState(() {});
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: ParsSpacing.md),
+          ParsButtonGrid(
+            children: <Widget>[
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await widget.securityRepository.setOnboardingComplete(false);
+                  widget.onOnboardingReset?.call();
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                icon: const Icon(Icons.restart_alt),
+                label: Text(context.l10n.resetOnboarding),
+              ),
+            ],
           ),
         ],
       ),
@@ -389,8 +444,8 @@ class _SecuritySettingsSheetBodyState
   }
 }
 
-class _GestureChangeSheetBody extends StatelessWidget {
-  const _GestureChangeSheetBody({
+class _PinChangeSheetBody extends StatelessWidget {
+  const _PinChangeSheetBody({
     required this.securityRepository,
     required this.onSaved,
   });
@@ -406,10 +461,10 @@ class _GestureChangeSheetBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(context.l10n.drawConfirmGesture),
+          Text(context.l10n.enterConfirmPin),
           const SizedBox(height: ParsSpacing.sm),
           Expanded(
-            child: GestureSetupPanel(
+            child: PinSetupPanel(
               securityRepository: securityRepository,
               onSaved: onSaved,
             ),
@@ -536,35 +591,50 @@ class _PgpPassphraseStorageSheetBodyState
 
   @override
   Widget build(BuildContext context) {
+    Future<void> toggleStorage(bool value) async {
+      await widget.securityRepository.setPgpPassphraseStorageEnabled(value);
+      if (!value) {
+        await _dropEncryptedLoginAndUrlIndex();
+      }
+      widget.onSecuritySettingsChanged?.call();
+      if (mounted) setState(() {});
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.storePgpPassphrase),
-              subtitle: Text(context.l10n.savedInSecureStorage),
-              value: widget.securityRepository.pgpPassphraseStorageEnabled,
-              onChanged: (value) async {
-                await widget.securityRepository.setPgpPassphraseStorageEnabled(
-                  value,
-                );
-                if (!value) {
-                  await _dropEncryptedLoginAndUrlIndex();
-                }
-                widget.onSecuritySettingsChanged?.call();
-                setState(() {});
-              },
+        AppSectionBox(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            ParsSectionRow(
+              leading: const ParsSectionRowIcon(icon: Icons.key_outlined),
+              title: context.l10n.storePgpPassphrase,
+              subtitle: context.l10n.savedInSecureStorage,
+              onTap:
+                  () => toggleStorage(
+                    !widget.securityRepository.pgpPassphraseStorageEnabled,
+                  ),
+              trailing: Switch(
+                value: widget.securityRepository.pgpPassphraseStorageEnabled,
+                onChanged: toggleStorage,
+              ),
             ),
-            const SizedBox(height: ParsSpacing.xs),
-            if (widget.privatePgpKeys.isEmpty)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.key_off_outlined),
-                title: Text(context.l10n.noPrivatePgpKeys),
-                subtitle: Text(context.l10n.createPrivatePgpKeyFirst),
-              )
-            else
+          ],
+        ),
+        const SizedBox(height: ParsSpacing.sm),
+        if (widget.privatePgpKeys.isEmpty)
+          AppSectionBox(
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              ParsSectionRow(
+                leading: const ParsSectionRowIcon(icon: Icons.key_off_outlined),
+                title: context.l10n.noPrivatePgpKeys,
+                subtitle: context.l10n.createPrivatePgpKeyFirst,
+              ),
+            ],
+          )
+        else
               DropdownButtonFormField<String>(
                 key: const Key('pgp-passphrase-key-dropdown'),
                 initialValue: _selectedFingerprint,

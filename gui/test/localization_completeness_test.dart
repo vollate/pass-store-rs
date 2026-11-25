@@ -24,9 +24,6 @@ void main() {
 
   test('production Text literals are classified machine data only', () {
     final allowed = <String, List<String>>{
-      'lib/widgets/pgp_key_import_body.dart': <String>[
-        r'${_kindLabel(context.l10n, inspection.kind)}\n',
-      ],
       'lib/widgets/path_picker_row.dart': <String>[r'$pathPrefix: $path'],
       'lib/screens/settings/widgets/settings_git_widgets.dart': <String>[
         'git',

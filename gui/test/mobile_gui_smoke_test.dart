@@ -26,7 +26,6 @@ import 'package:pars_gui/screens/vault/entry_detail_sheet.dart';
 import 'package:pars_gui/screens/vault/vault_screen.dart';
 import 'package:pars_gui/widgets/app_notification.dart';
 import 'package:pars_gui/widgets/app_section.dart';
-import 'package:pars_gui/widgets/gesture_lock_input.dart';
 
 const _testPgpFingerprint = '3A8E 9C12 77FA 22D1 90BD 48AA A991 D3B4 A702 91EF';
 const _publicKeyInspection = PgpKeyInspection(
@@ -72,8 +71,8 @@ void main() {
   testWidgets('shows onboarding before entering the vault', (tester) async {
     await tester.pumpWidget(ParsGuiApp.fake());
 
-    expect(find.text('Set gesture lock'), findsOneWidget);
-    expect(find.text('Draw at least 4 dots.'), findsOneWidget);
+    expect(find.text('Set PIN lock'), findsOneWidget);
+    expect(find.text('Enter a 6-digit PIN.'), findsOneWidget);
   });
 
   testWidgets('enters the mobile shell after onboarding', (tester) async {
@@ -97,8 +96,8 @@ void main() {
         settingsRepository: repository,
         keyRepository: repository,
         gitRepository: repository,
-        securityRepository: InMemorySecurityRepository.withPattern(
-          const <int>[0, 1, 2, 5],
+        securityRepository: InMemorySecurityRepository.withPin(
+          '123456',
           onboardingComplete: true,
           lastUnlockedAt: DateTime.now(),
         ),
@@ -151,8 +150,8 @@ void main() {
           settingsRepository: repository,
           keyRepository: repository,
           gitRepository: repository,
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
+          securityRepository: InMemorySecurityRepository.withPin(
+            '123456',
             onboardingComplete: true,
             lastUnlockedAt: DateTime.now(),
           ),
@@ -166,7 +165,7 @@ void main() {
     });
   }
 
-  testWidgets('onboarding captures gesture before key setup', (tester) async {
+  testWidgets('onboarding captures PIN before key setup', (tester) async {
     const repository = _StoreSetupRepository();
 
     await tester.pumpWidget(
@@ -179,10 +178,10 @@ void main() {
       ),
     );
 
-    expect(find.text('Set gesture lock'), findsOneWidget);
+    expect(find.text('Set PIN lock'), findsOneWidget);
     expect(find.text('Set up password store'), findsNothing);
 
-    await _completeGestureSetup(tester);
+    await _completePinSetup(tester);
 
     expect(find.text('Enable biometric unlock'), findsWidgets);
 
@@ -201,7 +200,7 @@ void main() {
     expect(find.text('Import'), findsOneWidget);
   });
 
-  testWidgets('existing gesture resumes prerequisite key setup', (
+  testWidgets('existing PIN resumes prerequisite key setup', (
     tester,
   ) async {
     const repository = _StoreSetupRepository();
@@ -212,8 +211,8 @@ void main() {
         settingsRepository: repository,
         keyRepository: repository,
         gitRepository: repository,
-        securityRepository: InMemorySecurityRepository.withPattern(
-          const <int>[0, 1, 2, 5],
+        securityRepository: InMemorySecurityRepository.withPin(
+          '123456',
           biometricUnlockEnabled: true,
           lastUnlockedAt: DateTime.now(),
         ),
@@ -226,8 +225,8 @@ void main() {
   });
 
   testWidgets('settings reset returns to onboarding', (tester) async {
-    final securityRepository = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final securityRepository = InMemorySecurityRepository.withPin(
+      '123456',
       lastUnlockedAt: DateTime.now(),
     );
 
@@ -243,7 +242,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.tap(find.text('PIN lock and biometrics'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Reset onboarding'));
     await tester.pumpAndSettle();
@@ -263,8 +262,8 @@ void main() {
         settingsRepository: repository,
         keyRepository: repository,
         gitRepository: repository,
-        securityRepository: InMemorySecurityRepository.withPattern(
-          const <int>[0, 1, 2, 5],
+        securityRepository: InMemorySecurityRepository.withPin(
+          '123456',
           onboardingComplete: true,
           lastUnlockedAt: DateTime.now(),
         ),
@@ -287,8 +286,8 @@ void main() {
     tester,
   ) async {
     final repository = _MutableAppStoreRepository();
-    final security = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final security = InMemorySecurityRepository.withPin(
+      '123456',
       onboardingComplete: true,
       lastUnlockedAt: DateTime.now(),
     );
@@ -327,8 +326,8 @@ void main() {
     'deleting the canonical app store exits the shell without resetting security',
     (tester) async {
       final repository = _MutableAppStoreRepository();
-      final security = InMemorySecurityRepository.withPattern(
-        const <int>[0, 1, 2, 5],
+      final security = InMemorySecurityRepository.withPin(
+        '123456',
         onboardingComplete: true,
         lastUnlockedAt: DateTime.now(),
       );
@@ -376,7 +375,7 @@ void main() {
       expect(find.text('Step 5 of 5'), findsOneWidget);
       expect(find.text('Vault'), findsNothing);
       expect(security.onboardingComplete, isTrue);
-      expect(security.hasGestureVerifier, isTrue);
+      expect(security.hasPinVerifier, isTrue);
     },
   );
 
@@ -384,8 +383,8 @@ void main() {
     tester,
   ) async {
     final repository = _MutableAppStoreRepository(failDelete: true);
-    final security = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final security = InMemorySecurityRepository.withPin(
+      '123456',
       onboardingComplete: true,
       lastUnlockedAt: DateTime.now(),
     );
@@ -421,12 +420,10 @@ void main() {
     tester,
   ) async {
     final repository = _MutableAppStoreRepository(initialStore: null);
-    final security = InMemorySecurityRepository.withPattern(const <int>[
-      0,
-      1,
-      2,
-      5,
-    ], onboardingComplete: true);
+    final security = InMemorySecurityRepository.withPin(
+      '123456',
+      onboardingComplete: true,
+    );
     await tester.pumpWidget(
       ParsGuiApp(
         vaultRepository: repository,
@@ -440,7 +437,7 @@ void main() {
 
     expect(find.text('Unlock Pars'), findsOneWidget);
     expect(find.text('Set up PGP key'), findsNothing);
-    await _drawGesture(tester);
+    await _enterPin(tester);
     await tester.pumpAndSettle();
     expect(find.text('Set up PGP key'), findsOneWidget);
     expect(find.text('Vault'), findsNothing);
@@ -1614,8 +1611,8 @@ void main() {
   });
 
   testWidgets('locks and unlocks an existing app session', (tester) async {
-    final securityRepository = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final securityRepository = InMemorySecurityRepository.withPin(
+      '123456',
       autoLockTimeout: const Duration(seconds: 1),
       lastUnlockedAt: DateTime.now(),
     );
@@ -1637,15 +1634,15 @@ void main() {
 
     expect(find.text('Unlock Pars'), findsOneWidget);
 
-    await _drawGesture(tester);
+    await _enterPin(tester);
     await tester.pumpAndSettle();
 
     expect(find.text('Vault'), findsWidgets);
   });
 
   testWidgets('background lock clears active PGP session', (tester) async {
-    final securityRepository = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final securityRepository = InMemorySecurityRepository.withPin(
+      '123456',
       lockOnResume: true,
       activePgpPassphrase: const PgpPassphraseCache(
         fingerprint: _testPgpFingerprint,
@@ -1679,8 +1676,8 @@ void main() {
   testWidgets('pulling down the notification shade does not lock', (
     tester,
   ) async {
-    final securityRepository = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final securityRepository = InMemorySecurityRepository.withPin(
+      '123456',
       lockOnResume: true,
       activePgpPassphrase: const PgpPassphraseCache(
         fingerprint: _testPgpFingerprint,
@@ -1714,8 +1711,8 @@ void main() {
     tester,
   ) async {
     var now = DateTime(2026);
-    final securityRepository = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final securityRepository = InMemorySecurityRepository.withPin(
+      '123456',
       autoLockTimeout: const Duration(seconds: 1),
       lastUnlockedAt: now,
     );
@@ -1777,8 +1774,8 @@ void main() {
   });
 
   testWidgets('settings updates local unlock controls', (tester) async {
-    final securityRepository = InMemorySecurityRepository.withPattern(
-      const <int>[0, 1, 2, 5],
+    final securityRepository = InMemorySecurityRepository.withPin(
+      '123456',
       lastUnlockedAt: DateTime.now(),
     );
 
@@ -1794,7 +1791,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.tap(find.text('PIN lock and biometrics'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Require unlock on app resume'));
@@ -1808,9 +1805,9 @@ void main() {
     expect(securityRepository.autoLockTimeout, Duration.zero);
   });
 
-  testWidgets('settings changes gesture lock pattern', (tester) async {
-    final securityRepository = InMemorySecurityRepository.withPattern(
-      const <int>[6, 3, 0, 1],
+  testWidgets('settings changes PIN lock code', (tester) async {
+    final securityRepository = InMemorySecurityRepository.withPin(
+      '630199',
       lastUnlockedAt: DateTime.now(),
     );
 
@@ -1826,36 +1823,32 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.tap(find.text('PIN lock and biometrics'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Change gesture'));
+    await tester.tap(find.text('Change PIN'));
     await tester.pumpAndSettle();
 
-    const newPattern = <int>[0, 1, 2, 5];
-    await _drawGesture(tester, newPattern);
+    const newPin = '123456';
+    await _enterPin(tester, newPin);
     await tester.pumpAndSettle();
     expect(
-      find.text('Gesture captured. Confirm it once more.'),
+      find.text('PIN entered. Confirm it once more.'),
       findsOneWidget,
     );
-    await _drawGesture(tester, newPattern);
+    await _enterPin(tester, newPin);
     await tester.pumpAndSettle();
 
-    expect(
-      await securityRepository.verifyGesture(const <int>[6, 3, 0, 1]),
-      isFalse,
-    );
-    expect(await securityRepository.verifyGesture(newPattern), isTrue);
+    expect(await securityRepository.verifyPin('630199'), isFalse);
+    expect(await securityRepository.verifyPin(newPin), isTrue);
   });
 
   testWidgets('settings updates PGP session timeout', (tester) async {
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
       biometricAuth: _FakeBiometricAuthAdapter(),
+      pinIterations: 1000,
     );
-    await securityRepository.saveGestureVerifier(
-      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-    );
+    await securityRepository.savePin('123456');
     await securityRepository.markUnlocked(DateTime.now());
     await securityRepository.setOnboardingComplete(true);
 
@@ -1889,10 +1882,9 @@ void main() {
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
       biometricAuth: biometrics,
+      pinIterations: 1000,
     );
-    await securityRepository.saveGestureVerifier(
-      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-    );
+    await securityRepository.savePin('123456');
     await securityRepository.setBiometricUnlockEnabled(true);
     await securityRepository.savePgpPassphrase(
       fingerprint: _testPgpFingerprint,
@@ -1928,10 +1920,9 @@ void main() {
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
       biometricAuth: biometrics,
+      pinIterations: 1000,
     );
-    await securityRepository.saveGestureVerifier(
-      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-    );
+    await securityRepository.savePin('123456');
     await securityRepository.setBiometricUnlockEnabled(true);
     await securityRepository.setLockOnResume(true);
     await securityRepository.setOnboardingComplete(true);
@@ -1964,10 +1955,9 @@ void main() {
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
       biometricAuth: biometrics,
+      pinIterations: 1000,
     );
-    await securityRepository.saveGestureVerifier(
-      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-    );
+    await securityRepository.savePin('123456');
     await securityRepository.markUnlocked(DateTime.now());
     await securityRepository.setOnboardingComplete(true);
 
@@ -1983,7 +1973,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.tap(find.text('PIN lock and biometrics'));
     await tester.pumpAndSettle();
 
     expect(find.text('Available on this device'), findsOneWidget);
@@ -2004,10 +1994,9 @@ void main() {
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
       biometricAuth: biometrics,
+      pinIterations: 1000,
     );
-    await securityRepository.saveGestureVerifier(
-      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-    );
+    await securityRepository.savePin('123456');
     await securityRepository.markUnlocked(DateTime.now());
     await securityRepository.setOnboardingComplete(true);
 
@@ -2023,7 +2012,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gesture lock and biometrics'));
+    await tester.tap(find.text('PIN lock and biometrics'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Biometric unlock'));
@@ -2043,10 +2032,9 @@ void main() {
     final securityRepository = await SecureStorageSecurityRepository.load(
       storage: _FakeSecureStorageAdapter(),
       biometricAuth: _FakeBiometricAuthAdapter(),
+      pinIterations: 1000,
     );
-    await securityRepository.saveGestureVerifier(
-      GestureVerifier.fromPattern(const <int>[0, 1, 2, 5]),
-    );
+    await securityRepository.savePin('123456');
     await securityRepository.markUnlocked(DateTime.now());
     await securityRepository.setOnboardingComplete(true);
 
@@ -2180,16 +2168,16 @@ Future<void> _openEntryDetailModal(
   await tester.pump(const Duration(milliseconds: 500));
 }
 
-Future<void> _completeGestureSetup(WidgetTester tester) async {
-  await _drawGesture(tester);
+Future<void> _completePinSetup(WidgetTester tester) async {
+  await _enterPin(tester);
   await tester.pumpAndSettle();
-  expect(find.text('Gesture captured. Confirm it once more.'), findsOneWidget);
-  await _drawGesture(tester);
+  expect(find.text('PIN entered. Confirm it once more.'), findsOneWidget);
+  await _enterPin(tester);
   await tester.pumpAndSettle();
 }
 
 Future<void> _completeReadyOnboarding(WidgetTester tester) async {
-  await _completeGestureSetup(tester);
+  await _completePinSetup(tester);
   for (var i = 0; i < 12; i += 1) {
     await tester.pumpAndSettle();
     if (find.text('Vault').evaluate().isNotEmpty) {
@@ -2315,27 +2303,14 @@ Future<void> _resumeApp(WidgetTester tester) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
 }
 
-Future<void> _drawGesture(
+Future<void> _enterPin(
   WidgetTester tester, [
-  List<int> pattern = const <int>[0, 1, 2, 5],
+  String pin = '123456',
 ]) async {
-  final box = tester.renderObject<RenderBox>(find.byType(GestureLockInput));
-  final topLeft = box.localToGlobal(Offset.zero);
-  final cell = box.size.width / 3;
-  Offset dot(int index) =>
-      topLeft +
-      Offset(cell * (index % 3) + cell / 2, cell * (index ~/ 3) + cell / 2);
-
-  final gesture = await tester.createGesture();
-  await gesture.down(dot(pattern.first));
-  await tester.pump();
-  await gesture.moveTo(dot(pattern.first) + Offset(cell / 4, 0));
-  await tester.pump();
-  for (final index in pattern.skip(1)) {
-    await gesture.moveTo(dot(index));
+  for (final digit in pin.split('')) {
+    await tester.tap(find.byKey(Key('pin-key-$digit')));
     await tester.pump();
   }
-  await gesture.up();
 }
 
 class _FakeSecureStorageAdapter implements SecureStorageAdapter {
@@ -2367,6 +2342,9 @@ class _FakeBiometricAuthAdapter implements BiometricAuthAdapter {
 
   @override
   Future<bool> isAvailable() async => available;
+
+  @override
+  Future<BiometricKind> biometricKind() async => BiometricKind.fingerprint;
 
   @override
   Future<bool> authenticate() async {

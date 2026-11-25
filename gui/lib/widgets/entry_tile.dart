@@ -36,7 +36,7 @@ class EntryTile extends StatelessWidget {
         const TextStyle();
 
     return ParsSectionRow(
-      leading: _EntryLeading(entry: entry),
+      leading: ParsEntryAvatar(entry: entry),
       title: entry.displayName,
       subtitle: subtitle,
       // Store paths are machine data and are easier to compare in monospace;
@@ -62,8 +62,8 @@ class EntryTile extends StatelessWidget {
   }
 }
 
-class _EntryLeading extends StatelessWidget {
-  const _EntryLeading({required this.entry});
+class ParsEntryAvatar extends StatelessWidget {
+  const ParsEntryAvatar({super.key, required this.entry});
 
   final PasswordEntry entry;
 

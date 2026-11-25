@@ -184,8 +184,8 @@ Widget _readyApp(
 }
 
 InMemorySecurityRepository _readySecurity() {
-  return InMemorySecurityRepository.withPattern(
-    const <int>[0, 1, 2, 5],
+  return InMemorySecurityRepository.withPin(
+    '123456',
     onboardingComplete: true,
     lastUnlockedAt: DateTime.now(),
   );

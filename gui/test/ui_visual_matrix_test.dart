@@ -194,9 +194,7 @@ void main() {
         locale: const Locale('zh'),
         brightness: Brightness.dark,
         child: LockScreen(
-          securityRepository: InMemorySecurityRepository.withPattern(
-            const <int>[0, 1, 2, 5],
-          ),
+          securityRepository: InMemorySecurityRepository.withPin('123456'),
           unlockWithBiometrics: () async => false,
           onUnlocked: () {},
         ),

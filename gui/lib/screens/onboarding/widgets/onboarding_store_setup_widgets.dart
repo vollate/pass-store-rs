@@ -56,53 +56,62 @@ class _StoreSetupActions extends StatelessWidget {
     final store = lifecycle.store;
     return ListView(
       children: <Widget>[
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(
-            Icons.folder_open_outlined,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          title: Text(
-            store == null
-                ? localizations.noPasswordStoreConfigured
-                : localizations.passwordStoreFolderNotFound,
-          ),
-          subtitle: Text(
-            store == null
-                ? localizations.storeFirstSetupSubtitle
-                : localizations.passwordStoreFolderNotFound,
-          ),
+        AppSectionBox(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            ParsSectionRow(
+              leading: ParsSectionRowIcon(
+                icon: Icons.folder_open_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title:
+                  store == null
+                      ? localizations.noPasswordStoreConfigured
+                      : localizations.passwordStoreFolderNotFound,
+              subtitle:
+                  store == null
+                      ? localizations.storeFirstSetupSubtitle
+                      : localizations.passwordStoreFolderNotFound,
+            ),
+          ],
         ),
-        const SizedBox(height: ParsSpacing.sm),
-        Semantics(
-          button: true,
-          label: localizations.importLocalStore,
-          child: FilledButton.icon(
-            onPressed: () => _showImportLocalStore(context),
-            icon: const Icon(Icons.folder_open_outlined),
-            label: Text(localizations.importLocalStore),
-          ),
-        ),
-        const SizedBox(height: ParsSpacing.xs),
-        Semantics(
-          button: true,
-          label: localizations.cloneGitStore,
-          child: FilledButton.tonalIcon(
-            onPressed: () => _showCloneStore(context),
-            icon: const Icon(Icons.cloud_download_outlined),
-            label: Text(localizations.cloneGitStore),
-          ),
+        const SizedBox(height: ParsSpacing.md),
+        ParsButtonGrid(
+          children: <Widget>[
+            Semantics(
+              button: true,
+              label: localizations.cloneGitStore,
+              child: FilledButton.tonalIcon(
+                onPressed: () => _showCloneStore(context),
+                icon: const Icon(Icons.cloud_download_outlined),
+                label: Text(localizations.cloneGitStore),
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: localizations.importLocalStore,
+              child: FilledButton.icon(
+                onPressed: () => _showImportLocalStore(context),
+                icon: const Icon(Icons.folder_open_outlined),
+                label: Text(localizations.importLocalStore),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: ParsSpacing.md),
         const Divider(),
-        const SizedBox(height: ParsSpacing.xs),
-        OutlinedButton.icon(
-          onPressed:
-              selectedPgpFingerprint == null
-                  ? onCreateNeedsRecipient
-                  : () => _showCreateLocalStore(context),
-          icon: const Icon(Icons.create_new_folder_outlined),
-          label: Text(localizations.createLocalStore),
+        const SizedBox(height: ParsSpacing.md),
+        ParsButtonGrid(
+          children: <Widget>[
+            OutlinedButton.icon(
+              onPressed:
+                  selectedPgpFingerprint == null
+                      ? onCreateNeedsRecipient
+                      : () => _showCreateLocalStore(context),
+              icon: const Icon(Icons.create_new_folder_outlined),
+              label: Text(localizations.createLocalStore),
+            ),
+          ],
         ),
         if (selectedPgpFingerprint == null)
           Padding(
@@ -155,12 +164,26 @@ class _StoreSetupActions extends StatelessWidget {
                       )
                       : null,
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: initializeGit,
-              onChanged: (value) => setSheetState(() => initializeGit = value),
-              title: Text(context.l10n.initializeGit),
-              subtitle: Text(context.l10n.gitOptionalForLocalStore),
+            const SizedBox(height: ParsSpacing.sm),
+            AppSectionBox(
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+                ParsSectionRow(
+                  leading: const ParsSectionRowIcon(
+                    icon: Icons.account_tree_outlined,
+                  ),
+                  title: context.l10n.initializeGit,
+                  subtitle: context.l10n.gitOptionalForLocalStore,
+                  onTap:
+                      () =>
+                          setSheetState(() => initializeGit = !initializeGit),
+                  trailing: Switch(
+                    value: initializeGit,
+                    onChanged:
+                        (value) => setSheetState(() => initializeGit = value),
+                  ),
+                ),
+              ],
             ),
           ],
     );
@@ -232,11 +255,17 @@ class _StoreSetupActions extends StatelessWidget {
       refreshHandledBySubmit: true,
       builder:
           (_, _) => <Widget>[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.copy_all_outlined),
-              title: Text(localizations.copyIntoAppStorage),
-              subtitle: Text(localizations.copyIntoAppStorageDescription),
+            AppSectionBox(
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+                ParsSectionRow(
+                  leading: const ParsSectionRowIcon(
+                    icon: Icons.copy_all_outlined,
+                  ),
+                  title: localizations.copyIntoAppStorage,
+                  subtitle: localizations.copyIntoAppStorageDescription,
+                ),
+              ],
             ),
           ],
     );
@@ -379,12 +408,19 @@ class _StoreSetupActions extends StatelessWidget {
             ),
             if (remoteUrlUsesSsh(remote.text) && !sshReady) ...<Widget>[
               const SizedBox(height: ParsSpacing.sm),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.vpn_key_outlined),
-                title: Text(context.l10n.sshKeyRequiredForRemote),
-                subtitle: Text(context.l10n.sshRequiredForThisClone),
+              AppSectionBox(
+                padding: EdgeInsets.zero,
+                children: <Widget>[
+                  ParsSectionRow(
+                    leading: const ParsSectionRowIcon(
+                      icon: Icons.vpn_key_outlined,
+                    ),
+                    title: context.l10n.sshKeyRequiredForRemote,
+                    subtitle: context.l10n.sshRequiredForThisClone,
+                  ),
+                ],
               ),
+              const SizedBox(height: ParsSpacing.sm),
               ParsButtonGrid(
                 children: <Widget>[
                   FilledButton.tonalIcon(
@@ -459,10 +495,10 @@ class _StoreSetupActions extends StatelessWidget {
       onSelected(path);
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(UiProblem.fromError(context.l10n, error).summary),
-        ),
+      AppNotification.show(
+        context,
+        UiProblem.fromError(context.l10n, error).summary,
+        severity: AppNotificationSeverity.error,
       );
     }
   }
@@ -616,25 +652,28 @@ class _CloneStoreFields extends StatelessWidget {
         ],
         if (remoteUrlUsesSsh(remote.text) && sshKeys.isNotEmpty) ...<Widget>[
           const SizedBox(height: ParsSpacing.sm),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              context.l10n.sshKeysTitle,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
+          AppSectionBox(
+            title: context.l10n.sshKeysTitle,
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              for (final key in sshKeys)
+                ParsSectionRow(
+                  leading: ParsSectionRowIcon(
+                    icon:
+                        key.name == selectedSshKey
+                            ? Icons.check_circle
+                            : Icons.circle_outlined,
+                    color:
+                        key.name == selectedSshKey
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                  ),
+                  title: key.name,
+                  selected: key.name == selectedSshKey,
+                  onTap: () => onSelectSshKey(key.name),
+                ),
+            ],
           ),
-          for (final key in sshKeys)
-            RadioListTile<String>(
-              contentPadding: EdgeInsets.zero,
-              value: key.name,
-              groupValue: selectedSshKey,
-              title: Text(key.name),
-              onChanged: (value) {
-                if (value != null) onSelectSshKey(value);
-              },
-            ),
         ],
       ],
     );

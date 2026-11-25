@@ -12,12 +12,12 @@ void main() {
     await tester.pumpWidget(ParsBootstrapApp(start: () => started.future));
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.text('Set gesture lock'), findsNothing);
+    expect(find.text('Set PIN lock'), findsNothing);
 
     started.complete(ParsGuiApp.fake());
     await tester.pump();
 
-    expect(find.text('Set gesture lock'), findsOneWidget);
+    expect(find.text('Set PIN lock'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
@@ -49,6 +49,6 @@ void main() {
     started.complete(ParsGuiApp.fake());
     await tester.pump();
 
-    expect(find.text('Set gesture lock'), findsOneWidget);
+    expect(find.text('Set PIN lock'), findsOneWidget);
   });
 }

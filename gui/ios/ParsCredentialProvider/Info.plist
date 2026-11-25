@@ -20,12 +20,22 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Pars uses Face ID to unlock the stored PGP passphrase for AutoFill.</string>
 	<key>ParsKeychainAccessGroup</key>
 	<string>$(AppIdentifierPrefix)com.example.parsGui.autofill</string>
 	<key>NSExtension</key>
 	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>ASCredentialProviderExtensionCapabilities</key>
+			<dict>
+				<key>ProvidesPasswords</key>
+				<true/>
+			</dict>
+		</dict>
 		<key>NSExtensionPointIdentifier</key>
-		<string>com.apple.authentication-services-credential-provider</string>
+		<string>com.apple.authentication-services-credential-provider-ui</string>
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).CredentialProviderViewController</string>
 	</dict>

@@ -78,11 +78,14 @@ abstract final class ParsSizes {
   static const double tallToolbar = 64;
   static const double statusBadge = 152;
   static const double qrCode = 200;
-  // The gesture grid stays square and thumb-sized rather than stretching to
-  // the window, so it is bounded on both axes.
-  static const double gestureGrid = 320;
-  static const double gestureGridMin = 160;
-  static const double gestureGridViewportFactor = 0.52;
+  // PIN lock dots, circular keypad buttons, and biometric glyph stay
+  // thumb-sized and bounded on both axes instead of stretching to the window.
+  static const double lockBadge = 48;
+  static const double pinDot = 14;
+  static const double pinKey = 72;
+  static const double pinKeyMin = minimumTouchTarget;
+  static const double pinKeypadMaxWidth = 300;
+  static const double biometricKeyIcon = 28;
   // Keeps the last row of a scrolling page clear of the floating action
   // button once the page is scrolled to the end.
   static const double floatingActionClearance = 96;
