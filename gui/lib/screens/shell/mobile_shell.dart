@@ -137,7 +137,9 @@ class _MobileShellState extends State<MobileShell> {
           final windowClass = ParsWindowClass.fromWidth(constraints.maxWidth);
           if (windowClass == ParsWindowClass.compact) {
             return Scaffold(
-              body: SafeArea(child: content),
+              // Top safe area is owned by each tab's SliverAppBar so the app
+              // bar extends cleanly behind the Dynamic Island and status bar.
+              body: SafeArea(top: false, child: content),
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _index,
                 onDestinationSelected: _selectDestination,
@@ -157,10 +159,11 @@ class _MobileShellState extends State<MobileShell> {
             );
           }
           return Scaffold(
-            body: SafeArea(
-              child: Row(
-                children: <Widget>[
-                  NavigationRail(
+            body: Row(
+              children: <Widget>[
+                SafeArea(
+                  right: false,
+                  child: NavigationRail(
                     selectedIndex: _index,
                     onDestinationSelected: _selectDestination,
                     labelType: NavigationRailLabelType.all,
@@ -177,10 +180,12 @@ class _MobileShellState extends State<MobileShell> {
                       ),
                     ],
                   ),
-                  const VerticalDivider(width: ParsSizes.hairline),
-                  Expanded(child: content),
-                ],
-              ),
+                ),
+                const VerticalDivider(width: ParsSizes.hairline),
+                Expanded(
+                  child: SafeArea(left: false, top: false, child: content),
+                ),
+              ],
             ),
           );
         },

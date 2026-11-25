@@ -4,13 +4,11 @@ class _BatchRegenerateSheet extends StatefulWidget {
   const _BatchRegenerateSheet({
     required this.entries,
     required this.onSubmit,
-    this.title,
     this.submitLabel,
   });
 
   final List<PasswordEntry> entries;
   final _BatchRegenerateSubmit onSubmit;
-  final String? title;
   final String? submitLabel;
 
   @override
@@ -45,8 +43,6 @@ class _BatchRegenerateSheetState extends State<_BatchRegenerateSheet> {
   @override
   Widget build(BuildContext context) {
     return _operationSheet(
-      context: context,
-      title: widget.title ?? context.l10n.regenerate,
       children: <Widget>[
         _SelectedPreview(entries: widget.entries),
         CheckboxListTile(

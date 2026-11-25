@@ -131,6 +131,7 @@ class _VaultScreenState extends State<VaultScreen> {
                 child: const Icon(Icons.add),
               ),
       body: RefreshIndicator(
+        edgeOffset: MediaQuery.paddingOf(context).top,
         onRefresh: _syncVault,
         child: CustomScrollView(
           controller: _viewState.scrollController,
@@ -348,22 +349,24 @@ class _VaultScreenState extends State<VaultScreen> {
       context: context,
       title: context.l10n.createPassword,
       builder:
-          (surfaceContext) => Column(
-            mainAxisSize: MainAxisSize.min,
+          (surfaceContext) => AppSectionBox(
+            padding: EdgeInsets.zero,
             children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.auto_fix_high),
-                title: Text(context.l10n.generateAndSave),
-                subtitle: Text(context.l10n.generateAndSaveDescription),
+              ParsSectionRow(
+                leading: const ParsSectionRowIcon(icon: Icons.auto_fix_high),
+                title: context.l10n.generateAndSave,
+                subtitle: context.l10n.generateAndSaveDescription,
                 onTap:
                     () => Navigator.of(
                       surfaceContext,
                     ).pop(_CreateEntryAction.generate),
               ),
-              ListTile(
-                leading: const Icon(Icons.password_outlined),
-                title: Text(context.l10n.saveExistingPassword),
-                subtitle: Text(context.l10n.saveExistingPasswordDescription),
+              ParsSectionRow(
+                leading: const ParsSectionRowIcon(
+                  icon: Icons.password_outlined,
+                ),
+                title: context.l10n.saveExistingPassword,
+                subtitle: context.l10n.saveExistingPasswordDescription,
                 onTap:
                     () => Navigator.of(
                       surfaceContext,
@@ -441,6 +444,7 @@ class _VaultScreenState extends State<VaultScreen> {
     final manageRepository = _manageRepository;
     final action = await showParsAdaptiveDetail<_EntryDetailAction>(
       context: context,
+      showDragHandle: false,
       builder:
           (sheetContext) => EntryDetailSheet(
             entry: entry,

@@ -487,12 +487,11 @@ class _StoreSetupActions extends StatelessWidget {
     required Future<void> Function()? onSubmit,
     bool refreshHandledBySubmit = false,
   }) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
+      title: title,
       builder:
           (context) => _StorePickerFormSheet(
-            title: title,
             submitLabel: submitLabel,
             canSubmit: canSubmit,
             builder: builder,
@@ -644,7 +643,6 @@ class _CloneStoreFields extends StatelessWidget {
 
 class _StorePickerFormSheet extends StatefulWidget {
   const _StorePickerFormSheet({
-    required this.title,
     required this.submitLabel,
     required this.canSubmit,
     required this.builder,
@@ -653,7 +651,6 @@ class _StorePickerFormSheet extends StatefulWidget {
     required this.refreshHandledBySubmit,
   });
 
-  final String title;
   final String submitLabel;
   final bool Function() canSubmit;
   final List<Widget> Function(BuildContext, StateSetter) builder;
@@ -671,48 +668,27 @@ class _StorePickerFormSheetState extends State<_StorePickerFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: ParsSpacing.lg,
-          right: ParsSpacing.lg,
-          top: ParsSpacing.lg,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                widget.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: ParsSpacing.sm),
-              ...widget.builder(context, setState),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: ParsSpacing.sm),
-                FailureNotice(problem: _error!),
-              ],
-              const SizedBox(height: ParsSpacing.md),
-              FilledButton(
-                onPressed:
-                    _isSubmitting ||
-                            !widget.canSubmit() ||
-                            widget.onSubmit == null
-                        ? null
-                        : _submit,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Center(child: Text(widget.submitLabel)),
-                ),
-              ),
-            ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        ...widget.builder(context, setState),
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: ParsSpacing.sm),
+          FailureNotice(problem: _error!),
+        ],
+        const SizedBox(height: ParsSpacing.md),
+        FilledButton(
+          onPressed:
+              _isSubmitting || !widget.canSubmit() || widget.onSubmit == null
+                  ? null
+                  : _submit,
+          child: SizedBox(
+            width: double.infinity,
+            child: Center(child: Text(widget.submitLabel)),
           ),
         ),
-      ),
+      ],
     );
   }
 

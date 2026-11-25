@@ -185,6 +185,67 @@ void main() {
       await tester.pumpAndSettle();
     }
   });
+
+  testWidgets('compact modal sheets stay below Dynamic Island safe area', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: Builder(
+          builder:
+              (context) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  FilledButton(
+                    onPressed:
+                        () => showParsAdaptiveSurface<void>(
+                          context: context,
+                          title: 'Tall surface',
+                          builder: (_) => const SizedBox(height: 1200),
+                        ),
+                    child: const Text('Open surface'),
+                  ),
+                  FilledButton(
+                    onPressed:
+                        () => showParsAdaptiveDetail<void>(
+                          context: context,
+                          builder:
+                              (_) => const SingleChildScrollView(
+                                child: SizedBox(height: 1200),
+                              ),
+                        ),
+                    child: const Text('Open detail'),
+                  ),
+                ],
+              ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open surface'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.byType(BottomSheet)).dy,
+      greaterThanOrEqualTo(59),
+    );
+    expectNoFlutterOverflow(tester);
+    Navigator.of(tester.element(find.text('Tall surface'))).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open detail'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.byType(BottomSheet)).dy,
+      greaterThanOrEqualTo(59),
+    );
+    expectNoFlutterOverflow(tester);
+  });
 }
 
 double _contrast(Color foreground, Color background) {

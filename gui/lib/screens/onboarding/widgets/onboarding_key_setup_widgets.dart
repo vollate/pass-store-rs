@@ -444,63 +444,42 @@ class _ImportSshFileSheetState extends State<_ImportSshFileSheet> {
   Widget build(BuildContext context) {
     final canSubmit =
         !_isSubmitting && _selected != null && _name.text.trim().isNotEmpty;
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: ParsSpacing.lg,
-          right: ParsSpacing.lg,
-          top: ParsSpacing.lg,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        TextField(
+          controller: _name,
+          decoration: InputDecoration(labelText: context.l10n.nameField),
+          textInputAction: TextInputAction.next,
+          onChanged: (_) => setState(() {}),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                context.l10n.importSshKeyFile,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: ParsSpacing.sm),
-              TextField(
-                controller: _name,
-                decoration: InputDecoration(labelText: context.l10n.nameField),
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: ParsSpacing.sm),
-              PathPickerRow(
-                title: context.l10n.keyFileField,
-                path: _selected?.location ?? widget.initialDirectory,
-                isSelected: _selected != null,
-                onPressed: _chooseFile,
-              ),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: ParsSpacing.sm),
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: ParsSpacing.md),
-              FilledButton(
-                onPressed: canSubmit ? _submit : null,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Center(child: Text(context.l10n.importAction)),
-                ),
-              ),
-            ],
+        const SizedBox(height: ParsSpacing.sm),
+        PathPickerRow(
+          title: context.l10n.keyFileField,
+          path: _selected?.location ?? widget.initialDirectory,
+          isSelected: _selected != null,
+          onPressed: _chooseFile,
+        ),
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: ParsSpacing.sm),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+        const SizedBox(height: ParsSpacing.md),
+        FilledButton(
+          onPressed: canSubmit ? _submit : null,
+          child: SizedBox(
+            width: double.infinity,
+            child: Center(child: Text(context.l10n.importAction)),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -546,13 +525,11 @@ class _ImportSshFileSheetState extends State<_ImportSshFileSheet> {
 
 class _OnboardingFormSheet extends StatefulWidget {
   const _OnboardingFormSheet({
-    required this.title,
     required this.fields,
     required this.submitLabel,
     required this.onSubmit,
   });
 
-  final String title;
   final List<Widget> fields;
   final String submitLabel;
   final Future<void> Function() onSubmit;
@@ -567,70 +544,48 @@ class _OnboardingFormSheetState extends State<_OnboardingFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: ParsSpacing.lg,
-          right: ParsSpacing.lg,
-          top: ParsSpacing.lg,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                widget.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: ParsSpacing.sm),
-              ...widget.fields,
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: ParsSpacing.sm),
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: ParsSpacing.md),
-              FilledButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Center(
-                    child:
-                        _isSubmitting
-                            ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: <Widget>[
-                                SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color:
-                                        Theme.of(context).colorScheme.onPrimary,
-                                  ),
-                                ),
-                                const SizedBox(width: ParsSpacing.sm),
-                                Text(widget.submitLabel),
-                              ],
-                            )
-                            : Text(widget.submitLabel),
-                  ),
-                ),
-              ),
-            ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        ...widget.fields,
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: ParsSpacing.sm),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+        const SizedBox(height: ParsSpacing.md),
+        FilledButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: SizedBox(
+            width: double.infinity,
+            child: Center(
+              child:
+                  _isSubmitting
+                      ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Theme.of(context).colorScheme.onPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: ParsSpacing.sm),
+                          Text(widget.submitLabel),
+                        ],
+                      )
+                      : Text(widget.submitLabel),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 

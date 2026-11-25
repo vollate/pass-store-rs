@@ -37,14 +37,14 @@ class AppSection extends StatelessWidget {
 class AppSectionBox extends StatelessWidget {
   const AppSectionBox({
     super.key,
-    required this.title,
+    this.title,
     required this.children,
     this.emptyLabel,
     this.scrollable = false,
     this.padding,
   });
 
-  final String title;
+  final String? title;
   final List<Widget> children;
   final String? emptyLabel;
 
@@ -103,23 +103,25 @@ class AppSectionBox extends StatelessWidget {
               ),
             );
 
+    final title = this.title;
     return Padding(
       padding: padding ?? style.padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Padding(
-            padding: style.headerPadding,
-            // Sentence case, not upper case. `toUpperCase()` is a no-op on
-            // Chinese, so forcing caps made the English and Chinese builds
-            // render visibly different heading hierarchies.
-            child: Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+          if (title != null)
+            Padding(
+              padding: style.headerPadding,
+              // Sentence case, not upper case. `toUpperCase()` is a no-op on
+              // Chinese, so forcing caps made the English and Chinese builds
+              // render visibly different heading hierarchies.
+              child: Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
           if (scrollable) Flexible(child: outline) else outline,
         ],
       ),

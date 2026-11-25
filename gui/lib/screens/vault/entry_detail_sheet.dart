@@ -15,6 +15,7 @@ import '../../services/ui_problem.dart';
 import '../../services/vault_repository.dart';
 import '../../widgets/app_notification.dart';
 import '../../widgets/pars_action_group.dart';
+import '../../widgets/pars_adaptive_surface.dart';
 
 enum _EntryDetailMenuAction { edit, move, rename, qr, regenerate, delete }
 
@@ -632,47 +633,18 @@ class _EntryDetailSheetState extends State<EntryDetailSheet> {
   }
 
   void _showQrCode(String password) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: false,
+      title: context.l10n.passwordQrCode,
+      closeTooltip: context.l10n.closeQrCode,
       builder:
-          (context) => SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: ParsInsets.sheetBlockTall,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    const _SheetHandle(),
-                    const SizedBox(height: ParsSpacing.lg),
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: Text(
-                            context.l10n.passwordQrCode,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: context.l10n.closeQrCode,
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: ParsSpacing.md),
-                    QrImageView(
-                      data: password,
-                      version: QrVersions.auto,
-                      size: ParsSizes.qrCode,
-                      // Keep QR modules on a fixed high-contrast background.
-                      backgroundColor: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
+          (context) => Center(
+            child: QrImageView(
+              data: password,
+              version: QrVersions.auto,
+              size: ParsSizes.qrCode,
+              // Keep QR modules on a fixed high-contrast background.
+              backgroundColor: Colors.white,
             ),
           ),
     );

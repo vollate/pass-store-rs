@@ -80,6 +80,7 @@ class SettingsScreen extends StatelessWidget {
     final localizations = context.l10n;
     return CustomScrollView(
       controller: scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: <Widget>[
         SliverAppBar(
           pinned: true,
@@ -203,21 +204,25 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       title: localizations.languageTitle,
       builder:
-          (surfaceContext) => Column(
-            mainAxisSize: MainAxisSize.min,
+          (surfaceContext) => AppSectionBox(
+            padding: EdgeInsets.zero,
             children: AppLocalePreference.values
-                .map(
-                  (preference) => ListTile(
-                    leading: Icon(
-                      preference == localePreference
-                          ? Icons.check_circle
-                          : Icons.circle_outlined,
+                .map((preference) {
+                  final isSelected = preference == localePreference;
+                  final colorScheme = Theme.of(surfaceContext).colorScheme;
+                  return ParsSectionRow(
+                    leading: ParsSectionRowIcon(
+                      icon:
+                          isSelected
+                              ? Icons.check_circle
+                              : Icons.circle_outlined,
+                      color: isSelected ? colorScheme.primary : null,
                     ),
-                    title: Text(_localeLabel(localizations, preference)),
-                    selected: preference == localePreference,
+                    title: _localeLabel(localizations, preference),
+                    selected: isSelected,
                     onTap: () => Navigator.of(surfaceContext).pop(preference),
-                  ),
-                )
+                  );
+                })
                 .toList(growable: false),
           ),
     );

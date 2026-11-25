@@ -166,7 +166,7 @@ void main() {
     await pumpVault(tester, repository);
 
     await pullToRefresh(tester);
-    await tester.tap(find.byTooltip('Close'));
+    await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
     expect(repository.savedIdentity, isNull);

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import 'pars_design_tokens.dart';
@@ -15,9 +16,15 @@ class ParsTheme {
   static ThemeData? _light;
   static ThemeData? _dark;
 
-  static ThemeData light() => _light ??= _build(Brightness.light);
+  static ThemeData light() =>
+      _light?.platform == defaultTargetPlatform
+          ? _light!
+          : (_light = _build(Brightness.light));
 
-  static ThemeData dark() => _dark ??= _build(Brightness.dark);
+  static ThemeData dark() =>
+      _dark?.platform == defaultTargetPlatform
+          ? _dark!
+          : (_dark = _build(Brightness.dark));
 
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;

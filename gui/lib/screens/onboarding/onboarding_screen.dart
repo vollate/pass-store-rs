@@ -19,6 +19,7 @@ import '../../widgets/git_flows.dart';
 import '../../widgets/managed_store_conflict_sheet.dart';
 import '../../widgets/failure_notice.dart';
 import '../../widgets/pars_action_group.dart';
+import '../../widgets/pars_adaptive_surface.dart';
 import '../../widgets/pars_dialog.dart';
 import '../../widgets/password_setup_panel.dart';
 import '../../widgets/path_picker_row.dart';
@@ -726,94 +727,64 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     KeyRepository repository, {
     bool repair = false,
   }) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
+      title: context.l10n.importPgpKey,
       builder:
-          (sheet) => SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: ParsSpacing.lg,
-                right: ParsSpacing.lg,
-                top: ParsSpacing.lg,
-                bottom: MediaQuery.of(sheet).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      context.l10n.importPgpKey,
-                      style: Theme.of(sheet).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: ParsSpacing.sm),
-                    PgpKeyImportBody(
-                      keyRepository: repository,
-                      securityRepository: widget.securityRepository,
-                      pathPickerService: widget.pathPickerService,
-                      initialDirectory: _defaultKeyFileBasePath(),
-                      validateInspection: (inspection) {
-                        if (!inspection.isPrivate ||
-                            !inspection.hasPrivateKey) {
-                          return context.l10n.requiredPrivatePgpKey;
-                        }
-                        if (repair &&
-                            _lifecycle?.store?.hasGpgId == true &&
-                            !pgpIdentityMatchesAnyRecipient(
-                              fingerprint: inspection.fingerprint,
-                              identity: inspection.identity,
-                              recipients: _requiredRecipients,
-                            )) {
-                          return context.l10n.pgpKeyDoesNotMatchStore;
-                        }
-                        return null;
-                      },
-                      onCancel: () => Navigator.of(sheet).pop(),
-                      onCompleted: (completion) async {
-                        if (!completion.key.hasPrivateKey ||
-                            !completion.key.hasLocalKeyMaterial) {
-                          if (mounted) {
-                            _showError(
-                              StateError(context.l10n.requiredPrivatePgpKey),
-                            );
-                          }
-                          return;
-                        }
-                        if (repair &&
-                            _lifecycle?.store?.hasGpgId == true &&
-                            !pgpIdentityMatchesAnyRecipient(
-                              fingerprint: completion.key.fingerprint,
-                              identity: completion.key.name,
-                              recipients: _requiredRecipients,
-                            )) {
-                          if (mounted) {
-                            _showError(
-                              StateError(context.l10n.pgpKeyDoesNotMatchStore),
-                            );
-                          }
-                          return;
-                        }
-                        if (sheet.mounted) Navigator.of(sheet).pop();
-                        if (completion.rememberFailed && mounted) {
-                          _error = context.l10n.importedKeyRememberFailed(
-                            completion.key.name,
-                          );
-                        }
-                        if (repair) {
-                          await _completePgpRepair(completion.key);
-                        } else {
-                          _selectedPgpFingerprint = completion.key.fingerprint;
-                          _returnAfterPgpKeyAdded();
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          (sheet) => PgpKeyImportBody(
+            keyRepository: repository,
+            securityRepository: widget.securityRepository,
+            pathPickerService: widget.pathPickerService,
+            initialDirectory: _defaultKeyFileBasePath(),
+            validateInspection: (inspection) {
+              if (!inspection.isPrivate || !inspection.hasPrivateKey) {
+                return context.l10n.requiredPrivatePgpKey;
+              }
+              if (repair &&
+                  _lifecycle?.store?.hasGpgId == true &&
+                  !pgpIdentityMatchesAnyRecipient(
+                    fingerprint: inspection.fingerprint,
+                    identity: inspection.identity,
+                    recipients: _requiredRecipients,
+                  )) {
+                return context.l10n.pgpKeyDoesNotMatchStore;
+              }
+              return null;
+            },
+            onCancel: () => Navigator.of(sheet).pop(),
+            onCompleted: (completion) async {
+              if (!completion.key.hasPrivateKey ||
+                  !completion.key.hasLocalKeyMaterial) {
+                if (mounted) {
+                  _showError(StateError(context.l10n.requiredPrivatePgpKey));
+                }
+                return;
+              }
+              if (repair &&
+                  _lifecycle?.store?.hasGpgId == true &&
+                  !pgpIdentityMatchesAnyRecipient(
+                    fingerprint: completion.key.fingerprint,
+                    identity: completion.key.name,
+                    recipients: _requiredRecipients,
+                  )) {
+                if (mounted) {
+                  _showError(StateError(context.l10n.pgpKeyDoesNotMatchStore));
+                }
+                return;
+              }
+              if (sheet.mounted) Navigator.of(sheet).pop();
+              if (completion.rememberFailed && mounted) {
+                _error = context.l10n.importedKeyRememberFailed(
+                  completion.key.name,
+                );
+              }
+              if (repair) {
+                await _completePgpRepair(completion.key);
+              } else {
+                _selectedPgpFingerprint = completion.key.fingerprint;
+                _returnAfterPgpKeyAdded();
+              }
+            },
           ),
     );
   }
@@ -919,9 +890,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     BuildContext context,
     KeyRepository repository,
   ) {
-    return showModalBottomSheet<void>(
+    return showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
+      title: context.l10n.importSshKeyFile,
       builder:
           (sheetContext) => _ImportSshFileSheet(
             repository: repository,
@@ -941,12 +912,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required String submitLabel,
     required Future<void> Function() onSubmit,
   }) {
-    return showModalBottomSheet<void>(
+    return showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
+      title: title,
       builder:
           (context) => _OnboardingFormSheet(
-            title: title,
             fields: fields,
             submitLabel: submitLabel,
             onSubmit: onSubmit,

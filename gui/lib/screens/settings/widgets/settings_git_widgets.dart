@@ -8,13 +8,14 @@ extension _SettingsScreenGitSheets on SettingsScreen {
       return;
     }
 
-    showParsAdaptiveDetail<void>(
+    showParsAdaptivePage<void>(
       context: context,
+      title: context.l10n.gitSyncTitle,
       builder:
-          (context) => _GitSyncSheetBody(
+          (pageContext) => _GitSyncSheetBody(
             git: git,
             gitMode: settingsRepository.store?.gitMode ?? StoreGitMode.disabled,
-            onManageSshKeys: () => _showSshKeys(context),
+            onManageSshKeys: () => _showSshKeys(pageContext),
             configPath: settingsRepository.lifecycle.configPath,
             sshKeys: keyRepository.keys
                 .where(
@@ -26,8 +27,9 @@ extension _SettingsScreenGitSheets on SettingsScreen {
   }
 
   void _showGitArgs(BuildContext context) {
-    showParsAdaptiveDetail<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
+      title: context.l10n.advancedGitArgsTitle,
       builder: (context) => _GitArgsSheetBody(git: _gitOperations),
     );
   }
@@ -170,56 +172,53 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          ParsSpacing.lg,
-          ParsSpacing.lg,
-          ParsSpacing.lg,
-          MediaQuery.of(context).viewInsets.bottom + ParsSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              l10n.gitSyncTitle,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        ParsSpacing.lg,
+        ParsSpacing.xs,
+        ParsSpacing.lg,
+        MediaQuery.of(context).viewInsets.bottom + ParsSpacing.lg,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            _gitModeLabel(context),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
+          ),
+          if (_gitMode == StoreGitMode.invalid) ...<Widget>[
             const SizedBox(height: ParsSpacing.xs),
-            Text(_gitModeLabel(context)),
-            if (_gitMode == StoreGitMode.invalid) ...<Widget>[
-              const SizedBox(height: ParsSpacing.xs),
-              Text(l10n.invalidGitMetadataMessage),
-            ],
-            if (_gitMode == StoreGitMode.disabled) ...<Widget>[
-              const SizedBox(height: ParsSpacing.md),
-              FilledButton.icon(
-                onPressed:
-                    _running
-                        ? null
-                        : () => _run(() async {
-                          final result = await _git.initializeRepository();
-                          _gitMode = _git.gitMode;
-                          return result;
-                        }),
-                icon: const Icon(Icons.account_tree_outlined),
-                label: Text(l10n.initializeGit),
-              ),
-            ],
-            if (_hasGit) ..._gitSections(context),
-            if (_running) ...const <Widget>[
-              SizedBox(height: ParsSpacing.sm),
-              LinearProgressIndicator(),
-            ],
-            if (_error != null) ...<Widget>[
-              const SizedBox(height: ParsSpacing.sm),
-              FailureNotice(problem: _error!),
-            ],
+            Text(l10n.invalidGitMetadataMessage),
           ],
-        ),
+          if (_gitMode == StoreGitMode.disabled) ...<Widget>[
+            const SizedBox(height: ParsSpacing.md),
+            FilledButton.icon(
+              onPressed:
+                  _running
+                      ? null
+                      : () => _run(() async {
+                        final result = await _git.initializeRepository();
+                        _gitMode = _git.gitMode;
+                        return result;
+                      }),
+              icon: const Icon(Icons.account_tree_outlined),
+              label: Text(l10n.initializeGit),
+            ),
+          ],
+          if (_hasGit) ..._gitSections(context),
+          if (_running) ...const <Widget>[
+            SizedBox(height: ParsSpacing.sm),
+            LinearProgressIndicator(),
+          ],
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: ParsSpacing.sm),
+            FailureNotice(problem: _error!),
+          ],
+        ],
       ),
     );
   }
@@ -614,8 +613,9 @@ class _GitSyncSheetBodyState extends State<_GitSyncSheetBody> {
   }
 
   Future<void> _showHistory() async {
-    await showParsAdaptiveDetail<void>(
+    await showParsAdaptivePage<void>(
       context: context,
+      title: context.l10n.gitHistory,
       builder: (context) => _GitHistorySheet(git: _git),
     );
   }
@@ -686,54 +686,45 @@ class _GitHistorySheetState extends State<_GitHistorySheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(ParsSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              l10n.gitHistory,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: ParsSpacing.md),
-            Flexible(
-              child: FutureBuilder<List<GitLogEntry>>(
-                future: _entries,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return FailureNotice(
-                      problem: UiProblem.fromError(l10n, snapshot.error!),
-                    );
-                  }
-                  final entries = snapshot.data;
-                  if (entries == null) {
-                    return const LinearProgressIndicator();
-                  }
-                  return AppSectionBox(
-                    title: widget.git.statusSummary?.branch ?? l10n.gitHistory,
-                    padding: EdgeInsets.zero,
-                    scrollable: true,
-                    emptyLabel: l10n.gitHistoryEmpty,
-                    children: <Widget>[
-                      for (final entry in entries)
-                        ParsSectionRow(
-                          leading: const ParsSectionRowIcon(icon: Icons.commit),
-                          title: entry.summary,
-                          subtitle:
-                              '${entry.id} · ${entry.author} · '
-                              '${_historyTime(entry.time)}',
-                        ),
-                    ],
+    return Padding(
+      padding: const EdgeInsets.all(ParsSpacing.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Flexible(
+            child: FutureBuilder<List<GitLogEntry>>(
+              future: _entries,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return FailureNotice(
+                    problem: UiProblem.fromError(l10n, snapshot.error!),
                   );
-                },
-              ),
+                }
+                final entries = snapshot.data;
+                if (entries == null) {
+                  return const LinearProgressIndicator();
+                }
+                return AppSectionBox(
+                  title: widget.git.statusSummary?.branch ?? l10n.gitHistory,
+                  padding: EdgeInsets.zero,
+                  scrollable: true,
+                  emptyLabel: l10n.gitHistoryEmpty,
+                  children: <Widget>[
+                    for (final entry in entries)
+                      ParsSectionRow(
+                        leading: const ParsSectionRowIcon(icon: Icons.commit),
+                        title: entry.summary,
+                        subtitle:
+                            '${entry.id} · ${entry.author} · '
+                            '${_historyTime(entry.time)}',
+                      ),
+                  ],
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -893,76 +884,52 @@ class _GitArgsSheetBodyState extends State<_GitArgsSheetBody> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: ParsSpacing.lg,
-            right: ParsSpacing.lg,
-            top: ParsSpacing.lg,
-            bottom: MediaQuery.of(context).viewInsets.bottom + ParsSpacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                context.l10n.advancedGitArgsTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(context.l10n.gitArgsOnlyDescription),
+        const SizedBox(height: ParsSpacing.sm),
+        Row(
+          children: <Widget>[
+            const Text('git', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(width: ParsSpacing.xs),
+            Expanded(
+              child: TextFormField(
+                initialValue: _argsText,
+                autocorrect: false,
+                decoration: const InputDecoration(hintText: 'status, log'),
+                onChanged: (value) {
+                  _argsText = value;
+                  setState(() {});
+                },
               ),
-              const SizedBox(height: ParsSpacing.xs),
-              Text(context.l10n.gitArgsOnlyDescription),
-              const SizedBox(height: ParsSpacing.sm),
-              Row(
-                children: <Widget>[
-                  const Text(
-                    'git',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(width: ParsSpacing.xs),
-                  Expanded(
-                    child: TextFormField(
-                      initialValue: _argsText,
-                      autocorrect: false,
-                      decoration: const InputDecoration(
-                        hintText: 'status, log',
-                      ),
-                      onChanged: (value) {
-                        _argsText = value;
-                        setState(() {});
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: ParsSpacing.xs),
-              SelectableText('git ${_argsText.trim()}'),
-              const SizedBox(height: ParsSpacing.sm),
-              FilledButton(
-                onPressed: _running ? null : _run,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Center(child: Text(context.l10n.runSelectedCommand)),
-                ),
-              ),
-              if (_running) ...const <Widget>[
-                SizedBox(height: ParsSpacing.sm),
-                LinearProgressIndicator(),
-              ],
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: ParsSpacing.sm),
-                FailureNotice(problem: _error!),
-              ],
-              if (_output != null) ...<Widget>[
-                const SizedBox(height: ParsSpacing.sm),
-                _GitOutputPanel(output: _output!),
-              ],
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: ParsSpacing.xs),
+        SelectableText('git ${_argsText.trim()}'),
+        const SizedBox(height: ParsSpacing.sm),
+        FilledButton(
+          onPressed: _running ? null : _run,
+          child: SizedBox(
+            width: double.infinity,
+            child: Center(child: Text(context.l10n.runSelectedCommand)),
           ),
         ),
-      ),
+        if (_running) ...const <Widget>[
+          SizedBox(height: ParsSpacing.sm),
+          LinearProgressIndicator(),
+        ],
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: ParsSpacing.sm),
+          FailureNotice(problem: _error!),
+        ],
+        if (_output != null) ...<Widget>[
+          const SizedBox(height: ParsSpacing.sm),
+          _GitOutputPanel(output: _output!),
+        ],
+      ],
     );
   }
 

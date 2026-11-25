@@ -2,122 +2,105 @@ part of '../settings_screen.dart';
 
 extension _SettingsScreenSshKeySheets on SettingsScreen {
   void _showSshKeys(BuildContext context) {
-    showParsAdaptiveDetail<void>(
+    showParsAdaptivePage<void>(
       context: context,
+      title: context.l10n.sshKeysTitle,
+      actionsBuilder:
+          (actionContext) => <Widget>[
+            IconButton(
+              tooltip: actionContext.l10n.githubSettings,
+              onPressed: () => openGithubSshSettings(actionContext),
+              icon: const Icon(Icons.open_in_new),
+            ),
+          ],
       builder:
           (surfaceContext) => StatefulBuilder(
             builder: (context, setSheetState) {
               final keys = keyRepository.keys
                   .where((key) => key.type == KeyRecordType.ssh)
                   .toList(growable: false);
-              return SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(ParsSpacing.lg),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(ParsSpacing.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(context.l10n.sshKeysGitOnlyDescription),
+                    const SizedBox(height: ParsSpacing.sm),
+                    AppSectionBox(
+                      padding: EdgeInsets.zero,
+                      title: context.l10n.sshKeysTitle,
+                      emptyLabel: context.l10n.noSshKeys,
                       children: <Widget>[
-                        Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: Text(
-                                context.l10n.sshKeysTitle,
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.w800),
+                        for (final key in keys)
+                          ParsSectionRow(
+                            leading: const ParsSectionRowIcon(
+                              icon: Icons.vpn_key_outlined,
+                            ),
+                            title: key.name,
+                            subtitle: key.fingerprint,
+                            onTap: () => _exportSshPublic(context, key),
+                            trailing: PopupMenuButton<String>(
+                              tooltip: context.l10n.keyActionsTooltip(
+                                context.l10n.sshStep,
+                                key.name,
                               ),
+                              onSelected: (action) {
+                                switch (action) {
+                                  case 'export_public':
+                                    _exportSshPublic(context, key);
+                                  case 'export_private':
+                                    _showExportSshPrivate(context, key);
+                                  case 'delete':
+                                    _showDeleteSshKey(
+                                      context,
+                                      key,
+                                      setSheetState,
+                                    );
+                                }
+                              },
+                              itemBuilder:
+                                  (context) => <PopupMenuEntry<String>>[
+                                    PopupMenuItem(
+                                      value: 'export_public',
+                                      child: Text(context.l10n.exportPublic),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'export_private',
+                                      child: Text(context.l10n.exportPrivate),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text(context.l10n.delete),
+                                    ),
+                                  ],
                             ),
-                            IconButton(
-                              tooltip: context.l10n.githubSettings,
-                              onPressed: () => openGithubSshSettings(context),
-                              icon: const Icon(Icons.open_in_new),
-                            ),
-                          ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: ParsSpacing.md),
+                    ParsButtonGrid(
+                      children: <Widget>[
+                        FilledButton.tonalIcon(
+                          onPressed:
+                              () =>
+                                  _showGenerateSshKey(context, setSheetState),
+                          icon: const Icon(Icons.add),
+                          label: Text(context.l10n.generateAction),
                         ),
-                        const SizedBox(height: ParsSpacing.xs),
-                        Text(context.l10n.sshKeysGitOnlyDescription),
-                        const SizedBox(height: ParsSpacing.sm),
-                        AppSectionBox(
-                          padding: EdgeInsets.zero,
-                          title: context.l10n.sshKeysTitle,
-                          emptyLabel: context.l10n.noSshKeys,
-                          children: <Widget>[
-                            for (final key in keys)
-                              ParsSectionRow(
-                                leading: const ParsSectionRowIcon(
-                                  icon: Icons.vpn_key_outlined,
-                                ),
-                                title: key.name,
-                                subtitle: key.fingerprint,
-                                onTap: () => _exportSshPublic(context, key),
-                                trailing: PopupMenuButton<String>(
-                                  tooltip: context.l10n.keyActionsTooltip(
-                                    context.l10n.sshStep,
-                                    key.name,
-                                  ),
-                                  onSelected: (action) {
-                                    switch (action) {
-                                      case 'export_public':
-                                        _exportSshPublic(context, key);
-                                      case 'export_private':
-                                        _showExportSshPrivate(context, key);
-                                      case 'delete':
-                                        _showDeleteSshKey(
-                                          context,
-                                          key,
-                                          setSheetState,
-                                        );
-                                    }
-                                  },
-                                  itemBuilder:
-                                      (context) => <PopupMenuEntry<String>>[
-                                        PopupMenuItem(
-                                          value: 'export_public',
-                                          child: Text(
-                                            context.l10n.exportPublic,
-                                          ),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'export_private',
-                                          child: Text(
-                                            context.l10n.exportPrivate,
-                                          ),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'delete',
-                                          child: Text(context.l10n.delete),
-                                        ),
-                                      ],
-                                ),
+                        OutlinedButton.icon(
+                          onPressed:
+                              () => _showImportSshOptions(
+                                context,
+                                setSheetState,
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: ParsSpacing.md),
-                        ParsButtonGrid(
-                          children: <Widget>[
-                            FilledButton.tonalIcon(
-                              onPressed:
-                                  () => _showGenerateSshKey(
-                                    context,
-                                    setSheetState,
-                                  ),
-                              icon: const Icon(Icons.add),
-                              label: Text(context.l10n.generateAction),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed:
-                                  () => _showImportSshOptions(
-                                    context,
-                                    setSheetState,
-                                  ),
-                              icon: const Icon(Icons.file_upload_outlined),
-                              label: Text(context.l10n.importAction),
-                            ),
-                          ],
+                          icon: const Icon(Icons.file_upload_outlined),
+                          label: Text(context.l10n.importAction),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               );
             },
@@ -212,14 +195,13 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
   ) async {
     SelectedKeyFile? selectedFile;
     final name = TextEditingController();
-    await showModalBottomSheet<void>(
+    await showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
+      title: context.l10n.importSshKeyFile,
       builder:
           (sheetContext) => StatefulBuilder(
             builder:
                 (context, setSheetState) => _SshActionFormBody(
-                  title: context.l10n.importSshKeyFile,
                   fields: <Widget>[
                     TextField(
                       controller: name,
@@ -360,12 +342,11 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
     required String submitLabel,
     required Future<void> Function() onSubmit,
   }) {
-    return showModalBottomSheet<void>(
+    return showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
+      title: title,
       builder:
           (context) => _SshActionFormBody(
-            title: title,
             fields: fields,
             submitLabel: submitLabel,
             canSubmit: () => true,
@@ -377,14 +358,12 @@ extension _SettingsScreenSshKeySheets on SettingsScreen {
 
 class _SshActionFormBody extends StatefulWidget {
   const _SshActionFormBody({
-    required this.title,
     required this.fields,
     required this.submitLabel,
     required this.canSubmit,
     required this.onSubmit,
   });
 
-  final String title;
   final List<Widget> fields;
   final String submitLabel;
   final bool Function() canSubmit;
@@ -400,51 +379,30 @@ class _SshActionFormBodyState extends State<_SshActionFormBody> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: ParsSpacing.lg,
-          right: ParsSpacing.lg,
-          top: ParsSpacing.lg,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                widget.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: ParsSpacing.sm),
-              ...widget.fields,
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: ParsSpacing.sm),
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: ParsSpacing.md),
-              FilledButton(
-                onPressed: _submitting || !widget.canSubmit() ? null : _submit,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Center(child: Text(widget.submitLabel)),
-                ),
-              ),
-            ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        ...widget.fields,
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: ParsSpacing.sm),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+        const SizedBox(height: ParsSpacing.md),
+        FilledButton(
+          onPressed: _submitting || !widget.canSubmit() ? null : _submit,
+          child: SizedBox(
+            width: double.infinity,
+            child: Center(child: Text(widget.submitLabel)),
           ),
         ),
-      ),
+      ],
     );
   }
 

@@ -27,6 +27,10 @@ GUI_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${GUI_DIR}/.." && pwd)"
 PROFILE="${PARS_BRIDGE_PROFILE:-debug}"
 
+# Xcode's script phase does not source the login shell, so Homebrew rustup
+# and ~/.cargo/bin are missing from PATH.
+export PATH="${HOME}/.cargo/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
+
 is_release_profile() {
   case "$1" in
     release|Release|profile|Profile)

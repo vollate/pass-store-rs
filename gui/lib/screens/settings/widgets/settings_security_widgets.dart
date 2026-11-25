@@ -15,9 +15,11 @@ String _localizedPgpExpiration(
 
 extension _SettingsScreenSecuritySheets on SettingsScreen {
   void _showUnavailableSheet(BuildContext context, String title) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
-      builder: (context) => _UnavailableFeatureSheetBody(title: title),
+      title: title,
+      builder:
+          (context) => Text(context.l10n.featureUnavailableDescription),
     );
   }
 
@@ -33,8 +35,9 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
           keyStorageBackend: keyStorageBackendLabel(securityRepository),
           nativeLibrary: localizations.unavailable,
         );
-    showParsAdaptiveDetail<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
+      title: localizations.runtimeDiagnosticsTitle,
       builder:
           (context) => _RuntimeDiagnosticsSheetBody(diagnostics: diagnostics),
     );
@@ -42,10 +45,8 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
 
   void _showSecuritySheet(BuildContext context) {
     final rootContext = context;
-    showModalBottomSheet<void>(
+    showParsAdaptiveDetail<void>(
       context: context,
-      isScrollControlled: true,
-      enableDrag: false,
       builder:
           (context) => _SecuritySettingsSheetBody(
             securityRepository: securityRepository,
@@ -72,8 +73,9 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
   }
 
   void _showPgpSessionTimeoutSheet(BuildContext context) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
+      title: context.l10n.pgpSessionTimeoutTitle,
       builder:
           (context) => _PgpSessionTimeoutSheetBody(
             securityRepository: securityRepository,
@@ -98,9 +100,9 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
               ),
         )
         .toList(growable: false);
-    showModalBottomSheet<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
+      title: context.l10n.keychainPassphraseTitle,
       builder:
           (context) => _PgpPassphraseStorageSheetBody(
             securityRepository: securityRepository,
@@ -114,35 +116,6 @@ extension _SettingsScreenSecuritySheets on SettingsScreen {
   }
 }
 
-class _UnavailableFeatureSheetBody extends StatelessWidget {
-  const _UnavailableFeatureSheetBody({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(ParsSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: ParsSpacing.sm),
-            Text(context.l10n.featureUnavailableDescription),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _RuntimeDiagnosticsSheetBody extends StatelessWidget {
   const _RuntimeDiagnosticsSheetBody({required this.diagnostics});
 
@@ -150,52 +123,36 @@ class _RuntimeDiagnosticsSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(ParsSpacing.lg),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                context.l10n.runtimeDiagnosticsTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: ParsSpacing.sm),
-              _DiagnosticRow(
-                label: context.l10n.bridgeLoadedLabel,
-                value:
-                    diagnostics.bridgeLoaded
-                        ? context.l10n.yes
-                        : context.l10n.no,
-              ),
-              _DiagnosticRow(
-                label: context.l10n.coreVersionLabel,
-                value: diagnostics.coreVersion,
-              ),
-              _DiagnosticRow(
-                label: context.l10n.nativeLibraryLabel,
-                value: diagnostics.nativeLibrary,
-              ),
-              _DiagnosticRow(
-                label: context.l10n.pgpBackendLabel,
-                value: diagnostics.pgpBackend,
-              ),
-              _DiagnosticRow(
-                label: context.l10n.gitBackendLabel,
-                value: diagnostics.gitBackend,
-              ),
-              _DiagnosticRow(
-                label: context.l10n.keyStorageBackendLabel,
-                value: diagnostics.keyStorageBackend,
-              ),
-            ],
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _DiagnosticRow(
+          label: context.l10n.bridgeLoadedLabel,
+          value:
+              diagnostics.bridgeLoaded ? context.l10n.yes : context.l10n.no,
         ),
-      ),
+        _DiagnosticRow(
+          label: context.l10n.coreVersionLabel,
+          value: diagnostics.coreVersion,
+        ),
+        _DiagnosticRow(
+          label: context.l10n.nativeLibraryLabel,
+          value: diagnostics.nativeLibrary,
+        ),
+        _DiagnosticRow(
+          label: context.l10n.pgpBackendLabel,
+          value: diagnostics.pgpBackend,
+        ),
+        _DiagnosticRow(
+          label: context.l10n.gitBackendLabel,
+          value: diagnostics.gitBackend,
+        ),
+        _DiagnosticRow(
+          label: context.l10n.keyStorageBackendLabel,
+          value: diagnostics.keyStorageBackend,
+        ),
+      ],
     );
   }
 }
@@ -231,79 +188,86 @@ class _SecuritySettingsSheetBodyState
     Duration(hours: 1),
   ];
 
-  LocalUnlockMethod? _editingMethod;
-
   LocalUnlockMethod get _currentMethod =>
       widget.securityRepository.unlockMethod ?? platformDefaultUnlockMethod();
 
-  void _finishEditing(String message) {
+  Future<void> _openMethodEditor(LocalUnlockMethod method) async {
+    final l10n = context.l10n;
+    final saved = await switch (method) {
+      LocalUnlockMethod.gesture => showParsAdaptivePage<bool>(
+        context: context,
+        title: l10n.changeGesture,
+        builder:
+            (editorContext) => _GestureChangeSheetBody(
+              securityRepository: widget.securityRepository,
+              onSaved: () {
+                if (editorContext.mounted) {
+                  Navigator.of(editorContext).pop(true);
+                }
+              },
+            ),
+      ),
+      LocalUnlockMethod.password => showParsAdaptiveSurface<bool>(
+        context: context,
+        title: l10n.setAppPassword,
+        builder:
+            (editorContext) => _PasswordChangeSheetBody(
+              securityRepository: widget.securityRepository,
+              onSaved: () {
+                if (editorContext.mounted) {
+                  Navigator.of(editorContext).pop(true);
+                }
+              },
+            ),
+      ),
+    };
+    if (saved != true || !mounted) return;
     widget.onSecuritySettingsChanged?.call();
-    setState(() => _editingMethod = null);
-    widget.onNotify(message);
+    setState(() {});
+    widget.onNotify(
+      method == LocalUnlockMethod.gesture
+          ? l10n.gestureConfirmed
+          : l10n.passwordSaved,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    switch (_editingMethod) {
-      case LocalUnlockMethod.gesture:
-        return _GestureChangeSheetBody(
-          securityRepository: widget.securityRepository,
-          onSaved: () => _finishEditing(context.l10n.gestureConfirmed),
-        );
-      case LocalUnlockMethod.password:
-        return _PasswordChangeSheetBody(
-          securityRepository: widget.securityRepository,
-          onSaved: () => _finishEditing(context.l10n.passwordSaved),
-        );
-      case null:
-        break;
-    }
-
     final usesPassword = _currentMethod == LocalUnlockMethod.password;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(ParsSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              usesPassword
-                  ? context.l10n.passwordBiometricsTitle
-                  : context.l10n.gestureBiometricsTitle,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: ParsSpacing.sm),
-            ParsActionGroup(
-              actions: <ParsActionItem>[
-                ParsActionItem(
-                  label:
+    return ParsAdaptiveSurface(
+      title:
+          usesPassword
+              ? context.l10n.passwordBiometricsTitle
+              : context.l10n.gestureBiometricsTitle,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          ParsActionGroup(
+            actions: <ParsActionItem>[
+              ParsActionItem(
+                label:
+                    usesPassword
+                        ? context.l10n.changePassword
+                        : context.l10n.changeGesture,
+                icon: usesPassword ? Icons.password : Icons.pattern,
+                onPressed: () => _openMethodEditor(_currentMethod),
+              ),
+              ParsActionItem(
+                label:
+                    usesPassword
+                        ? context.l10n.useGestureLock
+                        : context.l10n.usePasswordLock,
+                icon: usesPassword ? Icons.pattern : Icons.password,
+                onPressed:
+                    () => _openMethodEditor(
                       usesPassword
-                          ? context.l10n.changePassword
-                          : context.l10n.changeGesture,
-                  icon: usesPassword ? Icons.password : Icons.pattern,
-                  onPressed:
-                      () => setState(() => _editingMethod = _currentMethod),
-                ),
-                ParsActionItem(
-                  label:
-                      usesPassword
-                          ? context.l10n.useGestureLock
-                          : context.l10n.usePasswordLock,
-                  icon: usesPassword ? Icons.pattern : Icons.password,
-                  onPressed:
-                      () => setState(
-                        () =>
-                            _editingMethod =
-                                usesPassword
-                                    ? LocalUnlockMethod.gesture
-                                    : LocalUnlockMethod.password,
-                      ),
-                ),
-              ],
-            ),
+                          ? LocalUnlockMethod.gesture
+                          : LocalUnlockMethod.password,
+                    ),
+              ),
+            ],
+          ),
             const SizedBox(height: ParsSpacing.xs),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -386,19 +350,18 @@ class _SecuritySettingsSheetBodyState
               ],
             ),
             const SizedBox(height: ParsSpacing.sm),
-            OutlinedButton.icon(
-              onPressed: () async {
-                await widget.securityRepository.setOnboardingComplete(false);
-                widget.onOnboardingReset?.call();
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                }
-              },
-              icon: const Icon(Icons.restart_alt),
-              label: Text(context.l10n.resetOnboarding),
-            ),
-          ],
-        ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await widget.securityRepository.setOnboardingComplete(false);
+              widget.onOnboardingReset?.call();
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            icon: const Icon(Icons.restart_alt),
+            label: Text(context.l10n.resetOnboarding),
+          ),
+        ],
       ),
     );
   }
@@ -437,33 +400,27 @@ class _GestureChangeSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(ParsSpacing.lg),
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.72,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                context.l10n.changeGesture,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: ParsSpacing.xs),
-              Text(context.l10n.drawConfirmGesture),
-              const SizedBox(height: ParsSpacing.sm),
-              Expanded(
-                child: GestureSetupPanel(
-                  securityRepository: securityRepository,
-                  onSaved: onSaved,
-                ),
-              ),
-            ],
+    final compact = context.parsWindowClass == ParsWindowClass.compact;
+    final content = Padding(
+      padding: const EdgeInsets.all(ParsSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(context.l10n.drawConfirmGesture),
+          const SizedBox(height: ParsSpacing.sm),
+          Expanded(
+            child: GestureSetupPanel(
+              securityRepository: securityRepository,
+              onSaved: onSaved,
+            ),
           ),
-        ),
+        ],
       ),
+    );
+    if (compact) return content;
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.72,
+      child: content,
     );
   }
 }
@@ -479,36 +436,17 @@ class _PasswordChangeSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: ParsSpacing.lg,
-          right: ParsSpacing.lg,
-          top: ParsSpacing.lg,
-          bottom: MediaQuery.of(context).viewInsets.bottom + ParsSpacing.lg,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(context.l10n.enterConfirmPassword),
+        const SizedBox(height: ParsSpacing.md),
+        PasswordSetupPanel(
+          securityRepository: securityRepository,
+          onSaved: onSaved,
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                context.l10n.setAppPassword,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: ParsSpacing.xs),
-              Text(context.l10n.enterConfirmPassword),
-              const SizedBox(height: ParsSpacing.md),
-              PasswordSetupPanel(
-                securityRepository: securityRepository,
-                onSaved: onSaved,
-              ),
-            ],
-          ),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -531,45 +469,24 @@ class _PgpSessionTimeoutSheetBodyState
     extends State<_PgpSessionTimeoutSheetBody> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(ParsSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              context.l10n.pgpSessionTimeoutTitle,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: ParsSpacing.sm),
-            Wrap(
-              spacing: ParsSpacing.xs,
-              runSpacing: ParsSpacing.xs,
-              children: <Widget>[
-                for (final expiration in PgpSessionExpiration.values)
-                  ChoiceChip(
-                    label: Text(
-                      _localizedPgpExpiration(context.l10n, expiration),
-                    ),
-                    selected:
-                        widget.securityRepository.pgpSessionExpiration ==
-                        expiration,
-                    onSelected: (_) async {
-                      await widget.securityRepository.setPgpSessionExpiration(
-                        expiration,
-                      );
-                      widget.onSecuritySettingsChanged?.call();
-                      setState(() {});
-                    },
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return Wrap(
+      spacing: ParsSpacing.xs,
+      runSpacing: ParsSpacing.xs,
+      children: <Widget>[
+        for (final expiration in PgpSessionExpiration.values)
+          ChoiceChip(
+            label: Text(_localizedPgpExpiration(context.l10n, expiration)),
+            selected:
+                widget.securityRepository.pgpSessionExpiration == expiration,
+            onSelected: (_) async {
+              await widget.securityRepository.setPgpSessionExpiration(
+                expiration,
+              );
+              widget.onSecuritySettingsChanged?.call();
+              setState(() {});
+            },
+          ),
+      ],
     );
   }
 }
@@ -619,26 +536,11 @@ class _PgpPassphraseStorageSheetBodyState
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: ParsSpacing.lg,
-          right: ParsSpacing.lg,
-          top: ParsSpacing.lg,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              context.l10n.keychainPassphraseTitle,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: ParsSpacing.sm),
-            SwitchListTile(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(context.l10n.storePgpPassphrase),
               subtitle: Text(context.l10n.savedInSecureStorage),
@@ -666,12 +568,17 @@ class _PgpPassphraseStorageSheetBodyState
               DropdownButtonFormField<String>(
                 key: const Key('pgp-passphrase-key-dropdown'),
                 initialValue: _selectedFingerprint,
+                isExpanded: true,
                 decoration: InputDecoration(labelText: context.l10n.pgpKey),
                 items: widget.privatePgpKeys
                     .map(
                       (key) => DropdownMenuItem<String>(
                         value: key.fingerprint,
-                        child: Text(key.name),
+                        child: Text(
+                          key.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     )
                     .toList(growable: false),
@@ -782,9 +689,7 @@ class _PgpPassphraseStorageSheetBodyState
                 );
               },
             ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 

@@ -21,12 +21,12 @@ Future<EntryOperationResult?> showFocusedEditEntrySheet({
   required PasswordEntry entry,
   required ManageRepository repository,
 }) {
-  return showParsAdaptiveDetail<EntryOperationResult>(
+  return showParsAdaptiveSurface<EntryOperationResult>(
     context: context,
+    title: context.l10n.editEntries,
     builder:
         (context) => _EditEntrySheet(
           entry: entry,
-          title: context.l10n.editEntries,
           onReadEntry: repository.readEntry,
           onSaveRawNotes: (entry, password, fields, notes) async {
             final localizations = context.l10n;
@@ -71,12 +71,12 @@ Future<BatchOperationResult?> showFocusedRegenerateEntrySheet({
   required PasswordEntry entry,
   required ManageRepository repository,
 }) {
-  return showParsAdaptiveDetail<BatchOperationResult>(
+  return showParsAdaptiveSurface<BatchOperationResult>(
     context: context,
+    title: context.l10n.regenerate,
     builder:
         (context) => _BatchRegenerateSheet(
           entries: <PasswordEntry>[entry],
-          title: context.l10n.regenerate,
           submitLabel: context.l10n.regenerate,
           onSubmit: (noSymbols) async {
             final localizations = context.l10n;
@@ -105,8 +105,9 @@ Future<EntryOperationResult?> showFocusedDeleteEntrySheet({
   required PasswordEntry entry,
   required ManageRepository repository,
 }) {
-  return showParsAdaptiveDetail<EntryOperationResult>(
+  return showParsAdaptiveSurface<EntryOperationResult>(
     context: context,
+    title: context.l10n.deleteEntry,
     builder:
         (context) => _DeleteEntrySheet(
           entry: entry,
@@ -135,8 +136,9 @@ Future<EntryOperationResult?> showCreateGeneratedEntrySurface({
   required BuildContext context,
   required ManageRepository repository,
 }) {
-  return showParsAdaptiveDetail<EntryOperationResult>(
+  return showParsAdaptiveSurface<EntryOperationResult>(
     context: context,
+    title: context.l10n.generateAndSave,
     builder:
         (context) => _GenerateEntrySheet(
           onSubmit: (path, noSymbols, overwrite) async {
@@ -167,8 +169,9 @@ Future<EntryOperationResult?> showSaveExistingEntrySurface({
   required BuildContext context,
   required ManageRepository repository,
 }) {
-  return showParsAdaptiveDetail<EntryOperationResult>(
+  return showParsAdaptiveSurface<EntryOperationResult>(
     context: context,
+    title: context.l10n.saveExistingPassword,
     builder:
         (context) => _SaveExistingEntrySheet(
           onSubmit: (path, password, notes, overwrite) async {
@@ -200,8 +203,9 @@ Future<EntryOperationResult?> showFocusedMoveOrRenameEntrySurface({
   required ManageRepository repository,
   required bool rename,
 }) {
-  return showParsAdaptiveDetail<EntryOperationResult>(
+  return showParsAdaptiveSurface<EntryOperationResult>(
     context: context,
+    title: rename ? context.l10n.renameEntry : context.l10n.moveEntry,
     builder:
         (context) => _MoveOrRenameEntrySheet(
           entry: entry,

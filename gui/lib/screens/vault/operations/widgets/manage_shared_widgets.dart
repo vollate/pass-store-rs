@@ -65,36 +65,11 @@ class _ErrorText extends StatelessWidget {
   }
 }
 
-Widget _operationSheet({
-  required BuildContext context,
-  required String title,
-  required List<Widget> children,
-}) {
-  return SafeArea(
-    child: SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: ParsSpacing.md),
-            ...children,
-          ],
-        ),
-      ),
-    ),
+Widget _operationSheet({required List<Widget> children}) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: children,
   );
 }
 

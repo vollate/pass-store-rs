@@ -279,6 +279,138 @@ void main() {
     expect(repository.deletedName, 'github-mobile-ed25519');
   });
 
+  testWidgets(
+    'iOS Git sync and sub-pages support edge swipe back and clear Dynamic Island',
+    (tester) async {
+      await configureGuiTestViewport(tester);
+      tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+
+      const repository = FakeParsRepository();
+      await tester.pumpWidget(
+        buildLocalizedTestApp(
+          child: SettingsScreen(
+            settingsRepository: repository,
+            keyRepository: repository,
+            gitRepository: repository,
+            securityRepository: InMemorySecurityRepository(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Git sync and remotes'),
+        250,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.text('Git sync and remotes'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Git sync and remotes').last).dy,
+        greaterThanOrEqualTo(59),
+      );
+      expectNoFlutterOverflow(tester);
+
+      // Nested SSH keys page also clears Dynamic Island and pops on edge swipe.
+      await tester.scrollUntilVisible(
+        find.text('SSH keys'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.text('SSH keys'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(
+        tester.getTopLeft(find.text('SSH keys').first).dy,
+        greaterThanOrEqualTo(59),
+      );
+      await tester.dragFrom(const Offset(4, 400), const Offset(280, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Git sync and remotes'), findsOneWidget);
+
+      // Left-edge swipe back pops Git sync and remotes back to Settings.
+      await tester.dragFrom(const Offset(4, 400), const Offset(280, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Appearance'), findsOneWidget);
+      expectNoFlutterOverflow(tester);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{TargetPlatform.iOS}),
+  );
+
+  testWidgets('every Settings popup shares unified width and drag handle', (
+    tester,
+  ) async {
+    await configureGuiTestViewport(tester);
+    const repository = FakeParsRepository();
+    await tester.pumpWidget(
+      buildLocalizedTestApp(
+        child: SettingsScreen(
+          settingsRepository: repository,
+          keyRepository: repository,
+          gitRepository: repository,
+          securityRepository: InMemorySecurityRepository(),
+          autofillRepository: FakeAutofillRepository(),
+          vaultRepository: repository,
+          onLocalePreferenceChanged: (_) async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final expectedWidth = GuiTestViewport.compactPhone.size.width;
+    for (final label in <String>[
+      'Language',
+      'Gesture lock and biometrics',
+      'PGP session timeout',
+      'KMS / Keychain passphrase',
+      'Password store',
+      'System Autofill',
+      'Runtime diagnostics',
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+
+      final sheetFinder = find.byType(BottomSheet);
+      expect(sheetFinder, findsOneWidget, reason: '$label should open a sheet');
+      final sheet = tester.widget<BottomSheet>(sheetFinder);
+      expect(
+        sheet.showDragHandle,
+        isTrue,
+        reason: '$label must show the standard drag handle',
+      );
+      expect(
+        sheet.enableDrag,
+        isTrue,
+        reason: '$label must support drag to dismiss',
+      );
+      expect(
+        tester.getSize(sheetFinder).width,
+        expectedWidth,
+        reason: '$label must match the full compact viewport width',
+      );
+      expect(
+        find.byIcon(Icons.close),
+        findsNothing,
+        reason: '$label sheet already has a drag handle and should omit close',
+      );
+      expectNoFlutterOverflow(tester);
+
+      Navigator.of(tester.element(sheetFinder)).pop();
+      await tester.pumpAndSettle();
+    }
+  });
+
   test('UiProblem localizes summary and redacts secret diagnostics', () {
     final localizations = AppLocalizationsEn();
     final problem = UiProblem.fromError(

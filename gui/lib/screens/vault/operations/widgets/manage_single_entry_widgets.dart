@@ -39,8 +39,6 @@ class _GenerateEntrySheetState extends State<_GenerateEntrySheet> {
   @override
   Widget build(BuildContext context) {
     return _operationSheet(
-      context: context,
-      title: context.l10n.generateAndSave,
       children: <Widget>[
         TextFormField(
           decoration: InputDecoration(
@@ -124,8 +122,6 @@ class _SaveExistingEntrySheetState extends State<_SaveExistingEntrySheet> {
   @override
   Widget build(BuildContext context) {
     return _operationSheet(
-      context: context,
-      title: context.l10n.saveExistingPassword,
       children: <Widget>[
         TextFormField(
           decoration: InputDecoration(
@@ -222,8 +218,6 @@ class _MoveOrRenameEntrySheetState extends State<_MoveOrRenameEntrySheet> {
   Widget build(BuildContext context) {
     final rename = widget.rename;
     return _operationSheet(
-      context: context,
-      title: rename ? context.l10n.renameEntry : context.l10n.moveEntry,
       children: <Widget>[
         Text(context.l10n.pathValue(widget.entry.path)),
         const SizedBox(height: ParsSpacing.sm),
@@ -302,8 +296,6 @@ class _DeleteEntrySheetState extends State<_DeleteEntrySheet> {
   @override
   Widget build(BuildContext context) {
     return _operationSheet(
-      context: context,
-      title: context.l10n.deleteEntry,
       children: <Widget>[
         Text(context.l10n.pathValue(widget.entry.path)),
         const SizedBox(height: ParsSpacing.sm),

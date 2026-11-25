@@ -6,11 +6,9 @@ class _EditEntrySheet extends StatefulWidget {
     required this.onReadEntry,
     required this.onSaveRawNotes,
     required this.onReplacePassword,
-    this.title,
   });
 
   final PasswordEntry entry;
-  final String? title;
   final _ReadEntryForEdit onReadEntry;
   final _SaveEditedEntrySubmit onSaveRawNotes;
   final _ReplaceEntryPasswordSubmit onReplacePassword;
@@ -97,8 +95,6 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
   Widget build(BuildContext context) {
     final entry = widget.entry;
     return _operationSheet(
-      context: context,
-      title: widget.title ?? context.l10n.editEntries,
       children: <Widget>[
         Text(context.l10n.pathValue(entry.path)),
         if (_loading) ...const <Widget>[

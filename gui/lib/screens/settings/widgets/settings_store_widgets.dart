@@ -11,8 +11,9 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
   }
 
   void _showPasswordStore(BuildContext context) {
-    showParsAdaptiveDetail<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
+      title: context.l10n.passwordStore,
       builder:
           (surfaceContext) => _PasswordStoreSheetBody(
             store: settingsRepository.store,
@@ -86,12 +87,11 @@ extension _SettingsScreenStoreSheets on SettingsScreen {
     required Listenable listenable,
     required Future<void> Function() onSubmit,
   }) {
-    showModalBottomSheet<void>(
+    showParsAdaptiveSurface<void>(
       context: context,
-      isScrollControlled: true,
+      title: title,
       builder:
           (context) => _StoreFormSheetBody(
-            title: title,
             fields: fields,
             submitLabel: submitLabel,
             canSubmit: canSubmit,
@@ -140,81 +140,67 @@ class _PasswordStoreSheetBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final current = store;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(ParsSpacing.lg),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                context.l10n.passwordStore,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (current == null)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.folder_off_outlined),
+            title: Text(context.l10n.noPasswordStoreConfigured),
+            subtitle: Text(context.l10n.storeFirstSetupSubtitle),
+          )
+        else ...<Widget>[
+          Card(
+            child: ListTile(
+              leading: Icon(
+                current.exists
+                    ? Icons.folder_outlined
+                    : Icons.folder_off_outlined,
               ),
-              const SizedBox(height: ParsSpacing.sm),
-              if (current == null)
+              title: Text(current.name),
+              subtitle: Text(_storeState(context, current)),
+              trailing: Icon(
+                current.exists && !current.issues.contains('git_invalid')
+                    ? Icons.check_circle_outline
+                    : Icons.warning_amber_rounded,
+              ),
+            ),
+          ),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(context.l10n.details),
+            children: <Widget>[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(context.l10n.storeFolder),
+                subtitle: SelectableText(current.root),
+              ),
+              if (current.issues.isNotEmpty)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.folder_off_outlined),
-                  title: Text(context.l10n.noPasswordStoreConfigured),
-                  subtitle: Text(context.l10n.storeFirstSetupSubtitle),
-                )
-              else ...<Widget>[
-                Card(
-                  child: ListTile(
-                    leading: Icon(
-                      current.exists
-                          ? Icons.folder_outlined
-                          : Icons.folder_off_outlined,
-                    ),
-                    title: Text(current.name),
-                    subtitle: Text(_storeState(context, current)),
-                    trailing: Icon(
-                      current.exists && !current.issues.contains('git_invalid')
-                          ? Icons.check_circle_outline
-                          : Icons.warning_amber_rounded,
-                    ),
-                  ),
+                  title: Text(context.l10n.storeIssues),
+                  subtitle: Text(_repairSummary(context, current)),
                 ),
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: Text(context.l10n.details),
-                  children: <Widget>[
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(context.l10n.storeFolder),
-                      subtitle: SelectableText(current.root),
-                    ),
-                    if (current.issues.isNotEmpty)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(context.l10n.storeIssues),
-                        subtitle: Text(_repairSummary(context, current)),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: ParsSpacing.md),
-                FilledButton.tonalIcon(
-                  onPressed: () => onRemove(current),
-                  icon: Icon(
-                    isAppManaged(current.root)
-                        ? Icons.delete_outline
-                        : Icons.link_off,
-                  ),
-                  label: Text(
-                    isAppManaged(current.root)
-                        ? context.l10n.deleteAppCopy
-                        : context.l10n.disconnectStore,
-                  ),
-                ),
-              ],
             ],
           ),
-        ),
-      ),
+          const SizedBox(height: ParsSpacing.md),
+          FilledButton.tonalIcon(
+            onPressed: () => onRemove(current),
+            icon: Icon(
+              isAppManaged(current.root)
+                  ? Icons.delete_outline
+                  : Icons.link_off,
+            ),
+            label: Text(
+              isAppManaged(current.root)
+                  ? context.l10n.deleteAppCopy
+                  : context.l10n.disconnectStore,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -245,7 +231,6 @@ class _PasswordStoreSheetBody extends StatelessWidget {
 
 class _StoreFormSheetBody extends StatefulWidget {
   const _StoreFormSheetBody({
-    required this.title,
     required this.fields,
     required this.submitLabel,
     required this.canSubmit,
@@ -253,7 +238,6 @@ class _StoreFormSheetBody extends StatefulWidget {
     required this.onSubmit,
   });
 
-  final String title;
   final List<Widget> fields;
   final String submitLabel;
   final bool Function() canSubmit;
@@ -269,55 +253,36 @@ class _StoreFormSheetBodyState extends State<_StoreFormSheetBody> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: ParsSpacing.lg,
-          right: ParsSpacing.lg,
-          top: ParsSpacing.lg,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                widget.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        ...widget.fields,
+        const SizedBox(height: ParsSpacing.md),
+        ListenableBuilder(
+          listenable: widget.listenable,
+          builder:
+              (context, _) => FilledButton(
+                onPressed:
+                    _submitting || !widget.canSubmit()
+                        ? null
+                        : () async {
+                          setState(() => _submitting = true);
+                          try {
+                            await widget.onSubmit();
+                          } finally {
+                            if (mounted) {
+                              setState(() => _submitting = false);
+                            }
+                          }
+                        },
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Center(child: Text(widget.submitLabel)),
+                ),
               ),
-              const SizedBox(height: ParsSpacing.sm),
-              ...widget.fields,
-              const SizedBox(height: ParsSpacing.md),
-              ListenableBuilder(
-                listenable: widget.listenable,
-                builder:
-                    (context, _) => FilledButton(
-                      onPressed:
-                          _submitting || !widget.canSubmit()
-                              ? null
-                              : () async {
-                                setState(() => _submitting = true);
-                                try {
-                                  await widget.onSubmit();
-                                } finally {
-                                  if (mounted) {
-                                    setState(() => _submitting = false);
-                                  }
-                                }
-                              },
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: Center(child: Text(widget.submitLabel)),
-                      ),
-                    ),
-              ),
-            ],
-          ),
         ),
-      ),
+      ],
     );
   }
 }
